@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
-# screen type reaches a newly launched widget factory's entry whole: 60 characters read back in order five runs in five, and a newline in the text is dropped, never sent as Return.
+# screen type reaches a newly launched widget factory's entry whole, its first key Shift_L: 60 characters read back in order five runs in five, and a newline in the text is dropped, never sent as Return. A new foot, and a foot an agent click opened, each read Return, x, Return sent right after a Return elsewhere; unprimed, the first Return arrives as Escape.
 {
 source "$(dirname "$0")/lib.sh"
 
 dots_pointer_build || exit 1
 scripts=$repo/home/dot_claude/skills/desktop/scripts
 screen=$scripts/screen
+# Every wtype the scripts run is logged, then run.
+mkdir -p "$DOTS_DEV_DIR/wtype-log"
+printf '#!/usr/bin/env bash\necho "$*" >>%q\nexec %q "$@"\n' "$DOTS_DEV_DIR/wtype.log" "$(command -v wtype)" >"$DOTS_DEV_DIR/wtype-log/wtype"
+chmod +x "$DOTS_DEV_DIR/wtype-log/wtype"
+PATH=$DOTS_DEV_DIR/wtype-log:$PATH
+typed=$DOTS_DEV_DIR/typed
+mkdir -p "$typed"
+# A foot whose shell is a raw cat into a file, so every key that reaches it shows there.
+raw() { echo "stty raw -echo; exec cat >$typed/$1"; }
+read_is() { [ "$(cat "$typed/$1" 2>/dev/null)" = "$2" ]; }
 window_of() { niri msg -j windows | jq -r ".[] | select(.app_id == \"$1\") | .id" | sort -n | tail -1; }
 has_window() { [ -n "$(window_of "$1")" ]; }
 
@@ -51,6 +61,7 @@ read -r ex ey < <(entry box)
 "$scripts/mouse" click "$ex" "$ey"
 entry_is() { [ "$(entry text)" = "$1" ]; }
 
+check "nothing went through wtype before the factory's first screen type" test ! -s "$DOTS_DEV_DIR/wtype.log"
 text=The_quick_brown_fox_jumps_over_the_lazy_dog_0123456789-AbCdE
 check "the text is 60 characters" test "${#text}" = 60
 for run in 1 2 3 4 5; do
@@ -58,6 +69,8 @@ for run in 1 2 3 4 5; do
   until_ok 2000 entry_is ""
   "$screen" type "$text"
   rc=$?
+  first=$(head -2 "$DOTS_DEV_DIR/wtype.log" | tr '\n' '|')
+  [ "$run" = 1 ] && check "the first key into the new factory is Shift_L, then the text (log: $first)" test "$first" = "-k Shift_L|-- T|"
   check "run $run: screen type of 60 characters exits 0 (got $rc)" test "$rc" = 0
   check "run $run: and the entry reads all 60 in order" until_ok 2000 entry_is "$text"
 done
@@ -66,6 +79,32 @@ entry clear
 until_ok 2000 entry_is ""
 "$screen" type $'a\nb'
 check "screen type \$'a\\nb' into the entry reads ab, the newline dropped" until_ok 2000 entry_is ab
+
+# The keymap trap: niri sends a new window wtype's keymap only when it differs from the last one sent, so a Return into it right after a Return elsewhere arrives as Escape without the Shift_L first.
+keys_land() {
+  "$screen" key Return >/dev/null && "$screen" type x >/dev/null && "$screen" key Return >/dev/null
+  until_ok 2000 read_is "$1" $'\rx\r'
+}
+"$screen" key Return >/dev/null
+"$screen" launch foot -c /dev/null -a fresh sh -c "$(raw fresh)" >/dev/null
+until_ok 5000 has_window fresh
+check "a launched foot reads Return, x, Return from screen key Return, type x, key Return after a Return into the factory" keys_land fresh
+
+# A foot that opens another on the first mouse report a click sends it: the new one is an agent window by that click, and one wtype has not typed into.
+"$screen" launch foot -c /dev/null -a opener sh -c "stty raw -echo; printf '\033[?1000h'; head -c 1 >/dev/null; exec foot -c /dev/null -a dialog sh -c '$(raw dialog)'" >/dev/null
+until_ok 5000 has_window opener
+niri msg action fullscreen-window --id "$(window_of opener)"
+read -r cx cy < <(niri msg -j focused-output | jq -r '.logical | "\(.x + .width / 2 | floor) \(.y + .height / 2 | floor)"')
+sleep 0.5
+"$scripts/mouse" click "$cx" "$cy"
+until_ok 5000 has_window dialog
+dialog=$(window_of dialog)
+focus_is() { niri msg -j focused-window | jq -e ".id == $1" >/dev/null; }
+# niri keeps focus on the fullscreen opener, where a real dialog's app would take it.
+niri msg action focus-window --id "$dialog"
+check "the foot the click opened takes focus" until_ok 3000 focus_is "$dialog"
+check "and is an agent window" bash -c "'$scripts/desk' window $dialog | jq -e .agent >/dev/null"
+check "and reads Return, x, Return the same way" keys_land dialog
 
 exit $((fails > 0))
 }

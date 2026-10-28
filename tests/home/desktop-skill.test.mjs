@@ -129,7 +129,7 @@ test('screen type --any gets past the guard once lock state reads unlocked and b
   const r = spawnSync(screen, ['type', 'hi', '--any'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   const gate = 'dots-call lock state\ndots-call polkit state\ndots-call pinentry state\n';
-  assert.equal(readFileSync(log, 'utf8'), `${gate}${gate}wtype -- h\n${gate}wtype -- i\n`);
+  assert.equal(readFileSync(log, 'utf8'), `${gate}${gate}wtype -k Shift_L\n${gate}wtype -- h\n${gate}wtype -- i\n`);
 });
 
 const sent = (log, re) => readFileSync(log, 'utf8').split('\n').filter((l) => re.test(l));
@@ -479,4 +479,23 @@ test('a point in a shot of another output clicks that output at its own scale', 
   writeFileSync(join(state, 'shot'), '1920 0 2048 1280 1280 800\n');
   spawnSync(screen, ['click', '640', '400', '--any'], { env, encoding: 'utf8' });
   assert.match(readFileSync(log, 'utf8'), /^dots-pointer 0,0,3968,1280 move 2944 640 click left$/m);
+});
+
+// wtype's keymap reaches a window only once a key has gone to it, so the first key into a window not typed into before is Shift_L, and only the first.
+test('screen type and key prime a window not typed into before with Shift_L, once per window', () => {
+  const { env, log } = stubs(unlocked, 0);
+  const dir = join(log, '..');
+  writeFileSync(join(dir, 'niri'), `#!/usr/bin/env bash\necho "{\\"id\\":$(cat '${dir}/focus'),\\"app_id\\":\\"x\\"}"\n`);
+  const keys = () => sent(log, /^wtype /).map((l) => l.slice(6));
+  const run = (id, ...args) => {
+    writeFileSync(join(dir, 'focus'), `${id}`);
+    writeFileSync(log, '');
+    assert.equal(spawnSync(screen, [...args, '--any'], { env, encoding: 'utf8' }).status, 0);
+    return keys();
+  };
+  assert.deepEqual(run(7, 'type', 'ab'), ['-k Shift_L', '-- a', '-- b']);
+  assert.deepEqual(run(7, 'type', 'c'), ['-- c']);
+  assert.deepEqual(run(7, 'key', 'Return'), ['-k Return']);
+  assert.deepEqual(run(8, 'key', 'Return'), ['-k Shift_L', '-k Return']);
+  assert.deepEqual(run(8, 'type', 'd'), ['-- d']);
 });

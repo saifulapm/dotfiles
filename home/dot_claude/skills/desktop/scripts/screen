@@ -212,6 +212,18 @@ send() {
     SENT=$(ms)
 }
 
+# wtype's keymap reaches a window only once a key has gone to it, so a key
+# into a window not typed into before can arrive as another (Return as
+# Escape): the first key there is Shift_L. A dialog an agent click opened is
+# a new window too. Ids grow for the life of a niri, so the list never prunes.
+prime() {
+    local id
+    id=$(niri msg -j focused-window | jq -r '.id // empty')
+    [[ -n $id ]] && grep -qx "$id" "$DESK/typed" 2>/dev/null && return
+    send -k Shift_L
+    [[ -z $id ]] || { mkdir -p -m 700 "${DESK%/*}" "$DESK"; echo "$id" >>"$DESK/typed"; }
+}
+
 cmd=${1:-}
 [[ -n $cmd ]] || usage
 shift
@@ -301,6 +313,7 @@ type)
     # A newline would go as Return and submit a form halfway; characters, not bytes, whatever the caller's locale.
     LC_ALL=C.UTF-8
     text=${1//$'\n'/}
+    [[ -z $text ]] || prime
     for ((i = 0; i < ${#text}; i++)); do send -- "${text:i:1}"; done
     ;;
 key)
@@ -325,6 +338,7 @@ key)
     done
     up=()
     for ((i = ${#args[@]} - 1; i >= 1; i -= 2)); do up+=(-m "${args[i]}"); done
+    prime
     for ((i = 0; i < repeat; i++)); do send "${args[@]}" -k "$key" "${up[@]}"; done
     ;;
 launch)
