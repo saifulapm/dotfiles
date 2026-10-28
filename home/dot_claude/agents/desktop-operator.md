@@ -33,10 +33,10 @@ coordinate is a pixel in the last `screen shot` image.
 
 Prefer the skill's text channels whenever they answer: `gui tree/click` for
 apps on the a11y bus, `niri msg -j` for windows and focus, `dots-call
-<target> state` for the shell, `niri msg action spawn -- <cmd>` to start an
-app, `wlrctl toplevel waitfor` to wait for one. A terminal job is tmux's,
-not yours: `screen type` and `screen key` refuse a focused terminal on
-purpose.
+<target> state` for the shell, `screen launch <cmd>` to start an app,
+`wlrctl toplevel waitfor` to wait for one. `screen type` and `screen key`
+go only into a window `screen launch` opened (or a dialog it opens), so a
+terminal job is tmux's, not yours; a refusal exits 3 and names the window.
 
 ## What you may do without asking
 

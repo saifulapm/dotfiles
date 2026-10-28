@@ -67,9 +67,10 @@ for (const args of [['type', 'hi'], ['key', 'Return'], ['click', '1', '1']]) {
   });
 }
 
-test('screen type gets past the guard once lock state reads unlocked', () => {
+// --any skips the agent-window check, which needs a niri; tests/dev/desk-keys.sh checks it.
+test('screen type --any gets past the guard once lock state reads unlocked', () => {
   const { env, log } = stubs('{"locked":false,"secure":true,"heldBy":"claude","unlockedAt":1,"leaseUntil":2}', 0);
-  const r = spawnSync(screen, ['type', 'hi'], { env, encoding: 'utf8' });
+  const r = spawnSync(screen, ['type', 'hi', '--any'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\nwtype -- hi\n');
 });

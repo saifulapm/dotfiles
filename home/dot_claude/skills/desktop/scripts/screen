@@ -7,8 +7,8 @@
 #   screen click X Y [left|right|middle] [COUNT]   COUNT 2 = double, 3 = triple
 #   screen drag X1 Y1 X2 Y2              press at 1, release at 2
 #   screen scroll X Y up|down|left|right [N]       N wheel notches (default 3)
-#   screen type TEXT                     literal text at keyboard focus
-#   screen key COMBO [REPEAT]            ctrl+s · Return · super+t · shift+Tab
+#   screen type TEXT [--any]             literal text at keyboard focus
+#   screen key COMBO [REPEAT] [--any]    ctrl+s · Return · super+t · shift+Tab
 #   screen launch CMD...                 start CMD; its windows in the next 5 s are agent windows
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
@@ -19,15 +19,17 @@
 # would act where the caller did not point. Pointer work goes through
 # scripts/mouse, which keeps 2 px off the edges, where the hot corners are.
 #
-# Refuses all input while `dots-call lock state` reads locked, and
-# `type`/`key` while a terminal has focus: keystrokes there run as commands.
-# Drive terminals with tmux instead. For the nested session, source the env
-# bin/dots-dev prints, as the desktop skill says; MOUSE_SCREEN=WxH passes
+# Refuses all input while `dots-call lock state` reads locked, and keys
+# unless the focused window is an agent window (one `screen launch` opened,
+# see scripts/desk) or a shell surface holds the keyboard: a refusal exits 3
+# printing {"refused":"<reason>","window":{...}}. --any lifts that for a task
+# whose brief grants it. Usage exits 2. For the nested session, source the
+# env bin/dots-dev prints, as the desktop skill says; MOUSE_SCREEN=WxH passes
 # straight through to scripts/mouse.
 
 set -euo pipefail
 
-usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 DIR=/tmp/desk
@@ -71,18 +73,33 @@ unlocked() {
         die "screen is locked, no input: unlock on a lease (dots-call lock unlock claude 15) or stop"
 }
 
-no_terminal() {
-    local app
-    app=$(niri msg -j focused-window | jq -r '.app_id // ""')
-    case "${app,,}" in
-    foot | footclient | alacritty | kitty | *ghostty* | *wezterm* | *konsole* | *terminal*)
-        die "focused window is a terminal ($app) — keystrokes would run as commands; use tmux" ;;
-    esac
+refuse() { # reason [window JSON]
+    jq -nc --arg r "$1" --argjson w "${2:-null}" '{refused: $r} + (if $w then {window: $w} else {} end)'
+    exit 3
+}
+
+# Keys reach the focused window, so they go only when an agent opened it, or
+# when a shell surface holds the keyboard; the window is read here, in the
+# same command, and an action in it lets the dialog it opens join.
+keys_allowed() {
+    ((any)) && return
+    if niri msg -j layers | jq -e 'any(.[]; .keyboard_interactivity == "Exclusive")' >/dev/null; then
+        return
+    fi
+    local w
+    w=$("$DESK_PY" window) || refuse "no window"
+    jq -e .agent <<<"$w" >/dev/null || refuse "not an agent window" "$(jq -c '{id, app_id, title}' <<<"$w")"
+    "$DESK_PY" acted "$(jq -r .id <<<"$w")"
 }
 
 cmd=${1:-}
 [[ -n $cmd ]] || usage
 shift
+any=0
+if [[ $cmd == type || $cmd == key ]] && [[ ${!#} == --any ]]; then
+    any=1
+    set -- "${@:1:$#-1}"
+fi
 
 case "$cmd" in
 shot)
@@ -132,12 +149,12 @@ scroll)
     ;;
 type)
     [[ $# -eq 1 ]] || usage
-    unlocked; no_terminal
+    unlocked; keys_allowed
     wtype -- "$1"
     ;;
 key)
     [[ $# -ge 1 && $# -le 2 ]] || usage
-    unlocked; no_terminal
+    unlocked; keys_allowed
     repeat=${2:-1}
     [[ $repeat =~ ^[0-9]+$ ]] && ((repeat >= 1 && repeat <= 50)) || die "repeat: 1 to 50"
     IFS=+ read -ra parts <<<"$1"
