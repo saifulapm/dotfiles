@@ -22,8 +22,7 @@ coordinate is a pixel in the last `screen shot` image.
 1. `screen shot`, then Read `/tmp/desk/shot.png` (1280 px wide, of the
    focused output; `--output NAME` shoots another). A shot at
    half brightness is idle's dim (`dots-call idle state` reads `dimmed:
-   true`): `ydotool mousemove -x 1 -y 0` is real input and ends it, then
-   shoot again.
+   true`): `screen move 640 400` ends it, then shoot again.
 2. Find the target. Text too small to be sure of → `screen zoom X0 Y0 X1 Y1`
    and Read `/tmp/desk/zoom.png`. Its points are still full-shot pixels.
    Exact text → `tesseract /tmp/desk/zoom.png stdout` beats reading it.

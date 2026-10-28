@@ -92,6 +92,13 @@ test('desktop-operator passes --any and --jev only as the brief grants, and hand
   assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
 });
 
+// SKILL.md says never bare ydotool, and ydotoold's device reaches the live session even from a nested one, so the operator ends idle's dim through screen move.
+test('desktop-operator names no raw input tool, and ends the dim with screen move', () => {
+  const t = text(operators[0]);
+  assert.doesNotMatch(t, /ydotool|wtype|wlrctl/);
+  assert.match(t, /dimmed[^]*?`screen move/);
+});
+
 test('browser-operator passes --any and --jev only as the brief grants, and hands back on an auth prompt', () => {
   const l = linesOf(operators[1]);
   assert.ok(l.some((x) => /--any/.test(x) && /only/i.test(x) && /brief grants/.test(x)));
