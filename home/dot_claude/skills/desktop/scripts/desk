@@ -171,7 +171,7 @@ def watch():
             continue
         write_json(path, windows)
     # The stream ends when niri does, and its state goes with it.
-    for f in ("windows.json", "windows.old", "times", "shot", "watch.lock"):
+    for f in ("windows.json", "windows.old", "times", "shot", "gesture.lock", "watch.lock"):
         try:
             os.unlink(os.path.join(d, f))
         except OSError:
@@ -242,9 +242,12 @@ def redact(tool, args):
     """The text of screen type and gui type becomes its length and digest."""
     args = list(args)
     at = {"screen": 1, "gui": 3}.get(tool)
-    if at is not None and args[:1] == ["type"] and len(args) > at:
-        text = args[at]
-        args[at] = {"len": len(text), "sha256": hashlib.sha256(text.encode()).hexdigest()}
+    if at is None or args[:1] != ["type"]:
+        return args
+    # Everything from the text on but a trailing --any, so a misplaced flag never leaves text in the clear.
+    for i in range(at, len(args)):
+        if not (i == len(args) - 1 and args[i] == "--any"):
+            args[i] = {"len": len(args[i]), "sha256": hashlib.sha256(args[i].encode()).hexdigest()}
     return args
 
 

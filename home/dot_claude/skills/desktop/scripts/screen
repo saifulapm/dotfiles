@@ -80,14 +80,22 @@ refuse() { # reason [window JSON]
     exit 3
 }
 
+# A shell surface holds the keyboard when niri gives it the keys: an Exclusive
+# layer on the focused output, Overlay always, Top only with no fullscreen
+# window in front of it (niri's update_keyboard_focus).
+shell_has_keys() {
+    jq -en --argjson l "$(niri msg -j layers)" --argjson o "$(niri msg -j focused-output)" --argjson w "$(niri msg -j focused-window)" '
+        ($w != null and $w.layout.window_size == [$o.logical.width, $o.logical.height]) as $full
+        | any($l[]; .output == $o.name and .keyboard_interactivity == "Exclusive"
+            and (.layer == "Overlay" or (.layer == "Top" and ($full | not))))' >/dev/null
+}
+
 # Keys reach the focused window, so they go only when an agent opened it, or
 # when a shell surface holds the keyboard; the window is read here, in the
 # same command, and an action in it lets the dialog it opens join.
 keys_allowed() {
     ((any)) && return
-    if niri msg -j layers | jq -e 'any(.[]; .keyboard_interactivity == "Exclusive")' >/dev/null; then
-        return
-    fi
+    shell_has_keys && return
     local w
     w=$("$DESK_PY" window) || refuse "no window"
     SEEN=$(jq -c '{id, app_id, title}' <<<"$w")

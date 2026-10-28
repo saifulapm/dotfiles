@@ -17,7 +17,8 @@
 # window seen: a window of Saiful's, a shell surface or nothing ("no
 # window"), or no answer in 500 ms. niri focuses the window under every
 # press, so a refusal puts focus back. --any skips the check when a brief
-# grants it. Every call refuses while the session is locked, a click again
+# grants it. One gesture runs at a time per niri. Every call refuses while
+# the session is locked, a click again
 # when the lock arrives during its hit-test. Usage exits 2. Each action
 # leaves a journal line.
 #
@@ -53,19 +54,25 @@ refuse() { # reason [window JSON]
     exit 3
 }
 
+focused() { niri msg -j focused-window | jq -r '.id // empty'; }
+
+# Puts focus back on the window focused before the pick, which niri moved to the window under its press.
+restore() {
+    [[ -n $prev && $(focused) != "$prev" ]] || return 0
+    niri msg action focus-window --id "$prev"
+}
+
 # Hit-tests (X,Y) before a press; returns only over an agent window, noting the action, so a dialog it opens joins.
 hit() {
     ((any)) && return
-    local prev reply id w=null
-    prev=$(niri msg -j focused-window | jq -r '.id // empty')
-    reply=$(pointer move "$1" "$2" pick) || refuse "no answer"
+    local reply id w=null
+    prev=$(focused)
+    reply=$(pointer move "$1" "$2" pick) || { restore; refuse "no answer"; }
     id=$(jq -r '.Ok.PickedWindow.id // empty' <<<"$reply")
-    [[ -n $id ]] && w=$("$DESK_PY" window "$id")
+    [[ -n $id ]] && { w=$("$DESK_PY" window "$id") || w=null; }
     SEEN=$(jq -c 'if . then {id, app_id, title} else null end' <<<"$w")
     if [[ $w == null ]] || ! jq -e .agent <<<"$w" >/dev/null; then
-        if [[ -n $prev && $(niri msg -j focused-window | jq -r '.id // empty') != "$prev" ]]; then
-            niri msg action focus-window --id "$prev"
-        fi
+        restore
         [[ $w == null ]] && refuse "no window"
         refuse "not an agent window" "$SEEN"
     fi
@@ -108,6 +115,13 @@ else
         | "\($r.x) \($r.y) \($r.width) \($r.height) \($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"') || true
 fi
 [[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+
+# One gesture at a time per niri: another agent's move or pick between this
+# hit-test and its last press would steer the press or swallow it.
+lockdir=${XDG_RUNTIME_DIR:?}/desk/${NIRI_SOCKET##*/}
+mkdir -p -m 700 "$lockdir"
+exec 8>"$lockdir/gesture.lock"
+flock -w 10 8 || refuse "busy"
 
 case "$cmd" in
 to)

@@ -53,9 +53,8 @@ check "though its pid ($server) is the server's, not one the launch started" bas
 # The set is keyed by this niri's socket, so the live desktop's never holds these windows.
 dir=$XDG_RUNTIME_DIR/desk/$(basename "$NIRI_SOCKET")
 check "the state dir is named by the nested NIRI_SOCKET ($(basename "$NIRI_SOCKET"))" test -f "$dir/windows.json"
-live=$(ls -d "$XDG_RUNTIME_DIR"/desk/niri.wayland-1.* 2>/dev/null | head -1)
-check "and is not the live niri's" test "$dir" != "$live"
-check "whose list, if it has one, holds none of these windows" bash -c "[ -z '$live' ] || ! jq -e 'has(\"$factory\") and .[\"$factory\"].app_id == \"org.gtk.WidgetFactory4\"' '$live/windows.json' >/dev/null 2>&1"
+live=$(ls "$XDG_RUNTIME_DIR"/niri.wayland-1.*.sock 2>/dev/null | head -1)
+check "and is not the one the live niri's socket ($(basename "$live")) names" bash -c "[ -n '$live' ] && [ '$dir' != '$XDG_RUNTIME_DIR/desk/$(basename "$live")' ]"
 # A window that closes leaves the set.
 niri msg action close-window --id "$factory"
 gone() { ! jq -e "has(\"$factory\")" "$dir/windows.json" >/dev/null; }

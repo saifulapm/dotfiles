@@ -49,6 +49,26 @@ check "screen click over his foot is refused the same way" bash -c "jq -e '.wind
 check "while mouse click --any over his foot focuses it" until_ok 1000 focus_is "$his"
 focus "$factory"
 
+# Clicks from several agents at once: one gesture runs at a time, so no pick swallows another's press or sends its own for real.
+before=$(stamp "$his")
+results=$DOTS_DEV_DIR/together
+mkdir -p "$results"
+clicks=()
+for i in 1 2 3 4; do
+  "$mouse" click $((hx + 200 + i * 10)) $((hy + 200)) >"$results/his$i" &
+  clicks+=($!)
+  "$mouse" click $((fx + 300 + i * 10)) $((fy + 300)) >"$results/ours$i" &
+  clicks+=($!)
+done
+# By pid: a bare wait would wait for the nested session lib.sh runs in the background too.
+wait "${clicks[@]}"
+refusals=$(cat "$results"/his* | jq -s "map(select(.refused == \"not an agent window\" and .window.id == $his)) | length")
+check "four clicks over his foot run beside four over the factory: all four refused as his ($refusals)" test "$refusals" = 4
+check "and the four over the factory printed no refusal" bash -c "! cat '$results'/ours* | grep -q ."
+sleep 1
+check "and his foot ends with neither focus nor a new focus_timestamp" bash -c "[ '$(stamp "$his")' = '$before' ] && [ \"\$(niri msg -j focused-window | jq .id)\" != $his ]"
+focus "$factory"
+
 # Over the Island, with the factory beneath it: a shell surface takes no clicks.
 picked() { dots-pointer "0,0,$ow,$oh" move "$1" "$2" pick | jq -r '.Ok.PickedWindow.id // "null"'; }
 island_y=
@@ -125,8 +145,9 @@ flipped() { read -r _ _ now < <(widget check); [ "$now" != "$was" ]; }
 check "mouse click over the factory's first check box exits 0 (got $rc)" test "$rc" = 0
 check "and flips it from $was" until_ok 2000 flipped
 
-# A dialog the factory opens on that click joins, and takes keys.
+# A dialog the factory opens on that click joins, and takes keys; 6 s on, only the click can make it join.
 read -r bx by _ < <(widget button "Sans")
+sleep 6
 "$mouse" click "$bx" "$by"
 dialog() { niri msg -j windows | jq -r '.[] | select(.title == "Pick a Font") | .id' | head -1; }
 has_dialog() { [ -n "$(dialog)" ]; }

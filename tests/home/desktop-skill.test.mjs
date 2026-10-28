@@ -53,8 +53,8 @@ function stubs(lockState, inputExit) {
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
   for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
-  // The journal goes to the scratch dir, never the live ~/.local/state.
-  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson') };
+  // The journal and the desk state go to the scratch dir, never the live ~/.local/state or runtime dir.
+  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir, XDG_RUNTIME_DIR: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson') };
 }
 
 const locked = '{"locked":true,"secure":true}';
@@ -163,4 +163,14 @@ test('the first journal line of a day drops lines older than 30 days and keeps t
   // The day's second write prunes nothing more.
   spawnSync(join(scripts, 'mouse'), ['click', '10', '10'], { env, encoding: 'utf8' });
   assert.deepEqual(lines(journal).map((l) => l.args[0]), ['day29', 'click', 'click']);
+});
+
+// gui takes --any only as its last argument, so text after a misplaced one is still kept as length and digest.
+test('gui type keeps every argument from its text on out of the journal', () => {
+  const { env, journal } = stubs(locked, 1);
+  spawnSync(join(scripts, 'gui'), ['type', 'files', 'Name', '--any', 'secret-value'], { env, encoding: 'utf8' });
+  const [line] = lines(journal);
+  assert.deepEqual(line.args.slice(0, 3), ['type', 'files', 'Name']);
+  assert.equal(line.args[4].len, 'secret-value'.length);
+  assert.doesNotMatch(readFileSync(journal, 'utf8'), /secret-value/);
 });

@@ -20,7 +20,7 @@ niri msg action spawn -- foot -c /dev/null -a his sh -c "$(raw his)"
 until_ok 5000 has_window his
 his=$(window_of his)
 focus "$his"
-# wtype's first keymap reaches only windows open when it is sent (lessons 2024-10-24).
+# wtype's first keymap reaches only windows open when it is sent (lessons 2026-10-24).
 wtype -k Shift_L
 
 out=$("$screen" type x)
@@ -33,6 +33,25 @@ check "and the foot reads nothing" read_is his ""
 check "screen key Return into it exits 3 too" test $? = 3
 "$screen" type x --any
 check "while --any lets screen type x reach it" until_ok 2000 read_is his x
+
+# niri gives the keys to a fullscreen window ahead of a Top-layer surface holding them, so the Island focused over Saiful's fullscreen foot holds nothing.
+niri msg action fullscreen-window --id "$his"
+full() { niri msg -j windows | jq -e ".[] | select(.id == $his) | .layout.window_size == [$(niri msg -j outputs | jq -r '[.[] | .logical | .width, .height] | join(",")')]" >/dev/null; }
+until_ok 3000 full
+niri msg action spawn -- qs ipc call island focus
+island_holds() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+until_ok 3000 island_holds
+sleep 0.3
+"$screen" type z >/dev/null
+rc=$?
+check "the Island focused over his fullscreen foot: screen type z exits 3 (got $rc)" test "$rc" = 3
+sleep 0.3
+check "and his foot reads only the x --any sent" read_is his x
+niri msg action fullscreen-window --id "$his"
+until_ok 3000 island_holds
+wtype -k Escape
+island_lets_go() { ! island_holds; }
+until_ok 3000 island_lets_go
 
 "$screen" launch gtk4-widget-factory >/dev/null
 until_ok 8000 has_window org.gtk.WidgetFactory4
