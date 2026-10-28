@@ -19,7 +19,7 @@
 # would act where the caller did not point. Pointer work goes through
 # scripts/mouse, which keeps 2 px off the edges, where the hot corners are.
 #
-# Refuses all input while `dots-call lock state` reads locked, keys unless
+# Refuses all input unless `dots-call lock state` reads "locked": false, keys unless
 # the focused window is an agent window (one `screen launch` opened, see
 # scripts/desk) or a shell surface holds the keyboard, and a click or drag
 # unless an agent window is under the point (scripts/mouse): a refusal exits 3
@@ -70,8 +70,7 @@ to_logical() {
 # Keys sent at a lock land in its password field, so input waits for a lock
 # state that reads unlocked; a shell that does not answer counts as locked.
 unlocked() {
-    [[ "$(dots-call lock state 2>/dev/null | jq -r .locked 2>/dev/null)" == false ]] ||
-        die "screen is locked, no input: unlock on a lease (dots-call lock unlock claude 15) or stop"
+    dots-call lock state 2>/dev/null | jq -e '.locked == false' >/dev/null 2>&1 || refuse "locked"
 }
 
 refuse() { # reason [window JSON]

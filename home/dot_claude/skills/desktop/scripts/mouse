@@ -17,7 +17,8 @@
 # window seen: a window of Saiful's, a shell surface or nothing ("no
 # window"), or no answer in 500 ms. niri focuses the window under every
 # press, so a refusal puts focus back. --any skips the check when a brief
-# grants it. Usage exits 2.
+# grants it. Every call refuses while the session is locked, a click again
+# when the lock arrives during its hit-test. Usage exits 2.
 #
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
 # machines drive one display). With the env bin/dots-dev prints sourced,
@@ -29,25 +30,18 @@ set -euo pipefail
 usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "mouse: $*" >&2; exit 1; }
 
-# The rightmost output is the screen; dots-pointer maps onto the box around every output.
-if [[ -n "${MOUSE_SCREEN:-}" ]]; then
-    OX=0 OY=0 W=${MOUSE_SCREEN%x*} H=${MOUSE_SCREEN#*x}
-    BOX=0,0,$W,$H
-else
-    read -r OX OY W H BOX < <(niri msg -j outputs | jq -r '
-        [.[] | .logical | select(. != null)]
-        | (max_by(.x + .width)) as $r
-        | (map(.x) | min) as $x | (map(.y) | min) as $y
-        | "\($r.x) \($r.y) \($r.width) \($r.height) \($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"') || true
-fi
-[[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
-
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
 clamp() { local v=$1 lo=$2 hi=$3; ((v < lo)) && v=$lo; ((v > hi)) && v=$hi; echo "$v"; }
 clampx() { int "$1"; clamp "$1" $((OX + 2)) $((OX + W - 3)); }
 clampy() { int "$1"; clamp "$1" $((OY + 2)) $((OY + H - 3)); }
 
 pointer() { dots-pointer "$BOX" "$@"; }
+
+# A press at a lock lands in it, so every call reads the lock first, and a
+# click reads it again after its hit-test; anything but a literal false is locked.
+unlocked() {
+    dots-call lock state 2>/dev/null | jq -e '.locked == false' >/dev/null 2>&1 || refuse "locked"
+}
 
 DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 
@@ -72,6 +66,7 @@ hit() {
         refuse "not an agent window" "$(jq -c '{id, app_id, title}' <<<"$w")"
     fi
     "$DESK_PY" acted "$id"
+    unlocked
 }
 
 cmd=${1:-}
@@ -80,6 +75,22 @@ if [[ $cmd == click || $cmd == drag ]] && [[ ${!#} == --any ]]; then
     any=1
     set -- "${@:1:$#-1}"
 fi
+[[ $cmd =~ ^(to|click|drag|scroll)$ ]] || usage
+unlocked
+
+# The rightmost output is the screen; dots-pointer maps onto the box around every output.
+if [[ -n "${MOUSE_SCREEN:-}" ]]; then
+    OX=0 OY=0 W=${MOUSE_SCREEN%x*} H=${MOUSE_SCREEN#*x}
+    BOX=0,0,$W,$H
+else
+    read -r OX OY W H BOX < <(niri msg -j outputs | jq -r '
+        [.[] | .logical | select(. != null)]
+        | (max_by(.x + .width)) as $r
+        | (map(.x) | min) as $x | (map(.y) | min) as $y
+        | "\($r.x) \($r.y) \($r.width) \($r.height) \($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"') || true
+fi
+[[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+
 case "$cmd" in
 to)
     [[ $# -eq 3 ]] || usage

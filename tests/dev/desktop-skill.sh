@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The desktop skill's worked example, as SKILL.md spells it, opens foot, types echo hi and reads hi back by OCR; scripts/screen refuses input while locked.
+# The desktop skill's worked example, as SKILL.md spells it, opens foot, types echo hi and reads hi back by OCR; scripts/screen refuses input while locked, with exit 3.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -14,7 +14,7 @@ niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
 "$skill/scripts/screen" type hi >/dev/null 2>&1
 rc=$?
-check "while locked, scripts/screen type hi refuses with exit code 1 (got $rc)" test "$rc" = 1
+check "while locked, scripts/screen type hi refuses with exit code 3 (got $rc)" test "$rc" = 3
 check "and nothing reached the password field" lock_is '.field == 0'
 
 # An agent's way in: a lease, whose monitors go dark a second later; foot keeps drawing without frame callbacks, so the example needs no light.

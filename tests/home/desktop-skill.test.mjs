@@ -40,7 +40,7 @@ test('every IPC target the skill names is one the shell defines', () => {
   assert.deepEqual([...named].filter((n) => !known.has(n)), []);
 });
 
-// A PATH whose dots-call answers lock state with the given JSON, whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus.
+// A PATH whose dots-call answers lock state with the given JSON (or, given a function, runs its body), whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus.
 function stubs(lockState, inputExit) {
   const dir = mkdtempSync(join(tmpdir(), 'desktop-skill-'));
   const log = join(dir, 'calls.log');
@@ -48,23 +48,45 @@ function stubs(lockState, inputExit) {
     writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`);
     chmodSync(join(dir, name), 0o755);
   };
-  put('dots-call', `echo "dots-call $*" >>'${log}'; [[ "$*" == "lock state" ]] && { echo '${lockState}'; exit 0; }; exit 1`);
+  const answer = typeof lockState === 'function' ? lockState() : `echo '${lockState}'; exit 0`;
+  put('dots-call', `echo "dots-call $*" >>'${log}'; [[ "$*" == "lock state" ]] && { ${answer}; }; exit 1`);
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
-  for (const t of ['wtype', 'ydotool', 'wlrctl']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
+  for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
   return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}` }, log };
 }
 
 const locked = '{"locked":true,"secure":true}';
+const scripts = join(skill, 'scripts');
+const inputs = [
+  ['screen', 'type', 'hi'], ['screen', 'type', 'hi', '--any'], ['screen', 'key', 'Return'], ['screen', 'click', '1', '1'],
+  ['screen', 'click', '1', '1', 'left', '1', '--any'], ['screen', 'drag', '1', '1', '2', '2'], ['screen', 'move', '1', '1'], ['screen', 'scroll', '1', '1', 'down'],
+  ['mouse', 'click', '10', '10'], ['mouse', 'click', '10', '10', 'left', '1', '--any'], ['mouse', 'to', '10', '10'], ['mouse', 'drag', '1', '1', '2', '2'], ['mouse', 'scroll', '1', '1', 'down'],
+  ['gui', 'click', 'files', 'Save'], ['gui', 'click', 'files', 'Save', '--any'], ['gui', 'type', 'files', 'Name', 'x'],
+];
 
-for (const args of [['type', 'hi'], ['key', 'Return'], ['click', '1', '1']]) {
-  test(`screen ${args[0]} refuses while the session is locked and sends no input`, () => {
+// Keys or a press at a lock land in its password field, so every input path reads the lock first and refuses with exit 3.
+for (const [tool, ...args] of inputs) {
+  test(`${tool} ${args.join(' ')} refuses while the session is locked and sends no input`, () => {
     const { env, log } = stubs(locked, 1);
-    const r = spawnSync(screen, args, { env, encoding: 'utf8' });
-    assert.equal(r.status, 1, r.stderr);
-    assert.match(r.stderr, /locked/);
+    const r = spawnSync(join(scripts, tool), args, { env, encoding: 'utf8' });
+    assert.equal(r.status, 3, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { refused: 'locked' });
     assert.equal(existsSync(log) ? readFileSync(log, 'utf8') : '', 'dots-call lock state\n');
   });
+}
+
+// Anything but a literal "locked": false counts as locked: a lock state that fails, says nothing, or says it another way.
+for (const [why, answer] of [['fails', () => 'exit 1'], ['prints nothing', () => 'exit 0'], ['says "false" as a string', '{"locked":"false"}']]) {
+  for (const tool of [['mouse', 'click', '10', '10'], ['gui', 'click', 'files', 'Save'], ['screen', 'type', 'hi', '--any']]) {
+    test(`${tool.join(' ')} counts a lock state that ${why} as locked`, () => {
+      const { env, log } = stubs(answer, 1);
+      const r = spawnSync(join(scripts, tool[0]), tool.slice(1), { env, encoding: 'utf8' });
+      assert.equal(r.status, 3, r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), { refused: 'locked' });
+      assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\n');
+    });
+  }
 }
 
 // --any skips the agent-window check, which needs a niri; tests/dev/desk-keys.sh checks it.
