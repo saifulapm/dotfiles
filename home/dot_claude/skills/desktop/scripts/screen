@@ -7,7 +7,7 @@
 #   screen click X Y [left|right|middle] [COUNT] [--any]   COUNT 2 = double, 3 = triple
 #   screen drag X1 Y1 X2 Y2 [--any]      press at 1, release at 2
 #   screen scroll X Y up|down|left|right [N]       N wheel notches (default 3)
-#   screen type TEXT [--any]             literal text at keyboard focus
+#   screen type TEXT [--any]             literal text at keyboard focus, newlines dropped
 #   screen key COMBO [REPEAT] [--any]    ctrl+s · Return · super+t · shift+Tab
 #   screen launch CMD...                 start CMD; its windows in the next 5 s are agent windows
 #   screen wait COND [--timeout S]       until niri says COND (10 s, at most 60): window-open --app ID,
@@ -201,6 +201,17 @@ keys_allowed() {
     "$DESK_PY" acted "$(jq -r .id <<<"$w")"
 }
 
+# One key per wtype, each gated and 15 ms after the last one went out, so a
+# lock or a prompt arriving mid-burst stops it at the next key.
+SENT=0
+send() {
+    local pause=$((SENT + 15 - $(ms)))
+    ((pause <= 0)) || sleep "0.$(printf %03d "$pause")"
+    guard
+    wtype "$@"
+    SENT=$(ms)
+}
+
 cmd=${1:-}
 [[ -n $cmd ]] || usage
 shift
@@ -287,7 +298,10 @@ scroll)
 type)
     [[ $# -eq 1 ]] || usage
     guard; keys_allowed
-    wtype -- "$1"
+    # A newline would go as Return and submit a form halfway; characters, not bytes, whatever the caller's locale.
+    LC_ALL=C.UTF-8
+    text=${1//$'\n'/}
+    for ((i = 0; i < ${#text}; i++)); do send -- "${text:i:1}"; done
     ;;
 key)
     [[ $# -ge 1 && $# -le 2 ]] || usage
@@ -311,7 +325,7 @@ key)
     done
     up=()
     for ((i = ${#args[@]} - 1; i >= 1; i -= 2)); do up+=(-m "${args[i]}"); done
-    for ((i = 0; i < repeat; i++)); do wtype "${args[@]}" -k "$key" "${up[@]}"; done
+    for ((i = 0; i < repeat; i++)); do send "${args[@]}" -k "$key" "${up[@]}"; done
     ;;
 launch)
     [[ $# -ge 1 ]] || usage

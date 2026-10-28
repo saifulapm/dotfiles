@@ -52,9 +52,11 @@ function stubs(lockState, inputExit, { polkit = closed, pinentry = closed } = {}
   put('dots-call', `echo "dots-call $*" >>'${log}'; case "$*" in "lock state") ${say(lockState)} ;; "polkit state") ${say(polkit)} ;; "pinentry state") ${say(pinentry)} ;; esac; exit 1`);
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
-  for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer', 'grim']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
+  for (const t of ['ydotool', 'wlrctl', 'dots-pointer', 'grim']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
+  // Each wtype also notes when it began, in ms, for the spacing between keys.
+  put('wtype', `echo $(( \${EPOCHREALTIME/./} / 1000 )) >>'${join(dir, 'wtype.ms')}'; echo "wtype $*" >>'${log}'; exit ${inputExit}`);
   // The journal and the desk state go to the scratch dir, never the live ~/.local/state or runtime dir.
-  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir, XDG_RUNTIME_DIR: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson') };
+  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir, XDG_RUNTIME_DIR: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson'), wtypeMs: join(dir, 'wtype.ms') };
 }
 
 const locked = '{"locked":true,"secure":true}';
@@ -126,7 +128,62 @@ test('screen type --any gets past the guard once lock state reads unlocked and b
   const { env, log } = stubs(unlocked, 0);
   const r = spawnSync(screen, ['type', 'hi', '--any'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\ndots-call polkit state\ndots-call pinentry state\nwtype -- hi\n');
+  const gate = 'dots-call lock state\ndots-call polkit state\ndots-call pinentry state\n';
+  assert.equal(readFileSync(log, 'utf8'), `${gate}${gate}wtype -- h\n${gate}wtype -- i\n`);
+});
+
+const sent = (log, re) => readFileSync(log, 'utf8').split('\n').filter((l) => re.test(l));
+// The shell answers lock state, or a prompt's state, with this once n keys have gone out.
+const after = (n, then, before) => () => `if (( $(grep -c '^wtype -[-k] [^S]' "$(dirname "$0")/calls.log") >= ${n} )); then echo '${then}'; else echo '${before}'; fi; exit 0`;
+
+// A lock or a password prompt can arrive between two keys of a burst, so every key re-reads both and the burst stops at the first that is not clear.
+test('screen key Tab 50 with the session locking after key 10 sends at most 11 keys and exits 3', () => {
+  const { env, log } = stubs(after(10, locked, unlocked), 0);
+  const r = spawnSync(screen, ['key', 'Tab', '50', '--any'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 3, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { refused: 'locked' });
+  const keys = sent(log, /^wtype -k Tab$/).length;
+  assert.ok(keys >= 10 && keys <= 11, `${keys} keys`);
+});
+
+test('a polkit prompt opening after key 5 of a 40-character screen type stops it within 6 keys', () => {
+  const { env, log } = stubs(unlocked, 0, { polkit: after(5, open, closed) });
+  const r = spawnSync(screen, ['type', 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN', '--any'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 3, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { refused: 'auth prompt' });
+  const keys = sent(log, /^wtype -- /).map((l) => l.slice(9));
+  assert.ok(keys.length >= 5 && keys.length <= 6, keys.join());
+  assert.deepEqual(keys, [...'abcdef'].slice(0, keys.length));
+});
+
+test('screen type of 40 characters reads the lock and both prompts before each key', () => {
+  const { env, log } = stubs(unlocked, 0);
+  const text = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMN';
+  assert.equal(spawnSync(screen, ['type', text, '--any'], { env, encoding: 'utf8' }).status, 0);
+  const calls = readFileSync(log, 'utf8').trim().split('\n');
+  const keys = calls.flatMap((l, i) => (l.startsWith('wtype -- ') ? [i] : []));
+  assert.equal(keys.length, 40);
+  for (const i of keys) assert.deepEqual(calls.slice(i - 3, i), ['dots-call lock state', 'dots-call polkit state', 'dots-call pinentry state']);
+  assert.equal(keys.map((i) => calls[i].slice(9)).join(''), text);
+});
+
+test('keys go out at least 15 ms apart, for type and for a repeated key', () => {
+  for (const args of [['type', 'abcdefghij', '--any'], ['key', 'ctrl+z', '10', '--any']]) {
+    const { env, wtypeMs } = stubs(unlocked, 0);
+    assert.equal(spawnSync(screen, args, { env, encoding: 'utf8' }).status, 0);
+    const ms = readFileSync(wtypeMs, 'utf8').trim().split('\n').map(Number);
+    assert.ok(ms.length >= 10, ms.join());
+    const gaps = ms.slice(1).map((t, i) => t - ms[i]);
+    assert.ok(Math.min(...gaps) >= 15, `${args[0]}: gaps ${gaps.join()}`);
+  }
+});
+
+// A newline sent as Return would submit a form halfway, so type drops it; a character outside ASCII goes whole, even in the C locale.
+test('screen type drops newlines and sends each character whole', () => {
+  const { env, log } = stubs(unlocked, 0);
+  assert.equal(spawnSync(screen, ['type', 'a\nb\né✓', '--any'], { env: { ...env, LC_ALL: 'C' }, encoding: 'utf8' }).status, 0);
+  assert.deepEqual(sent(log, /^wtype -- /), ['wtype -- a', 'wtype -- b', 'wtype -- é', 'wtype -- ✓']);
+  assert.doesNotMatch(readFileSync(log, 'utf8'), /Return/);
 });
 
 // dots-pointer is the skill's pointer, built at apply from wlr-protocols' XML like dots-dshift, and rebuilt when its source changes.
