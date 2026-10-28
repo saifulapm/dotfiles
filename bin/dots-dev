@@ -54,6 +54,8 @@ unset TMUX
 dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
 session=
 pw=
+a11y=
+registry=
 
 qs_dead() {
   local run=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/quickshell live id pid shell
@@ -79,6 +81,8 @@ cleanup() {
   fi
   tmux kill-server 2>/dev/null || true
   [ -z "$pw" ] || { kill "$pw" 2>/dev/null; wait "$pw" 2>/dev/null; } || true
+  [ -z "$registry" ] || { kill "$registry" 2>/dev/null; wait "$registry" 2>/dev/null; } || true
+  [ -z "$a11y" ] || { kill "$a11y" 2>/dev/null; wait "$a11y" 2>/dev/null; } || true
   rm -f "$dconf_dir/$dconf_name" "${XDG_RUNTIME_DIR:-/nonexistent}/dconf/$dconf_name"
   rm -rf "$D"
 }
@@ -110,6 +114,19 @@ until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
   kill -0 "$pw" 2>/dev/null || { cat "$D/pipewire.log" >&2; exit 1; }
   sleep 0.02
 done
+
+# SELinux keeps the nested bus's dbus-daemon from starting at-spi-bus-launcher, so the nested apps and the desktop skill's gui share an accessibility bus started here.
+mkdir -p "$D/a11y"
+dbus-daemon --config-file=/usr/share/defaults/at-spi2/accessibility.conf --nofork --address="unix:path=$D/a11y/bus" --print-address=3 3>"$D/a11y/address" &
+a11y=$!
+until [ -s "$D/a11y/address" ]; do
+  kill -0 "$a11y" 2>/dev/null || exit 1
+  sleep 0.02
+done
+AT_SPI_BUS_ADDRESS=$(head -1 "$D/a11y/address")
+export AT_SPI_BUS_ADDRESS
+env -u DBUS_SESSION_BUS_ADDRESS /usr/libexec/at-spi2-registryd --use-gnome-session=0 >"$D/a11y/registry.log" 2>&1 &
+registry=$!
 
 # The nested bus starts file dialogs with the nested shell's picker; its daemon never sees the live display, so nothing it starts before niri's own can draw there (bin/dots-dev-shell hands it the nested one).
 mkdir -p "$XDG_DATA_HOME/dbus-1/services"

@@ -3,14 +3,10 @@
 {
 source "$(dirname "$0")/lib.sh"
 
+dots_pointer_build || exit 1
 b=$DOTS_DEV_DIR/dots-pointer
-mkdir -p "$b"
-xml=/usr/share/wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml
-wayland-scanner client-header "$xml" "$b/wlr-virtual-pointer-unstable-v1-client-protocol.h"
-wayland-scanner private-code "$xml" "$b/protocol.c"
-gcc -O2 -Wall -Werror -I"$b" -o "$b/dots-pointer" "$repo/bin/dots-pointer.c" "$b/protocol.c" -lwayland-client || exit 1
 
-box=$(niri msg -j outputs | jq -r '[.[] | .logical] | "\(map(.x) | min),\(map(.y) | min),\(map(.x + .width) | max),\(map(.y + .height) | max)"')
+box=$(niri msg -j outputs | jq -r '[.[] | .logical] | (map(.x) | min) as $x | (map(.y) | min) as $y | "\($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"')
 dp() { "$b/dots-pointer" "$box" "$@"; }
 picked() { dp move "$1" "$2" pick | jq -c '.Ok.PickedWindow.id // null'; }
 foots() { niri msg -j windows | jq '[.[] | select(.app_id == "foot")] | length'; }

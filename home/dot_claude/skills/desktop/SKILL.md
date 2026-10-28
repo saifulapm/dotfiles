@@ -119,7 +119,7 @@ exposes nothing: use pixels. Chromium and Electron need
   empty shot. A surface closes on the next key or click, so chain open and
   grim in one call.
 
-## 4. Input: wtype for keys, ydotool for buttons
+## 4. Input: wtype for keys, dots-pointer for the pointer
 
 - **Check focus first**, inside the same Bash call as the keys:
   `niri msg -j focused-window | jq '{id,app_id,title}'`. A miss lands your
@@ -127,14 +127,11 @@ exposes nothing: use pixels. Chromium and Electron need
 - Text `wtype 'hello'`; keys `wtype -k Return`; chords
   `wtype -M ctrl -k s -m ctrl`.
 - Pointer: `~/.claude/skills/desktop/scripts/mouse to X Y`, `click X Y
-  [left|right|middle]`, `drag X1 Y1 X2 Y2`. Coordinates are `grim -s 1`
-  pixels. It moves with wlrctl and holds buttons with ydotool, and it never
-  rests on niri's top-left hot corner. Do not pin the pointer to a corner
-  yourself.
-- ydotool talks to `ydotoold.service` (a user unit, socket
-  `$XDG_RUNTIME_DIR/.ydotool_socket`): `systemctl --user is-active ydotoold`.
-  Use it only for buttons; `ydotool mousemove --absolute` is ignored by its
-  relative device.
+  [left|right|middle] [COUNT]`, `drag X1 Y1 X2 Y2`, `scroll X Y
+  up|down|left|right [N]`. Coordinates are `grim -s 1` pixels. It moves,
+  presses and scrolls through `dots-pointer` on niri's virtual pointer, and
+  it never rests within 2 px of an edge, where the hot corners are. Do not
+  pin the pointer to a corner yourself.
 - Moving the pointer can close an open surface. Prefer `gui click`, which
   does not move it.
 - When Saiful is active, do focus, check and type in one atomic call, and
@@ -259,8 +256,7 @@ at anything not named.
 Anything that could wreck the live session (the lock itself, a shell crash,
 a destructive keybind) is tested in the nested session: `bin/dots-dev` in
 `~/Codes/dotfiles` starts it and prints the env to source. With it sourced,
-niri msg, dots-call, qs ipc, grim, wtype and wlrctl act on the nested
-session; ydotool does not, since ydotoold's device reaches the live one, so
-leave `mouse drag` and `screen drag`, the two that press through it, alone
-there. Clicks and scrolls go through wlrctl and work. The nested lock's
+niri msg, dots-call, qs ipc, grim, wtype and dots-pointer act on the nested
+session, so `mouse` and `screen` work there, drags included; ydotool does
+not, since ydotoold's device reaches the live one. The nested lock's
 password is `dots-test-pass`.

@@ -5,17 +5,18 @@
 #   screen zoom X0 Y0 X1 Y1              that box at native resolution → /tmp/desk/zoom.png
 #   screen move X Y                      hover
 #   screen click X Y [left|right|middle] [COUNT]   COUNT 2 = double, 3 = triple
-#   screen drag X1 Y1 X2 Y2              press at 1, release at 2 (needs ydotoold)
+#   screen drag X1 Y1 X2 Y2              press at 1, release at 2
 #   screen scroll X Y up|down|left|right [N]       N wheel notches (default 3)
 #   screen type TEXT                     literal text at keyboard focus
 #   screen key COMBO [REPEAT]            ctrl+s · Return · super+t · shift+Tab
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
-# coordinate, so a shot must come first; it records the scale it used and
-# every later action converts through it. A point outside that image is
-# refused, not clamped — moving it into range would act where the caller did
-# not point. Pointer work goes through scripts/mouse, which keeps the
-# hot-corner and notes-strip clamps.
+# coordinate, so a shot must come first; it records the scale it used in
+# $XDG_RUNTIME_DIR/desk/<NIRI_SOCKET basename>/, so a nested session's shot
+# never steers the live one, and every later action converts through it. A
+# point outside that image is refused, not clamped — moving it into range
+# would act where the caller did not point. Pointer work goes through
+# scripts/mouse, which keeps 2 px off the edges, where the hot corners are.
 #
 # Refuses all input while `dots-call lock state` reads locked, and
 # `type`/`key` while a terminal has focus: keystrokes there run as commands.
@@ -29,7 +30,9 @@ usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 DIR=/tmp/desk
-STATE=$DIR/state
+[[ -n "${NIRI_SOCKET:-}" ]] || die "NIRI_SOCKET is not set"
+DESK=${XDG_RUNTIME_DIR:?}/desk/${NIRI_SOCKET##*/}
+STATE=$DESK/shot
 SHOT_W=1280
 MOUSE="$(dirname "$(readlink -f "$0")")/mouse"
 
@@ -81,7 +84,7 @@ shift
 
 case "$cmd" in
 shot)
-    mkdir -p "$DIR"
+    mkdir -p "$DIR" "$DESK"
     read -r OX OY W H < <(geometry) || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
     SH=$((H * SHOT_W / W))
     grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
@@ -111,8 +114,7 @@ click)
     button=${3:-left} count=${4:-1}
     [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
     [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
-    "$MOUSE" click "$LX" "$LY" "$button"
-    for ((i = 1; i < count; i++)); do wlrctl pointer click "$button"; done
+    "$MOUSE" click "$LX" "$LY" "$button" "$count"
     ;;
 drag)
     [[ $# -eq 4 ]] || usage
@@ -124,17 +126,7 @@ drag)
 scroll)
     [[ $# -ge 3 && $# -le 4 ]] || usage
     unlocked; load; to_logical "$1" "$2"
-    n=${4:-3}
-    [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= 30)) || die "notches: 1 to 30"
-    "$MOUSE" to "$LX" "$LY"
-    d=$((n * 15)) # one wheel notch is 15 axis units
-    case "$3" in
-    up) wlrctl pointer scroll "-$d" 0 ;;
-    down) wlrctl pointer scroll "$d" 0 ;;
-    left) wlrctl pointer scroll 0 "-$d" ;;
-    right) wlrctl pointer scroll 0 "$d" ;;
-    *) die "direction: up, down, left or right" ;;
-    esac
+    "$MOUSE" scroll "$LX" "$LY" "$3" "${4:-3}"
     ;;
 type)
     [[ $# -eq 1 ]] || usage

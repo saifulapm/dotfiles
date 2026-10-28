@@ -1,68 +1,80 @@
 #!/usr/bin/env bash
-# mouse — hot-zone-safe absolute pointer positioning (wlrctl is relative-only).
+# mouse — the pointer in logical pixels, through dots-pointer.
 #
-#   mouse to X Y             put the pointer at logical (X,Y) (= grim -s 1 pixels)
-#   mouse click X Y [button] move there, then click (left, right, middle)
-#   mouse drag X1 Y1 X2 Y2   left-press at 1, glide, release at 2 (needs ydotoold)
+#   mouse to X Y                         put the pointer at logical (X,Y) (= grim -s 1 pixels)
+#   mouse click X Y [button] [COUNT]     move there, then click (left, right, middle); COUNT 2 = double, 3 = triple
+#   mouse drag X1 Y1 X2 Y2               left-press at 1, glide, release at 2
+#   mouse scroll X Y up|down|left|right [N]   N wheel notches (default 3)
 #
-# Absolute positioning needs a corner pin first, and the pin corner is
-# top-right: niri's overview hot corner is the 1x1-px rect at (0,0), which
-# fires even under a layer surface (niri.rs is_inside_hot_corner).
-#
-# Targets are clamped 2 px inside the screen so a landing can never rest in
-# a hot corner. wlrctl deltas are applied as a single jump (no traversal),
-# so only endpoints matter.
+# dots-pointer moves to an exact logical point on niri's own virtual
+# pointer, so one process presses, glides and releases. Targets are clamped
+# 2 px inside the screen so a landing never rests in a hot corner: niri's
+# bottom-left one or the shell's top-right one.
 #
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
 # machines drive one display). With the env bin/dots-dev prints sourced,
-# niri msg and wlrctl answer for the nested session; MOUSE_SCREEN=WxH
-# overrides the geometry. drag presses through ydotool, which still reaches
-# the live session.
+# niri msg and dots-pointer answer for the nested session; MOUSE_SCREEN=WxH
+# overrides the geometry.
 
 set -euo pipefail
 
 usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 die() { echo "mouse: $*" >&2; exit 1; }
 
+# The rightmost output is the screen; dots-pointer maps onto the box around every output.
 if [[ -n "${MOUSE_SCREEN:-}" ]]; then
     OX=0 OY=0 W=${MOUSE_SCREEN%x*} H=${MOUSE_SCREEN#*x}
+    BOX=0,0,$W,$H
 else
-    read -r OX OY W H < <(niri msg -j outputs | jq -r '
-        [.[] | .logical | select(. != null)] | max_by(.x + .width)
-        | "\(.x) \(.y) \(.width) \(.height)"') || true
+    read -r OX OY W H BOX < <(niri msg -j outputs | jq -r '
+        [.[] | .logical | select(. != null)]
+        | (max_by(.x + .width)) as $r
+        | (map(.x) | min) as $x | (map(.y) | min) as $y
+        | "\($r.x) \($r.y) \($r.width) \($r.height) \($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"') || true
 fi
 [[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
 
+int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
 clamp() { local v=$1 lo=$2 hi=$3; ((v < lo)) && v=$lo; ((v > hi)) && v=$hi; echo "$v"; }
-clampx() { clamp "$1" $((OX + 2)) $((OX + W - 3)); }
-clampy() { clamp "$1" $((OY + 2)) $((OY + H - 3)); }
+clampx() { int "$1"; clamp "$1" $((OX + 2)) $((OX + W - 3)); }
+clampy() { int "$1"; clamp "$1" $((OY + 2)) $((OY + H - 3)); }
 
-goto() { # args already clamped
-    wlrctl pointer move 20000 -20000                       # pin at top-right, on the bar
-    wlrctl pointer move $(($1 - OX - W + 1)) $(($2 - OY))  # one jump to the target
-}
+pointer() { dots-pointer "$BOX" "$@"; }
 
 cmd=${1:-}
 case "$cmd" in
-to | click)
-    [[ $# -ge 3 ]] || usage
-    goto "$(clampx "$2")" "$(clampy "$3")"
-    # Not `[[ click ]] && …`: as the case's last list that leaves `to`
-    # exiting 1, and every && chain built on a plain move aborts.
-    if [[ $cmd == click ]]; then
-        wlrctl pointer click "${4:-left}"
-    fi
+to)
+    [[ $# -eq 3 ]] || usage
+    pointer move "$(clampx "$2")" "$(clampy "$3")"
+    ;;
+click)
+    [[ $# -ge 3 && $# -le 5 ]] || usage
+    button=${4:-left} count=${5:-1}
+    [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
+    [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
+    ops=(move "$(clampx "$2")" "$(clampy "$3")" click "$button")
+    for ((i = 1; i < count; i++)); do ops+=(wait 30 click "$button"); done
+    pointer "${ops[@]}"
     ;;
 drag)
     [[ $# -eq 5 ]] || usage
-    systemctl --user is-active -q ydotoold || die "ydotoold is not running; drag needs it for the held button"
     X1=$(clampx "$2") Y1=$(clampy "$3") X2=$(clampx "$4") Y2=$(clampy "$5")
-    goto "$X1" "$Y1"
-    ydotool click 0x40 # press and HOLD left
-    sleep 0.05
-    wlrctl pointer move $((X2 - X1)) $((Y2 - Y1))
-    sleep 0.05
-    ydotool click 0x80 # release
+    # Ten steps between, so a slider or a drag source sees the button move while held.
+    ops=(move "$X1" "$Y1" down left wait 50)
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+        ops+=(move $((X1 + (X2 - X1) * i / 10)) $((Y1 + (Y2 - Y1) * i / 10)) wait 10)
+    done
+    pointer "${ops[@]}" wait 50 up left
+    ;;
+scroll)
+    [[ $# -ge 4 && $# -le 5 ]] || usage
+    n=${5:-3}
+    [[ $n =~ ^[0-9]+$ ]] && ((n >= 1 && n <= 30)) || die "notches: 1 to 30"
+    case "$4" in
+    up) d=(0 "-$n") ;; down) d=(0 "$n") ;; left) d=("-$n" 0) ;; right) d=("$n" 0) ;;
+    *) die "direction: up, down, left or right" ;;
+    esac
+    pointer move "$(clampx "$2")" "$(clampy "$3")" scroll "${d[@]}"
     ;;
 *)
     usage

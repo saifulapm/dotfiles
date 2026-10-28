@@ -91,14 +91,24 @@ def states(node):
         return set()
 
 
+def value(node):
+    """A slider's, spin button's or scroll bar's current value, else None."""
+    try:
+        return node.get_value().get_current_value()
+    except Exception:
+        return None
+
+
 def describe(node):
     role = node.get_role_name()
     name = node.get_name() or ""
     box = coords(node)
     where = f" at {box[0]},{box[1]} {box[2]}x{box[3]}" if box else ""
+    v = value(node)
+    current = f" = {v:g}" if v is not None else ""
     flags = states(node) & {"checked", "selected", "focused", "expanded", "sensitive"}
     marks = f" [{','.join(sorted(flags))}]" if flags else ""
-    return f"{role:14} {name!r}{where}{marks}"
+    return f"{role:14} {name!r}{current}{where}{marks}"
 
 
 def matches(node, text):

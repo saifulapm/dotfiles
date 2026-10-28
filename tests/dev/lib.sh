@@ -127,3 +127,13 @@ until_ok 6000 at_rest
 # A check that exports DOTS_DEV_FAKE_CASTS=1 before sourcing this file has its shell behind dev/niri-relay.mjs; these two are its handles.
 fake_event() { node "$repo/dev/niri-relay.mjs" inject "$DOTS_DEV_DIR/niri-relay.sock" "$1"; }
 relay_stops() { cat "$DOTS_DEV_DIR/niri-relay-stops" 2>/dev/null; }
+
+# dots-pointer built from this tree as apply builds it, first on PATH, so the desktop skill's scripts drive the nested session with it.
+dots_pointer_build() {
+  local b=$DOTS_DEV_DIR/dots-pointer xml=/usr/share/wlr-protocols/unstable/wlr-virtual-pointer-unstable-v1.xml
+  mkdir -p "$b"
+  wayland-scanner client-header "$xml" "$b/wlr-virtual-pointer-unstable-v1-client-protocol.h" &&
+    wayland-scanner private-code "$xml" "$b/protocol.c" &&
+    gcc -O2 -Wall -Werror -I"$b" -o "$b/dots-pointer" "$repo/bin/dots-pointer.c" "$b/protocol.c" -lwayland-client || return 1
+  PATH=$b:$PATH
+}
