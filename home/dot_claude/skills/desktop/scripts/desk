@@ -36,6 +36,7 @@ import select
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 
@@ -571,9 +572,10 @@ def jev(kind, text, shot):
     r = subprocess.run(["pass", "show", "AI/openrouter/main"], capture_output=True, text=True, env={**os.environ, "PASSWORD_STORE_GPG_OPTS": "--pinentry-mode error"})
     key = r.stdout.split("\n")[0].strip() if r.returncode == 0 else ""
     if not key:
-        jev_fail("no key in pass AI/openrouter/main")
-    path = os.path.join(state_dir(), "jev.json")
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        # A store that needs its passphrase fails here too, and gpg says so.
+        jev_fail("no key from pass AI/openrouter/main" + "".join(f" ({l})" for l in r.stderr.strip().splitlines()[-1:]))
+    # A file of this call's own, so two finds on one niri never send each other's shot.
+    fd, path = tempfile.mkstemp(prefix="jev-", suffix=".json", dir=state_dir())
     with os.fdopen(fd, "w") as f:
         json.dump(body, f)
     try:

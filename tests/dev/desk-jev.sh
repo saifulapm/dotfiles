@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # JEV for real, through OpenRouter, so only with JEV_ALLOWED=1, which sends shots of the nested widget factory and nothing else: screen find "the text entry that says Click icon to change mode" --jev prints a point, and a click there then screen type hi leaves an entry reading hi; a purple elephant exits 4; screen check says yes to "does a text entry read hi?" and no to "is a file dialog open?"; the journal holds the sends with no image.
-[ "${JEV_ALLOWED:-}" = 1 ] || { echo "skip desk-jev.sh: it sends shots to OpenRouter, so it runs only with JEV_ALLOWED=1"; exit 0; }
 {
+[ "${JEV_ALLOWED:-}" = 1 ] || { echo "skip desk-jev.sh: it sends shots to OpenRouter, so it runs only with JEV_ALLOWED=1"; exit 0; }
 source "$(dirname "$0")/lib.sh"
 
 dots_pointer_build || exit 1

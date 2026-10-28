@@ -13,6 +13,7 @@ call, `gui click|type`) refuses with exit 3 and prints
 | `locked` | `dots-call lock state` reads locked | unlock only if the brief says to; else hand back |
 | `auth prompt` | a polkit or pinentry password prompt is open (`dots-call polkit state` or `dots-call pinentry state` reads anything but `"open": false`) | refused even with `--any`; stop, hand the task back to Saiful, never type a password |
 | `jev not granted` | `screen find` or `screen check` ran without `--jev` | pass `--jev` only if the brief says "JEV allowed"; else use `gui` or OCR |
+| `overview open` | `screen find` or `check` without `--any` while niri's overview shows every workspace | retry once it is closed; the overview may be Saiful's, so if the agent did not open it, hand back |
 | `not an agent window` | the focused window (keys) or the window under the point (clicks) is not one `screen launch` opened; for `screen find` and `check`, any window on the focused output's active workspace that is not | `screen launch` the app, or `--any` if the brief grants it |
 | `no window` | no window under the point, or none focused | re-read `niri msg -j windows`, re-shoot |
 | `no answer` | `mouse` got no answer from niri's pick-window in 500 ms | retry once, then hand back |
@@ -64,10 +65,11 @@ OpenRouter and TypeSafe, billed to Saiful's OpenRouter credits.
   Exit 0 either way.
 - Exit 3 refuses: `{"refused":"jev not granted"}` without `--jev` (nothing is
   read, shot or sent); `locked` and `auth prompt` as for every input, even
-  with `--any`; and `not an agent window` when any window on the focused
-  output's active workspace, floating ones included, is not one
-  `screen launch` opened. `--any` lifts only that last check, and only when
-  the brief grants `--any`.
+  with `--any`; `overview open` while niri's overview shows every workspace;
+  and `not an agent window` when any window on the focused output's active
+  workspace, floating ones included, is not one `screen launch` opened, read
+  both before and after the shot. `--any` lifts only those last two checks,
+  and only when the brief grants `--any`.
 - Exit 1 is any other failure: no key, network, HTTP error, a malformed
   answer, or no reply within 10 s (no retry). stderr ends "fall back to gui or
   OCR". Find the thing with `gui find` or `gui tree`, or OCR of

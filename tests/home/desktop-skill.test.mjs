@@ -648,8 +648,7 @@ function png(w, h) {
 const pngSize = (b) => [b.readUInt32BE(16), b.readUInt32BE(20)];
 
 const KEY = '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';
-// The workspace check needs a niri (tests/dev/desk-jev-guards.sh), so these pass --any.
-// The unlocked stubs, plus a grim that writes a w x h shot, a pass that holds KEY, and a curl that keeps its argv, its stdin and the body it was given, then answers `reply` with `status`.
+// The unlocked stubs, plus a grim that writes a w x h shot, a pass that holds KEY, and a curl that keeps its argv, its stdin and the body it was given, then answers `reply` with `status`; the workspace check needs a niri (tests/dev/desk-jev-guards.sh), so `run` passes --any.
 function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply, lock = unlocked, polkit = closed } = {}) {
   const s = stubs(lock, 0, { polkit });
   const dir = join(s.log, '..');
@@ -837,8 +836,42 @@ for (const [why, opts, refused] of [['locked', { lock: locked }, 'locked'], ['a 
 // Without --any the workspace's windows are read from niri; a niri that cannot say lets no shot through.
 test('screen find --jev without --any sends nothing when niri cannot list the workspace', () => {
   const j = jevStubs({ answers: { target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+  writeFileSync(join(j.dir, 'niri'), `#!/usr/bin/env bash\ncase "$*" in "msg -j overview-state") echo '{"is_open":false}' ;; *) echo '{"app_id":"x"}' ;; esac\n`);
   const r = spawnSync(screen, ['find', 'the first text entry', '--jev'], { env: j.env, encoding: 'utf8' });
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stderr, /workspace/);
   assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^(curl|pass) /m);
+});
+
+// The overview shows every workspace of the output, so a shot of it could hold any window there: without --any, nothing goes while it is open, or while niri cannot say.
+for (const [why, answer] of [['open', '{"is_open":true}'], ['unknown', '']]) {
+  test(`screen find --jev without --any sends nothing with the overview ${why}`, () => {
+    const j = jevStubs({ answers: { target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+    writeFileSync(join(j.dir, 'niri'), `#!/usr/bin/env bash\ncase "$*" in "msg -j overview-state") echo '${answer}' ;; *) echo '{"app_id":"x"}' ;; esac\n`);
+    const r = spawnSync(screen, ['find', 'the first text entry', '--jev'], { env: j.env, encoding: 'utf8' });
+    assert.equal(r.status, 3, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { refused: 'overview open' });
+    assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^(curl|pass) /m);
+  });
+}
+
+// Two finds on one niri at once each send their own request, never the other's.
+test('each send writes its request to a file of its own', () => {
+  const j = jevStubs({ answers: { target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+  const body = () => j.argv()[j.argv().indexOf('--data-binary') + 1];
+  run(j.env, 'find', 'a', '--jev');
+  const first = body();
+  run(j.env, 'find', 'a', '--jev');
+  assert.notEqual(body(), first);
+  assert.deepEqual(readdirSync(join(j.dir, 'desk', process.env.NIRI_SOCKET.split('/').pop())).filter((f) => /jev/.test(f)), []);
+});
+
+// A store that needs its passphrase is not a missing key, and says so.
+test('a pass store it cannot open says why, and sends nothing', () => {
+  const j = jevStubs();
+  writeFileSync(join(j.dir, 'pass'), `#!/usr/bin/env bash\necho 'gpg: decryption failed: No pinentry' >&2; exit 2\n`);
+  const r = run(j.env, 'find', 'a', '--jev');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /decryption failed: No pinentry/);
+  assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^curl /m);
 });

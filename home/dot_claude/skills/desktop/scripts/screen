@@ -212,6 +212,19 @@ keys_allowed() {
     "$DESK_PY" acted "$(jq -r .id <<<"$w")"
 }
 
+# Without --any a JEV shot goes only when it can show agent windows alone: the
+# overview shows every workspace of the output, and on the active one every
+# window, floating ones too, must be an agent's. niri gives tiled windows no
+# position, so the workspace is what is checked; a niri that cannot say lets
+# nothing through.
+only_agents() {
+    ((any)) && return
+    local w rc=0
+    niri msg -j overview-state 2>/dev/null | jq -e '.is_open == false' >/dev/null 2>&1 || refuse "overview open"
+    w=$("$DESK_PY" stranger "$NAME") || rc=$?
+    ((rc == 4)) || { ((rc == 0)) && refuse "not an agent window" "$w"; die "could not read the workspace's windows"; }
+}
+
 # One key per wtype, each gated and 15 ms after the last one went out, so a
 # lock or a prompt arriving mid-burst stops it at the next key.
 SENT=0
@@ -377,15 +390,14 @@ find | check)
     mkdir -p "$DIR"
     mkdir -p -m 700 "${DESK%/*}" "$DESK"
     JEV_SHOT=$(mktemp -p "$DESK" jev-XXXXXX.png)
+    # Read before the shot and after it, so a window that left while grim ran counts, and one that mapped meanwhile.
+    guard
+    focused_box
+    only_agents
     shoot "" "$JEV_SHOT"
     cp "$JEV_SHOT" "$DIR/shot.png"
     guard
-    # Read after the shot, so a window that mapped while grim ran counts; tiled windows have no position, so the workspace is what is checked.
-    if ((!any)); then
-        rc=0
-        w=$("$DESK_PY" stranger "$NAME") || rc=$?
-        ((rc == 4)) || { ((rc == 0)) && refuse "not an agent window" "$w"; die "could not read the workspace's windows"; }
-    fi
+    only_agents
     "$DESK_PY" jev "$cmd" "$1" "$JEV_SHOT"
     ;;
 *)

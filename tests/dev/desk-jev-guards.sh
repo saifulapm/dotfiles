@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# JEV's workspace guard, against a stub curl: with only an agent window on the active workspace, screen find --jev sends; with a foot that no launch opened beside it, tiled or floating, it exits 3 naming that foot and sends nothing; with --any it sends; once that foot is on another workspace it sends again.
+# JEV's workspace guard, against a stub curl: with only an agent window on the active workspace, screen find --jev sends; with the overview open, which shows the other workspace's foot, it exits 3; with a foot that no launch opened beside it, tiled or floating, or one that closes while grim runs, it exits 3 naming that foot and sends nothing; with --any it sends.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -35,6 +35,15 @@ out=$("$screen" find "the terminal" --jev)
 rc=$?
 check "with only our foot there, find --jev sends once and prints a point (rc $rc: $out)" bash -c "[ $rc = 0 ] && [ $(count) = 1 ] && jq -e '.x and .y' <<<'$out' >/dev/null"
 
+# The overview draws every workspace of the output, his among them.
+niri msg action open-overview
+until_ok 2000 bash -c "niri msg -j overview-state | jq -e .is_open >/dev/null"
+out=$("$screen" find "the terminal" --jev)
+rc=$?
+check "with the overview open, find --jev exits 3 and sends nothing (rc $rc, $(count) sends: $out)" bash -c "[ $rc = 3 ] && jq -e '.refused == \"overview open\"' <<<'$out' >/dev/null && [ $(count) = 1 ]"
+niri msg action close-overview
+until_ok 2000 bash -c "niri msg -j overview-state | jq -e '.is_open == false' >/dev/null"
+
 niri msg action move-window-to-workspace --window-id "$his" --focus false "$(niri msg -j workspaces | jq '.[] | select(.is_active) | .idx')"
 niri msg action focus-window --id "$ours"
 out=$("$screen" find "the terminal" --jev)
@@ -49,11 +58,19 @@ check "his foot floats now" bash -c "niri msg -j windows | jq -e '.[] | select(.
 out=$("$screen" find "the terminal" --jev)
 check "floating, it still refuses: $out" bash -c "jq -e '.window.app_id == \"saiful-foot\"' <<<'$out' >/dev/null && [ $(count) = 1 ]"
 
+# A window that closes while grim runs was in the shot, so the read before it counts too.
+printf '#!/usr/bin/env bash\n%q "$@" && niri msg action close-window --id %s\n' "$(command -v grim)" "$his" >"$stub/grim"
+chmod +x "$stub/grim"
+out=$("$screen" find "the terminal" --jev)
+still=$(foot_ids saiful-foot)
+check "a foot of his that closes during the shot refuses still, before grim runs, so it is open ($(count) sends, open: $still: $out)" bash -c "jq -e '.window.app_id == \"saiful-foot\"' <<<'$out' >/dev/null && [ $(count) = 1 ] && [ '$still' = $his ]"
+rm "$stub/grim"
+
 out=$("$screen" find "the terminal" --jev --any)
 rc=$?
 check "with --any, find sends (rc $rc, $(count) sends)" bash -c "[ $rc = 0 ] && [ $(count) = 2 ]"
 line=$(tail -1 "$XDG_STATE_HOME/dots/agent-journal.ndjson")
-check "the refusal and the send are journal lines, the send with its answer: $(cut -c1-160 <<<"$line")" bash -c "jq -e '.outcome == \"ok\" and .jev.on_screen == 0.9' <<<'$line' >/dev/null && grep -c '\"refused\"' '$XDG_STATE_HOME/dots/agent-journal.ndjson' | grep -qx 3"
+check "the refusal and the send are journal lines, the send with its answer: $(cut -c1-160 <<<"$line")" bash -c "jq -e '.outcome == \"ok\" and .jev.on_screen == 0.9' <<<'$line' >/dev/null && grep -c '\"refused\"' '$XDG_STATE_HOME/dots/agent-journal.ndjson' | grep -qx 5"
 
 exit $((fails > 0))
 }
