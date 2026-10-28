@@ -92,6 +92,17 @@ record() {
     echo "$OX $OY $W $H $SW $SH" >"$STATE"
 }
 
+# A shot of output $1, the focused one when empty, into $DIR/shot.png; every later X/Y converts through it.
+shoot() {
+    local g
+    mkdir -p "$DIR"
+    mkdir -p -m 700 "${DESK%/*}" "$DESK"
+    g=$(geometry "$1") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
+    read -r NAME OX OY W H <<<"$g"
+    grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
+    record "$DIR/shot.png"
+}
+
 ms() { echo $((${EPOCHREALTIME/./} / 1000)); }
 
 # Frames of the focused output into $1, each starting 100 ms after the last
@@ -254,11 +265,14 @@ journal() {
     [[ -n $w ]] || w=$(niri msg -j focused-window 2>/dev/null | jq -c 'if . then {id, app_id, title} else null end' 2>/dev/null) || w=null
     rm -f "$DESK_SEEN"
     "$DESK_PY" journal screen "$rc" $(($(date +%s%3N) - T0)) "${w:-null}" "${ARGV[@]}" || true
+    rm -f "${DESK_JEV:-}"
     exit "$rc"
 }
 if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch|find|check)$ ]]; then
     DESK_SEEN=$(mktemp)
     export DESK_SEEN
+    # What a JEV send answered, for its journal line.
+    [[ ! $cmd =~ ^(find|check)$ ]] || { DESK_JEV=$(mktemp); export DESK_JEV; }
     trap journal EXIT
 fi
 
@@ -266,12 +280,7 @@ case "$cmd" in
 shot)
     output=
     [[ $# -eq 0 ]] || { [[ $# -eq 2 && $1 == --output ]] && output=$2; } || usage
-    mkdir -p "$DIR"
-    mkdir -p -m 700 "${DESK%/*}" "$DESK"
-    g=$(geometry "$output") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
-    read -r NAME OX OY W H <<<"$g"
-    grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
-    record "$DIR/shot.png"
+    shoot "$output"
     jq -nc --arg p "$DIR/shot.png" --arg o "$NAME" --argjson w "$SW" --argjson h "$SH" '{shot: $p, output: $o, width: $w, height: $h}'
     ;;
 zoom)
@@ -364,7 +373,9 @@ find | check)
     done
     [[ $# -eq 1 && -n $1 && $1 != --* ]] || usage
     ((jev)) || refuse "jev not granted"
-    die "jev: not built yet"
+    shoot ""
+    guard
+    "$DESK_PY" jev "$cmd" "$1" "$DIR/shot.png"
     ;;
 *)
     usage

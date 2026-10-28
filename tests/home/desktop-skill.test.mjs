@@ -2,7 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { crc32, deflateSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -600,4 +603,195 @@ test('screen find and check need a description, and say how without a journal li
     assert.match(r.stderr + r.stdout, /screen find DESCRIPTION --jev/);
   }
   assert.ok(!existsSync(journal));
+});
+
+// A black RGB PNG of w x h.
+function png(w, h) {
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const len = Buffer.alloc(4);
+    const crc = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([len, body, crc]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 2;
+  return Buffer.concat([Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.alloc((w * 3 + 1) * h))), chunk('IEND', Buffer.alloc(0))]);
+}
+const pngSize = (b) => [b.readUInt32BE(16), b.readUInt32BE(20)];
+
+const KEY = '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';
+// The unlocked stubs, plus a grim that writes a w x h shot, a pass that holds KEY, and a curl that keeps its argv, its stdin and the body it was given, then answers `reply` with `status`.
+function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply } = {}) {
+  const s = stubs(unlocked, 0);
+  const dir = join(s.log, '..');
+  const put = (name, body) => {
+    writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`);
+    chmodSync(join(dir, name), 0o755);
+  };
+  writeFileSync(join(dir, 'fixture.png'), png(w, h));
+  put('grim', `echo "grim $*" >>'${s.log}'; cp '${join(dir, 'fixture.png')}' "\${@: -1}"`);
+  put('pass', `echo "pass $* $PASSWORD_STORE_GPG_OPTS" >>'${s.log}'; [ "$*" = "show AI/openrouter/main" ] && printf '%s\\nurl: openrouter.ai\\n' '${KEY}'`);
+  writeFileSync(join(dir, 'reply'), reply ?? JSON.stringify({ model: 'typesafe/jev-1.14', answers }));
+  put('curl', [
+    `echo "curl $*" >>'${s.log}'`,
+    `printf '%s\\0' "$@" >'${join(dir, 'curl.argv')}'`,
+    `cat >'${join(dir, 'curl.stdin')}'`,
+    `prev=; for a in "$@"; do [ "$prev" = --data-binary ] && cp "\${a#@}" '${join(dir, 'curl.body')}'; prev=$a; done`,
+    `cat '${join(dir, 'reply')}'; printf '\\n%s' '${status}'`,
+  ].join('\n'));
+  const env = { ...s.env, MOUSE_SCREEN: '2560x1600' };
+  const argv = () => readFileSync(join(dir, 'curl.argv'), 'utf8').split('\0').slice(0, -1);
+  const body = () => JSON.parse(readFileSync(join(dir, 'curl.body'), 'utf8'));
+  const asset = () => Object.values(body().assets)[0];
+  return { ...s, env, dir, argv, body, asset, stdin: () => readFileSync(join(dir, 'curl.stdin'), 'utf8') };
+}
+const box = (left, right, top, bottom, confidence = 0.9) => ({ type: 'box', box: { left, right, top, bottom }, confidence });
+const noul = (p) => ({ type: 'noul', noul: p });
+const run = (env, ...args) => spawnSync(screen, args, { env, encoding: 'utf8' });
+
+test('screen find --jev sends one request with a Box and a Noul over a fresh shot, and prints the Box centre with both confidences', () => {
+  const j = jevStubs({ answers: { target: box(0.25, 0.75, 0.5, 0.5, 0.92), on_screen: noul(0.97) } });
+  const r = run(j.env, 'find', 'the first text entry', '--jev');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { x: 640, y: 400, confidence: 0.92, on_screen: 0.97 });
+  assert.equal(sent(j.log, /^curl /).length, 1);
+  const argv = j.argv();
+  assert.equal(argv.at(-1), 'https://openrouter.ai/api/v1/systemone');
+  assert.ok(argv.includes('TypeSafe-Danger-Zone-Images: true'), argv.join(' '));
+  assert.equal(argv[argv.indexOf('--max-time') + 1], '10');
+  assert.ok(!argv.some((a) => /retry/.test(a)), argv.join(' '));
+  // The key reaches curl as a header on its stdin, never on its argv, where any process can read it.
+  assert.equal(j.stdin(), `Authorization: Bearer ${KEY}\n`);
+  assert.ok(!argv.some((a) => a.includes(KEY.slice(10, 18))));
+  assert.match(readFileSync(j.log, 'utf8'), /^pass show AI\/openrouter\/main --pinentry-mode error$/m);
+  const b = j.body();
+  assert.equal(b.model, 'typesafe/jev-1.14');
+  const [ref] = Object.keys(b.assets);
+  assert.deepEqual(b.state, { shot: ref });
+  assert.deepEqual(Object.keys(j.asset()).sort(), ['data_base64', 'format', 'type']);
+  assert.equal(j.asset().type, 'image');
+  assert.equal(j.asset().format, 'png');
+  assert.deepEqual(Buffer.from(j.asset().data_base64, 'base64'), png(1280, 800));
+  assert.equal(b.questions.target.type, 'box');
+  assert.equal(b.questions.on_screen.type, 'noul');
+  for (const q of Object.values(b.questions)) assert.ok(q.instructions.includes('the first text entry') && q.instructions.includes('`shot`'), q.instructions);
+});
+
+// The point is in the shot find took, which is the last shot, so screen click converts it through that shot's scale.
+test('screen click takes the point find printed, through the shot find took', () => {
+  const j = jevStubs({ answers: { target: box(0.25, 0.75, 0.5, 0.5), on_screen: noul(0.97) } });
+  const { x, y } = JSON.parse(run(j.env, 'find', 'the first text entry', '--jev').stdout);
+  assert.equal(run(j.env, 'click', `${x}`, `${y}`, '--any').status, 0);
+  assert.match(readFileSync(j.log, 'utf8'), /^dots-pointer \S+ move 1280 800 click left$/m);
+});
+
+test('screen find exits 4 when the Noul says it is not on screen, and the journal says nothing was found', () => {
+  const j = jevStubs({ answers: { target: box(0.1, 0.2, 0.1, 0.2), on_screen: noul(0.3) } });
+  const r = run(j.env, 'find', 'a purple elephant', '--jev');
+  assert.equal(r.status, 4, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { found: false, on_screen: 0.3 });
+  const [line] = lines(j.journal);
+  assert.equal(line.outcome, 'nothing');
+  assert.deepEqual(line.jev, { found: false, on_screen: 0.3 });
+});
+
+// A Box edge at 1.0 is the image's far edge, one past its last pixel, and screen click refuses a point there.
+for (const [left, right, x] of [[0.98, 1.0, 1267], [1.0, 1.0, 1279], [0.0, 0.0, 0]]) {
+  test(`a Box from ${left} to ${right} maps to x ${x}, inside the shot`, () => {
+    const j = jevStubs({ answers: { target: box(left, right, 1.0, 1.0), on_screen: noul(0.9) } });
+    const r = run(j.env, 'find', 'the close button', '--jev');
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { x, y: 799, confidence: 0.9, on_screen: 0.9 });
+  });
+}
+
+// JEV takes sides of at least 256 px; the padding goes right and below, so a point keeps its place in the shot.
+test('a shot under 256 px a side goes padded to 256, and its point maps back into the unpadded shot', () => {
+  const j = jevStubs({ w: 200, h: 100, answers: { target: box(0.2, 0.3, 0.1, 0.2), on_screen: noul(0.9) } });
+  let r = run(j.env, 'find', 'the entry', '--jev');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(pngSize(Buffer.from(j.asset().data_base64, 'base64')), [256, 256]);
+  assert.deepEqual(JSON.parse(r.stdout), { x: 64, y: 38, confidence: 0.9, on_screen: 0.9 });
+  writeFileSync(join(j.dir, 'reply'), JSON.stringify({ answers: { target: box(0.98, 1.0, 0.98, 1.0), on_screen: noul(0.9) } }));
+  r = run(j.env, 'find', 'the entry', '--jev');
+  assert.deepEqual(JSON.parse(r.stdout), { x: 199, y: 99, confidence: 0.9, on_screen: 0.9 });
+});
+
+test('a shot of 256 px a side or more goes as it was taken', () => {
+  const j = jevStubs({ w: 256, h: 300, answers: { target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+  assert.equal(run(j.env, 'find', 'the entry', '--jev').status, 0);
+  assert.deepEqual(Buffer.from(j.asset().data_base64, 'base64'), png(256, 300));
+});
+
+for (const [p, yes] of [[0.83, true], [0.5, true], [0.2, false]]) {
+  test(`screen check --jev sends one Noul and says yes ${yes} at ${p}`, () => {
+    const j = jevStubs({ answers: { answer: noul(p) } });
+    const r = run(j.env, 'check', 'does a text entry read hi?', '--jev');
+    assert.equal(r.status, 0, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { yes, probability: p });
+    const { questions } = j.body();
+    assert.deepEqual(Object.values(questions).map((q) => q.type), ['noul']);
+    assert.ok(questions.answer.instructions.includes('does a text entry read hi?') && questions.answer.instructions.includes('`shot`'));
+  });
+}
+
+// Every send is a journal line with the question and the answer, never the image.
+test('a send is a journal line with the question, the answer and its confidences, and no image data', () => {
+  const j = jevStubs({ answers: { target: box(0.25, 0.75, 0.5, 0.5, 0.92), on_screen: noul(0.97) } });
+  assert.equal(run(j.env, 'find', 'the first text entry', '--jev').status, 0);
+  const [line, ...more] = lines(j.journal);
+  assert.deepEqual(more, []);
+  assert.equal(line.outcome, 'ok');
+  assert.deepEqual(line.args, ['find', 'the first text entry', '--jev']);
+  assert.deepEqual(line.jev, { x: 640, y: 400, confidence: 0.92, on_screen: 0.97 });
+  const text = readFileSync(j.journal, 'utf8');
+  assert.ok(text.length < 1000, `${text.length} bytes`);
+  assert.ok(!text.includes(j.asset().data_base64.slice(0, 40)));
+});
+
+// OpenRouter could name the key it was sent in its error; no 8 characters of it reach the error message or the journal.
+test('after a 401 from a wrong key, neither the error nor the journal holds any 8 characters of the key', () => {
+  const j = jevStubs({ status: 401, reply: '{"error":{"message":"Invalid key: ' + KEY + '","code":401}}' });
+  const r = run(j.env, 'find', 'the first text entry', '--jev');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /401/);
+  const said = r.stdout + r.stderr + readFileSync(j.journal, 'utf8');
+  for (let i = 0; i + 8 <= KEY.length; i++) assert.ok(!said.includes(KEY.slice(i, i + 8)), `holds ${KEY.slice(i, i + 8)}: ${said}`);
+  assert.equal(lines(j.journal)[0].outcome, 'error');
+});
+
+test('an answer without the questions it asked is a failure, exit 1', () => {
+  const j = jevStubs({ answers: { on_screen: noul(0.9) } });
+  const r = run(j.env, 'find', 'the first text entry', '--jev');
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /jev/);
+});
+
+// The real curl, through a proxy that takes the connection and never answers: --max-time bounds the whole call, and nothing tries again.
+test('with OpenRouter unreachable, find exits 1 within 10.5 s, after one attempt', async () => {
+  const j = jevStubs();
+  unlinkSync(join(j.dir, 'curl'));
+  let connections = 0;
+  const held = [];
+  const proxy = createServer((c) => {
+    connections++;
+    held.push(c);
+  });
+  await new Promise((ok) => proxy.listen(0, '127.0.0.1', ok));
+  const url = `http://127.0.0.1:${proxy.address().port}`;
+  const env = { ...j.env, https_proxy: url, HTTPS_PROXY: url, no_proxy: '', NO_PROXY: '' };
+  const t0 = Date.now();
+  const status = await new Promise((ok) => spawn(screen, ['find', 'the first text entry', '--jev'], { env, stdio: 'ignore' }).on('exit', ok));
+  const took = Date.now() - t0;
+  for (const c of held) c.destroy();
+  proxy.close();
+  assert.equal(status, 1);
+  assert.ok(took <= 10500, `${took} ms`);
+  assert.ok(took >= 9500, `${took} ms: it never waited for the timeout`);
+  assert.equal(connections, 1);
 });
