@@ -17,6 +17,11 @@ island, the launcher, the panels and the lock.
 dots-call lock state | jq '{locked, heldBy, leaseUntil}'
 ```
 
+`~/.claude/skills/desktop/scripts/screen doctor` answers that and the rest
+in one JSON object: the lock and its lease, niri's socket and outputs,
+whether the a11y bus answers, which input tools are there, `blockers`, and
+one `next` step for the first of them. It exits 1 while anything blocks.
+
 While locked, these still work: tmux, every `dots-call <target> state`,
 `niri msg -j` queries, and `systemd-run --user`. Captures show only the lock
 screen, `niri msg action` ignores all but power and VT actions, and wtype or
@@ -63,7 +68,7 @@ money; command output is free.
 | Web page | `playwright-cli` (section 6) |
 
 A megabyte of text is not free to read either: search it (`grep` a snapshot
-file, `gui tree <app> | grep`) instead of dumping it, or hand the job to an
+file, `gui tree <app> | jq`) instead of dumping it, or hand the job to an
 operator subagent (section 9).
 
 ### tmux for anything in a terminal
@@ -89,11 +94,15 @@ tmux kill-session -t agent-x                  # always
 
 ```sh
 gui apps                      # apps on the a11y bus
-gui tree <app>                # interactive widgets, coords, [checked,focused,...] flags
-gui click <app> 'Save'        # activates it; the pointer never moves
-gui type <app> 'Search' 'foo' # sets an entry's text
+gui tree <app>                # JSON: interactive widgets, boxes, checked/focused/... states
+gui click <app> 'Save'        # activates it, {"ok": true}; exit 1 when the widget refused it
+gui type <app> 'Search' 'foo' # sets an entry's text, the same way
 gui text <app>                # every readable string
 ```
+
+`tree` prints at most 1000 nodes and 32 KB; a longer tree is written whole
+to the file its `"spill"` names, with the same `i` for each node. Read the
+file with `jq`, not whole.
 
 An app missing from `gui apps`, or whose `tree` is empty (Qt Quick apps),
 exposes nothing: use pixels. Chromium and Electron need
@@ -132,6 +141,11 @@ exposes nothing: use pixels. Chromium and Electron need
   presses and scrolls through `dots-pointer` on niri's virtual pointer, and
   it never rests within 2 px of an edge, where the hot corners are. Do not
   pin the pointer to a corner yourself.
+- **Look in the same call.** Every acting command of `screen`, `mouse` and
+  `gui` takes `--then shot|windows|tree` last: it acts, waits until two
+  frames 100 ms apart match, and adds the look to its JSON, as in
+  `{"stable": true, "shot": "/tmp/desk/shot.png"}`. `"stable": false` means
+  the screen still moved 2 s after the call (a spinner), which is no failure.
 - Moving the pointer can close an open surface. Prefer `gui click`, which
   does not move it.
 - When Saiful is active, do focus, check and type in one atomic call, and
@@ -145,7 +159,11 @@ systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-brow
 # its own unit, which works while locked too; ExitType=cgroup keeps it up while any chromium process lives
 ```
 
-Then wait for the window: `wlrctl toplevel waitfor app_id:<id>`. Check it
+Then wait for the window, never with `sleep`: `screen wait window-open --app
+<id>` prints its JSON the moment niri opens it, or at once with `"already":
+true`. It also waits for `window-closed --id N`, `focus --id N`, `title --id
+N --matches RE`, `workspace N` and `overview open|closed`, 10 s by default
+(`--timeout` up to 60), and exits 1 with the last state it saw. Check it
 survived, not just that it flashed: after 3 s, `niri msg -j windows | jq -r
 '.[].app_id'` still lists it.
 

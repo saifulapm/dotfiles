@@ -19,7 +19,8 @@ arguments prints its usage). Its verbs are the computer-use action set:
 `shot`, `zoom`, `move`, `click`, `drag`, `scroll`, `type`, `key`. Every
 coordinate is a pixel in the last `screen shot` image.
 
-1. `screen shot`, then Read `/tmp/desk/shot.png` (1280 px wide). A shot at
+1. `screen shot`, then Read `/tmp/desk/shot.png` (1280 px wide, of the
+   focused output; `--output NAME` shoots another). A shot at
    half brightness is idle's dim (`dots-call idle state` reads `dimmed:
    true`): `ydotool mousemove -x 1 -y 0` is real input and ends it, then
    shoot again.
@@ -28,13 +29,15 @@ coordinate is a pixel in the last `screen shot` image.
    Exact text → `tesseract /tmp/desk/zoom.png stdout` beats reading it.
 3. Act: several actions may share one Bash call, `&&`-chained, so the
    first failure stops the rest.
-4. `screen shot` again and confirm the effect before the next step. A
-   click that "did nothing" is usually your coordinates: re-shoot, re-aim.
+4. Confirm the effect before the next step: end the action with `--then
+   shot` and Read the shot it names, taken once the screen is still
+   (`"stable": false` means it still moved after 2 s). A click that "did
+   nothing" is usually your coordinates: re-shoot, re-aim.
 
 Prefer the skill's text channels whenever they answer: `gui tree/click` for
 apps on the a11y bus, `niri msg -j` for windows and focus, `dots-call
 <target> state` for the shell, `screen launch <cmd>` to start an app,
-`wlrctl toplevel waitfor` to wait for one. `screen type` and `screen key`
+`screen wait window-open --app <id>` to wait for one. `screen type` and `screen key`
 go only into a window `screen launch` opened (or a dialog it opens), so a
 terminal job is tmux's, not yours; a refusal exits 3 and names the window.
 
