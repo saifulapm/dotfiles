@@ -6,7 +6,8 @@ no focus stealing. Works for GTK/Qt apps that expose AT-SPI; Electron and
 Chromium need --force-renderer-accessibility to appear.
 
   gui apps                      apps currently on the a11y bus
-  gui tree <app> [--all]        interactive widgets (--all = every node)
+  gui tree <app> [--all]        interactive widgets as one JSON object (--all = every node)
+  gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
   gui click <app> <text> [--any]       activate the first match semantically
   gui type <app> <text> <val> [--any]  set an entry's text
@@ -16,7 +17,10 @@ Chromium need --force-renderer-accessibility to appear.
 files 'Save'` is enough. click and type act only in an agent window: the
 element's app pid and window title must match one `screen launch` opened
 (scripts/desk), else they exit 3 printing the refusal; --any lifts that for
-a brief that grants it. Both refuse with exit 3 unless `dots-call lock
+a brief that grants it. click and type print {"ok": ...} with the result the
+accessibility call reported, exit 1 when it failed. tree prints at most 1000
+nodes and 32 KB; a longer tree is written whole to a file in the desk state
+directory, named under "spill". Both refuse with exit 3 unless `dots-call lock
 state` reads "locked": false. Exit 4 = no such app/widget (nothing was
 clicked), 2 = usage.
 """
@@ -48,6 +52,9 @@ INTERACTIVE = {
 }
 
 MAX_NODES = 4000  # a deep tree must not hang the caller
+INLINE_NODES = 1000  # what gui tree prints before it spills
+INLINE_BYTES = 32768  # the printed object, newline included
+SPILL_KEEP_S = 3600  # a spill older than this goes on the next gui call
 seen = None  # the window an action saw, for its journal line
 
 
@@ -168,6 +175,76 @@ def value(node):
         return None
 
 
+FLAGS = {"checked", "selected", "focused", "expanded", "sensitive"}
+
+
+def numbered(app, want=None):
+    """Yield (i, depth, node) for every node under app; i counts the whole walk, whatever want keeps."""
+    i = 0
+    for depth, node in walk(app):
+        if node is app:
+            continue
+        if want is None or node.get_role_name() in want:
+            yield i, depth, node
+        i += 1
+
+
+def spill_files(state):
+    try:
+        return [os.path.join(state, f) for f in os.listdir(state) if f.startswith("tree-") and f.endswith(".json")]
+    except OSError:
+        return []
+
+
+def sweep():
+    """Removes spills older than an hour; any gui call, and never a reason to fail."""
+    try:
+        state = load_desk().state_dir()
+        for path in spill_files(state):
+            if time.time() - os.stat(path).st_mtime > SPILL_KEEP_S:
+                os.unlink(path)
+    except (Exception, SystemExit):
+        pass
+
+
+def widget(i, node):
+    return {"i": i, "role": node.get_role_name(), "name": node.get_name() or ""}
+
+
+def entry(i, depth, node):
+    box = coords(node)
+    out = {"i": i, "depth": depth, "role": node.get_role_name(), "name": node.get_name() or "", "box": list(box) if box else None, "states": sorted(states(node) & FLAGS)}
+    v = value(node)
+    if v is not None:
+        out["value"] = v
+    return out
+
+
+def tree(app, everything):
+    """The app's widgets as a dict; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file."""
+    nodes = [entry(i, d, n) for i, d, n in numbered(app, None if everything else INTERACTIVE)]
+    head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
+    whole = dict(head, nodes=nodes)
+    if len(nodes) <= INLINE_NODES and len(json.dumps(whole)) < INLINE_BYTES:
+        return whole
+    state = load_desk().state_dir()
+    os.makedirs(state, mode=0o700, exist_ok=True)
+    for old in spill_files(state):
+        os.unlink(old)
+    path = os.path.join(state, f"tree-{int(time.time() * 1000)}.json")
+    with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
+        json.dump(whole, f)
+    # The newline print adds counts against the budget, so stop one byte short.
+    size = len(json.dumps(dict(head, nodes=[], spill=path)))
+    kept = 0
+    for n in nodes[:INLINE_NODES]:
+        size += len(json.dumps(n)) + (2 if kept else 0)
+        if size >= INLINE_BYTES:
+            break
+        kept += 1
+    return dict(head, nodes=nodes[:kept], spill=path)
+
+
 def describe(node):
     role = node.get_role_name()
     name = node.get_name() or ""
@@ -175,7 +252,7 @@ def describe(node):
     where = f" at {box[0]},{box[1]} {box[2]}x{box[3]}" if box else ""
     v = value(node)
     current = f" = {v:g}" if v is not None else ""
-    flags = states(node) & {"checked", "selected", "focused", "expanded", "sensitive"}
+    flags = states(node) & FLAGS
     marks = f" [{','.join(sorted(flags))}]" if flags else ""
     return f"{role:14} {name!r}{current}{where}{marks}"
 
@@ -192,6 +269,7 @@ def main(argv):
     if len(argv) < 2:
         usage()
     cmd = argv[1]
+    sweep()
 
     if cmd == "apps":
         Atspi.init()
@@ -205,14 +283,18 @@ def main(argv):
     if cmd in ("click", "type"):
         unlocked()
     Atspi.init()
+    if cmd == "tree" and argv[2] == "--pid":
+        if len(argv) < 4 or not argv[3].isdigit():
+            usage()
+        pids = [app for _, app in apps() if app.get_process_id() == int(argv[3])]
+        if not pids:
+            nothing(f"no app with pid {argv[3]} on the a11y bus")
+        print(json.dumps(tree(pids[0], "--all" in argv)))
+        return
     app = find_app(argv[2])
 
     if cmd == "tree":
-        want = None if "--all" in argv else INTERACTIVE
-        for depth, node in walk(app, want):
-            if node is app:
-                continue
-            print("  " * min(depth, 6) + describe(node))
+        print(json.dumps(tree(app, "--all" in argv)))
         return
 
     if cmd == "text":
@@ -227,17 +309,17 @@ def main(argv):
     if len(argv) < 4:
         usage()
     needle = argv[3]
-    hits = [n for _, n in walk(app) if n is not app and matches(n, needle)]
+    hits = [(i, n) for i, _, n in numbered(app) if matches(n, needle)]
 
     if cmd == "find":
         if not hits:
             nothing(f"nothing matching {needle!r}")
-        for node in hits[:20]:
+        for _, node in hits[:20]:
             print(describe(node))
         return
 
     if cmd == "click":
-        for node in hits:
+        for i, node in hits:
             try:
                 action = node.get_action()
                 names = [
@@ -253,16 +335,19 @@ def main(argv):
             if not anywhere:
                 confine(app, node)
             unlocked()
-            Atspi.Action.do_action(action, index)
-            print(f"{names[index]}: {describe(node)}")
-            return
+            try:
+                ok = bool(Atspi.Action.do_action(action, index))
+            except Exception:
+                ok = False
+            print(json.dumps({"ok": ok, "action": names[index], "widget": widget(i, node)}))
+            sys.exit(0 if ok else 1)
         nothing(f"nothing clickable matching {needle!r}")
 
     if cmd == "type":
         if len(argv) < 5:
             usage()
         value = argv[4]
-        for node in hits:
+        for i, node in hits:
             try:
                 editable = node.get_editable_text()
             except Exception:
@@ -273,11 +358,11 @@ def main(argv):
                 confine(app, node)
             unlocked()
             try:
-                Atspi.EditableText.set_text_contents(editable, value)
+                ok = bool(Atspi.EditableText.set_text_contents(editable, value))
             except Exception:
-                continue
-            print(f"typed into {describe(node)}")
-            return
+                ok = False
+            print(json.dumps({"ok": ok, "typed": len(value), "widget": widget(i, node)}))
+            sys.exit(0 if ok else 1)
         nothing(f"no editable widget matching {needle!r}")
 
     usage()
