@@ -10,6 +10,7 @@
 #   screen type TEXT [--any]             literal text at keyboard focus
 #   screen key COMBO [REPEAT] [--any]    ctrl+s · Return · super+t · shift+Tab
 #   screen launch CMD...                 start CMD; its windows in the next 5 s are agent windows
+#   screen doctor                        readiness JSON: blockers and the one next step
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
 # coordinate, so a shot must come first; it records the scale it used in
@@ -31,8 +32,11 @@
 set -euo pipefail
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
-usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
+
+# doctor answers without a niri too: no niri is one of its blockers.
+[[ ${1:-} == doctor ]] && exec "$(dirname "$(readlink -f "$0")")/desk" doctor "${@:2}"
 
 DIR=/tmp/desk
 [[ -n "${NIRI_SOCKET:-}" ]] || die "NIRI_SOCKET is not set"

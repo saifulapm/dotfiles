@@ -219,3 +219,77 @@ test('mouse keeps a point inside the output under it', () => {
   assert.equal(r.status, 1, r.stderr);
   assert.match(readFileSync(log, 'utf8'), /^dots-pointer 0,0,3968,1280 move 100 2$/m);
 });
+
+// A PATH holding only what doctor runs, so each tool is present only when the test puts it there.
+function doctorEnv({ lock = unlocked, tools = ['grim', 'wtype', 'dots-pointer', 'ydotoold', 'tesseract'], a11y = true } = {}) {
+  const dir = mkdtempSync(join(tmpdir(), 'desktop-doctor-'));
+  const put = (name, body) => {
+    writeFileSync(join(dir, name), `#!/bin/bash\n${body}\n`);
+    chmodSync(join(dir, name), 0o755);
+  };
+  for (const t of ['bash', 'python3', 'dirname', 'readlink', 'date']) spawnSync('ln', ['-s', spawnSync('bash', ['-c', `command -v ${t}`], { encoding: 'utf8' }).stdout.trim(), join(dir, t)]);
+  put('dots-call', `[[ "$*" == "lock state" ]] && echo '${lock}'`);
+  put('niri', `case "$*" in
+"msg -j outputs") echo '{"eDP-1":{"name":"eDP-1","logical":{"x":0,"y":0,"width":2048,"height":1280,"scale":1.25}}}' ;;
+"msg -j focused-output") echo '{"name":"eDP-1","logical":{"x":0,"y":0,"width":2048,"height":1280,"scale":1.25}}' ;;
+esac`);
+  // The a11y bus's address, then the registry's root on it, as gui reaches them.
+  put('dbus-send', a11y ? `[[ "$*" == *GetAddress* ]] && echo '   unix:path=/run/a11y'; [[ "$*" == *ChildCount* ]] && echo '   variant       int32 2'; exit 0` : 'exit 1');
+  for (const t of tools) put(t, 'exit 0');
+  return { ...process.env, PATH: dir, NIRI_SOCKET: join(dir, 'niri.sock'), XDG_RUNTIME_DIR: dir };
+}
+const doctor = (env) => {
+  const r = spawnSync(screen, ['doctor'], { env, encoding: 'utf8' });
+  return { status: r.status, out: r.stdout ? JSON.parse(r.stdout) : r.stderr };
+};
+
+test('screen doctor on a ready desktop has no blockers and exits 0', () => {
+  const { status, out } = doctor(doctorEnv());
+  assert.equal(status, 0, JSON.stringify(out));
+  assert.deepEqual(out.blockers, []);
+  assert.equal(out.next, null);
+  assert.equal(out.locked, false);
+  assert.deepEqual(out.lease, { by: 'claude', until: 2 });
+  assert.equal(out.niri.ok, true);
+  assert.match(out.niri.socket, /niri\.sock$/);
+  assert.deepEqual(out.outputs, [{ name: 'eDP-1', focused: true, x: 0, y: 0, width: 2048, height: 1280, scale: 1.25 }]);
+  assert.equal(out.at_spi, true);
+  assert.deepEqual(out.tools, { grim: true, wtype: true, 'dots-pointer': true, ydotoold: true, tesseract: true });
+});
+
+test('screen doctor while locked names the lock and how to lift it', () => {
+  const { status, out } = doctor(doctorEnv({ lock: locked }));
+  assert.equal(status, 1);
+  assert.deepEqual(out.blockers, ['locked']);
+  assert.match(out.next, /dots-call lock unlock/);
+});
+
+test('screen doctor names a missing dots-pointer, and only a missing tool the skill needs blocks', () => {
+  const { out } = doctor(doctorEnv({ tools: ['grim', 'wtype'] }));
+  assert.deepEqual(out.blockers, ['dots-pointer']);
+  assert.deepEqual(out.tools, { grim: true, wtype: true, 'dots-pointer': false, ydotoold: false, tesseract: false });
+  assert.match(out.next, /chezmoi apply/);
+});
+
+test('screen doctor counts an a11y bus that does not answer as a blocker', () => {
+  const { out } = doctor(doctorEnv({ a11y: false }));
+  assert.equal(out.at_spi, false);
+  assert.deepEqual(out.blockers, ['at-spi']);
+  assert.match(out.next, /systemctl --user restart at-spi-dbus-bus\.service/);
+});
+
+test('screen doctor without a niri says so instead of dying', () => {
+  const env = doctorEnv();
+  delete env.NIRI_SOCKET;
+  const { status, out } = doctor(env);
+  assert.equal(status, 1);
+  assert.deepEqual(out.niri, { socket: null, ok: false });
+  assert.ok(out.blockers.includes('niri'), out.blockers);
+});
+
+test('screen doctor reaches the a11y bus AT_SPI_BUS_ADDRESS names, as libatspi does', () => {
+  const env = doctorEnv({ a11y: false });
+  writeFileSync(join(env.PATH, 'dbus-send'), `#!/bin/bash\n[[ "$*" == *--bus=unix:path=/run/nested-a11y* && "$*" == *ChildCount* ]] && echo '   variant       int32 1' && exit 0\nexit 1\n`);
+  const { out } = doctor({ ...env, AT_SPI_BUS_ADDRESS: 'unix:path=/run/nested-a11y' });
+  assert.equal(out.at_spi, true);
+});

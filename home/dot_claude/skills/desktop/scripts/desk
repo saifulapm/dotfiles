@@ -6,6 +6,7 @@
   desk acted ID          note an agent action in window ID, if it is an agent window
   desk journal TOOL RC MS WINDOW ARG...   the journal line for one action
   desk watch             the watcher itself, started by the others
+  desk doctor            whether an agent can drive this desktop now: JSON, exit 1 with blockers
 
 A window is an agent window when it opens within 5 s after a launch, or
 after an agent action in an agent window (a Save As dialog). One watcher per
@@ -33,6 +34,16 @@ import time
 WINDOW_MS = 5000
 KEEP_DAYS = 30
 OUTCOMES = {0: "ok", 3: "refused", 4: "nothing"}
+TOOLS = ("grim", "wtype", "dots-pointer", "ydotoold", "tesseract")
+# The first blocker's way out; a tool the skill does not call (ydotoold, tesseract) blocks nothing.
+NEXT = {
+    "niri": "run inside the niri session, or source the env bin/dots-dev prints",
+    "locked": "dots-call lock unlock claude 120",
+    "grim": "dots install",
+    "wtype": "dots install",
+    "dots-pointer": "chezmoi apply (it builds ~/.local/bin/dots-pointer)",
+    "at-spi": "systemctl --user restart at-spi-dbus-bus.service",
+}
 
 
 def die(msg, code=1):
@@ -281,10 +292,64 @@ def stamp(line):
         return None
 
 
+def run_json(argv):
+    try:
+        return json.loads(subprocess.run(argv, capture_output=True, text=True, timeout=5).stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def dbus(argv):
+    try:
+        r = subprocess.run(["dbus-send", "--print-reply=literal", *argv], capture_output=True, text=True, timeout=3)
+        return r.stdout.strip() if r.returncode == 0 else None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+
+def a11y_alive():
+    """The a11y bus gui reaches answers for the registry's root; the bus launcher is never run (m48's probe killed the bus)."""
+    # libatspi takes AT_SPI_BUS_ADDRESS first, as a nested session sets it, and asks org.a11y.Bus only without it.
+    addr = os.environ.get("AT_SPI_BUS_ADDRESS") or dbus(["--session", "--dest=org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus.GetAddress"])
+    return bool(addr) and dbus([f"--bus={addr}", "--dest=org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root", "org.freedesktop.DBus.Properties.Get", "string:org.a11y.atspi.Accessible", "string:ChildCount"]) is not None
+
+
+def doctor():
+    """Prints whether an agent can drive this desktop now, and the one step that comes first when it cannot."""
+    lock = run_json(["dots-call", "lock", "state"])
+    locked = lock.get("locked") if isinstance(lock, dict) else None
+    sock = os.environ.get("NIRI_SOCKET")
+    outputs = run_json(["niri", "msg", "-j", "outputs"]) if sock else None
+    focused = (run_json(["niri", "msg", "-j", "focused-output"]) or {}) if sock else {}
+    tools = {t: shutil.which(t) is not None for t in TOOLS}
+    at_spi = a11y_alive()
+    blockers = [b for b, bad in (
+        ("niri", not isinstance(outputs, dict)),
+        # A shell that does not answer counts as locked, as it does for every input.
+        ("locked", locked is not False),
+        ("grim", not tools["grim"]), ("wtype", not tools["wtype"]), ("dots-pointer", not tools["dots-pointer"]),
+        ("at-spi", not at_spi),
+    ) if bad]
+    print(json.dumps({
+        "blockers": blockers,
+        "next": NEXT[blockers[0]] if blockers else None,
+        "locked": locked,
+        "lease": {"by": lock["heldBy"], "until": lock.get("leaseUntil")} if isinstance(lock, dict) and lock.get("heldBy") else None,
+        "niri": {"socket": sock or None, "ok": isinstance(outputs, dict)},
+        "outputs": [{"name": o["name"], "focused": o["name"] == focused.get("name"), **{k: o["logical"][k] for k in ("x", "y", "width", "height", "scale")}}
+                    for o in (outputs or {}).values() if o.get("logical")],
+        "at_spi": at_spi,
+        "tools": tools,
+    }))
+    sys.exit(1 if blockers else 0)
+
+
 def main(argv):
     cmd = argv[1] if len(argv) > 1 else ""
     if cmd == "watch":
         watch()
+    elif cmd == "doctor" and len(argv) == 2:
+        doctor()
     elif cmd == "launch" and len(argv) > 2:
         ensure_watcher()
         note("launch")
