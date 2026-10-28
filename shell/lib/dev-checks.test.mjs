@@ -163,3 +163,16 @@ test('no tests/dev script sets an EXIT trap after sourcing lib.sh', () => {
   }
   assert.deepEqual(found, [], 'put the teardown in cleanup()');
 });
+
+// lib.sh runs dots-dev in the background, so a bare wait in a check waits for the nested session itself and hangs while holding the nested-check lock (m48); wait by pid.
+test('no tests/dev script runs a bare wait', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    readFileSync(dir + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/(^|[;&|(]|\bthen|\bdo)\s*wait\s*($|[;&|)#])/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, [], 'wait "$pid"');
+});
