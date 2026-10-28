@@ -58,6 +58,12 @@ test("an account's API credit reads under its limits as what is left of the gran
   assert.equal(main.limits.at(-1).fraction, 246.200338 / 250);
 });
 
+test('a full account keeps its credit and cuts the last limit to stay inside the card', () => {
+  const credit = row({ provider: 'claude', label: 'main', account: 'main', metric: 'credit', kind: 'money', value: 246.2, limit: 250, unit: 'USD' });
+  const main = view([...rows, claude('main', 'weekly Opus', 5, null), credit]).accounts[0];
+  assert.deepEqual(main.limits.map((l) => l.name), ['5-hour', 'Weekly', 'Weekly Fable', 'Credit']);
+});
+
 test('a limit at 80% or more warns, one at 79% does not, and the bar never leaves 0 to 1', () => {
   const r = [claude('main', '5-hour', 92, null), claude('main', 'weekly', 79, null), claude('main', 'weekly Fable', 80, null), claude('work', '5-hour', 140, null), claude('work', 'weekly', -3, null)];
   const v = view(r);

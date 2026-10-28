@@ -106,6 +106,9 @@ export function accountsView(registryText, rowsText, now, busy) {
   const reg = accountsOf(registryText);
   const accounts = reg.list.slice(0, MOST.accounts).map((a) => {
     const own = rows.filter((r) => r.provider === 'claude' && r.account === a.id);
+    // The credit rows are kept first and the limits fill what is left of the card's rows.
+    const good = own.filter((r) => num(r.value));
+    const credit = good.filter((r) => r.kind === 'money').slice(0, MOST.limits);
     const failed = own.find((r) => !num(r.value));
     const stale = own.find((r) => r.state === 'stale');
     let note = '';
@@ -118,7 +121,7 @@ export function accountsView(registryText, rowsText, now, busy) {
       active: a.id === reg.active,
       note,
       dim: note !== '',
-      limits: own.filter((r) => num(r.value)).slice(0, MOST.limits).map((r) => Object.assign(figureOf(r, now), { name: cap(clean(r.metric)) })),
+      limits: [...good.filter((r) => r.kind !== 'money').slice(0, MOST.limits - credit.length), ...credit].map((r) => Object.assign(figureOf(r, now), { name: cap(clean(r.metric)) })),
     };
   });
   const others = rows.filter((r) => r.provider !== 'claude');
