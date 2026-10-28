@@ -538,6 +538,8 @@ def jev_fail(msg, key=""):
     """Exit 1, the message scrubbed of the key: none of it, not 8 characters in a row, reaches stderr or the journal."""
     if key and any(key[i:i + 8] in msg for i in range(len(key) - 7)):
         msg = msg.split(":")[0] + ": (the answer quoted the key)"
+    # Much of it can be the other side's text: no escapes or bidi controls reach the terminal, and no more than a line of it.
+    msg = "".join(c if c.isprintable() else "?" for c in msg)[:200]
     jev_note({"error": msg})
     die(f"jev: {msg}; fall back to gui or OCR")
 
@@ -549,12 +551,21 @@ def jev_note(answer):
             json.dump(answer, f)
 
 
+def at(d, *path):
+    """d[path[0]][path[1]]..., None where any step is no object."""
+    for k in path:
+        d = d.get(k) if isinstance(d, dict) else None
+    return d
+
+
 def number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
 
 
-def jev(kind, text, shot):
-    """One request to JEV over the shot: find asks a Box and a Noul, check one Noul; prints the answer in shot pixels."""
+def jev(kind, text, shot, t0):
+    """One request to JEV over the shot: find asks a Box and a Noul, check one Noul; prints the answer in shot pixels.
+
+    The 10 s run from t0, when the command began, so the shot and pass come out of curl's share."""
     with open(shot, "rb") as f:
         data = f.read()
     w, h = png_size(data)
@@ -578,10 +589,14 @@ def jev(kind, text, shot):
     fd, path = tempfile.mkstemp(prefix="jev-", suffix=".json", dir=state_dir())
     with os.fdopen(fd, "w") as f:
         json.dump(body, f)
+    left = JEV_S - (now_ms() - t0) / 1000
+    if left <= 0:
+        os.unlink(path)
+        jev_fail(f"no time left of {JEV_S} s for the request", key)
     try:
         # The key goes as a header on curl's stdin, never its argv; --max-time bounds the whole call, DNS too, and curl never retries unasked.
-        r = subprocess.run(["curl", "-sS", "--max-time", str(JEV_S), "-H", "@-", "-H", "Content-Type: application/json", "-H", "TypeSafe-Danger-Zone-Images: true",
-                            "--data-binary", f"@{path}", "-w", "\n%{http_code}", JEV_URL], input=f"Authorization: Bearer {key}\n", capture_output=True, text=True)
+        r = subprocess.run(["curl", "-sS", "--max-time", f"{left:.3f}", "-H", "@-", "-H", "Content-Type: application/json", "-H", "TypeSafe-Danger-Zone-Images: true",
+                            "--data-binary", f"@{path}", "-w", "\n%{http_code}", JEV_URL], input=f"Authorization: Bearer {key}\n", capture_output=True, text=True, errors="replace")
     finally:
         os.unlink(path)
     if r.returncode != 0:
@@ -589,25 +604,23 @@ def jev(kind, text, shot):
     reply, _, code = r.stdout.rpartition("\n")
     try:
         answer = json.loads(reply)
-    except ValueError:
+    except (ValueError, RecursionError):
         answer = None
     if code != "200":
-        err = answer.get("error") if isinstance(answer, dict) else None
-        msg = err.get("message") if isinstance(err, dict) else None
-        jev_fail(f"HTTP {code}" + (f": {str(msg)[:200]}" if msg else ""), key)
-    answers = answer.get("answers") if isinstance(answer, dict) else None
-    if not isinstance(answers, dict):
+        msg = at(answer, "error", "message")
+        jev_fail(f"HTTP {code}" + (f": {msg}" if msg else ""), key)
+    if not isinstance(at(answer, "answers"), dict):
         jev_fail("an answer with no answers", key)
     if kind == "check":
-        p = (answers.get("answer") or {}).get("noul")
+        p = at(answer, "answers", "answer", "noul")
         if not number(p):
             jev_fail("an answer with no Noul", key)
         out = {"yes": p >= 0.5, "probability": p}
     else:
-        p = (answers.get("on_screen") or {}).get("noul")
-        target = answers.get("target") or {}
-        edges = target.get("box") or {}
-        if not number(p) or not number(target.get("confidence")) or not all(number(edges.get(e)) for e in ("left", "right", "top", "bottom")):
+        p = at(answer, "answers", "on_screen", "noul")
+        c = at(answer, "answers", "target", "confidence")
+        edges = {e: at(answer, "answers", "target", "box", e) for e in ("left", "right", "top", "bottom")}
+        if not number(p) or not number(c) or not all(number(v) for v in edges.values()):
             jev_fail("an answer with no Box or no Noul", key)
         if p < 0.5:
             out = {"found": False, "on_screen": p}
@@ -615,7 +628,7 @@ def jev(kind, text, shot):
             # Fractions of the padded image; an edge at 1.0 is one past the last pixel, and the padding is no part of the shot.
             x = min(max(int((edges["left"] + edges["right"]) / 2 * pw), 0), w - 1)
             y = min(max(int((edges["top"] + edges["bottom"]) / 2 * ph), 0), h - 1)
-            out = {"x": x, "y": y, "confidence": target["confidence"], "on_screen": p}
+            out = {"x": x, "y": y, "confidence": c, "on_screen": p}
     jev_note(out)
     print(json.dumps(out))
     sys.exit(4 if out.get("found") is False else 0)
@@ -653,7 +666,7 @@ def main(argv):
         print(json.dumps(w))
         sys.exit(0 if w else 4)
     elif cmd == "jev" and len(argv) == 5 and argv[2] in ("find", "check"):
-        jev(argv[2], argv[3], argv[4])
+        jev(argv[2], argv[3], argv[4], int(os.environ.get("DESK_T0") or now_ms()))
     elif cmd == "acted" and len(argv) == 3 and argv[2].isdigit():
         w = window(int(argv[2]))
         if w and w["agent"]:

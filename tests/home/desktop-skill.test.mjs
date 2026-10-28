@@ -686,7 +686,9 @@ test('screen find --jev sends one request with a Box and a Noul over a fresh sho
   const argv = j.argv();
   assert.equal(argv.at(-1), 'https://openrouter.ai/api/v1/systemone');
   assert.ok(argv.includes('TypeSafe-Danger-Zone-Images: true'), argv.join(' '));
-  assert.equal(argv[argv.indexOf('--max-time') + 1], '10');
+  // What is left of the command's 10 s once the shot is taken and the key read.
+  const maxTime = Number(argv[argv.indexOf('--max-time') + 1]);
+  assert.ok(maxTime > 9 && maxTime <= 10, `--max-time ${maxTime}`);
   assert.ok(!argv.some((a) => /retry/.test(a)), argv.join(' '));
   // The key reaches curl as a header on its stdin, never on its argv, where any process can read it.
   assert.equal(j.stdin(), `Authorization: Bearer ${KEY}\n`);
@@ -874,4 +876,55 @@ test('a pass store it cannot open says why, and sends nothing', () => {
   assert.equal(r.status, 1);
   assert.match(r.stderr, /decryption failed: No pinentry/);
   assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^curl /m);
+});
+
+// The 10 s are the whole command's, so a slow pass and the shot come out of curl's share.
+test('with OpenRouter unreachable and a slow pass, find still exits 1 within 10.5 s', async () => {
+  const j = jevStubs();
+  unlinkSync(join(j.dir, 'curl'));
+  writeFileSync(join(j.dir, 'pass'), `#!/usr/bin/env bash\nsleep 0.8; echo '${KEY}'\n`);
+  const held = [];
+  const proxy = createServer((c) => held.push(c));
+  await new Promise((ok) => proxy.listen(0, '127.0.0.1', ok));
+  const url = `http://127.0.0.1:${proxy.address().port}`;
+  const env = { ...j.env, https_proxy: url, HTTPS_PROXY: url, no_proxy: '', NO_PROXY: '' };
+  const t0 = Date.now();
+  const status = await new Promise((ok) => spawn(screen, ['find', 'a', '--jev', '--any'], { env, stdio: 'ignore' }).on('exit', ok));
+  const took = Date.now() - t0;
+  for (const c of held) c.destroy();
+  proxy.close();
+  assert.equal(status, 1);
+  assert.ok(took <= 10500, `${took} ms`);
+  assert.equal(held.length, 1);
+});
+
+// JEV's reply is the one input another party writes: any shape of it is exit 1 with a journal error, never a traceback.
+const hostile = [
+  ['an answer as a string', 'check', '{"answers":{"answer":"yes"}}'],
+  ['answers as a list', 'check', '{"answers":["yes"]}'],
+  ['a target and a Noul as strings', 'find', '{"answers":{"on_screen":"y","target":"x"}}'],
+  ['a box as a list', 'find', '{"answers":{"target":{"box":[0.1,0.2,0.3,0.4],"confidence":0.9},"on_screen":{"noul":0.9}}}'],
+  ['bytes that are no UTF-8', 'check', Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('{"answers":{}}')])],
+  ['JSON nested past any depth', 'check', '['.repeat(200000)],
+];
+for (const [why, cmd, reply] of hostile) {
+  test(`a reply with ${why} exits 1 with no traceback`, () => {
+    const j = jevStubs();
+    writeFileSync(join(j.dir, 'reply'), reply);
+    const r = run(j.env, cmd, 'a', '--jev');
+    assert.equal(r.status, 1, r.stdout);
+    assert.doesNotMatch(r.stderr, /Traceback/);
+    assert.match(r.stderr, /fall back to gui or OCR/);
+    assert.equal(typeof lines(j.journal)[0].jev.error, 'string');
+  });
+}
+
+// An error message is the other party's text, so it reaches the terminal without escapes, bidi controls or its length.
+test('an error message from the other side reaches stderr without control characters, cut short', () => {
+  const j = jevStubs({ status: 500, reply: JSON.stringify({ error: { message: '\u001b[31mred\u001b]0;pwn\u0007‮evil ' + 'x'.repeat(5000) } }) });
+  const r = run(j.env, 'check', 'a', '--jev');
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /HTTP 500/);
+  assert.doesNotMatch(r.stderr, /[\u0000-\u0008\u000b-\u001f\u007f‮]/);
+  assert.ok(r.stderr.length < 500, `${r.stderr.length} chars`);
 });

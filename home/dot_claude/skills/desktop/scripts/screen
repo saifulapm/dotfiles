@@ -398,7 +398,7 @@ find | check)
     cp "$JEV_SHOT" "$DIR/shot.png"
     guard
     only_agents
-    "$DESK_PY" jev "$cmd" "$1" "$JEV_SHOT"
+    DESK_T0=$T0 "$DESK_PY" jev "$cmd" "$1" "$JEV_SHOT"
     ;;
 *)
     usage
