@@ -40,16 +40,16 @@ test('every IPC target the skill names is one the shell defines', () => {
   assert.deepEqual([...named].filter((n) => !known.has(n)), []);
 });
 
-// A PATH whose dots-call answers lock state with the given JSON (or, given a function, runs its body), whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus; XDG_STATE_HOME is the same scratch dir.
-function stubs(lockState, inputExit) {
+// A PATH whose dots-call answers lock state, polkit state and pinentry state with the given JSON (or, given a function, runs its body), the prompts closed unless given, whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus; XDG_STATE_HOME is the same scratch dir.
+function stubs(lockState, inputExit, { polkit = closed, pinentry = closed } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'desktop-skill-'));
   const log = join(dir, 'calls.log');
   const put = (name, body) => {
     writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`);
     chmodSync(join(dir, name), 0o755);
   };
-  const answer = typeof lockState === 'function' ? lockState() : `echo '${lockState}'; exit 0`;
-  put('dots-call', `echo "dots-call $*" >>'${log}'; [[ "$*" == "lock state" ]] && { ${answer}; }; exit 1`);
+  const say = (a) => (typeof a === 'function' ? a() : `echo '${a}'; exit 0`);
+  put('dots-call', `echo "dots-call $*" >>'${log}'; case "$*" in "lock state") ${say(lockState)} ;; "polkit state") ${say(polkit)} ;; "pinentry state") ${say(pinentry)} ;; esac; exit 1`);
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
   for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer', 'grim']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
@@ -58,6 +58,9 @@ function stubs(lockState, inputExit) {
 }
 
 const locked = '{"locked":true,"secure":true}';
+const unlocked = '{"locked":false,"secure":true,"heldBy":"claude","unlockedAt":1,"leaseUntil":2}';
+const closed = '{"open":false,"loaded":false,"waiting":0}';
+const open = '{"open":true,"settled":true,"field":0}';
 const scripts = join(skill, 'scripts');
 const inputs = [
   ['screen', 'type', 'hi'], ['screen', 'type', 'hi', '--any'], ['screen', 'key', 'Return'], ['screen', 'click', '1', '1'],
@@ -92,12 +95,38 @@ for (const [why, answer] of [['fails', () => 'exit 1'], ['prints nothing', () =>
   }
 }
 
+// A key or a press at a password prompt lands in its field, so with the session unlocked an open polkit or pinentry prompt refuses every input path, --any too.
+for (const prompt of ['polkit', 'pinentry']) {
+  for (const [tool, ...args] of inputs) {
+    test(`${tool} ${args.join(' ')} refuses while a ${prompt} prompt is open and sends no input`, () => {
+      const { env, log } = stubs(unlocked, 1, { [prompt]: open });
+      const r = spawnSync(join(scripts, tool), args, { env, encoding: 'utf8' });
+      assert.equal(r.status, 3, r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), { refused: 'auth prompt' });
+      assert.doesNotMatch(readFileSync(log, 'utf8'), /^(wtype|ydotool|wlrctl|dots-pointer)/m);
+    });
+  }
+}
+
+// Anything but a literal "open": false counts as an open prompt.
+for (const [why, prompts] of [['polkit state fails', { polkit: () => 'exit 1' }], ['pinentry state prints nothing', { pinentry: () => 'exit 0' }], ['polkit state says "false" as a string', { polkit: '{"open":"false"}' }]]) {
+  for (const tool of [['mouse', 'click', '10', '10'], ['gui', 'click', 'files', 'Save'], ['screen', 'type', 'hi', '--any'], ['screen', 'key', 'Return', '--any']]) {
+    test(`${tool.join(' ')} counts it as an open prompt when ${why}`, () => {
+      const { env, log } = stubs(unlocked, 1, prompts);
+      const r = spawnSync(join(scripts, tool[0]), tool.slice(1), { env, encoding: 'utf8' });
+      assert.equal(r.status, 3, r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), { refused: 'auth prompt' });
+      assert.doesNotMatch(readFileSync(log, 'utf8'), /^(wtype|dots-pointer)/m);
+    });
+  }
+}
+
 // --any skips the agent-window check, which needs a niri; tests/dev/desk-keys.sh checks it.
-test('screen type --any gets past the guard once lock state reads unlocked', () => {
-  const { env, log } = stubs('{"locked":false,"secure":true,"heldBy":"claude","unlockedAt":1,"leaseUntil":2}', 0);
+test('screen type --any gets past the guard once lock state reads unlocked and both prompts closed', () => {
+  const { env, log } = stubs(unlocked, 0);
   const r = spawnSync(screen, ['type', 'hi', '--any'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\nwtype -- hi\n');
+  assert.equal(readFileSync(log, 'utf8'), 'dots-call lock state\ndots-call polkit state\ndots-call pinentry state\nwtype -- hi\n');
 });
 
 // dots-pointer is the skill's pointer, built at apply from wlr-protocols' XML like dots-dshift, and rebuilt when its source changes.
@@ -110,7 +139,6 @@ test('apply builds dots-pointer from bin/dots-pointer.c and the virtual-pointer 
   assert.match(script, /gcc -O2 -Wall .*-o "\$HOME\/\.local\/bin\/dots-pointer" .*bin\/dots-pointer\.c.* -lwayland-client \|\| \{/);
 });
 
-const unlocked = '{"locked":false,"secure":true,"heldBy":"claude","unlockedAt":1,"leaseUntil":2}';
 const lines = (f) => readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
 
 // Each action is one journal line, and typed text is kept as its length and digest, never as the text.

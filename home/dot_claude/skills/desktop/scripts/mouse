@@ -20,8 +20,8 @@
 # window"), or no answer in 500 ms. niri focuses the window under every
 # press, so a refusal puts focus back. --any skips the check when a brief
 # grants it. One gesture runs at a time per niri. Every call refuses while
-# the session is locked, a click again
-# when the lock arrives during its hit-test. Usage exits 2. Each action
+# the session is locked or a polkit or pinentry prompt is open, a click again
+# when either arrives during its hit-test. Usage exits 2. Each action
 # leaves a journal line.
 #
 # Output geometry comes from `niri msg -j outputs`. With the env bin/dots-dev prints sourced,
@@ -57,6 +57,16 @@ unlocked() {
     dots-call lock state 2>/dev/null | jq -e '.locked == false' >/dev/null 2>&1 || refuse "locked"
 }
 
+# A key or a press at a polkit or pinentry prompt lands in its password field,
+# so input waits until both read a literal "open": false, --any or not.
+no_prompt() {
+    local p
+    for p in polkit pinentry; do
+        dots-call "$p" state 2>/dev/null | jq -e '.open == false' >/dev/null 2>&1 || refuse "auth prompt"
+    done
+}
+guard() { unlocked; no_prompt; }
+
 DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 SCREEN="$(dirname "$(readlink -f "$0")")/screen"
 
@@ -89,7 +99,7 @@ hit() {
         refuse "not an agent window" "$SEEN"
     fi
     "$DESK_PY" acted "$id"
-    unlocked
+    guard
 }
 
 # The trailing flags, in either order: --any on a press, and --then KIND.
@@ -122,7 +132,7 @@ journal() {
     exit "$rc"
 }
 trap journal EXIT
-unlocked
+guard
 
 # Each output's box, the focused one first; dots-pointer maps onto the box around every output.
 OUTS=() BOX=

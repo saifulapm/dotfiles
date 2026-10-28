@@ -22,7 +22,8 @@ accessibility call reported, exit 1 when it failed; --then adds the look
 `screen look` takes once the screen is still, the tree of this app. tree prints at most 1000
 nodes and 32 KB; a longer tree is written whole to a file in the desk state
 directory, named under "spill". Both refuse with exit 3 unless `dots-call lock
-state` reads "locked": false. Exit 4 = no such app/widget (nothing was
+state` reads "locked": false and `dots-call polkit state` and `pinentry state`
+read "open": false, --any or not. Exit 4 = no such app/widget (nothing was
 clicked), 2 = usage.
 """
 
@@ -98,6 +99,24 @@ def unlocked():
         pass
     print(json.dumps({"refused": "locked"}))
     sys.exit(3)
+
+
+def no_prompt():
+    """A press or text at a polkit or pinentry prompt lands in its field, so anything but a literal "open": false from both refuses with exit 3."""
+    for target in ("polkit", "pinentry"):
+        try:
+            out = subprocess.run(["dots-call", target, "state"], capture_output=True, text=True, timeout=5).stdout
+            if json.loads(out).get("open") is False:
+                continue
+        except Exception:
+            pass
+        print(json.dumps({"refused": "auth prompt"}))
+        sys.exit(3)
+
+
+def guard():
+    unlocked()
+    no_prompt()
 
 
 def confine(app, node):
@@ -307,7 +326,7 @@ def main(argv):
     if len(argv) < 3:
         usage()
     if cmd in ("click", "type"):
-        unlocked()
+        guard()
     Atspi.init()
     if cmd == "tree" and argv[2] == "--pid":
         if len(argv) < 4 or not argv[3].isdigit():
@@ -360,7 +379,7 @@ def main(argv):
             index = names.index("click") if "click" in names else 0
             if not anywhere:
                 confine(app, node)
-            unlocked()
+            guard()
             try:
                 ok = bool(Atspi.Action.do_action(action, index))
             except Exception:
@@ -381,7 +400,7 @@ def main(argv):
                 continue
             if not anywhere:
                 confine(app, node)
-            unlocked()
+            guard()
             try:
                 ok = bool(Atspi.EditableText.set_text_contents(editable, value))
             except Exception:
