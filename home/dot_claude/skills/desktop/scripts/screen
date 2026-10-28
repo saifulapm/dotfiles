@@ -9,6 +9,7 @@
 #   screen scroll X Y up|down|left|right [N]       N wheel notches (default 3)
 #   screen type TEXT                     literal text at keyboard focus
 #   screen key COMBO [REPEAT]            ctrl+s · Return · super+t · shift+Tab
+#   screen launch CMD...                 start CMD; its windows in the next 5 s are agent windows
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
 # coordinate, so a shot must come first; it records the scale it used in
@@ -26,7 +27,7 @@
 
 set -euo pipefail
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
+usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 1; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 DIR=/tmp/desk
@@ -35,6 +36,7 @@ DESK=${XDG_RUNTIME_DIR:?}/desk/${NIRI_SOCKET##*/}
 STATE=$DESK/shot
 SHOT_W=1280
 MOUSE="$(dirname "$(readlink -f "$0")")/mouse"
+DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
 
@@ -156,6 +158,10 @@ key)
     up=()
     for ((i = ${#args[@]} - 1; i >= 1; i -= 2)); do up+=(-m "${args[i]}"); done
     for ((i = 0; i < repeat; i++)); do wtype "${args[@]}" -k "$key" "${up[@]}"; done
+    ;;
+launch)
+    [[ $# -ge 1 ]] || usage
+    "$DESK_PY" launch "$@"
     ;;
 *)
     usage

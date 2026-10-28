@@ -1,0 +1,253 @@
+#!/usr/bin/env python3
+"""desk — the desktop skill's record of agent windows, shared by screen, mouse and gui.
+
+  desk launch CMD...     start CMD through niri; its windows in the next 5 s are agent windows
+  desk window [ID]       the window's JSON with "agent", the focused one without ID; exit 4 if none
+  desk acted ID          note an agent action in window ID, if it is an agent window
+  desk watch             the watcher itself, started by the others
+
+A window is an agent window when it opens within 5 s after a launch, or
+after an agent action in an agent window (a Save As dialog). One watcher per
+niri reads its event stream and decides that the moment a window opens, from
+the times the scripts noted just before acting, so no command waits 5 s. The
+state is $XDG_RUNTIME_DIR/desk/<NIRI_SOCKET basename>/, so a nested niri and
+the live one never share agent windows; it goes when that niri does.
+"""
+
+import fcntl
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+
+WINDOW_MS = 5000
+
+
+def die(msg, code=1):
+    print(f"desk: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def state_dir():
+    sock = os.environ.get("NIRI_SOCKET")
+    if not sock:
+        die("NIRI_SOCKET is not set")
+    run = os.environ.get("XDG_RUNTIME_DIR") or die("XDG_RUNTIME_DIR is not set")
+    return os.path.join(run, "desk", os.path.basename(sock))
+
+
+def now_ms():
+    return int(time.time() * 1000)
+
+
+def write_json(path, value):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(value, f)
+    os.replace(tmp, path)
+
+
+def read_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def note(kind, extra=""):
+    """Appends a launch or an action time; the watcher reads them when a window opens."""
+    d = state_dir()
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    with open(os.path.join(d, "times"), "a") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        f.write(f"{kind} {now_ms()} {extra}\n")
+
+
+def recent_times(d, opened):
+    try:
+        with open(os.path.join(d, "times")) as f:
+            lines = f.read().split("\n")
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) >= 2 and parts[1].isdigit():
+            out.append(int(parts[1]))
+    return [t for t in out if t <= opened <= t + WINDOW_MS]
+
+
+def prune_times(d):
+    """Keeps only the times a window opening from now on could still join by."""
+    try:
+        f = open(os.path.join(d, "times"), "r+")
+    except OSError:
+        return
+    with f:
+        # The lock note() takes too, so a time noted meanwhile is never cut.
+        fcntl.flock(f, fcntl.LOCK_EX)
+        lines = [l for l in f.read().split("\n") if l.strip()]
+        keep = [l for l in lines if l.split()[1].isdigit() and int(l.split()[1]) > now_ms() - 2 * WINDOW_MS]
+        if len(keep) < len(lines):
+            f.seek(0)
+            f.truncate()
+            f.write("".join(l + "\n" for l in keep))
+
+
+def entry(w, opened, agent):
+    return {"id": w["id"], "app_id": w.get("app_id"), "title": w.get("title"), "pid": w.get("pid"), "opened": opened, "agent": agent}
+
+
+def sweep(d):
+    """Removes the state of every niri whose socket is gone, such as a nested check's that never ran a watcher."""
+    socks = os.path.dirname(os.environ["NIRI_SOCKET"])
+    top = os.path.dirname(d)
+    for name in os.listdir(top):
+        if name != os.path.basename(d) and not os.path.exists(os.path.join(socks, name)):
+            shutil.rmtree(os.path.join(top, name), ignore_errors=True)
+
+
+def watch():
+    d = state_dir()
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    sweep(d)
+    lock = open(os.path.join(d, "watch.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return  # another watcher has this niri
+    path = os.path.join(d, "windows.json")
+    # A watcher started again keeps what the last one knew of windows still open; niri never reuses an id.
+    known = read_json(os.path.join(d, "windows.old"), {})
+    stream = subprocess.Popen(["niri", "msg", "-j", "event-stream"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    windows = None
+    for line in stream.stdout:
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if "WindowsChanged" in ev:
+            fresh = {}
+            for w in ev["WindowsChanged"]["windows"]:
+                old = (windows or known).get(str(w["id"]))
+                # Windows open before the first watch never joined: they opened without a launch to tie them to.
+                if old:
+                    fresh[str(w["id"])] = entry(w, old["opened"], old["agent"])
+                elif windows is None:
+                    fresh[str(w["id"])] = entry(w, None, False)
+                else:
+                    opened = now_ms()
+                    fresh[str(w["id"])] = entry(w, opened, bool(recent_times(d, opened)))
+            windows = fresh
+            try:
+                os.unlink(os.path.join(d, "windows.old"))
+            except OSError:
+                pass
+        elif "WindowOpenedOrChanged" in ev and windows is not None:
+            w = ev["WindowOpenedOrChanged"]["window"]
+            old = windows.get(str(w["id"]))
+            if old:
+                windows[str(w["id"])] = entry(w, old["opened"], old["agent"])
+            else:
+                opened = now_ms()
+                windows[str(w["id"])] = entry(w, opened, bool(recent_times(d, opened)))
+                prune_times(d)
+        elif "WindowClosed" in ev and windows is not None:
+            windows.pop(str(ev["WindowClosed"]["id"]), None)
+        else:
+            continue
+        write_json(path, windows)
+    # The stream ends when niri does, and its state goes with it.
+    for f in ("windows.json", "windows.old", "times", "shot", "watch.lock"):
+        try:
+            os.unlink(os.path.join(d, f))
+        except OSError:
+            pass
+    try:
+        os.rmdir(d)
+    except OSError:
+        pass
+
+
+def ensure_watcher():
+    """Starts the watcher unless one runs, and waits until it has read niri's windows."""
+    d = state_dir()
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    lock_path = os.path.join(d, "watch.lock")
+    with open(lock_path, "a") as probe:
+        try:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            running = False
+            fcntl.flock(probe, fcntl.LOCK_UN)
+        except OSError:
+            running = True
+    path = os.path.join(d, "windows.json")
+    if not running:
+        # The new watcher reads the old list for the windows still open, and writes its own once it has niri's.
+        try:
+            os.replace(path, os.path.join(d, "windows.old"))
+        except OSError:
+            pass
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    deadline = time.monotonic() + 3
+    while not os.path.exists(path):
+        if time.monotonic() > deadline:
+            die("the desk watcher never read niri's windows")
+        time.sleep(0.02)
+    return path
+
+
+def windows():
+    return read_json(ensure_watcher(), {})
+
+
+def window(wid=None):
+    """The window's entry, read from niri if the watcher has not caught up yet; None if there is none."""
+    if wid is None:
+        out = subprocess.run(["niri", "msg", "-j", "focused-window"], capture_output=True, text=True)
+        try:
+            focused = json.loads(out.stdout)
+        except ValueError:
+            die("niri msg focused-window failed")
+        if not focused:
+            return None
+        wid = focused["id"]
+    deadline = time.monotonic() + 0.5
+    while True:
+        w = windows().get(str(wid))
+        if w or time.monotonic() > deadline:
+            return w
+        time.sleep(0.02)
+
+
+def main(argv):
+    cmd = argv[1] if len(argv) > 1 else ""
+    if cmd == "watch":
+        watch()
+    elif cmd == "launch" and len(argv) > 2:
+        ensure_watcher()
+        note("launch")
+        r = subprocess.run(["niri", "msg", "action", "spawn", "--", *argv[2:]], capture_output=True, text=True)
+        if r.returncode != 0:
+            die(f"niri could not spawn {argv[2]}: {r.stderr.strip()}")
+        print(json.dumps({"launched": argv[2:], "agent_ms": WINDOW_MS}))
+    elif cmd == "window" and len(argv) <= 3 and (len(argv) == 2 or argv[2].isdigit()):
+        w = window(int(argv[2]) if len(argv) == 3 else None)
+        if not w:
+            print(json.dumps({"window": None}))
+            sys.exit(4)
+        print(json.dumps(w))
+    elif cmd == "acted" and len(argv) == 3 and argv[2].isdigit():
+        w = window(int(argv[2]))
+        if w and w["agent"]:
+            note("act", argv[2])
+    else:
+        print(__doc__.split("\n\n")[1], file=sys.stderr)
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
