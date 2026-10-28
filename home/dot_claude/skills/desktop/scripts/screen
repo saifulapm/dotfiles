@@ -24,11 +24,12 @@
 # scripts/desk) or a shell surface holds the keyboard, and a click or drag
 # unless an agent window is under the point (scripts/mouse): a refusal exits 3
 # printing {"refused":"<reason>","window":{...}}. --any lifts that for a task
-# whose brief grants it. Usage exits 2. For the nested session, source the
+# whose brief grants it. Usage exits 2. Each action leaves a journal line. For the nested session, source the
 # env bin/dots-dev prints, as the desktop skill says; MOUSE_SCREEN=WxH passes
 # straight through to scripts/mouse.
 
 set -euo pipefail
+ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
 usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
@@ -74,6 +75,7 @@ unlocked() {
 }
 
 refuse() { # reason [window JSON]
+    [[ -z ${2:-} ]] || SEEN=$2
     jq -nc --arg r "$1" --argjson w "${2:-null}" '{refused: $r} + (if $w then {window: $w} else {} end)'
     exit 3
 }
@@ -88,7 +90,8 @@ keys_allowed() {
     fi
     local w
     w=$("$DESK_PY" window) || refuse "no window"
-    jq -e .agent <<<"$w" >/dev/null || refuse "not an agent window" "$(jq -c '{id, app_id, title}' <<<"$w")"
+    SEEN=$(jq -c '{id, app_id, title}' <<<"$w")
+    jq -e .agent <<<"$w" >/dev/null || refuse "not an agent window" "$SEEN"
     "$DESK_PY" acted "$(jq -r .id <<<"$w")"
 }
 
@@ -99,6 +102,22 @@ any=0 anyarg=()
 if [[ $cmd =~ ^(type|key|click|drag)$ ]] && [[ ${!#} == --any ]]; then
     any=1 anyarg=(--any)
     set -- "${@:1:$#-1}"
+fi
+
+# One journal line per action, refusals included (scripts/desk); the window is
+# the one the action saw, scripts/mouse's for the pointer, else the focused one.
+journal() {
+    local rc=$? w=$SEEN
+    [[ -z $w && -s $DESK_SEEN ]] && w=$(<"$DESK_SEEN")
+    [[ -n $w ]] || w=$(niri msg -j focused-window 2>/dev/null | jq -c 'if . then {id, app_id, title} else null end' 2>/dev/null) || w=null
+    rm -f "$DESK_SEEN"
+    "$DESK_PY" journal screen "$rc" $(($(date +%s%3N) - T0)) "${w:-null}" "${ARGV[@]}" || true
+    exit "$rc"
+}
+if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch)$ ]]; then
+    DESK_SEEN=$(mktemp)
+    export DESK_SEEN
+    trap journal EXIT
 fi
 
 case "$cmd" in

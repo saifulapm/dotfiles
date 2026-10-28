@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -40,7 +40,7 @@ test('every IPC target the skill names is one the shell defines', () => {
   assert.deepEqual([...named].filter((n) => !known.has(n)), []);
 });
 
-// A PATH whose dots-call answers lock state with the given JSON (or, given a function, runs its body), whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus.
+// A PATH whose dots-call answers lock state with the given JSON (or, given a function, runs its body), whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus; XDG_STATE_HOME is the same scratch dir.
 function stubs(lockState, inputExit) {
   const dir = mkdtempSync(join(tmpdir(), 'desktop-skill-'));
   const log = join(dir, 'calls.log');
@@ -53,7 +53,8 @@ function stubs(lockState, inputExit) {
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
   for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
-  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}` }, log };
+  // The journal goes to the scratch dir, never the live ~/.local/state.
+  return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson') };
 }
 
 const locked = '{"locked":true,"secure":true}';
@@ -105,4 +106,61 @@ test('apply builds dots-pointer from bin/dots-pointer.c and the virtual-pointer 
   assert.match(script, /wayland-scanner client-header "\$xml"/);
   assert.match(script, /wayland-scanner private-code "\$xml"/);
   assert.match(script, /gcc -O2 -Wall .*-o "\$HOME\/\.local\/bin\/dots-pointer" .*bin\/dots-pointer\.c.* -lwayland-client \|\| \{/);
+});
+
+const unlocked = '{"locked":false,"secure":true,"heldBy":"claude","unlockedAt":1,"leaseUntil":2}';
+const lines = (f) => readFileSync(f, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+
+// Each action is one journal line, and typed text is kept as its length and digest, never as the text.
+test('screen type leaves one journal line with the text as length and sha256', () => {
+  const { env, journal } = stubs(unlocked, 0);
+  const r = spawnSync(join(scripts, 'screen'), ['type', 'hello', '--any'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
+  const [line, ...more] = lines(journal);
+  assert.deepEqual(more, []);
+  assert.equal(line.tool, 'screen');
+  assert.equal(line.outcome, 'ok');
+  assert.deepEqual(line.args[0], 'type');
+  assert.equal(line.args[1].len, 5);
+  assert.match(line.args[1].sha256, /^[0-9a-f]{64}$/);
+  assert.equal(line.window.app_id, 'org.gnome.TextEditor');
+  assert.ok(Number.isInteger(line.ms) && line.ms >= 0, `ms ${line.ms}`);
+  assert.ok(!Number.isNaN(Date.parse(line.ts)), line.ts);
+  assert.doesNotMatch(readFileSync(journal, 'utf8'), /hello/);
+});
+
+test('a refusal is a journal line too, naming the window it saw', () => {
+  const { env, journal } = stubs(locked, 1);
+  spawnSync(join(scripts, 'gui'), ['type', 'files', 'Name', 'secret-value'], { env, encoding: 'utf8' });
+  spawnSync(join(scripts, 'mouse'), ['click', '10', '10'], { env, encoding: 'utf8' });
+  const [gui, mouse] = lines(journal);
+  assert.equal(gui.tool, 'gui');
+  assert.equal(gui.outcome, 'refused');
+  assert.equal(gui.args[3].len, 'secret-value'.length);
+  assert.equal(mouse.tool, 'mouse');
+  assert.equal(mouse.outcome, 'refused');
+  assert.deepEqual(mouse.args, ['click', '10', '10']);
+  assert.equal(mouse.window.app_id, 'org.gnome.TextEditor');
+  assert.doesNotMatch(readFileSync(journal, 'utf8'), /secret-value/);
+});
+
+test('a usage error is no action and leaves no journal line', () => {
+  const { env, journal } = stubs(unlocked, 0);
+  assert.equal(spawnSync(join(scripts, 'mouse'), ['click', '10'], { env: { ...env, MOUSE_SCREEN: '100x100' }, encoding: 'utf8' }).status, 2);
+  assert.equal(spawnSync(join(scripts, 'screen'), ['key'], { env, encoding: 'utf8' }).status, 2);
+  assert.ok(!existsSync(journal));
+});
+
+// The day's first line prunes the lines older than 30 days.
+test('the first journal line of a day drops lines older than 30 days and keeps the rest', () => {
+  const { env, journal } = stubs(locked, 1);
+  const ago = (days) => new Date(Date.now() - days * 86400000).toISOString();
+  mkdirSync(join(journal, '..'), { recursive: true });
+  writeFileSync(journal, [31, 29].map((d) => JSON.stringify({ ts: ago(d), tool: 'screen', args: [`day${d}`], outcome: 'ok', ms: 1, window: null })).join('\n') + '\n');
+  spawnSync(join(scripts, 'mouse'), ['click', '10', '10'], { env, encoding: 'utf8' });
+  const kept = lines(journal);
+  assert.deepEqual(kept.map((l) => l.args[0]), ['day29', 'click']);
+  // The day's second write prunes nothing more.
+  spawnSync(join(scripts, 'mouse'), ['click', '10', '10'], { env, encoding: 'utf8' });
+  assert.deepEqual(lines(journal).map((l) => l.args[0]), ['day29', 'click', 'click']);
 });

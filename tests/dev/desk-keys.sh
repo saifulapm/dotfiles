@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# screen type and key go only into an agent window or a shell surface holding the keyboard: a foot of Saiful's gets nothing and the refusal names it, --any reaches it, a launched widget factory's entry and a launched footclient take the text, and a window opening 6 s after the last action does not.
+# screen type and key go only into an agent window or a shell surface holding the keyboard: a foot of Saiful's gets nothing and the refusal names it, --any reaches it, a launched widget factory's entry and a launched footclient take the text, and a window opening 6 s after the last action does not; each action and refusal leaves a journal line without the text.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -114,6 +114,15 @@ check "screen type into the open launcher exits 0 though Saiful's window has foc
 query_is() { timeout 0.5 qs ipc call launcher state | jq -e ".query == \"$1\"" >/dev/null; }
 check "and the launcher's query reads calc" until_ok 2000 query_is calc
 check "while the late foot behind it reads nothing" read_is late ""
+
+# The journal: the nested session's own, under its XDG_STATE_HOME.
+journal=$XDG_STATE_HOME/dots/agent-journal.ndjson
+check "every action left a journal line in the nested state dir" test -s "$journal"
+hello=$(jq -c "select(.args[0] == \"type\" and .args[1].len == 5 and .window.id == $factory)" "$journal" | tail -1)
+check "the type of hello is a line with \"len\":5 and a 64-hex sha256: $hello" bash -c "jq -e '.outcome == \"ok\" and (.args[1].sha256 | test(\"^[0-9a-f]{64}\$\"))' <<<'$hello' >/dev/null"
+check "and no hello anywhere in the file" bash -c "! grep -q hello '$journal'"
+check "the refusal in Saiful's foot is a line with outcome refused and his window" bash -c "jq -e 'select(.outcome == \"refused\" and .window.id == $his)' '$journal' | grep -q ."
+check "and the launch is one too" bash -c "jq -e 'select(.args == [\"launch\", \"gtk4-widget-factory\"])' '$journal' | grep -q ."
 
 exit $((fails > 0))
 }

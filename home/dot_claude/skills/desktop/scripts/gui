@@ -27,6 +27,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 import warnings
 
 warnings.filterwarnings("ignore")
@@ -47,6 +48,7 @@ INTERACTIVE = {
 }
 
 MAX_NODES = 4000  # a deep tree must not hang the caller
+seen = None  # the window an action saw, for its journal line
 
 
 def load_desk():
@@ -91,15 +93,17 @@ def unlocked():
 
 def confine(app, node):
     """Returns only when node sits in an agent window, noting the action there; else refuses with exit 3."""
+    global seen
     desk = load_desk()
     pid, title = app.get_process_id(), toplevel(node).get_name() or ""
-    seen = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
-    for w in seen:
+    hits = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
+    seen = {k: hits[0][k] for k in ("id", "app_id", "title")} if hits else {"pid": pid, "title": title}
+    for w in hits:
         if w["agent"]:
+            seen = {k: w[k] for k in ("id", "app_id", "title")}
             desk.note("act", str(w["id"]))
             return
-    window = {k: seen[0][k] for k in ("id", "app_id", "title")} if seen else {"pid": pid, "title": title}
-    print(json.dumps({"refused": "not an agent window", "window": window}))
+    print(json.dumps({"refused": "not an agent window", "window": seen}))
     sys.exit(3)
 
 
@@ -280,4 +284,14 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    started, rc = time.monotonic(), 1
+    try:
+        main(sys.argv)
+        rc = 0
+    except SystemExit as e:
+        rc = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
+        raise
+    finally:
+        # click and type are actions, and each leaves one journal line, refusals included.
+        if sys.argv[1:2] in (["click"], ["type"]):
+            load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:])

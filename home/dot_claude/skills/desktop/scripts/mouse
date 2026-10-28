@@ -18,7 +18,8 @@
 # window"), or no answer in 500 ms. niri focuses the window under every
 # press, so a refusal puts focus back. --any skips the check when a brief
 # grants it. Every call refuses while the session is locked, a click again
-# when the lock arrives during its hit-test. Usage exits 2.
+# when the lock arrives during its hit-test. Usage exits 2. Each action
+# leaves a journal line.
 #
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
 # machines drive one display). With the env bin/dots-dev prints sourced,
@@ -26,6 +27,7 @@
 # overrides the geometry.
 
 set -euo pipefail
+ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
 usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "mouse: $*" >&2; exit 1; }
@@ -46,6 +48,7 @@ unlocked() {
 DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 
 refuse() { # reason [window JSON]
+    [[ -z ${2:-} ]] || SEEN=$2
     jq -nc --arg r "$1" --argjson w "${2:-null}" '{refused: $r} + (if $w then {window: $w} else {} end)'
     exit 3
 }
@@ -58,12 +61,13 @@ hit() {
     reply=$(pointer move "$1" "$2" pick) || refuse "no answer"
     id=$(jq -r '.Ok.PickedWindow.id // empty' <<<"$reply")
     [[ -n $id ]] && w=$("$DESK_PY" window "$id")
+    SEEN=$(jq -c 'if . then {id, app_id, title} else null end' <<<"$w")
     if [[ $w == null ]] || ! jq -e .agent <<<"$w" >/dev/null; then
         if [[ -n $prev && $(niri msg -j focused-window | jq -r '.id // empty') != "$prev" ]]; then
             niri msg action focus-window --id "$prev"
         fi
         [[ $w == null ]] && refuse "no window"
-        refuse "not an agent window" "$(jq -c '{id, app_id, title}' <<<"$w")"
+        refuse "not an agent window" "$SEEN"
     fi
     "$DESK_PY" acted "$id"
     unlocked
@@ -76,6 +80,20 @@ if [[ $cmd == click || $cmd == drag ]] && [[ ${!#} == --any ]]; then
     set -- "${@:1:$#-1}"
 fi
 [[ $cmd =~ ^(to|click|drag|scroll)$ ]] || usage
+
+# One journal line per action, refusals included (scripts/desk); called from
+# screen, which writes the line, it hands over the window it saw instead.
+journal() {
+    local rc=$? w=$SEEN
+    if [[ -n ${DESK_SEEN:-} ]]; then
+        [[ -n $w ]] && printf '%s' "$w" >"$DESK_SEEN"
+    else
+        [[ -n $w ]] || w=$(niri msg -j focused-window 2>/dev/null | jq -c 'if . then {id, app_id, title} else null end' 2>/dev/null) || w=null
+        "$DESK_PY" journal mouse "$rc" $(($(date +%s%3N) - T0)) "${w:-null}" "${ARGV[@]}" || true
+    fi
+    exit "$rc"
+}
+trap journal EXIT
 unlocked
 
 # The rightmost output is the screen; dots-pointer maps onto the box around every output.
