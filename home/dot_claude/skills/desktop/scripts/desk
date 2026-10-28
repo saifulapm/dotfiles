@@ -4,6 +4,7 @@
   desk launch CMD...     start CMD through niri; its windows in the next 5 s are agent windows
   desk window [ID]       the window's JSON with "agent", the focused one without ID; exit 4 if none
   desk acted ID          note an agent action in window ID, if it is an agent window
+  desk stranger OUTPUT   the first window on OUTPUT's active workspace that is no agent window; exit 4 if none
   desk journal TOOL RC MS WINDOW ARG...   the journal line for one action
   desk watch             the watcher itself, started by the others
   desk doctor            whether an agent can drive this desktop now: JSON, exit 1 with blockers
@@ -258,6 +259,21 @@ def window(wid=None):
         if w or time.monotonic() > deadline:
             return w
         time.sleep(0.02)
+
+
+def stranger(output):
+    """A window on the output's active workspace, floating ones too, that an agent did not open: what a shot of it would show."""
+    spaces = run_json(["niri", "msg", "-j", "workspaces"])
+    wins = run_json(["niri", "msg", "-j", "windows"])
+    if not isinstance(spaces, list) or not isinstance(wins, list):
+        die("niri msg workspaces or windows failed")
+    active = {ws["id"] for ws in spaces if ws.get("output") == output and ws.get("is_active")}
+    if not active:
+        die(f"no active workspace on {output}")
+    for w in wins:
+        if w.get("workspace_id") in active and not (window(w["id"]) or {}).get("agent"):
+            return {"id": w["id"], "app_id": w.get("app_id"), "title": w.get("title")}
+    return None
 
 
 def journal_path():
@@ -630,6 +646,10 @@ def main(argv):
         except ValueError:
             seen = None
         journal(argv[2], int(argv[3]), int(argv[4]), seen, argv[6:], read_json(os.environ.get("DESK_JEV") or "", None))
+    elif cmd == "stranger" and len(argv) == 3:
+        w = stranger(argv[2])
+        print(json.dumps(w))
+        sys.exit(0 if w else 4)
     elif cmd == "jev" and len(argv) == 5 and argv[2] in ("find", "check"):
         jev(argv[2], argv[3], argv[4])
     elif cmd == "acted" and len(argv) == 3 and argv[2].isdigit():

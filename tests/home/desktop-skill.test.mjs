@@ -625,9 +625,10 @@ function png(w, h) {
 const pngSize = (b) => [b.readUInt32BE(16), b.readUInt32BE(20)];
 
 const KEY = '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';
+// The workspace check needs a niri (tests/dev/desk-jev-guards.sh), so these pass --any.
 // The unlocked stubs, plus a grim that writes a w x h shot, a pass that holds KEY, and a curl that keeps its argv, its stdin and the body it was given, then answers `reply` with `status`.
-function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply } = {}) {
-  const s = stubs(unlocked, 0);
+function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply, lock = unlocked, polkit = closed } = {}) {
+  const s = stubs(lock, 0, { polkit });
   const dir = join(s.log, '..');
   const put = (name, body) => {
     writeFileSync(join(dir, name), `#!/usr/bin/env bash\n${body}\n`);
@@ -652,7 +653,7 @@ function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply } = {})
 }
 const box = (left, right, top, bottom, confidence = 0.9) => ({ type: 'box', box: { left, right, top, bottom }, confidence });
 const noul = (p) => ({ type: 'noul', noul: p });
-const run = (env, ...args) => spawnSync(screen, args, { env, encoding: 'utf8' });
+const run = (env, ...args) => spawnSync(screen, [...args, '--any'], { env, encoding: 'utf8' });
 
 test('screen find --jev sends one request with a Box and a Noul over a fresh shot, and prints the Box centre with both confidences', () => {
   const j = jevStubs({ answers: { target: box(0.25, 0.75, 0.5, 0.5, 0.92), on_screen: noul(0.97) } });
@@ -686,7 +687,7 @@ test('screen find --jev sends one request with a Box and a Noul over a fresh sho
 test('screen click takes the point find printed, through the shot find took', () => {
   const j = jevStubs({ answers: { target: box(0.25, 0.75, 0.5, 0.5), on_screen: noul(0.97) } });
   const { x, y } = JSON.parse(run(j.env, 'find', 'the first text entry', '--jev').stdout);
-  assert.equal(run(j.env, 'click', `${x}`, `${y}`, '--any').status, 0);
+  assert.equal(run(j.env, 'click', `${x}`, `${y}`).status, 0);
   assert.match(readFileSync(j.log, 'utf8'), /^dots-pointer \S+ move 1280 800 click left$/m);
 });
 
@@ -747,7 +748,7 @@ test('a send is a journal line with the question, the answer and its confidences
   const [line, ...more] = lines(j.journal);
   assert.deepEqual(more, []);
   assert.equal(line.outcome, 'ok');
-  assert.deepEqual(line.args, ['find', 'the first text entry', '--jev']);
+  assert.deepEqual(line.args, ['find', 'the first text entry', '--jev', '--any']);
   assert.deepEqual(line.jev, { x: 640, y: 400, confidence: 0.92, on_screen: 0.97 });
   const text = readFileSync(j.journal, 'utf8');
   assert.ok(text.length < 1000, `${text.length} bytes`);
@@ -786,7 +787,7 @@ test('with OpenRouter unreachable, find exits 1 within 10.5 s, after one attempt
   const url = `http://127.0.0.1:${proxy.address().port}`;
   const env = { ...j.env, https_proxy: url, HTTPS_PROXY: url, no_proxy: '', NO_PROXY: '' };
   const t0 = Date.now();
-  const status = await new Promise((ok) => spawn(screen, ['find', 'the first text entry', '--jev'], { env, stdio: 'ignore' }).on('exit', ok));
+  const status = await new Promise((ok) => spawn(screen, ['find', 'the first text entry', '--jev', '--any'], { env, stdio: 'ignore' }).on('exit', ok));
   const took = Date.now() - t0;
   for (const c of held) c.destroy();
   proxy.close();
@@ -794,4 +795,27 @@ test('with OpenRouter unreachable, find exits 1 within 10.5 s, after one attempt
   assert.ok(took <= 10500, `${took} ms`);
   assert.ok(took >= 9500, `${took} ms: it never waited for the timeout`);
   assert.equal(connections, 1);
+});
+
+// No shot leaves while locked, or with a password prompt open, --any or not.
+for (const [why, opts, refused] of [['locked', { lock: locked }, 'locked'], ['a polkit prompt is open', { polkit: open }, 'auth prompt']]) {
+  for (const args of [['find', 'the first text entry', '--jev'], ['check', 'is a file dialog open?', '--jev', '--any']]) {
+    test(`screen ${args.join(' ')} sends nothing while ${why}`, () => {
+      const j = jevStubs({ ...opts, answers: { answer: noul(0.9), target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+      const r = spawnSync(screen, args, { env: j.env, encoding: 'utf8' });
+      assert.equal(r.status, 3, r.stderr);
+      assert.deepEqual(JSON.parse(r.stdout), { refused });
+      assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^(curl|pass) /m);
+      assert.equal(lines(j.journal)[0].jev, undefined);
+    });
+  }
+}
+
+// Without --any the workspace's windows are read from niri; a niri that cannot say lets no shot through.
+test('screen find --jev without --any sends nothing when niri cannot list the workspace', () => {
+  const j = jevStubs({ answers: { target: box(0.5, 0.5, 0.5, 0.5), on_screen: noul(0.9) } });
+  const r = spawnSync(screen, ['find', 'the first text entry', '--jev'], { env: j.env, encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stdout);
+  assert.match(r.stderr, /workspace/);
+  assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^(curl|pass) /m);
 });

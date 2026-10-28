@@ -92,15 +92,13 @@ record() {
     echo "$OX $OY $W $H $SW $SH" >"$STATE"
 }
 
-# A shot of output $1, the focused one when empty, into $DIR/shot.png; every later X/Y converts through it.
+# A shot of output $1, the focused one when empty, into $2; every later X/Y converts through it.
 shoot() {
     local g
-    mkdir -p "$DIR"
-    mkdir -p -m 700 "${DESK%/*}" "$DESK"
     g=$(geometry "$1") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
     read -r NAME OX OY W H <<<"$g"
-    grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
-    record "$DIR/shot.png"
+    grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$2"
+    record "$2"
 }
 
 ms() { echo $((${EPOCHREALTIME/./} / 1000)); }
@@ -265,7 +263,7 @@ journal() {
     [[ -n $w ]] || w=$(niri msg -j focused-window 2>/dev/null | jq -c 'if . then {id, app_id, title} else null end' 2>/dev/null) || w=null
     rm -f "$DESK_SEEN"
     "$DESK_PY" journal screen "$rc" $(($(date +%s%3N) - T0)) "${w:-null}" "${ARGV[@]}" || true
-    rm -f "${DESK_JEV:-}"
+    rm -f "${DESK_JEV:-}" "${JEV_SHOT:-}"
     exit "$rc"
 }
 if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch|find|check)$ ]]; then
@@ -280,7 +278,9 @@ case "$cmd" in
 shot)
     output=
     [[ $# -eq 0 ]] || { [[ $# -eq 2 && $1 == --output ]] && output=$2; } || usage
-    shoot "$output"
+    mkdir -p "$DIR"
+    mkdir -p -m 700 "${DESK%/*}" "$DESK"
+    shoot "$output" "$DIR/shot.png"
     jq -nc --arg p "$DIR/shot.png" --arg o "$NAME" --argjson w "$SW" --argjson h "$SH" '{shot: $p, output: $o, width: $w, height: $h}'
     ;;
 zoom)
@@ -373,9 +373,20 @@ find | check)
     done
     [[ $# -eq 1 && -n $1 && $1 != --* ]] || usage
     ((jev)) || refuse "jev not granted"
-    shoot ""
+    # The shot that goes is this command's own, never one another agent wrote to $DIR meanwhile; it is the last shot too.
+    mkdir -p "$DIR"
+    mkdir -p -m 700 "${DESK%/*}" "$DESK"
+    JEV_SHOT=$(mktemp -p "$DESK" jev-XXXXXX.png)
+    shoot "" "$JEV_SHOT"
+    cp "$JEV_SHOT" "$DIR/shot.png"
     guard
-    "$DESK_PY" jev "$cmd" "$1" "$DIR/shot.png"
+    # Read after the shot, so a window that mapped while grim ran counts; tiled windows have no position, so the workspace is what is checked.
+    if ((!any)); then
+        rc=0
+        w=$("$DESK_PY" stranger "$NAME") || rc=$?
+        ((rc == 4)) || { ((rc == 0)) && refuse "not an agent window" "$w"; die "could not read the workspace's windows"; }
+    fi
+    "$DESK_PY" jev "$cmd" "$1" "$JEV_SHOT"
     ;;
 *)
     usage
