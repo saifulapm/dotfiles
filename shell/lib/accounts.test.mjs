@@ -51,6 +51,13 @@ test("main's limits read as the board draws them: percent used and the reset in 
   assert.equal(main.limits[0].fraction, 0.34);
 });
 
+test("an account's API credit reads under its limits as what is left of the grant, with a bar of credit left", () => {
+  const credit = row({ provider: 'claude', label: 'main', account: 'main', metric: 'credit', kind: 'money', value: 246.200338, limit: 250, unit: 'USD', resets_at: '2026-11-05T07:59:00Z' });
+  const main = view([...rows, credit]).accounts[0];
+  assert.deepEqual(main.limits.map((l) => [l.name, l.figure, l.reset]).at(-1), ['Credit', '$246.20 of $250', 'resets 5 Nov']);
+  assert.equal(main.limits.at(-1).fraction, 246.200338 / 250);
+});
+
 test('a limit at 80% or more warns, one at 79% does not, and the bar never leaves 0 to 1', () => {
   const r = [claude('main', '5-hour', 92, null), claude('main', 'weekly', 79, null), claude('main', 'weekly Fable', 80, null), claude('work', '5-hour', 140, null), claude('work', 'weekly', -3, null)];
   const v = view(r);

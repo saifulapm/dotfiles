@@ -80,6 +80,10 @@ function claudeRows(account, body) {
   }
   // Limits that name nothing known mean the endpoint changed shape, so the cache stays and serves stale.
   if (!rows.length) throw new Failure('shape');
+  // A subscription's API credit sits in a bucket under a codename, so any bucket with a dollar grant is read, whatever its name.
+  for (const b of Object.values(body)) {
+    if (b && num(b.limit_dollars) !== null && num(b.remaining_dollars) !== null) rows.push({ ...names(account), metric: 'credit', kind: 'money', value: num(b.remaining_dollars), limit: num(b.limit_dollars), unit: 'USD', resets_at: b.resets_at ? iso(b.resets_at) : null });
+  }
   return rows;
 }
 

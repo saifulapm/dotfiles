@@ -74,6 +74,8 @@ process.stdin.on('data', (d) => {
 };
 
 const ELEVEN = { tier: 'creator', character_count: 11500, character_limit: 32000, next_character_count_reset_unix: 1793000000, currency: 'usd' };
+// A dollar bucket as the usage endpoint gave it on 2026-10-28, under a codename that may change.
+const CREDIT = { utilization: 1.52, resets_at: '2026-11-05T07:59:00+00:00', limit_dollars: 250, used_dollars: 3.799662, remaining_dollars: 246.200338, locked_reason: null };
 const FAL = { username: 'my-team', credits: { current_balance: 24.5, currency: 'USD' } };
 
 // The stub answers with whatever `mode` holds at the time and records every request. `claude` is the usage endpoint's mode, `eleven` and `fal` the others' status.
@@ -94,6 +96,7 @@ async function stub(t) {
     if (s.mode === 'ok') send(200, usage);
     else if (s.mode === 'slow') setTimeout(() => send(200, usage), 300);
     else if (s.mode === 'forged') send(200, JSON.stringify({ limits: FORGED.map((display_name, i) => ({ kind: 'weekly_scoped', percent: i + 1, resets_at: null, scope: { model: { display_name } } })) }));
+    else if (s.mode === 'credit' || s.mode === 'renamed') send(200, JSON.stringify({ ...JSON.parse(usage), [s.mode === 'credit' ? 'iguana_necktie' : 'new_codename']: CREDIT }));
     else if (s.mode === 'nolimits') send(200, JSON.stringify({ five_hour: { utilization: 34 } }));
     else if (s.mode === 'newkinds') send(200, JSON.stringify({ limits: [{ kind: 'five_hour_v2', utilization: 34 }] }));
     else send(s.mode, '{"error":{"message":"sk-ant-oat01-ECHO forged\\n reason"}}');
@@ -212,6 +215,17 @@ test('prints each registry account limits from the usage response', async (t) =>
   assert.deepEqual(s.seen.map((q) => q.headers.authorization).sort(), [`Bearer ${TOKEN.main}`, `Bearer ${TOKEN.work}`]);
   assert.ok(!JSON.stringify(s.seen).includes(REFRESH), 'the refresh token is never sent');
   assert.deepEqual(cacheFiles(ctx).map(([f]) => f).sort(), ['claude-main.json', 'claude-work.json']);
+});
+
+test('a dollar bucket under any name is a credit row after the limits: what is left of the grant', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  const credit = { provider: 'claude', label: 'main', account: 'main', metric: 'credit', kind: 'money', value: 246.200338, limit: 250, unit: 'USD', resets_at: '2026-11-05T07:59:00Z', state: 'ok', reason: null };
+  for (const mode of ['credit', 'renamed']) {
+    s.mode = mode;
+    const { out } = await rows(ctx);
+    assert.deepEqual(strip(out), [...limits('main'), credit], mode);
+  }
 });
 
 test('a failing fetch serves the cached rows as stale with their old time', async (t) => {
