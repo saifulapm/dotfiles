@@ -52,7 +52,7 @@ function stubs(lockState, inputExit) {
   put('dots-call', `echo "dots-call $*" >>'${log}'; [[ "$*" == "lock state" ]] && { ${answer}; }; exit 1`);
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
-  for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
+  for (const t of ['wtype', 'ydotool', 'wlrctl', 'dots-pointer', 'grim']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
   // The journal and the desk state go to the scratch dir, never the live ~/.local/state or runtime dir.
   return { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, XDG_STATE_HOME: dir, XDG_RUNTIME_DIR: dir }, log, journal: join(dir, 'dots/agent-journal.ndjson') };
 }
@@ -173,4 +173,49 @@ test('gui type keeps every argument from its text on out of the journal', () => 
   assert.deepEqual(line.args.slice(0, 3), ['type', 'files', 'Name']);
   assert.equal(line.args[4].len, 'secret-value'.length);
   assert.doesNotMatch(readFileSync(journal, 'utf8'), /secret-value/);
+});
+
+// Two outputs side by side, the focused one on the left, so the rightmost is never the one meant.
+function twoOutputs() {
+  const s = stubs(unlocked, 1);
+  const dir = join(s.log, '..');
+  const out = (name, x, width, height, scale) => ({ name, logical: { x, y: 0, width, height, scale, transform: 'Normal' } });
+  const outputs = { 'DP-1': out('DP-1', 0, 1920, 1080, 1), 'eDP-1': out('eDP-1', 1920, 2048, 1280, 1.25) };
+  writeFileSync(join(dir, 'niri'), `#!/usr/bin/env bash
+case "$*" in
+"msg -j outputs") echo '${JSON.stringify(outputs)}' ;;
+"msg -j focused-output") echo '${JSON.stringify(outputs['DP-1'])}' ;;
+*) echo '{"app_id":"org.gnome.TextEditor"}' ;;
+esac
+`);
+  return { ...s, env: { ...s.env, NIRI_SOCKET: join(dir, 'niri.sock') } };
+}
+
+// grim fails in the stub, so no test writes /tmp/desk/shot.png; the call it got is what counts.
+test('screen shot covers the focused output, not the rightmost', () => {
+  const { env, log } = twoOutputs();
+  spawnSync(screen, ['shot'], { env, encoding: 'utf8' });
+  assert.match(readFileSync(log, 'utf8'), /^grim -g 0,0 1920x1080 -s 0\.666667 /m);
+});
+
+test('screen shot --output names another output', () => {
+  const { env, log } = twoOutputs();
+  spawnSync(screen, ['shot', '--output', 'eDP-1'], { env, encoding: 'utf8' });
+  assert.match(readFileSync(log, 'utf8'), /^grim -g 1920,0 2048x1280 -s 0\.625 /m);
+});
+
+test('screen shot --output with no such output exits 2 naming the outputs there are', () => {
+  const { env, log } = twoOutputs();
+  const r = spawnSync(screen, ['shot', '--output', 'nope'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /nope.*DP-1, eDP-1/);
+  assert.ok(!existsSync(log) || !/grim/.test(readFileSync(log, 'utf8')));
+});
+
+// A point on the left output stays where it is; only the edges of the output under it clamp it.
+test('mouse keeps a point inside the output under it', () => {
+  const { env, log } = twoOutputs();
+  const r = spawnSync(join(scripts, 'mouse'), ['to', '100', '0'], { env, encoding: 'utf8' });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(readFileSync(log, 'utf8'), /^dots-pointer 0,0,3968,1280 move 100 2$/m);
 });

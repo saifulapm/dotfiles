@@ -8,8 +8,9 @@
 #
 # dots-pointer moves to an exact logical point on niri's own virtual
 # pointer, so one process presses, glides and releases. Targets are clamped
-# 2 px inside the screen so a landing never rests in a hot corner: niri's
-# bottom-left one or the shell's top-right one.
+# 2 px inside the output under them, or the focused output when none is, so
+# a landing never rests in a hot corner: niri's bottom-left one or the
+# shell's top-right one.
 #
 # A press goes only over an agent window (scripts/desk): first niri's
 # pick-window names the window under the point, taking one press that the
@@ -22,8 +23,7 @@
 # when the lock arrives during its hit-test. Usage exits 2. Each action
 # leaves a journal line.
 #
-# Screen geometry comes from `niri msg -j outputs` (rightmost output; these
-# machines drive one display). With the env bin/dots-dev prints sourced,
+# Output geometry comes from `niri msg -j outputs`. With the env bin/dots-dev prints sourced,
 # niri msg and dots-pointer answer for the nested session; MOUSE_SCREEN=WxH
 # overrides the geometry.
 
@@ -35,8 +35,18 @@ die() { echo "mouse: $*" >&2; exit 1; }
 
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
 clamp() { local v=$1 lo=$2 hi=$3; ((v < lo)) && v=$lo; ((v > hi)) && v=$hi; echo "$v"; }
-clampx() { int "$1"; clamp "$1" $((OX + 2)) $((OX + W - 3)); }
-clampy() { int "$1"; clamp "$1" $((OY + 2)) $((OY + H - 3)); }
+
+# Sets PX PY to (X,Y) clamped inside the output under it, the focused one (first in OUTS) when none is.
+point() {
+    local o x y w h ox oy ow oh
+    int "$1"; int "$2"
+    read -r ox oy ow oh <<<"${OUTS[0]}"
+    for o in "${OUTS[@]}"; do
+        read -r x y w h <<<"$o"
+        ((x <= $1 && $1 < x + w && y <= $2 && $2 < y + h)) && { ox=$x oy=$y ow=$w oh=$h; break; }
+    done
+    PX=$(clamp "$1" $((ox + 2)) $((ox + ow - 3))) PY=$(clamp "$2" $((oy + 2)) $((oy + oh - 3)))
+}
 
 pointer() { dots-pointer "$BOX" "$@"; }
 
@@ -103,18 +113,22 @@ journal() {
 trap journal EXIT
 unlocked
 
-# The rightmost output is the screen; dots-pointer maps onto the box around every output.
+# Each output's box, the focused one first; dots-pointer maps onto the box around every output.
+OUTS=() BOX=
 if [[ -n "${MOUSE_SCREEN:-}" ]]; then
-    OX=0 OY=0 W=${MOUSE_SCREEN%x*} H=${MOUSE_SCREEN#*x}
-    BOX=0,0,$W,$H
+    OUTS=("0 0 ${MOUSE_SCREEN%x*} ${MOUSE_SCREEN#*x}")
+    BOX=0,0,${MOUSE_SCREEN%x*},${MOUSE_SCREEN#*x}
 else
-    read -r OX OY W H BOX < <(niri msg -j outputs | jq -r '
-        [.[] | .logical | select(. != null)]
-        | (max_by(.x + .width)) as $r
-        | (map(.x) | min) as $x | (map(.y) | min) as $y
-        | "\($r.x) \($r.y) \($r.width) \($r.height) \($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"') || true
+    outs=$(niri msg -j outputs) && focus=$(niri msg -j focused-output) && {
+        mapfile -t OUTS < <(jq -nr --argjson a "$outs" --argjson f "$focus" '
+            [$f.logical] + [$a[] | .logical] | .[] | select(. != null) | "\(.x) \(.y) \(.width) \(.height)"')
+        BOX=$(jq -nr --argjson a "$outs" '
+            [$a[] | .logical | select(. != null)]
+            | (map(.x) | min) as $x | (map(.y) | min) as $y
+            | "\($x),\($y),\((map(.x + .width) | max) - $x),\((map(.y + .height) | max) - $y)"')
+    } || true
 fi
-[[ "${W:-0}" =~ ^[0-9]+$ && ${W:-0} -gt 0 ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+[[ ${#OUTS[@]} -gt 0 && ${OUTS[0]} =~ ^-?[0-9]+\ -?[0-9]+\ [1-9] ]] || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
 
 # One gesture at a time per niri: another agent's move or pick between this
 # hit-test and its last press would steer the press or swallow it.
@@ -126,14 +140,15 @@ flock -w 10 8 || refuse "busy"
 case "$cmd" in
 to)
     [[ $# -eq 3 ]] || usage
-    pointer move "$(clampx "$2")" "$(clampy "$3")"
+    point "$2" "$3"
+    pointer move "$PX" "$PY"
     ;;
 click)
     [[ $# -ge 3 && $# -le 5 ]] || usage
     button=${4:-left} count=${5:-1}
     [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
     [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
-    X=$(clampx "$2") Y=$(clampy "$3")
+    point "$2" "$3"; X=$PX Y=$PY
     hit "$X" "$Y"
     ops=(move "$X" "$Y" click "$button")
     for ((i = 1; i < count; i++)); do ops+=(wait 30 click "$button"); done
@@ -141,7 +156,8 @@ click)
     ;;
 drag)
     [[ $# -eq 5 ]] || usage
-    X1=$(clampx "$2") Y1=$(clampy "$3") X2=$(clampx "$4") Y2=$(clampy "$5")
+    point "$2" "$3"; X1=$PX Y1=$PY
+    point "$4" "$5"; X2=$PX Y2=$PY
     hit "$X1" "$Y1"
     # Ten steps between, so a slider or a drag source sees the button move while held.
     ops=(move "$X1" "$Y1" down left wait 50)
@@ -158,7 +174,8 @@ scroll)
     up) d=(0 "-$n") ;; down) d=(0 "$n") ;; left) d=("-$n" 0) ;; right) d=("$n" 0) ;;
     *) die "direction: up, down, left or right" ;;
     esac
-    pointer move "$(clampx "$2")" "$(clampy "$3")" scroll "${d[@]}"
+    point "$2" "$3"
+    pointer move "$PX" "$PY" scroll "${d[@]}"
     ;;
 *)
     usage

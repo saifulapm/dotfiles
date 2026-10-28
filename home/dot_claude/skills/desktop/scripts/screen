@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # screen — the computer-use action set over this desktop, in screenshot space.
 #
-#   screen shot                          whole screen, 1280 px wide → /tmp/desk/shot.png
+#   screen shot [--output NAME]          the focused output, 1280 px wide → /tmp/desk/shot.png
 #   screen zoom X0 Y0 X1 Y1              that box at native resolution → /tmp/desk/zoom.png
 #   screen move X Y                      hover
 #   screen click X Y [left|right|middle] [COUNT] [--any]   COUNT 2 = double, 3 = triple
@@ -44,13 +44,19 @@ DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
 
-geometry() { # same output scripts/mouse drives: the rightmost
+# The focused output, or the one named: "NAME X Y W H" in logical pixels.
+# A name niri does not have is a usage error that lists the ones it has.
+geometry() {
+    local all
     if [[ -n "${MOUSE_SCREEN:-}" ]]; then
-        echo "0 0 ${MOUSE_SCREEN%x*} ${MOUSE_SCREEN#*x}"
+        echo "screen 0 0 ${MOUSE_SCREEN%x*} ${MOUSE_SCREEN#*x}"
+    elif [[ -z ${1:-} ]]; then
+        niri msg -j focused-output | jq -er '"\(.name) \(.logical | "\(.x) \(.y) \(.width) \(.height)")"'
     else
-        niri msg -j outputs | jq -r '
-            [.[] | .logical | select(. != null)] | max_by(.x + .width)
-            | "\(.x) \(.y) \(.width) \(.height)"'
+        all=$(niri msg -j outputs)
+        jq -er --arg n "$1" '.[$n] | select(.logical) | "\(.name) \(.logical | "\(.x) \(.y) \(.width) \(.height)")"' <<<"$all" && return
+        echo "screen: no output $1; there are: $(jq -r '[.[] | select(.logical) | .name] | join(", ")' <<<"$all")" >&2
+        exit 2
     fi
 }
 
@@ -130,14 +136,17 @@ fi
 
 case "$cmd" in
 shot)
+    output=
+    [[ $# -eq 0 ]] || { [[ $# -eq 2 && $1 == --output ]] && output=$2; } || usage
     mkdir -p "$DIR" "$DESK"
-    read -r OX OY W H < <(geometry) || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+    g=$(geometry "$output") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
+    read -r NAME OX OY W H <<<"$g"
     SH=$((H * SHOT_W / W))
     grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
     # grim rounds the scaled size; record what it actually wrote.
     read -r SW SH < <(file "$DIR/shot.png" | sed -n 's/.*, \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')
     echo "$OX $OY $W $H $SW $SH" >"$STATE"
-    echo "$DIR/shot.png ${SW}x$SH"
+    jq -nc --arg p "$DIR/shot.png" --arg o "$NAME" --argjson w "$SW" --argjson h "$SH" '{shot: $p, output: $o, width: $w, height: $h}'
     ;;
 zoom)
     [[ $# -eq 4 ]] || usage
