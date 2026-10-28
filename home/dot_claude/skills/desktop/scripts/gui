@@ -9,8 +9,8 @@ Chromium need --force-renderer-accessibility to appear.
   gui tree <app> [--all]        interactive widgets as one JSON object (--all = every node)
   gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
-  gui click <app> <text> [--any]       activate the first match semantically
-  gui type <app> <text> <val> [--any]  set an entry's text
+  gui click <app> <text> [--any] [--then shot|windows|tree]       activate the first match semantically
+  gui type <app> <text> <val> [--any] [--then shot|windows|tree]  set an entry's text
   gui text <app>                all readable text in the app
 
 <app> and <text> match case-insensitively on a substring, so `gui click
@@ -18,7 +18,8 @@ files 'Save'` is enough. click and type act only in an agent window: the
 element's app pid and window title must match one `screen launch` opened
 (scripts/desk), else they exit 3 printing the refusal; --any lifts that for
 a brief that grants it. click and type print {"ok": ...} with the result the
-accessibility call reported, exit 1 when it failed. tree prints at most 1000
+accessibility call reported, exit 1 when it failed; --then adds the look
+`screen look` takes once the screen is still, the tree of this app. tree prints at most 1000
 nodes and 32 KB; a longer tree is written whole to a file in the desk state
 directory, named under "spill". Both refuse with exit 3 unless `dots-call lock
 state` reads "locked": false. Exit 4 = no such app/widget (nothing was
@@ -56,6 +57,7 @@ INLINE_NODES = 1000  # what gui tree prints before it spills
 INLINE_BYTES = 32768  # the printed object, newline included
 SPILL_KEEP_S = 3600  # a spill older than this goes on the next gui call
 seen = None  # the window an action saw, for its journal line
+STARTED_MS = int(time.time() * 1000)  # the 2 s a --then look waits count from here
 
 
 def load_desk():
@@ -262,10 +264,32 @@ def matches(node, text):
     return text.lower() in haystack.lower()
 
 
+def finish(out, then, app):
+    """Prints an action's JSON, with the look --then asked for once it worked; exit 1 when it did not."""
+    if out["ok"] and then:
+        screen = os.path.join(os.path.dirname(os.path.realpath(__file__)), "screen")
+        r = subprocess.run([screen, "look", then, str(app.get_process_id())], capture_output=True, text=True, env={**os.environ, "DESK_T0": str(STARTED_MS)})
+        if r.returncode != 0:
+            print(json.dumps(out))
+            print(f"gui: the look failed: {r.stderr.strip()}", file=sys.stderr)
+            sys.exit(1)
+        out.update(json.loads(r.stdout))
+    print(json.dumps(out))
+    sys.exit(0 if out["ok"] else 1)
+
+
 def main(argv):
-    anywhere = argv[-1] == "--any"
-    if anywhere:
-        argv = argv[:-1]
+    # The trailing flags, in either order: --any, and --then KIND on click and type.
+    anywhere, then = False, None
+    while len(argv) > 2:
+        if argv[-1] == "--any" and not anywhere:
+            anywhere, argv = True, argv[:-1]
+        elif argv[1] in ("click", "type") and argv[-2] == "--then" and then is None:
+            then, argv = argv[-1], argv[:-2]
+            if then not in ("shot", "windows", "tree"):
+                usage()
+        else:
+            break
     if len(argv) < 2:
         usage()
     cmd = argv[1]
@@ -339,8 +363,7 @@ def main(argv):
                 ok = bool(Atspi.Action.do_action(action, index))
             except Exception:
                 ok = False
-            print(json.dumps({"ok": ok, "action": names[index], "widget": widget(i, node)}))
-            sys.exit(0 if ok else 1)
+            finish({"ok": ok, "action": names[index], "widget": widget(i, node)}, then, app)
         nothing(f"nothing clickable matching {needle!r}")
 
     if cmd == "type":
@@ -361,8 +384,7 @@ def main(argv):
                 ok = bool(Atspi.EditableText.set_text_contents(editable, value))
             except Exception:
                 ok = False
-            print(json.dumps({"ok": ok, "typed": len(value), "widget": widget(i, node)}))
-            sys.exit(0 if ok else 1)
+            finish({"ok": ok, "typed": len(value), "widget": widget(i, node)}, then, app)
         nothing(f"no editable widget matching {needle!r}")
 
     usage()

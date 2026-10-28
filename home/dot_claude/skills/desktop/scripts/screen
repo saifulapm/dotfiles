@@ -14,6 +14,12 @@
 #                                        window-closed --id N, focus --id N, title --id N --matches RE,
 #                                        workspace N, overview open|closed
 #   screen doctor                        readiness JSON: blockers and the one next step
+#   screen look shot|windows|tree        wait for a still screen, then look: {"stable", KIND}
+#
+# Every acting command takes --then shot|windows|tree last: it acts, then
+# prints the look in the same JSON. A still screen is two identical frames
+# 100 ms apart; 2 s after the command began it stops waiting and says
+# "stable": false, which is no failure (a spinner never stops).
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
 # coordinate, so a shot must come first; it records the scale it used in
@@ -35,7 +41,7 @@
 set -euo pipefail
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
-usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 # doctor answers without a niri too: no niri is one of its blockers.
@@ -47,6 +53,7 @@ DESK=${XDG_RUNTIME_DIR:?}/desk/${NIRI_SOCKET##*/}
 STATE=$DESK/shot
 SHOT_W=1280
 MOUSE="$(dirname "$(readlink -f "$0")")/mouse"
+GUI="$(dirname "$(readlink -f "$0")")/gui"
 DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
 
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
@@ -65,6 +72,70 @@ geometry() {
         echo "screen: no output $1; there are: $(jq -r '[.[] | select(.logical) | .name] | join(", ")' <<<"$all")" >&2
         exit 2
     fi
+}
+
+# The focused output's box and the scale that makes it SHOT_W wide.
+focused_box() {
+    local g
+    g=$(geometry "") || die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"
+    read -r NAME OX OY W H <<<"$g"
+}
+
+# grim rounds the scaled size, so the shot's state records what it actually wrote.
+record() {
+    read -r SW SH < <(file "$1" | sed -n 's/.*, \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')
+    echo "$OX $OY $W $H $SW $SH" >"$STATE"
+}
+
+ms() { echo $((${EPOCHREALTIME/./} / 1000)); }
+
+# Frames of the focused output into $1, each starting 100 ms after the last
+# began (at once when a grab takes longer), until two match or it is 2 s
+# since the acting command began ($DESK_T0 from mouse and gui); STABLE says
+# which. The last frame stays in $1. PNG at compression 1, for speed.
+settle() {
+    local t0=${DESK_T0:-$T0} next=$1.next scale start pause
+    scale=$(awk "BEGIN { print $SHOT_W / $W }")
+    grab() { grim -l 1 -g "$OX,$OY ${W}x$H" -s "$scale" "$1"; }
+    start=$(ms)
+    grab "$1"
+    STABLE=false
+    while :; do
+        pause=$((start + 100 - $(ms)))
+        ((pause <= 0)) || sleep "0.$(printf %03d "$pause")"
+        start=$(ms)
+        grab "$next"
+        cmp -s "$1" "$next" && { STABLE=true; rm -f "$next"; return; }
+        mv "$next" "$1"
+        (($(ms) - t0 < 2000)) || return 0
+    done
+}
+
+# Prints {"stable": bool, KIND: ...}: the still frame as the shot, niri's
+# windows, or the AT-SPI tree of pid $2's app, the focused window's without it.
+look() {
+    local kind=$1 pid=${2:-} file tree
+    focused_box
+    mkdir -p "$DIR" "$DESK"
+    file=$DESK/settle.png
+    [[ $kind == shot ]] && file=$DIR/shot.png
+    settle "$file"
+    case $kind in
+    shot)
+        record "$file"
+        jq -nc --argjson s "$STABLE" --arg p "$file" '{stable: $s, shot: $p}'
+        ;;
+    windows)
+        rm -f "$file"
+        niri msg -j windows | jq -c --argjson s "$STABLE" '{stable: $s, windows: map({id, app_id, title, workspace_id, focused: .is_focused})}'
+        ;;
+    tree)
+        rm -f "$file"
+        [[ -n $pid ]] || pid=$(niri msg -j focused-window | jq -r '.pid // empty')
+        tree=$("$GUI" tree --pid "${pid:-0}" 2>/dev/null) || tree=null
+        jq -nc --argjson s "$STABLE" --argjson t "$tree" '{stable: $s, tree: $t}'
+        ;;
+    esac
 }
 
 load() {
@@ -119,10 +190,21 @@ keys_allowed() {
 cmd=${1:-}
 [[ -n $cmd ]] || usage
 shift
-any=0 anyarg=()
-if [[ $cmd =~ ^(type|key|click|drag)$ ]] && [[ ${!#} == --any ]]; then
-    any=1 anyarg=(--any)
-    set -- "${@:1:$#-1}"
+# The trailing flags of an acting command, in either order: --any, and --then KIND.
+any=0 anyarg=() then=
+if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch)$ ]]; then
+    while (($# > 0)); do
+        if [[ $cmd =~ ^(type|key|click|drag)$ && ${!#} == --any && $any == 0 ]]; then
+            any=1 anyarg=(--any)
+            set -- "${@:1:$#-1}"
+        elif (($# > 1)) && [[ ${*:$#-1:1} == --then && -z $then ]]; then
+            then=${!#}
+            [[ $then =~ ^(shot|windows|tree)$ ]] || usage
+            set -- "${@:1:$#-2}"
+        else
+            break
+        fi
+    done
 fi
 
 # One journal line per action, refusals included (scripts/desk); the window is
@@ -148,11 +230,8 @@ shot)
     mkdir -p "$DIR" "$DESK"
     g=$(geometry "$output") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
     read -r NAME OX OY W H <<<"$g"
-    SH=$((H * SHOT_W / W))
     grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
-    # grim rounds the scaled size; record what it actually wrote.
-    read -r SW SH < <(file "$DIR/shot.png" | sed -n 's/.*, \([0-9]*\) x \([0-9]*\),.*/\1 \2/p')
-    echo "$OX $OY $W $H $SW $SH" >"$STATE"
+    record "$DIR/shot.png"
     jq -nc --arg p "$DIR/shot.png" --arg o "$NAME" --argjson w "$SW" --argjson h "$SH" '{shot: $p, output: $o, width: $w, height: $h}'
     ;;
 zoom)
@@ -221,7 +300,12 @@ key)
     ;;
 launch)
     [[ $# -ge 1 ]] || usage
-    "$DESK_PY" launch "$@"
+    launched=$("$DESK_PY" launch "$@")
+    [[ -n $then ]] || echo "$launched"
+    ;;
+look)
+    [[ $# -ge 1 && $# -le 2 && $1 =~ ^(shot|windows|tree)$ ]] || usage
+    look "$@"
     ;;
 wait)
     exec "$DESK_PY" wait "$@"
@@ -230,3 +314,8 @@ wait)
     usage
     ;;
 esac
+
+if [[ -n $then ]]; then
+    seen=$(look "$then")
+    jq -nc --argjson a "${launched:-null}" --argjson l "$seen" '($a // {}) + $l'
+fi

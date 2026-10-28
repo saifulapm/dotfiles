@@ -64,6 +64,8 @@ const inputs = [
   ['screen', 'click', '1', '1', 'left', '1', '--any'], ['screen', 'drag', '1', '1', '2', '2'], ['screen', 'move', '1', '1'], ['screen', 'scroll', '1', '1', 'down'],
   ['mouse', 'click', '10', '10'], ['mouse', 'click', '10', '10', 'left', '1', '--any'], ['mouse', 'to', '10', '10'], ['mouse', 'drag', '1', '1', '2', '2'], ['mouse', 'scroll', '1', '1', 'down'],
   ['gui', 'click', 'files', 'Save'], ['gui', 'click', 'files', 'Save', '--any'], ['gui', 'type', 'files', 'Name', 'x'],
+  ['screen', 'type', 'hi', '--then', 'shot'], ['screen', 'click', '1', '1', '--any', '--then', 'windows'], ['mouse', 'click', '10', '10', '--then', 'tree'],
+  ['gui', 'click', 'files', 'Save', '--then', 'tree'], ['gui', 'type', 'files', 'Name', 'x', '--then', 'shot', '--any'],
 ];
 
 // Keys or a press at a lock land in its password field, so every input path reads the lock first and refuses with exit 3.
@@ -361,3 +363,25 @@ for (const bad of [['window-open', '--app', 'x', '--timeout', '61'], ['window-op
     assert.equal(wait(stream().env, ...bad).status, 2);
   });
 }
+
+for (const [tool, ...args] of [['screen', 'click', '1', '1', '--then', 'nope'], ['screen', 'type', 'hi', '--then'], ['mouse', 'click', '1', '1', '--then', 'pixels'], ['gui', 'click', 'files', 'Save', '--then', 'nope']]) {
+  test(`${tool} ${args.join(' ')} is a usage error that sends nothing`, () => {
+    const { env, log } = stubs(unlocked, 0);
+    const r = spawnSync(join(scripts, tool), args, { env: { ...env, MOUSE_SCREEN: '100x100' }, encoding: 'utf8' });
+    assert.equal(r.status, 2, r.stderr);
+    assert.doesNotMatch(existsSync(log) ? readFileSync(log, 'utf8') : '', /wtype|dots-pointer/);
+  });
+}
+
+// --then and its kind stay in the clear after the text, which is still kept as length and digest.
+test('the journal keeps --then and its kind, and only the text goes', () => {
+  const { env, journal } = stubs(locked, 1);
+  spawnSync(screen, ['type', 'secret-value', '--then', 'shot'], { env, encoding: 'utf8' });
+  spawnSync(join(scripts, 'gui'), ['type', 'files', 'Name', 'secret-value', '--any', '--then', 'tree'], { env, encoding: 'utf8' });
+  const [scr, gui] = lines(journal);
+  assert.equal(scr.args[1].len, 'secret-value'.length);
+  assert.deepEqual(scr.args.slice(2), ['--then', 'shot']);
+  assert.equal(gui.args[3].len, 'secret-value'.length);
+  assert.deepEqual(gui.args.slice(4), ['--any', '--then', 'tree']);
+  assert.doesNotMatch(readFileSync(journal, 'utf8'), /secret-value/);
+});

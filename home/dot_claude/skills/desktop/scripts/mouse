@@ -5,6 +5,7 @@
 #   mouse click X Y [button] [COUNT] [--any]   move there, then click (left, right, middle); COUNT 2 = double, 3 = triple
 #   mouse drag X1 Y1 X2 Y2 [--any]       left-press at 1, glide, release at 2
 #   mouse scroll X Y up|down|left|right [N]   N wheel notches (default 3)
+#   ... --then shot|windows|tree         then look once the screen is still (scripts/screen look)
 #
 # dots-pointer moves to an exact logical point on niri's own virtual
 # pointer, so one process presses, glides and releases. Targets are clamped
@@ -30,7 +31,7 @@
 set -euo pipefail
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
-usage() { sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "mouse: $*" >&2; exit 1; }
 
 int() { [[ $1 =~ ^-?[0-9]+$ ]] || die "not an integer: $1"; }
@@ -57,6 +58,7 @@ unlocked() {
 }
 
 DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
+SCREEN="$(dirname "$(readlink -f "$0")")/screen"
 
 refuse() { # reason [window JSON]
     [[ -z ${2:-} ]] || SEEN=$2
@@ -90,12 +92,21 @@ hit() {
     unlocked
 }
 
+# The trailing flags, in either order: --any on a press, and --then KIND.
 cmd=${1:-}
-any=0
-if [[ $cmd == click || $cmd == drag ]] && [[ ${!#} == --any ]]; then
-    any=1
-    set -- "${@:1:$#-1}"
-fi
+any=0 then=
+while (($# > 1)); do
+    if [[ $cmd =~ ^(click|drag)$ && ${!#} == --any && $any == 0 ]]; then
+        any=1
+        set -- "${@:1:$#-1}"
+    elif (($# > 2)) && [[ ${*:$#-1:1} == --then && -z $then ]]; then
+        then=${!#}
+        [[ $then =~ ^(shot|windows|tree)$ ]] || usage
+        set -- "${@:1:$#-2}"
+    else
+        break
+    fi
+done
 [[ $cmd =~ ^(to|click|drag|scroll)$ ]] || usage
 
 # One journal line per action, refusals included (scripts/desk); called from
@@ -181,3 +192,9 @@ scroll)
     usage
     ;;
 esac
+
+# The look waits for a still screen without the gesture lock, so no other gesture waits on it.
+if [[ -n $then ]]; then
+    exec 8>&-
+    DESK_T0=$T0 "$SCREEN" look "$then"
+fi

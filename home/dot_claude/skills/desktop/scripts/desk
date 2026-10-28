@@ -262,10 +262,17 @@ def redact(tool, args):
     at = {"screen": 1, "gui": 3}.get(tool)
     if at is None or args[:1] != ["type"]:
         return args
-    # Everything from the text on but a trailing --any, so a misplaced flag never leaves text in the clear.
-    for i in range(at, len(args)):
-        if not (i == len(args) - 1 and args[i] == "--any"):
-            args[i] = {"len": len(args[i]), "sha256": hashlib.sha256(args[i].encode()).hexdigest()}
+    # Everything from the text on but the trailing flags (--any, --then KIND), so a misplaced flag never leaves text in the clear.
+    end = len(args)
+    while end > at + 1:
+        if args[end - 1] == "--any":
+            end -= 1
+        elif end > at + 2 and args[end - 2] == "--then":
+            end -= 2
+        else:
+            break
+    for i in range(at, end):
+        args[i] = {"len": len(args[i]), "sha256": hashlib.sha256(args[i].encode()).hexdigest()}
     return args
 
 
