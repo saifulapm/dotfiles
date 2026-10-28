@@ -178,8 +178,9 @@ survived, not just that it flashed: after 3 s, `niri msg -j windows | jq -r
 
 ```sh
 screen=~/.claude/skills/desktop/scripts/screen
-$screen launch foot && $screen wait window-open --app foot >/dev/null &&
-id=$(niri msg -j focused-window | jq -er 'select(.app_id == "foot") | .id') &&
+$screen launch foot -a agent-hi &&
+id=$($screen wait window-open --app agent-hi | jq -er .window.id) &&
+$screen wait focus --id "$id" >/dev/null &&
 $screen type 'echo hi' && $screen key Return &&
 niri msg action fullscreen-window --id "$id" && sleep 0.5 &&
 text=$(grim -s 3 -o "$(niri msg -j focused-output | jq -r .name)" - | tesseract stdin stdout 2>/dev/null)

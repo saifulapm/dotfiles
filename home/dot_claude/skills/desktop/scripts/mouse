@@ -157,6 +157,8 @@ lockdir=${XDG_RUNTIME_DIR:?}/desk/${NIRI_SOCKET##*/}
 mkdir -p -m 700 "$lockdir"
 exec 8>"$lockdir/gesture.lock"
 flock -w 10 8 || refuse "busy"
+# The wait for the lock can take 10 s, so the lock and the prompts are read again, --any or not.
+guard
 
 case "$cmd" in
 to)

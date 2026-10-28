@@ -310,9 +310,9 @@ scroll)
 type)
     [[ $# -eq 1 ]] || usage
     guard; keys_allowed
-    # A newline would go as Return and submit a form halfway; characters, not bytes, whatever the caller's locale.
+    # A newline, or a CRLF's \r, would go as Return and submit a form halfway; characters, not bytes, whatever the caller's locale.
     LC_ALL=C.UTF-8
-    text=${1//$'\n'/}
+    text=${1//[$'\n\r']/}
     [[ -z $text ]] || prime
     for ((i = 0; i < ${#text}; i++)); do send -- "${text:i:1}"; done
     ;;

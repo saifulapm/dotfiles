@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The desktop skill's worked example, as SKILL.md spells it, opens foot, types echo hi and reads hi back by OCR; scripts/screen refuses input while locked, with exit 3.
+# The desktop skill's worked example, as SKILL.md spells it, opens foot, types echo hi and reads hi back by OCR, closing its own foot and not Saiful's focused one; scripts/screen refuses input while locked, with exit 3.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -8,7 +8,7 @@ lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/nu
 # The fenced block under "The worked example"; a nested foot reads /dev/null, since the live foot.ini themes every foot.
 example=$(awk '/\*\*The worked example\*\*/ { on = 1; next } on && /^```sh$/ { inside = 1; next } inside && /^```$/ { exit } inside' "$skill/SKILL.md" | sed 's|launch foot |launch foot -c /dev/null |')
 check "SKILL.md has the worked example, opening foot and reading it with tesseract" grep -q 'tesseract' <<<"$example"
-foot_count() { niri msg -j windows | jq '[.[] | select(.app_id == "foot")] | length'; }
+count() { niri msg -j windows | jq --arg a "$1" '[.[] | select(.app_id == $a)] | length'; }
 
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
@@ -21,11 +21,16 @@ check "and nothing reached the password field" lock_is '.field == 0'
 timeout 0.5 qs ipc call lock unlock claude 5 >/dev/null
 until_ok 3000 lock_is '.locked == false and .monitorsOff == 1'
 
+# A foot of Saiful's, focused when the example starts, as the one running the agent often is.
+niri msg action spawn -- foot -c /dev/null
+his_up() { [ "$(count foot)" = 1 ]; }
+until_ok 5000 his_up
 out=$(bash -c "$example" 2>&1)
 rc=$?
 echo "     example printed: $(tr '\n' ' ' <<<"$out")"
 check "the example reads hi back by OCR, and says so by its exit code" bash -c "[ $rc = 0 ] && grep -qxE '\\s*hi\\s*' <<<\"\$1\"" _ "$out"
-check "and closes its foot" test "$(foot_count)" = 0
+check "and closes its foot" test "$(count agent-hi)" = 0
+check "and leaves Saiful's foot open" test "$(count foot)" = 1
 
 timeout 0.5 qs ipc call lock lock >/dev/null
 until_ok 3000 lock_is '.locked and .secure'

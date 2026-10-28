@@ -70,6 +70,15 @@ test('SKILL.md runs no bare wtype in a code block, and its worked example launch
   assert.match(example, /screen launch/);
 });
 
+// A wait for any foot answers at once for one of Saiful's, and the focused window can still be his, so the example closes only the id its own app id's wait printed.
+test('the worked example closes only the window its own launch opened', () => {
+  const example = doc.split('**The worked example**')[1].split('\n## ')[0];
+  const app = example.match(/screen launch foot -a ([\w-]+)/)?.[1];
+  assert.ok(app, 'the example launches foot under an app id of its own');
+  assert.match(example, new RegExp(`id=\\$\\(\\$screen wait window-open --app ${app} \\| jq -er \\.window\\.id\\)`));
+  assert.doesNotMatch(example, /focused-window/);
+});
+
 test('SKILL.md links reference.md, which holds the refusal reasons', () => {
   assert.match(doc, /\]\(reference\.md\)/);
   const ref = text(join(skill, 'reference.md'));
@@ -83,9 +92,10 @@ test('desktop-operator passes --any and --jev only as the brief grants, and hand
   assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
 });
 
-test('browser-operator passes --any only as the brief grants, and hands back on an auth prompt', () => {
+test('browser-operator passes --any and --jev only as the brief grants, and hands back on an auth prompt', () => {
   const l = linesOf(operators[1]);
   assert.ok(l.some((x) => /--any/.test(x) && /only/i.test(x) && /brief grants/.test(x)));
+  assert.ok(l.some((x) => /--jev/.test(x) && /JEV allowed/.test(x)));
   assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
 });
 
@@ -227,10 +237,10 @@ test('keys go out at least 15 ms apart, for type and for a repeated key', () => 
   }
 });
 
-// A newline sent as Return would submit a form halfway, so type drops it; a character outside ASCII goes whole, even in the C locale.
+// A newline sent as Return would submit a form halfway, so type drops it, a CRLF's \r too; a character outside ASCII goes whole, even in the C locale.
 test('screen type drops newlines and sends each character whole', () => {
   const { env, log } = stubs(unlocked, 0);
-  assert.equal(spawnSync(screen, ['type', 'a\nb\né✓', '--any'], { env: { ...env, LC_ALL: 'C' }, encoding: 'utf8' }).status, 0);
+  assert.equal(spawnSync(screen, ['type', 'a\nb\r\né✓', '--any'], { env: { ...env, LC_ALL: 'C' }, encoding: 'utf8' }).status, 0);
   assert.deepEqual(sent(log, /^wtype -- /), ['wtype -- a', 'wtype -- b', 'wtype -- é', 'wtype -- ✓']);
   assert.doesNotMatch(readFileSync(log, 'utf8'), /Return/);
 });
@@ -547,4 +557,14 @@ test('screen type and key prime a window not typed into before with Shift_L, onc
   assert.deepEqual(run(7, 'key', 'Return'), ['-k Return']);
   assert.deepEqual(run(8, 'key', 'Return'), ['-k Shift_L', '-k Return']);
   assert.deepEqual(run(8, 'type', 'd'), ['-- d']);
+});
+
+// A click can wait up to 10 s behind another agent's gesture, and --any skips the hit-test's second read, so the prompts are read again once the gesture is this click's.
+test('mouse click --any reads the prompts again once it holds the gesture lock', () => {
+  const opensOnSecondRead = () => `if (( $(grep -c '^dots-call polkit state' "$(dirname "$0")/calls.log") >= 2 )); then echo '${open}'; else echo '${closed}'; fi; exit 0`;
+  const { env, log } = stubs(unlocked, 0, { polkit: opensOnSecondRead });
+  const r = spawnSync(join(scripts, 'mouse'), ['click', '10', '10', '--any'], { env: { ...env, MOUSE_SCREEN: '100x100' }, encoding: 'utf8' });
+  assert.equal(r.status, 3, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { refused: 'auth prompt' });
+  assert.doesNotMatch(readFileSync(log, 'utf8'), /^dots-pointer/m);
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# An open polkit or pinentry prompt refuses every key and click, --any too, and its field stays empty; once it closes keys go again. A polkit prompt opening after key 5 of a 40-character screen type stops it within 6 keys, and a lock taken after key 10 of screen key Tab 50 stops it within 11, each with its field empty.
+# An open polkit or pinentry prompt refuses every key and click, --any too, and its field stays empty; once it closes keys go again. A polkit prompt opening after key 5 of a 40-character screen type stops it within 6 keys, and a lock taken after key 10 of screen key Tab 50 stops it within 11, each with its field empty. A prompt opening during mouse click's hit-test, or after gui click's agent-window check, refuses that action too.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -114,6 +114,35 @@ wtype -k Return
 until_ok 3000 state_is lock '.locked == false'
 tabs_are() { [ "$(tr -cd '\t' <"$typed/tabs" | wc -c)" = "$1" ]; }
 check "and the foot reads those $sent tabs" tabs_are "$sent"
+
+# A dots-pointer that opens a polkit prompt as soon as its pick has answered: the prompt lands between mouse's hit-test and its press.
+mkdir -p "$DOTS_DEV_DIR/pickshim"
+printf '#!/usr/bin/env bash\necho "$*" >>%q\n%q "$@" || exit\ncase " $* " in *" pick "*) %s ;; esac\n' \
+  "$DOTS_DEV_DIR/pick.log" "$(command -v dots-pointer)" \
+  "busctl --address='$DBUS_SESSION_BUS_ADDRESS' call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit Begin s c3 >/dev/null; for _ in \$(seq 60); do dots-call polkit state | jq -e .open >/dev/null && break; sleep 0.05; done" >"$DOTS_DEV_DIR/pickshim/dots-pointer"
+chmod +x "$DOTS_DEV_DIR/pickshim/dots-pointer"
+niri msg action fullscreen-window --id "$(window_of tabs)"
+sleep 0.5
+out=$(PATH=$DOTS_DEV_DIR/pickshim:$PATH "$scripts/mouse" click "$cx" "$cy")
+rc=$?
+check "a polkit prompt opening during mouse click's hit-test over an agent window refuses it (got $rc: $out)" refused "$rc" "$out" "auth prompt"
+check "and no press followed the pick ($(tr '\n' '|' <"$DOTS_DEV_DIR/pick.log"))" bash -c "grep -q pick '$DOTS_DEV_DIR/pick.log' && ! grep -q click '$DOTS_DEV_DIR/pick.log'"
+wtype -k Escape
+until_ok 2000 state_is polkit '.open == false'
+
+# A dots-call whose second polkit state reads open: gui reads the prompts again after its agent-window check, just before it acts.
+mkdir -p "$DOTS_DEV_DIR/callshim"
+printf '#!/usr/bin/env bash\nif [ "$*" = "polkit state" ]; then echo x >>%q; [ "$(wc -l <%q)" -ge 2 ] && { echo %q; exit 0; }; fi\nexec %q "$@"\n' \
+  "$DOTS_DEV_DIR/polkit.reads" "$DOTS_DEV_DIR/polkit.reads" '{"open":true}' "$(command -v dots-call)" >"$DOTS_DEV_DIR/callshim/dots-call"
+chmod +x "$DOTS_DEV_DIR/callshim/dots-call"
+"$screen" launch gtk4-widget-factory >/dev/null
+until_ok 8000 has_window org.gtk.WidgetFactory4
+found() { "$scripts/gui" find gtk4-widget-factory checkbutton >/dev/null 2>&1; }
+until_ok 8000 found
+out=$(PATH=$DOTS_DEV_DIR/callshim:$PATH "$scripts/gui" click gtk4-widget-factory checkbutton)
+rc=$?
+check "a polkit prompt reading open after gui click's agent-window check refuses it (got $rc: $out)" refused "$rc" "$out" "auth prompt"
+check "on its second read of polkit state" test "$(wc -l <"$DOTS_DEV_DIR/polkit.reads")" = 2
 
 exit $((fails > 0))
 }
