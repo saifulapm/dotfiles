@@ -7,6 +7,7 @@
   desk journal TOOL RC MS WINDOW ARG...   the journal line for one action
   desk watch             the watcher itself, started by the others
   desk doctor            whether an agent can drive this desktop now: JSON, exit 1 with blockers
+  desk wait COND [--timeout S]   until COND holds on niri's event stream; exit 1 at the timeout
 
 A window is an agent window when it opens within 5 s after a launch, or
 after an agent action in an agent window (a Save As dialog). One watcher per
@@ -26,6 +27,8 @@ import fcntl
 import hashlib
 import json
 import os
+import re
+import select
 import shutil
 import subprocess
 import sys
@@ -34,6 +37,10 @@ import time
 WINDOW_MS = 5000
 KEEP_DAYS = 30
 OUTCOMES = {0: "ok", 3: "refused", 4: "nothing"}
+WAIT_S, WAIT_MAX_S = 10, 60
+# The kinds niri replays on connect that a wait reads; once all three are in, the state is whole.
+REPLAY = {"WindowsChanged", "WorkspacesChanged", "OverviewOpenedOrClosed"}
+WAIT_USAGE = "wait window-open --app ID | window-closed --id N | focus --id N | title --id N --matches RE | workspace N | overview open|closed [--timeout S]"
 TOOLS = ("grim", "wtype", "dots-pointer", "ydotoold", "tesseract")
 # The first blocker's way out; a tool the skill does not call (ydotoold, tesseract) blocks nothing.
 NEXT = {
@@ -344,10 +351,137 @@ def doctor():
     sys.exit(1 if blockers else 0)
 
 
+def wait_args(args):
+    """The condition's kind and options, and the timeout in seconds; anything else is a usage error."""
+    args, timeout = list(args), WAIT_S
+    if "--timeout" in args:
+        at = args.index("--timeout")
+        try:
+            timeout = float(args[at + 1])
+        except (IndexError, ValueError):
+            die(WAIT_USAGE, 2)
+        del args[at:at + 2]
+        if not 0 < timeout <= WAIT_MAX_S:
+            die(f"--timeout: more than 0, at most {WAIT_MAX_S} s", 2)
+        timeout = int(timeout) if timeout == int(timeout) else timeout
+    kind, rest = (args[0], args[1:]) if args else ("", [])
+    shapes = {"window-open": {"--app"}, "window-closed": {"--id"}, "focus": {"--id"}, "title": {"--id", "--matches"}}
+    if kind in shapes and len(rest) % 2 == 0:
+        opts = dict(zip(rest[::2], rest[1::2]))
+        if set(opts) == shapes[kind] and opts.get("--id", "0").isdigit():
+            try:
+                re.compile(opts.get("--matches", ""))
+                return kind, opts, timeout
+            except re.error:
+                pass
+    if kind == "workspace" and len(rest) == 1 or kind == "overview" and rest in (["open"], ["closed"]):
+        return kind, {"ref": rest[0]}, timeout
+    die(WAIT_USAGE, 2)
+
+
+def follow(st, ev):
+    """Folds one niri event into st: windows by id, the focused window, workspaces by id, the overview."""
+    if "WindowsChanged" in ev:
+        st["windows"] = {w["id"]: w for w in ev["WindowsChanged"]["windows"]}
+        st["focused"] = next((w["id"] for w in st["windows"].values() if w.get("is_focused")), None)
+    elif "WindowOpenedOrChanged" in ev:
+        w = ev["WindowOpenedOrChanged"]["window"]
+        st["windows"][w["id"]] = w
+        if w.get("is_focused"):
+            st["focused"] = w["id"]
+    elif "WindowClosed" in ev:
+        st["windows"].pop(ev["WindowClosed"]["id"], None)
+        if st["focused"] == ev["WindowClosed"]["id"]:
+            st["focused"] = None
+    elif "WindowFocusChanged" in ev:
+        st["focused"] = ev["WindowFocusChanged"]["id"]
+    elif "WorkspacesChanged" in ev:
+        st["workspaces"] = {w["id"]: w for w in ev["WorkspacesChanged"]["workspaces"]}
+    elif "WorkspaceActivated" in ev:
+        a = ev["WorkspaceActivated"]
+        ws = st["workspaces"].get(a["id"])
+        if ws:
+            for o in st["workspaces"].values():
+                if o.get("output") == ws.get("output"):
+                    o["is_active"] = False
+                if a["focused"]:
+                    o["is_focused"] = False
+            ws["is_active"] = True
+            ws["is_focused"] = ws.get("is_focused") or a["focused"]
+    elif "OverviewOpenedOrClosed" in ev:
+        st["overview"] = ev["OverviewOpenedOrClosed"]["is_open"]
+
+
+def brief(st, w):
+    return {"id": w["id"], "app_id": w.get("app_id"), "title": w.get("title"), "pid": w.get("pid"), "workspace_id": w.get("workspace_id"), "focused": w["id"] == st["focused"]}
+
+
+def focused_workspace(st):
+    ws = next((w for w in st["workspaces"].values() if w.get("is_focused")), None)
+    return ws and {k: ws.get(k) for k in ("id", "idx", "name", "output")}
+
+
+def holds(kind, opts, st):
+    """What the wait prints once its condition holds, else None."""
+    wins = st["windows"]
+    n = int(opts.get("--id", 0))
+    if kind == "window-open":
+        hits = [w for w in wins.values() if w.get("app_id") == opts["--app"]]
+        return {"window": brief(st, max(hits, key=lambda w: w["id"]))} if hits else None
+    if kind == "window-closed":
+        return None if n in wins else {"closed": n}
+    if kind == "focus":
+        return {"window": brief(st, wins[n])} if st["focused"] == n and n in wins else None
+    if kind == "title":
+        w = wins.get(n)
+        return {"window": brief(st, w)} if w and re.search(opts["--matches"], w.get("title") or "") else None
+    if kind == "workspace":
+        ws = focused_workspace(st)
+        return {"workspace": ws} if ws and opts["ref"] in (str(ws["idx"]), ws["name"]) else None
+    return {"overview": opts["ref"]} if st["overview"] == (opts["ref"] == "open") else None
+
+
+def wait(args):
+    """Prints what the condition holds for once it does, with already when niri's opening replay held it; exit 1 at the timeout."""
+    started = time.monotonic()
+    kind, opts, timeout = wait_args(args)
+    # One connection: its replay is the check and its events are the listen, so nothing happens between them.
+    stream = subprocess.Popen(["niri", "msg", "-j", "event-stream"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    st = {"windows": {}, "focused": None, "workspaces": {}, "overview": False}
+    seen, buf = set(), b""
+    try:
+        while True:
+            left = started + timeout - time.monotonic()
+            if left <= 0 or not select.select([stream.stdout], [], [], left)[0]:
+                last = {"windows": [brief(st, w) for _, w in sorted(st["windows"].items())], "focused": st["focused"], "workspace": focused_workspace(st), "overview": st["overview"]}
+                print(json.dumps({"timeout": timeout, "last": last}))
+                sys.exit(1)
+            chunk = os.read(stream.stdout.fileno(), 65536)
+            if not chunk:
+                die("niri's event stream ended")
+            *lines, buf = (buf + chunk).split(b"\n")
+            for line in lines:
+                try:
+                    ev = json.loads(line)
+                except ValueError:
+                    continue
+                replaying = seen != REPLAY
+                follow(st, ev)
+                seen |= REPLAY & ev.keys()
+                hit = seen == REPLAY and holds(kind, opts, st)
+                if hit:
+                    print(json.dumps({"already": replaying, **hit}))
+                    return
+    finally:
+        stream.kill()
+
+
 def main(argv):
     cmd = argv[1] if len(argv) > 1 else ""
     if cmd == "watch":
         watch()
+    elif cmd == "wait":
+        wait(argv[2:])
     elif cmd == "doctor" and len(argv) == 2:
         doctor()
     elif cmd == "launch" and len(argv) > 2:

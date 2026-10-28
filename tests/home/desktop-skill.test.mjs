@@ -293,3 +293,71 @@ test('screen doctor reaches the a11y bus AT_SPI_BUS_ADDRESS names, as libatspi d
   const { out } = doctor({ ...env, AT_SPI_BUS_ADDRESS: 'unix:path=/run/nested-a11y' });
   assert.equal(out.at_spi, true);
 });
+
+// A niri whose event stream replays a desktop with one foot window (id 1) on workspace 1, then sends `later`, a list of [seconds, event], and stays open.
+function stream(later = [], { windows = [{ id: 1, app_id: 'foot', title: 'fish', is_focused: true, workspace_id: 1, pid: 10 }] } = {}) {
+  const s = stubs(unlocked, 0);
+  const dir = join(s.log, '..');
+  const replay = [
+    { WorkspacesChanged: { workspaces: [{ id: 1, idx: 1, name: null, output: 'eDP-1', is_active: true, is_focused: true }, { id: 2, idx: 2, name: 'web', output: 'eDP-1', is_active: false, is_focused: false }] } },
+    { WindowsChanged: { windows } },
+    { KeyboardLayoutsChanged: { keyboard_layouts: { names: ['us'], current_idx: 0 } } },
+    { OverviewOpenedOrClosed: { is_open: false } },
+  ];
+  const lines = replay.map((e) => `echo '${JSON.stringify(e)}'`);
+  for (const [t, e] of later) lines.push(`sleep ${t}`, `echo '${JSON.stringify(e)}'`);
+  writeFileSync(join(dir, 'niri'), `#!/usr/bin/env bash\n[[ "$*" == "msg -j event-stream" ]] || exit 1\n${lines.join('\n')}\nexec sleep 100\n`);
+  return { ...s, env: { ...s.env, NIRI_SOCKET: join(dir, 'niri.sock') } };
+}
+const wait = (env, ...args) => {
+  const t0 = Date.now();
+  const r = spawnSync(screen, ['wait', ...args], { env, encoding: 'utf8', timeout: 20000 });
+  return { status: r.status, ms: Date.now() - t0, out: r.stdout ? JSON.parse(r.stdout) : r.stderr };
+};
+const opened = (id, app_id, title = app_id) => ({ WindowOpenedOrChanged: { window: { id, app_id, title, is_focused: false, workspace_id: 1, pid: 20 } } });
+
+test('screen wait window-open returns at once with already when such a window is open', () => {
+  const { status, out } = wait(stream().env, 'window-open', '--app', 'foot');
+  assert.equal(status, 0, JSON.stringify(out));
+  assert.equal(out.already, true);
+  assert.equal(out.window.id, 1);
+});
+
+test('screen wait window-open returns the window that opens later', () => {
+  const { status, out, ms } = wait(stream([[0.4, opened(7, 'org.gtk.WidgetFactory4')]]).env, 'window-open', '--app', 'org.gtk.WidgetFactory4');
+  assert.equal(status, 0, JSON.stringify(out));
+  assert.deepEqual([out.already, out.window.id, out.window.app_id], [false, 7, 'org.gtk.WidgetFactory4']);
+  assert.ok(ms >= 400, `${ms} ms`);
+});
+
+test('screen wait title returns when the title comes to match', () => {
+  const env = stream([[0.2, opened(1, 'foot', 'build')], [0.2, opened(1, 'foot', 'build done x')]]).env;
+  const { status, out } = wait(env, 'title', '--id', '1', '--matches', 'x$');
+  assert.equal(status, 0, JSON.stringify(out));
+  assert.deepEqual([out.already, out.window.title], [false, 'build done x']);
+});
+
+test('screen wait focus, window-closed, workspace and overview follow their events', () => {
+  const later = [[0.1, opened(5, 'kak')], [0.1, { WindowFocusChanged: { id: 5 } }], [0.1, { WorkspaceActivated: { id: 2, focused: true } }], [0.1, { OverviewOpenedOrClosed: { is_open: true } }], [0.1, { WindowClosed: { id: 1 } }]];
+  assert.deepEqual(wait(stream(later).env, 'focus', '--id', '5').out.window.id, 5);
+  assert.deepEqual(wait(stream(later).env, 'workspace', 'web').out.workspace.id, 2);
+  assert.deepEqual(wait(stream(later).env, 'workspace', '2').out.workspace.name, 'web');
+  assert.deepEqual(wait(stream(later).env, 'overview', 'open').out, { already: false, overview: 'open' });
+  assert.deepEqual(wait(stream(later).env, 'window-closed', '--id', '1').out, { already: false, closed: 1 });
+  assert.deepEqual(wait(stream().env, 'overview', 'closed').out, { already: true, overview: 'closed' });
+});
+
+test('screen wait gives up after its timeout with exit 1 and the last state seen', () => {
+  const { status, out, ms } = wait(stream([[0.2, opened(3, 'kak', 'notes')]]).env, 'window-open', '--app', 'nothing', '--timeout', '1');
+  assert.equal(status, 1);
+  assert.ok(ms >= 1000 && ms < 1500, `${ms} ms`);
+  assert.equal(out.timeout, 1);
+  assert.deepEqual(out.last.windows.map((w) => [w.id, w.app_id, w.title]), [[1, 'foot', 'fish'], [3, 'kak', 'notes']]);
+  assert.deepEqual([out.last.focused, out.last.workspace.id, out.last.overview], [1, 1, false]);
+});
+
+for (const bad of [['window-open', '--app', 'x', '--timeout', '61'], ['window-open', '--app', 'x', '--timeout', '0'], ['window-open'], ['title', '--id', '1'], ['focus', '--id', 'x'], ['overview', 'half'], ['nap']]) {
+  test(`screen wait ${bad.join(' ')} is a usage error`, () => {
+    assert.equal(wait(stream().env, ...bad).status, 2);
+  });
+}

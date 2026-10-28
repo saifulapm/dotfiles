@@ -10,6 +10,9 @@
 #   screen type TEXT [--any]             literal text at keyboard focus
 #   screen key COMBO [REPEAT] [--any]    ctrl+s · Return · super+t · shift+Tab
 #   screen launch CMD...                 start CMD; its windows in the next 5 s are agent windows
+#   screen wait COND [--timeout S]       until niri says COND (10 s, at most 60): window-open --app ID,
+#                                        window-closed --id N, focus --id N, title --id N --matches RE,
+#                                        workspace N, overview open|closed
 #   screen doctor                        readiness JSON: blockers and the one next step
 #
 # Every X/Y is a pixel in the LAST `screen shot` image, never a logical
@@ -32,7 +35,7 @@
 set -euo pipefail
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 # doctor answers without a niri too: no niri is one of its blockers.
@@ -219,6 +222,9 @@ key)
 launch)
     [[ $# -ge 1 ]] || usage
     "$DESK_PY" launch "$@"
+    ;;
+wait)
+    exec "$DESK_PY" wait "$@"
     ;;
 *)
     usage
