@@ -118,7 +118,7 @@ function stubs(lockState, inputExit, { polkit = closed, pinentry = closed } = {}
   put('dots-call', `echo "dots-call $*" >>'${log}'; case "$*" in "lock state") ${say(lockState)} ;; "polkit state") ${say(polkit)} ;; "pinentry state") ${say(pinentry)} ;; esac; exit 1`);
   put('qs', 'echo "Function not found" >&2; exit 1');
   put('niri', `echo '{"app_id":"org.gnome.TextEditor"}'`);
-  for (const t of ['ydotool', 'wlrctl', 'dots-pointer', 'grim']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
+  for (const t of ['ydotool', 'wlrctl', 'dots-pointer', 'grim', 'curl']) put(t, `echo "${t} $*" >>'${log}'; exit ${inputExit}`);
   // Each wtype also notes when it began, in ms, for the spacing between keys.
   put('wtype', `echo $(( \${EPOCHREALTIME/./} / 1000 )) >>'${join(dir, 'wtype.ms')}'; echo "wtype $*" >>'${log}'; exit ${inputExit}`);
   // The journal and the desk state go to the scratch dir, never the live ~/.local/state or runtime dir.
@@ -574,4 +574,30 @@ test('mouse click --any reads the prompts again once it holds the gesture lock',
   assert.equal(r.status, 3, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), { refused: 'auth prompt' });
   assert.doesNotMatch(readFileSync(log, 'utf8'), /^dots-pointer/m);
+});
+
+// JEV sends a shot off the machine, so find and check do nothing without a brief's --jev: no guard read, no shot, no request, and a journal line with no send.
+for (const args of [['find', 'the first text entry'], ['check', 'is anything open?'], ['find', 'the first text entry', '--any']]) {
+  test(`screen ${args.join(' ')} without --jev refuses and sends nothing`, () => {
+    const { env, log, journal } = stubs(unlocked, 0);
+    const r = spawnSync(screen, args, { env, encoding: 'utf8' });
+    assert.equal(r.status, 3, r.stderr);
+    assert.deepEqual(JSON.parse(r.stdout), { refused: 'jev not granted' });
+    assert.equal(existsSync(log) ? readFileSync(log, 'utf8') : '', '');
+    const [line, ...more] = lines(journal);
+    assert.deepEqual(more, []);
+    assert.equal(line.outcome, 'refused');
+    assert.deepEqual(line.args, args);
+    assert.equal(line.jev, undefined);
+  });
+}
+
+test('screen find and check need a description, and say how without a journal line', () => {
+  const { env, journal } = stubs(unlocked, 0);
+  for (const args of [['find'], ['check', '--jev'], ['find', '', '--jev'], ['check', 'a', 'b', '--jev']]) {
+    const r = spawnSync(screen, args, { env, encoding: 'utf8' });
+    assert.equal(r.status, 2, `${args}: ${r.stderr}`);
+    assert.match(r.stderr + r.stdout, /screen find DESCRIPTION --jev/);
+  }
+  assert.ok(!existsSync(journal));
 });

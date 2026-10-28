@@ -15,6 +15,8 @@
 #                                        workspace N, overview open|closed
 #   screen doctor                        readiness JSON: blockers and the one next step
 #   screen look shot|windows|tree        wait for a still screen, then look: {"stable", KIND}
+#   screen find DESCRIPTION --jev [--any]   a fresh shot to JEV: the point to click, in shot pixels
+#   screen check QUESTION --jev [--any]     a fresh shot to JEV: yes or no, with its probability
 #
 # Every acting command takes --then shot|windows|tree last: it acts, then
 # prints the look in the same JSON. A still screen is two identical frames
@@ -44,7 +46,7 @@ set -euo pipefail
 shopt -s inherit_errexit
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
-usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 die() { echo "screen: $*" >&2; exit 1; }
 
 # doctor answers without a niri too: no niri is one of its blockers.
@@ -254,7 +256,7 @@ journal() {
     "$DESK_PY" journal screen "$rc" $(($(date +%s%3N) - T0)) "${w:-null}" "${ARGV[@]}" || true
     exit "$rc"
 }
-if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch)$ ]]; then
+if [[ $cmd =~ ^(move|click|drag|scroll|type|key|launch|find|check)$ ]]; then
     DESK_SEEN=$(mktemp)
     export DESK_SEEN
     trap journal EXIT
@@ -352,6 +354,17 @@ look)
     ;;
 wait)
     exec "$DESK_PY" wait "$@"
+    ;;
+find | check)
+    # The grant comes first: without it nothing is read, shot or sent.
+    jev=0
+    while (($# > 1)) && [[ ${!#} =~ ^--(jev|any)$ ]]; do
+        if [[ ${!#} == --jev ]]; then jev=1; else any=1; fi
+        set -- "${@:1:$#-1}"
+    done
+    [[ $# -eq 1 && -n $1 && $1 != --* ]] || usage
+    ((jev)) || refuse "jev not granted"
+    die "jev: not built yet"
     ;;
 *)
     usage
