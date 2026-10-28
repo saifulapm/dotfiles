@@ -28,7 +28,7 @@ function groupOf(combo, action) {
   if (combo.split('+').pop().startsWith('XF86')) return 'SYSTEM';
   if (/^spawn "(qs" "ipc" "call|dots-call)"/.test(action)) return 'SURFACES';
   // nirius moves windows, so its binds are window binds though they spawn.
-  if (/^spawn "nirius"/.test(action)) return 'WINDOWS';
+  if (/^spawn "(nirius|dots-scratchpad)"/.test(action)) return 'WINDOWS';
   if (/^spawn\b/.test(action)) return 'WORK';
   if (/window|column|workspace/.test(action)) return 'WINDOWS';
   return 'SYSTEM';

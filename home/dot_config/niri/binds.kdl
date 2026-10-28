@@ -86,7 +86,7 @@ binds {
     Mod+Shift+V hotkey-overlay-title="Focus Floating or Tiled" { switch-focus-between-floating-and-tiling; }
     Mod+Shift+C hotkey-overlay-title="Center Column" { center-column; }
     Mod+Ctrl+C hotkey-overlay-title="Center Visible Columns" { center-visible-columns; }
-    Mod+Z repeat=false hotkey-overlay-title="Show Scratchpad" { spawn "nirius" "scratchpad-show"; }
+    Mod+Z repeat=false hotkey-overlay-title="Show Scratchpad" { spawn "dots-scratchpad"; }
     Mod+Shift+Z repeat=false hotkey-overlay-title="Window to Scratchpad or Back" { spawn "nirius" "scratchpad-toggle"; }
     Mod+Shift+S repeat=false hotkey-overlay-title="Window Follows Workspaces" { spawn "nirius" "toggle-follow-mode"; }
 

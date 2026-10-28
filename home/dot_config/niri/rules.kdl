@@ -23,6 +23,11 @@ window-rule {
     default-column-width { proportion 0.5; }
     default-window-height { proportion 0.55; }
 }
+// Files floats at the size it asks for.
+window-rule {
+    match app-id="^files$"
+    open-floating true
+}
 window-rule {
     match app-id="^chromium-browser$" title=r#"(?i)^(sign in|sign up|log in|login|authoriz|authenticat|continue with|verify)"#
     open-floating true

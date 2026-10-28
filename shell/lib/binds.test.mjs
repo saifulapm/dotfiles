@@ -155,8 +155,8 @@ test('Mod+; clicks a detected target with wl-kbptr, and Mod+Shift+; picks a tile
   assert.match(binds, spawns('Mod+Shift+Semicolon', ['wl-kbptr', '-o', 'modes=tile,bisect']));
 });
 
-test('Mod+Z shows the nirius scratchpad, Mod+Shift+Z sends a window to it or back, and Mod+Shift+S makes a window follow', () => {
-  assert.match(binds, spawns('Mod+Z', ['nirius', 'scratchpad-show']));
+test('Mod+Z shows the nirius scratchpad centered, Mod+Shift+Z sends a window to it or back, and Mod+Shift+S makes a window follow', () => {
+  assert.match(binds, spawns('Mod+Z', ['dots-scratchpad']));
   assert.match(binds, spawns('Mod+Shift+Z', ['nirius', 'scratchpad-toggle']));
   assert.match(binds, spawns('Mod+Shift+S', ['nirius', 'toggle-follow-mode']));
 });
@@ -175,11 +175,12 @@ test('the Touch Bar keys light the keyboard and search, and Alt and Shift fine-t
   assert.match(binds, acts('Mod+Shift+P', 'power-off-monitors'));
 });
 
-test('picture-in-picture, viewers and Chromium sign-in and sharing windows float, and terminals scroll faster', () => {
+test('picture-in-picture, viewers, Files and Chromium sign-in and sharing windows float, and terminals scroll faster', () => {
   const rules = readFileSync(new URL('../../home/dot_config/niri/rules.kdl', import.meta.url), 'utf8');
   const block = (re) => rules.split(/^window-rule /m).find((r) => re.test(r)) ?? '';
   assert.match(block(/Picture/), /open-floating true/);
   assert.match(block(/\^mpv\$/), /open-floating true/);
+  assert.match(block(/\^files\$/), /open-floating true/);
   assert.match(block(/sign in/), /open-floating true/);
   assert.match(block(/title=r#"\(\?i\)is sharing/), /open-focused false/);
   assert.match(block(/footclient/), /scroll-factor 1\.5/);

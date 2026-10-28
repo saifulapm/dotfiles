@@ -51,7 +51,8 @@ test('binds group into surfaces, work, windows and system', () => {
   assert.equal(row('    Mod+1 hotkey-overlay-title="Focus Workspace 1" { focus-workspace 1; }').group, 'WINDOWS');
   assert.equal(row('    Mod+F hotkey-overlay-title="Maximize Column" { maximize-column; }').group, 'WINDOWS');
   // nirius moves windows, so its binds are window binds though they spawn.
-  assert.equal(row('    Mod+Z hotkey-overlay-title="Show Scratchpad" { spawn "nirius" "scratchpad-show"; }').group, 'WINDOWS');
+  assert.equal(row('    Mod+Shift+Z hotkey-overlay-title="Window to Scratchpad or Back" { spawn "nirius" "scratchpad-toggle"; }').group, 'WINDOWS');
+  assert.equal(row('    Mod+Z hotkey-overlay-title="Show Scratchpad" { spawn "dots-scratchpad"; }').group, 'WINDOWS');
   assert.equal(row('    Mod+Shift+Q hotkey-overlay-title="Quit niri" { quit; }').group, 'SYSTEM');
   assert.equal(row('    Print hotkey-overlay-title="Screenshot" { screenshot; }').group, 'SYSTEM');
   // The media keys spawn qs and wpctl, yet they are system keys, not surfaces or apps.

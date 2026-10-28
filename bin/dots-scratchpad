@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# dots-scratchpad: shows the nirius scratchpad, or hides it, and centers the window it shows, since niri keeps a floating window where it last was.
+set -euo pipefail
+{
+nirius scratchpad-show
+id=$(niri msg -j focused-window | jq -r '.id // empty')
+# After a hide the focused window is no scratchpad window, and it stays where it is.
+nirius list-scratchpad | grep -q "^id: $id," && niri msg action center-window --id "$id"
+exit 0
+}
