@@ -82,7 +82,7 @@ grant permissions or accept dialogs the brief did not ask for.
 If a job needs the desktop skill's `screen`, `mouse` or `gui` (a file picker, say):
 
 - `--any` is passed only when the brief grants it.
-- `--jev` is for JEV commands (`screen find`, `screen check`, not built yet); it is passed only when the brief says "JEV allowed".
+- `--jev` is for JEV commands (`screen find`, `screen check`); it is passed only when the brief says "JEV allowed". Exit 4 means the thing is not on screen. On exit 1 fall back to `gui` or OCR of `screen zoom`, and do not retry JEV.
 - A refusal exits 3. On exit 3 with `auth prompt` (a polkit or pinentry password prompt is open), stop and hand the task back to Saiful; never type a password.
 
 ## Hand back

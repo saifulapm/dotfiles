@@ -152,8 +152,15 @@ clicks: they skip the lock, prompt and window checks the scripts make.
   only that, never the lock or a prompt; pass it only when the brief grants it.
 - **Auth prompt.** A polkit or pinentry password prompt refuses every input,
   `--any` or not. Stop and hand the task back to Saiful; never type a password.
-- `--jev` is a grant for JEV commands (`screen find`, `screen check`, coming
-  later): pass it only when the brief says "JEV allowed".
+- **JEV.** `screen find "<thing>" --jev` takes a fresh shot (the last shot)
+  and prints `{"x":..,"y":..,"confidence":..,"on_screen":..}`, the point in
+  shot pixels; exit 4 with `{"found":false,"on_screen":p}` when it is not on
+  screen. `screen check "<yes-or-no question>" --jev` prints
+  `{"yes":true|false,"probability":p}`, exit 0 either way. Pass `--jev` only
+  when the brief says "JEV allowed": each call sends a screenshot off the
+  machine, to OpenRouter and TypeSafe, on Saiful's credits. Without it, exit 3
+  `{"refused":"jev not granted"}`. On exit 1, fall back to `gui find`,
+  `gui tree` or OCR of `screen zoom`; never retry JEV in a loop.
 - Moving the pointer can close an open surface. Prefer `gui click`.
 
 Refusal reasons, the journal and the rest: [reference.md](reference.md).

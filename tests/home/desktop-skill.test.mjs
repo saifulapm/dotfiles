@@ -109,6 +109,29 @@ test('browser-operator passes --any and --jev only as the brief grants, and hand
   assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
 });
 
+test('the skill documents screen find and screen check with --jev, and none of it says JEV is unbuilt', () => {
+  assert.match(doc, /screen find[^]*--jev/);
+  assert.match(doc, /screen check[^]*--jev/);
+  for (const f of [join(skill, 'SKILL.md'), join(skill, 'reference.md'), ...operators]) assert.doesNotMatch(text(f), /not built yet|not in this build|coming later/, f);
+});
+
+test('reference.md JEV section names exit 4, the exit 1 fallback, jev not granted and an image-free journal', () => {
+  const ref = text(join(skill, 'reference.md'));
+  const jev = ref.slice(ref.indexOf('## JEV'), ref.indexOf('## Journal'));
+  assert.match(jev, /exit 4/i);
+  assert.ok(jev.split('\n- ').some((x) => /exit 1/i.test(x) && /gui/.test(x) && /OCR/.test(x)));
+  assert.match(jev, /jev not granted/);
+  assert.match(jev, /never[^.]*image/i);
+});
+
+test('each operator names --jev with JEV allowed, and exit 1 with a fallback to gui or OCR', () => {
+  for (const o of operators.slice(0, 2)) {
+    const l = linesOf(o);
+    assert.ok(l.some((x) => /--jev/.test(x) && /JEV allowed/.test(x)), o);
+    assert.ok(l.some((x) => /exit 1/.test(x) && /`gui`|OCR/.test(x) && /fall back/i.test(x)), o);
+  }
+});
+
 // A PATH whose dots-call answers lock state, polkit state and pinentry state with the given JSON (or, given a function, runs its body), the prompts closed unless given, whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus; XDG_STATE_HOME is the same scratch dir.
 function stubs(lockState, inputExit, { polkit = closed, pinentry = closed } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'desktop-skill-'));

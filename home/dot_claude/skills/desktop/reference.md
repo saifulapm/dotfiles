@@ -12,7 +12,8 @@ call, `gui click|type`) refuses with exit 3 and prints
 |---|---|---|
 | `locked` | `dots-call lock state` reads locked | unlock only if the brief says to; else hand back |
 | `auth prompt` | a polkit or pinentry password prompt is open (`dots-call polkit state` or `dots-call pinentry state` reads anything but `"open": false`) | refused even with `--any`; stop, hand the task back to Saiful, never type a password |
-| `not an agent window` | the focused window (keys) or the window under the point (clicks) is not one `screen launch` opened | `screen launch` the app, or `--any` if the brief grants it |
+| `jev not granted` | `screen find` or `screen check` ran without `--jev` | pass `--jev` only if the brief says "JEV allowed"; else use `gui` or OCR |
+| `not an agent window` | the focused window (keys) or the window under the point (clicks) is not one `screen launch` opened; for `screen find` and `check`, any window on the focused output's active workspace that is not | `screen launch` the app, or `--any` if the brief grants it |
 | `no window` | no window under the point, or none focused | re-read `niri msg -j windows`, re-shoot |
 | `no answer` | `mouse` got no answer from niri's pick-window in 500 ms | retry once, then hand back |
 | `busy` | another gesture runs on this niri | wait, retry |
@@ -47,8 +48,32 @@ by hand.
 
 ## JEV
 
-`--jev` is a grant for JEV commands (`screen find`, `screen check`), which
-are not in this build. Pass it only when the brief says "JEV allowed".
+JEV is TypeSafe's hosted decision model, reached through OpenRouter. Pass
+`--jev` only when the brief says "JEV allowed"; there is no standing switch.
+Each call sends a fresh screenshot of the focused output off the machine, to
+OpenRouter and TypeSafe, billed to Saiful's OpenRouter credits.
+
+- `screen find "<description>" --jev [--any]` takes a fresh shot, which
+  becomes the last shot, so `screen click X Y` right after takes the point as
+  printed. It prints `{"x":..,"y":..,"confidence":..,"on_screen":..}`: the
+  point in shot pixels, the Box confidence and the probability the thing is
+  on screen. Exit 4 prints `{"found":false,"on_screen":p}` when that
+  probability is under 0.5.
+- `screen check "<yes-or-no question>" --jev [--any]` prints
+  `{"yes":true|false,"probability":p}`. `yes` is true when p is at least 0.5.
+  Exit 0 either way.
+- Exit 3 refuses: `{"refused":"jev not granted"}` without `--jev` (nothing is
+  read, shot or sent); `locked` and `auth prompt` as for every input, even
+  with `--any`; and `not an agent window` when any window on the focused
+  output's active workspace, floating ones included, is not one
+  `screen launch` opened. `--any` lifts only that last check, and only when
+  the brief grants `--any`.
+- Exit 1 is any other failure: no key, network, HTTP error, a malformed
+  answer, or no reply within 10 s (no retry). stderr ends "fall back to gui or
+  OCR". Find the thing with `gui find` or `gui tree`, or OCR of
+  `screen zoom`. Never retry JEV in a loop.
+- Every send is a journal line holding the question and JEV's answer. The
+  journal never holds the image.
 
 ## Journal
 
