@@ -11,6 +11,7 @@ const skill = join(repo, 'home/dot_claude/skills/desktop');
 const screen = join(skill, 'scripts/screen');
 const files = [
   join(skill, 'SKILL.md'),
+  join(skill, 'reference.md'),
   ...readdirSync(join(skill, 'scripts')).map((f) => join(skill, 'scripts', f)),
   join(repo, 'home/dot_claude/agents/desktop-operator.md'),
   join(repo, 'home/dot_claude/agents/browser-operator.md'),
@@ -38,6 +39,54 @@ test('every IPC target the skill names is one the shell defines', () => {
   assert.ok(table.length > 0, 'the skill has no IPC table');
   for (const t of table) named.add(t);
   assert.deepEqual([...named].filter((n) => !known.has(n)), []);
+});
+
+const doc = text(join(skill, 'SKILL.md'));
+const linesOf = (f) => text(f).split('\n');
+const operators = ['desktop-operator', 'browser-operator'].map((n) => join(repo, `home/dot_claude/agents/${n}.md`));
+
+test('SKILL.md stays under 20,000 characters', () => {
+  assert.ok(doc.length < 20000, String(doc.length));
+});
+
+test('SKILL.md names launch, wait, doctor and --then', () => {
+  for (const w of ['screen launch', 'screen wait', 'screen doctor', '--then']) assert.ok(doc.includes('`' + w) || doc.includes(w), w);
+  for (const w of ['screen launch', 'screen wait', 'screen doctor']) assert.match(doc, new RegExp('`[^`\\n]*' + w), w);
+});
+
+test('SKILL.md says never to send input with wtype, wlrctl or ydotool', () => {
+  assert.ok(linesOf(join(skill, 'SKILL.md')).some((l) => /never/i.test(l) && /wtype/.test(l) && /wlrctl/.test(l) && /ydotool/.test(l)));
+});
+
+test('SKILL.md runs no bare wtype in a code block, and its worked example launches through screen', () => {
+  let fenced = false;
+  const bare = [];
+  for (const l of linesOf(join(skill, 'SKILL.md'))) {
+    if (l.startsWith('```')) fenced = !fenced;
+    else if (fenced && /^\s*wtype\b|&&\s*wtype\b/.test(l)) bare.push(l);
+  }
+  assert.deepEqual(bare, []);
+  const example = doc.split('**The worked example**')[1].split('\n## ')[0];
+  assert.match(example, /screen launch/);
+});
+
+test('SKILL.md links reference.md, which holds the refusal reasons', () => {
+  assert.match(doc, /\]\(reference\.md\)/);
+  const ref = text(join(skill, 'reference.md'));
+  for (const r of ['locked', 'auth prompt', 'not an agent window', 'no window', 'no answer', 'busy']) assert.ok(ref.includes(r), r);
+});
+
+test('desktop-operator passes --any and --jev only as the brief grants, and hands back on an auth prompt', () => {
+  const l = linesOf(operators[0]);
+  assert.ok(l.some((x) => /--any/.test(x) && /only/i.test(x) && /brief grants/.test(x)));
+  assert.ok(l.some((x) => /--jev/.test(x) && /JEV allowed/.test(x)));
+  assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
+});
+
+test('browser-operator passes --any only as the brief grants, and hands back on an auth prompt', () => {
+  const l = linesOf(operators[1]);
+  assert.ok(l.some((x) => /--any/.test(x) && /only/i.test(x) && /brief grants/.test(x)));
+  assert.ok(l.some((x) => /exit 3/.test(x) && /auth prompt/.test(x) && /hand/i.test(x)));
 });
 
 // A PATH whose dots-call answers lock state, polkit state and pinentry state with the given JSON (or, given a function, runs its body), the prompts closed unless given, whose dots-call and input tools log their argv to one file, in call order, and whose niri says a plain app has focus; XDG_STATE_HOME is the same scratch dir.

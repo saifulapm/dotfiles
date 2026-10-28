@@ -24,8 +24,8 @@ one `next` step for the first of them. It exits 1 while anything blocks.
 
 While locked, these still work: tmux, every `dots-call <target> state`,
 `niri msg -j` queries, and `systemd-run --user`. Captures show only the lock
-screen, `niri msg action` ignores all but power and VT actions, and wtype or
-ydotool type into the lock's password field. So stay locked for text work,
+screen, `niri msg action` ignores all but power and VT actions, and any key
+typed lands in the lock's password field. So stay locked for text work,
 and unlock only when the task needs pixels or input:
 
 ```sh
@@ -44,10 +44,9 @@ redrawing and a capture shows its last frame; foot keeps drawing. When the
 task needs pixels of such a window, light the desk first with `niri msg
 action power-on-monitors`.
 
-**Before each burst of input, read `lock state` again** and stop typing if
-`locked` is true: the lease ended, or Saiful locked, and the next key would
-land in the password field. Without a lease idle locks at 300 s, and wtype
-may not count as activity. A `heldBy` with another name is another agent's
+`screen`, `mouse` and `gui` read `lock state` before every input and refuse
+with exit 3 while it is locked, so a lease that ended mid-job stops you; hand
+back instead of renewing past the brief. Without a lease idle locks at 300 s. A `heldBy` with another name is another agent's
 lease: do not lock or renew it under that agent.
 
 Over SSH (`$SSH_CONNECTION` set) fish's `conf.d/ssh-desktop.fish` imports
@@ -128,37 +127,43 @@ exposes nothing: use pixels. Chromium and Electron need
   empty shot. A surface closes on the next key or click, so chain open and
   grim in one call.
 
-## 4. Input: wtype for keys, dots-pointer for the pointer
+## 4. Input: only through the scripts
 
-- **Check focus first**, inside the same Bash call as the keys:
-  `niri msg -j focused-window | jq '{id,app_id,title}'`. A miss lands your
-  keys in Saiful's terminal or in this prompt.
-- Text `wtype 'hello'`; keys `wtype -k Return`; chords
-  `wtype -M ctrl -k s -m ctrl`.
-- Pointer: `~/.claude/skills/desktop/scripts/mouse to X Y`, `click X Y
-  [left|right|middle] [COUNT]`, `drag X1 Y1 X2 Y2`, `scroll X Y
-  up|down|left|right [N]`. Coordinates are `grim -s 1` pixels. It moves,
-  presses and scrolls through `dots-pointer` on niri's virtual pointer, and
-  it never rests within 2 px of an edge, where the hot corners are. Do not
-  pin the pointer to a corner yourself.
+Send keys and clicks only through `scripts/screen`, `scripts/mouse` and
+`scripts/gui`. Never use bare `wtype`, `wlrctl` or `ydotool` for text or
+clicks: they skip the lock, prompt and window checks the scripts make.
+(`ydotool` stays only for a keyboard bind that needs uinput, a real Mod bind.)
+
+- Keys: `screen type TEXT` (newlines dropped), `screen key Return`,
+  `screen key ctrl+s`, `screen key Tab 3` (repeat 1-50). Each key is gated
+  alone and the first into a new window is primed for you; do not prime.
+- Pointer: `screen click|move|drag|scroll` in `screen shot` pixels, or
+  `scripts/mouse to|click|drag|scroll X Y` in `grim -s 1` pixels. It never
+  rests within 2 px of an edge, where the hot corners are.
 - **Look in the same call.** Every acting command of `screen`, `mouse` and
   `gui` takes `--then shot|windows|tree` last: it acts, waits until two
   frames 100 ms apart match, and adds the look to its JSON, as in
   `{"stable": true, "shot": "/tmp/desk/shot.png"}`. `"stable": false` means
   the screen still moved 2 s after the call (a spinner), which is no failure.
-  It looks as soon as the screen is still, so after `screen launch` it may
-  look before the window maps: wait for that with `screen wait` (section 5).
-- Moving the pointer can close an open surface. Prefer `gui click`, which
-  does not move it.
-- When Saiful is active, do focus, check and type in one atomic call, and
-  abort on a mismatch.
+  After `screen launch` it may look before the window maps: `screen wait`.
+- **Confinement.** Keys go only into windows `screen launch` opened (or a
+  dialog an agent action opened within 5 s), clicks only over them. Anything
+  else exits 3 with `{"refused":"not an agent window",...}`. `--any` lifts
+  only that, never the lock or a prompt; pass it only when the brief grants it.
+- **Auth prompt.** A polkit or pinentry password prompt refuses every input,
+  `--any` or not. Stop and hand the task back to Saiful; never type a password.
+- `--jev` is a grant for JEV commands (`screen find`, `screen check`, coming
+  later): pass it only when the brief says "JEV allowed".
+- Moving the pointer can close an open surface. Prefer `gui click`.
+
+Refusal reasons, the journal and the rest: [reference.md](reference.md).
 
 ## 5. Launching apps
 
 ```sh
-niri msg action spawn -- foot                                # a child of niri, focused when it maps
+screen launch foot                                           # for anything you will type into or click
 systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
-# its own unit, which works while locked too; ExitType=cgroup keeps it up while any chromium process lives
+# not an agent window; for background apps: its own unit, which works while locked too; ExitType=cgroup keeps it up while any chromium process lives
 ```
 
 Then wait for the window, never with `sleep`: `screen wait window-open --app
@@ -172,10 +177,10 @@ survived, not just that it flashed: after 3 s, `niri msg -j windows | jq -r
 **The worked example**, as one call so nothing types into the wrong window:
 
 ```sh
-niri msg action spawn -- foot && sleep 1 &&
+screen=~/.claude/skills/desktop/scripts/screen
+$screen launch foot && $screen wait window-open --app foot >/dev/null &&
 id=$(niri msg -j focused-window | jq -er 'select(.app_id == "foot") | .id') &&
-[ "$(dots-call lock state | jq -r .locked)" = false ] &&
-wtype 'echo hi' && wtype -k Return &&
+$screen type 'echo hi' && $screen key Return &&
 niri msg action fullscreen-window --id "$id" && sleep 0.5 &&
 text=$(grim -s 3 -o "$(niri msg -j focused-output | jq -r .name)" - | tesseract stdin stdout 2>/dev/null)
 [ -n "$id" ] && niri msg action close-window --id "$id"
@@ -266,17 +271,17 @@ and screenshot out of your context:
 - `browser-operator`: a multi-step web job, isolated or in Saiful's Chromium.
 - `desktop-operator`: a visual GUI job with no text channel. It drives
   `scripts/screen`, the computer-use action set (`shot`, `zoom`, `click`,
-  `type`, `key`...) in screenshot pixels, which refuses input while `lock
-  state` reads locked.
+  `type`, `key`...) in screenshot pixels, which refuses input while the
+  session is locked or an auth prompt is open.
 
 The brief names the goal, what counts as done, whether it needs Saiful's
-login, and every text it may type and commit action it may take; it stops
-at anything not named.
+login, and every text it may type and commit action it may take, and whether
+it may pass `--any` or "JEV allowed"; it stops at anything not named.
 
 Anything that could wreck the live session (the lock itself, a shell crash,
 a destructive keybind) is tested in the nested session: `bin/dots-dev` in
 `~/Codes/dotfiles` starts it and prints the env to source. With it sourced,
-niri msg, dots-call, qs ipc, grim, wtype and dots-pointer act on the nested
+niri msg, dots-call, qs ipc, grim and dots-pointer act on the nested
 session, so `mouse` and `screen` work there, drags included; ydotool does
 not, since ydotoold's device reaches the live one. The nested lock's
 password is `dots-test-pass`.

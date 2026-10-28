@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 skill=$repo/home/dot_claude/skills/desktop
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
 # The fenced block under "The worked example"; a nested foot reads /dev/null, since the live foot.ini themes every foot.
-example=$(awk '/\*\*The worked example\*\*/ { on = 1; next } on && /^```sh$/ { inside = 1; next } inside && /^```$/ { exit } inside' "$skill/SKILL.md" | sed 's|spawn -- foot |spawn -- foot -c /dev/null |')
+example=$(awk '/\*\*The worked example\*\*/ { on = 1; next } on && /^```sh$/ { inside = 1; next } inside && /^```$/ { exit } inside' "$skill/SKILL.md" | sed 's|launch foot |launch foot -c /dev/null |')
 check "SKILL.md has the worked example, opening foot and reading it with tesseract" grep -q 'tesseract' <<<"$example"
 foot_count() { niri msg -j windows | jq '[.[] | select(.app_id == "foot")] | length'; }
 

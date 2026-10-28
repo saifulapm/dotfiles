@@ -41,6 +41,12 @@ apps on the a11y bus, `niri msg -j` for windows and focus, `dots-call
 go only into a window `screen launch` opened (or a dialog it opens), so a
 terminal job is tmux's, not yours; a refusal exits 3 and names the window.
 
+## Flags and refusals
+
+- `--any` lifts only the agent-window check, never the lock or an auth prompt; it is passed only when the brief grants it.
+- `--jev` is for JEV commands (`screen find`, `screen check`, not built yet); it is passed only when the brief says "JEV allowed".
+- A refusal exits 3. On exit 3 with `auth prompt` (a polkit or pinentry password prompt is open), stop and hand the task back to Saiful; never type a password.
+
 ## What you may do without asking
 
 Screenshots, zooms, hovering, scrolling, and ordinary clicks that navigate
