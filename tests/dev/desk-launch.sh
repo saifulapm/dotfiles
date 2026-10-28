@@ -41,7 +41,7 @@ after_ours=$(newest foot)
 check "a window opening just after an action in the factory joins" test "$(agent "$after_ours")" = true
 
 # footclient's window belongs to the foot server's pid, which an agent did not start.
-niri msg action spawn -- foot --server -c /dev/null
+niri msg action spawn -- foot -c /dev/null --server
 sleep 6
 "$scripts/screen" launch footclient
 until_ok 5000 count_is footclient 1

@@ -1,10 +1,4 @@
-// dots-pointer BOX OP...: niri's virtual pointer, for the desktop skill; BOX is X,Y,W,H, the bounding box of every output in logical pixels, and each OP runs in order in one process, so a button pressed here is released here.
-//   move X Y        to logical (X,Y), exactly: niri maps x/W onto the box's width
-//   down|up|click B left, right or middle
-//   scroll DX DY    wheel notches, down and right positive
-//   wait MS
-//   pick            niri's pick-window under the pointer: prints its reply line; no reply in 500 ms exits 3
-// Exit 1 is an error, 2 usage; a compositor that stops answering ends the run 2 s past its waits, with 1.
+// dots-pointer X,Y,W,H OP...: niri's virtual pointer for the desktop skill, one process per gesture so a button pressed here is released here; X,Y,W,H is the box around every output in logical pixels, and the ops run in order: move X Y (exact, as niri maps x/W onto the box), down|up|click left|right|middle, scroll DX DY (wheel notches, down and right positive), wait MS, and pick (niri's pick-window under the pointer, printing its reply line; no reply in 500 ms exits 3); 1 is an error, 2 usage, and a compositor that stops answering ends the run 2 s past its waits.
 
 #include <errno.h>
 #include <linux/input-event-codes.h>

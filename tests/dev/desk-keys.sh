@@ -81,7 +81,7 @@ check "screen type hello into the launched factory's first entry exits 0 (got $r
 check "and the entry reads hello (it read '$before')" until_ok 2000 entry_is "${before}hello"
 
 # footclient's window is the server's pid, and still joins by its launch.
-niri msg action spawn -- foot --server -c /dev/null
+niri msg action spawn -- foot -c /dev/null --server
 sleep 6
 "$screen" launch footclient -a ours sh -c "$(raw ours)" >/dev/null
 until_ok 5000 has_window ours
