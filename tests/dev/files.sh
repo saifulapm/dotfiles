@@ -54,6 +54,15 @@ check "l on screenshots/ lists its 8 entries, the folder first ($(files_state | 
 check "the status line reads the cursor's path, the counts and its place ($(files_state | jq -c .status))" \
   files_is '.status | {path, counts, at} == {"path": "~/Downloads/screenshots/old", "counts": "8 items · 1 folder · 7 files · 0 marked", "at": "1 of 8"}'
 check "and the path draws whole, with room beside it (finding #KYZ754D8)" files_is '.status.pathElided == false'
+wtype G
+until_ok 1000 files_is '.cursor == "shot-7.png"'
+check "G goes to the last row ($(files_state | jq -r .cursor))" files_is '.cursor == "shot-7.png"'
+wtype gg
+until_ok 1000 files_is '.cursor == "old"'
+check "gg goes to the first row ($(files_state | jq -r .cursor))" files_is '.cursor == "old"'
+wtype gjg
+until_ok 1000 files_is '.cursor == "shot-1.png"'
+check "a g and another key is that key alone ($(files_state | jq -r .cursor))" files_is '.cursor == "shot-1.png"'
 wtype h
 until_ok 2000 files_is '.listed and (.folder | endswith("/Downloads"))'
 check "h goes back up with the cursor on screenshots/ ($(files_state | jq -r .cursor))" files_is '.cursor == "screenshots"'

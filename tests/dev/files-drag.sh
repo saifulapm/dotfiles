@@ -47,9 +47,9 @@ target=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e 'any(.[]; .title == \"drop-target\")' >/dev/null"
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
-# Tiled windows report no position, so both float side by side where the drag can find them: the target left, Files right of it.
+# Tiled windows report no position, so both float side by side where the drag can find them: the target left, Files right of it. Files opens floating.
 win_id() { niri msg -j windows | jq -r --arg t "$1" '.[] | select(.app_id == $t or .title == $t) | .id'; }
-for w in drop-target files; do niri msg action toggle-window-floating --id "$(win_id "$w")"; done
+niri msg action toggle-window-floating --id "$(win_id drop-target)"
 niri msg action move-floating-window --id "$(win_id drop-target)" -x 10 -y 60
 niri msg action set-window-width --id "$(win_id drop-target)" 400
 niri msg action move-floating-window --id "$(win_id files)" -x 450 -y 60

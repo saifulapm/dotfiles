@@ -55,9 +55,9 @@ until_ok 5000 bash -c "niri msg -j windows | jq -e '[.[] | select(.title == \"dr
 many_source=$(niri msg -j windows | jq -r --argjson f "$first_source" '.[] | select(.title == "drag-source" and .id != $f) | .id')
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
-# Tiled windows report no position, so both float side by side where the drag can find them: the target left, Files right of it.
+# Tiled windows report no position, so both float side by side where the drag can find them: the target left, Files right of it. Files opens floating.
 win_id() { niri msg -j windows | jq -r --arg t "$1" '.[] | select(.app_id == $t or .title == $t) | .id'; }
-for w in "$first_source" "$many_source" "$(win_id files)"; do niri msg action toggle-window-floating --id "$w"; done
+for w in "$first_source" "$many_source"; do niri msg action toggle-window-floating --id "$w"; done
 # Floating keeps the tiled size; a pressed source is raised, so the sources are narrowed to stay clear of Files.
 for w in "$first_source" "$many_source"; do
   niri msg action set-window-width --id "$w" 400

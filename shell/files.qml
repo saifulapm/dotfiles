@@ -76,6 +76,8 @@ ShellRoot {
     property var marked: []
     // Keys typed before the folder's rows landed, played on them once they do.
     property var held: []
+    // A g waits for a second one: gg goes to the first row, as yazi's does.
+    property bool gHeld: false
     // list or places: which pane j, k and Enter move in.
     property string side: "list"
     property int placeAt: 0
@@ -360,6 +362,10 @@ ShellRoot {
             move(1);
         else if (k === "up")
             move(-1);
+        else if (k === "top")
+            move(-Infinity);
+        else if (k === "bottom")
+            move(Infinity);
         else if (k === "in")
             choose();
         else if (k === "out")
@@ -705,7 +711,17 @@ ShellRoot {
                     event.accepted = true;
                     return;
                 }
-                if (t === "/") {
+                const g = app.gHeld;
+                app.gHeld = false;
+                if (t === "g") {
+                    if (g)
+                        app.rowKey("top");
+                    else
+                        app.gHeld = true;
+                }
+                else if (t === "G")
+                    app.rowKey("bottom");
+                else if (t === "/") {
                     // A new find starts empty, as yazi's and vim's do.
                     app.setQuery("");
                     app.finding = true;
