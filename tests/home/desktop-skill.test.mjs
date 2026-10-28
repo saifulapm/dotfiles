@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { crc32, deflateSync } from 'node:zlib';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -927,4 +927,54 @@ test('an error message from the other side reaches stderr without control charac
   assert.match(r.stderr, /HTTP 500/);
   assert.doesNotMatch(r.stderr, /[\u0000-\u0008\u000b-\u001f\u007f‮]/);
   assert.ok(r.stderr.length < 500, `${r.stderr.length} chars`);
+});
+
+// The key can sit anywhere in an error, its first words too, so an error that holds any of it says only that.
+for (const [why, curl] of [
+  ['a curl error that starts with the key', `cat >/dev/null; echo '${KEY} refused' >&2; exit 28`],
+  ['a status line that is the key', `cat >/dev/null; printf '{}\\n%s' '${KEY}'`],
+]) {
+  test(`${why} leaves no 8 characters of the key in the error or the journal`, () => {
+    const j = jevStubs();
+    writeFileSync(join(j.dir, 'curl'), `#!/usr/bin/env bash\n${curl}\n`);
+    const r = run(j.env, 'find', 'a', '--jev');
+    assert.equal(r.status, 1);
+    const said = r.stdout + r.stderr + readFileSync(j.journal, 'utf8');
+    for (let i = 0; i + 8 <= KEY.length; i++) assert.ok(!said.includes(KEY.slice(i, i + 8)), `holds ${KEY.slice(i, i + 8)}: ${said}`);
+  });
+}
+
+// pass is inside the 10 s too: a gpg that stalls is a failure at 10 s, never a find held open.
+test('a pass that stalls fails within 10.5 s, and sends nothing', () => {
+  const j = jevStubs();
+  writeFileSync(join(j.dir, 'pass'), `#!/usr/bin/env bash\nsleep 14; echo '${KEY}'\n`);
+  const t0 = Date.now();
+  const r = run(j.env, 'find', 'a', '--jev');
+  assert.equal(r.status, 1);
+  assert.ok(Date.now() - t0 <= 10500, `${Date.now() - t0} ms`);
+  assert.doesNotMatch(r.stderr, /Traceback/);
+  assert.doesNotMatch(readFileSync(j.log, 'utf8'), /^curl /m);
+});
+
+// A PATH lookup skips a file it cannot run and finds the next, so the tool goes from a PATH of /usr/bin links instead.
+test('a missing pass or curl is exit 1 with the fallback line, not a traceback', () => {
+  for (const tool of ['pass', 'curl']) {
+    const j = jevStubs();
+    unlinkSync(join(j.dir, tool));
+    const bin = join(j.dir, 'usr-bin');
+    mkdirSync(bin);
+    for (const f of readdirSync('/usr/bin')) if (f !== tool) symlinkSync(join('/usr/bin', f), join(bin, f));
+    const r = run({ ...j.env, PATH: `${j.dir}:${bin}` }, 'check', 'a', '--jev');
+    assert.equal(r.status, 1, tool);
+    assert.doesNotMatch(r.stderr, /Traceback/, tool);
+    assert.match(r.stderr, /fall back to gui or OCR/, tool);
+  }
+});
+
+// The Noul decides whether it is there; a Box is no use when it is not.
+test('a Noul under 0.5 exits 4 even with no Box in the answer', () => {
+  const j = jevStubs({ answers: { on_screen: noul(0.1) } });
+  const r = run(j.env, 'find', 'a purple elephant', '--jev');
+  assert.equal(r.status, 4, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { found: false, on_screen: 0.1 });
 });

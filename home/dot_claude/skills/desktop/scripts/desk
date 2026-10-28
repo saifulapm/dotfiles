@@ -536,8 +536,14 @@ def padded(data):
 
 def jev_fail(msg, key=""):
     """Exit 1, the message scrubbed of the key: none of it, not 8 characters in a row, reaches stderr or the journal."""
-    if key and any(key[i:i + 8] in msg for i in range(len(key) - 7)):
-        msg = msg.split(":")[0] + ": (the answer quoted the key)"
+    # The key can sit anywhere in it, its first words too: every run of it 8 characters long goes, wherever it is.
+    cut = [False] * len(msg)
+    for i in range(len(key) - 7):
+        j = msg.find(key[i:i + 8])
+        while j >= 0:
+            cut[j:j + 8] = [True] * 8
+            j = msg.find(key[i:i + 8], j + 1)
+    msg = "".join("" if c and i and cut[i - 1] else "[key]" if c else ch for i, (ch, c) in enumerate(zip(msg, cut)))
     # Much of it can be the other side's text: no escapes or bidi controls reach the terminal, and no more than a line of it.
     msg = "".join(c if c.isprintable() else "?" for c in msg)[:200]
     jev_note({"error": msg})
@@ -579,8 +585,14 @@ def jev(kind, text, shot, t0):
     else:
         questions = {"answer": {"type": "noul", "instructions": f"About the screenshot `shot`: {text}"}}
     body = {"model": JEV_MODEL, "state": {"shot": ref}, "assets": {ref: {"type": "image", "format": "png", "data_base64": base64.b64encode(image).decode()}}, "questions": questions}
-    # The key is read at each call; with no passphrase prompt, a locked store fails at once.
-    r = subprocess.run(["pass", "show", "AI/openrouter/main"], capture_output=True, text=True, env={**os.environ, "PASSWORD_STORE_GPG_OPTS": "--pinentry-mode error"})
+    left = lambda: JEV_S - (now_ms() - t0) / 1000
+    # The key is read at each call; with no passphrase prompt, a locked store fails at once, and a stalled gpg at the 10 s.
+    try:
+        r = subprocess.run(["pass", "show", "AI/openrouter/main"], capture_output=True, text=True, timeout=max(left(), 0.001), env={**os.environ, "PASSWORD_STORE_GPG_OPTS": "--pinentry-mode error"})
+    except subprocess.TimeoutExpired:
+        jev_fail(f"pass gave no key within {JEV_S} s")
+    except OSError as e:
+        jev_fail(f"pass: {e.strerror}")
     key = r.stdout.split("\n")[0].strip() if r.returncode == 0 else ""
     if not key:
         # A store that needs its passphrase fails here too, and gpg says so.
@@ -589,14 +601,15 @@ def jev(kind, text, shot, t0):
     fd, path = tempfile.mkstemp(prefix="jev-", suffix=".json", dir=state_dir())
     with os.fdopen(fd, "w") as f:
         json.dump(body, f)
-    left = JEV_S - (now_ms() - t0) / 1000
-    if left <= 0:
+    if left() <= 0:
         os.unlink(path)
         jev_fail(f"no time left of {JEV_S} s for the request", key)
     try:
         # The key goes as a header on curl's stdin, never its argv; --max-time bounds the whole call, DNS too, and curl never retries unasked.
-        r = subprocess.run(["curl", "-sS", "--max-time", f"{left:.3f}", "-H", "@-", "-H", "Content-Type: application/json", "-H", "TypeSafe-Danger-Zone-Images: true",
+        r = subprocess.run(["curl", "-sS", "--max-time", f"{left():.3f}", "-H", "@-", "-H", "Content-Type: application/json", "-H", "TypeSafe-Danger-Zone-Images: true",
                             "--data-binary", f"@{path}", "-w", "\n%{http_code}", JEV_URL], input=f"Authorization: Bearer {key}\n", capture_output=True, text=True, errors="replace")
+    except OSError as e:
+        jev_fail(f"curl: {e.strerror}", key)
     finally:
         os.unlink(path)
     if r.returncode != 0:
@@ -620,10 +633,13 @@ def jev(kind, text, shot, t0):
         p = at(answer, "answers", "on_screen", "noul")
         c = at(answer, "answers", "target", "confidence")
         edges = {e: at(answer, "answers", "target", "box", e) for e in ("left", "right", "top", "bottom")}
-        if not number(p) or not number(c) or not all(number(v) for v in edges.values()):
-            jev_fail("an answer with no Box or no Noul", key)
+        # The Noul decides whether it is there; a Box is no use when it is not.
+        if not number(p):
+            jev_fail("an answer with no Noul", key)
         if p < 0.5:
             out = {"found": False, "on_screen": p}
+        elif not number(c) or not all(number(v) for v in edges.values()):
+            jev_fail("an answer with no Box", key)
         else:
             # Fractions of the padded image; an edge at 1.0 is one past the last pixel, and the padding is no part of the shot.
             x = min(max(int((edges["left"] + edges["right"]) / 2 * pw), 0), w - 1)
