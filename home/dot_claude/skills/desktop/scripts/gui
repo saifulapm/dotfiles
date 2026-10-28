@@ -177,7 +177,7 @@ def value(node):
         return None
 
 
-FLAGS = {"checked", "selected", "focused", "expanded", "sensitive"}
+FLAGS = {"checked", "pressed", "selected", "focused", "expanded", "sensitive"}
 
 
 def numbered(app, want=None):

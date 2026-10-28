@@ -55,11 +55,15 @@ out=$("$repo/home/dot_claude/skills/desktop/scripts/mouse" to 20 20 --then windo
 check "mouse to --then windows prints the window list too: $(cut -c1-80 <<<"$out")" bash -c "jq -e '(.stable | type) == \"boolean\" and (.windows | map(.id) | index($factory)) != null' <<<'$out' >/dev/null"
 
 # A toggle button: GTK4's check boxes offer no action, and Page 2's Inform opens a dialog that takes the clicks after it.
+had=$("$gui" tree widget | jq '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].states | index("pressed") != null')
 out=$("$gui" click widget "togglebutton toggle button" --then tree)
 rc=$?
 check "gui click on a toggle button --then tree exits 0 (got $rc)" test "$rc" = 0
 pid=$(niri msg -j windows | jq ".[] | select(.id == $factory) | .pid")
-check "printing the click's result and the factory's tree, which holds the button clicked: $(cut -c1-120 <<<"$out")" bash -c "jq -e '.ok == true and .action == \"click\" and (.stable | type) == \"boolean\" and .tree.pid == $pid and (.tree.nodes | map(.i) | index(\$o.widget.i)) != null' --argjson o '$(jq -c '{widget}' <<<"$out")' <<<'$out' >/dev/null"
+i=$(jq '.widget.i' <<<"$out")
+check "printing the click's result and the factory's tree: $(cut -c1-120 <<<"$out")" bash -c "jq -e '.ok == true and .action == \"click\" and (.stable | type) == \"boolean\" and .tree.pid == $pid' <<<'$out' >/dev/null"
+# The tree is the one after the click: the toggle it pressed reads pressed there, and did not before.
+check "where the toggle reads pressed, as it did not before ($had)" bash -c "[ '$had' = false ] && jq -e '.tree.nodes[] | select(.i == $i) | .states | index(\"pressed\") != null' <<<'$out' >/dev/null"
 
 exit $((fails > 0))
 }
