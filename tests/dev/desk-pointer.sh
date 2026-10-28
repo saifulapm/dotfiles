@@ -26,7 +26,7 @@ check "while dots-pointer at the corner itself opens the overview" until_ok 1000
 niri msg action close-overview
 until_ok 2000 overview_is false
 
-niri msg action spawn -- gtk4-widget-factory
+"$scripts/screen" launch gtk4-widget-factory >/dev/null
 factory() { niri msg -j windows | jq -r '.[] | select(.app_id == "org.gtk.WidgetFactory4") | .id'; }
 factory_up() { [ -n "$(factory)" ]; }
 until_ok 8000 factory_up

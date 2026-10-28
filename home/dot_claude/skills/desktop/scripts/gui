@@ -8,18 +8,27 @@ Chromium need --force-renderer-accessibility to appear.
   gui apps                      apps currently on the a11y bus
   gui tree <app> [--all]        interactive widgets (--all = every node)
   gui find <app> <text>         matching widgets + screen coords
-  gui click <app> <text>        activate the first match semantically
-  gui type <app> <text> <val>   set an entry's text
+  gui click <app> <text> [--any]       activate the first match semantically
+  gui type <app> <text> <val> [--any]  set an entry's text
   gui text <app>                all readable text in the app
 
 <app> and <text> match case-insensitively on a substring, so `gui click
-files 'Save'` is enough. Exit 1 = no such app/widget (nothing was clicked).
+files 'Save'` is enough. click and type act only in an agent window: the
+element's app pid and window title must match one `screen launch` opened
+(scripts/desk), else they exit 3 printing the refusal; --any lifts that for
+a brief that grants it. Exit 4 = no such app/widget (nothing was clicked),
+2 = usage.
 """
 
+import importlib.machinery
+import importlib.util
+import json
+import os
 import sys
 import warnings
 
 warnings.filterwarnings("ignore")
+sys.dont_write_bytecode = True
 
 import gi  # noqa: E402
 
@@ -36,6 +45,48 @@ INTERACTIVE = {
 }
 
 MAX_NODES = 4000  # a deep tree must not hang the caller
+
+
+def load_desk():
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "desk")
+    spec = importlib.util.spec_from_loader("desk", importlib.machinery.SourceFileLoader("desk", path))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def usage():
+    print(__doc__, file=sys.stderr)
+    sys.exit(2)
+
+
+def nothing(msg):
+    print(f"gui: {msg}", file=sys.stderr)
+    sys.exit(4)
+
+
+def toplevel(node):
+    """The window holding node: the ancestor whose parent is the application."""
+    try:
+        while node.get_parent() and node.get_parent().get_role_name() != "application":
+            node = node.get_parent()
+    except Exception:
+        pass
+    return node
+
+
+def confine(app, node):
+    """Returns only when node sits in an agent window, noting the action there; else refuses with exit 3."""
+    desk = load_desk()
+    pid, title = app.get_process_id(), toplevel(node).get_name() or ""
+    seen = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
+    for w in seen:
+        if w["agent"]:
+            desk.note("act", str(w["id"]))
+            return
+    window = {k: seen[0][k] for k in ("id", "app_id", "title")} if seen else {"pid": pid, "title": title}
+    print(json.dumps({"refused": "not an agent window", "window": window}))
+    sys.exit(3)
 
 
 def apps():
@@ -55,7 +106,7 @@ def find_app(pattern):
     hits = [app for name, app in apps() if pattern.lower() in name.lower()]
     if not hits:
         known = ", ".join(n for n, _ in apps() if n) or "none"
-        sys.exit(f"gui: no app matching {pattern!r} on the a11y bus (have: {known})")
+        nothing(f"no app matching {pattern!r} on the a11y bus (have: {known})")
     return hits[0]
 
 
@@ -117,8 +168,11 @@ def matches(node, text):
 
 
 def main(argv):
+    anywhere = argv[-1] == "--any"
+    if anywhere:
+        argv = argv[:-1]
     if len(argv) < 2:
-        sys.exit(__doc__)
+        usage()
     cmd = argv[1]
 
     if cmd == "apps":
@@ -129,7 +183,7 @@ def main(argv):
         return
 
     if len(argv) < 3:
-        sys.exit(__doc__)
+        usage()
     Atspi.init()
     app = find_app(argv[2])
 
@@ -151,13 +205,13 @@ def main(argv):
         return
 
     if len(argv) < 4:
-        sys.exit(__doc__)
+        usage()
     needle = argv[3]
     hits = [n for _, n in walk(app) if n is not app and matches(n, needle)]
 
     if cmd == "find":
         if not hits:
-            sys.exit(f"gui: nothing matching {needle!r}")
+            nothing(f"nothing matching {needle!r}")
         for node in hits[:20]:
             print(describe(node))
         return
@@ -176,25 +230,35 @@ def main(argv):
                 continue
             # "click" where offered, else the first action the widget has.
             index = names.index("click") if "click" in names else 0
+            if not anywhere:
+                confine(app, node)
             Atspi.Action.do_action(action, index)
             print(f"{names[index]}: {describe(node)}")
             return
-        sys.exit(f"gui: nothing clickable matching {needle!r}")
+        nothing(f"nothing clickable matching {needle!r}")
 
     if cmd == "type":
         if len(argv) < 5:
-            sys.exit(__doc__)
+            usage()
         value = argv[4]
         for node in hits:
             try:
-                Atspi.EditableText.set_text_contents(node.get_editable_text(), value)
+                editable = node.get_editable_text()
+            except Exception:
+                continue
+            if editable is None:
+                continue
+            if not anywhere:
+                confine(app, node)
+            try:
+                Atspi.EditableText.set_text_contents(editable, value)
             except Exception:
                 continue
             print(f"typed into {describe(node)}")
             return
-        sys.exit(f"gui: no editable widget matching {needle!r}")
+        nothing(f"no editable widget matching {needle!r}")
 
-    sys.exit(__doc__)
+    usage()
 
 
 if __name__ == "__main__":

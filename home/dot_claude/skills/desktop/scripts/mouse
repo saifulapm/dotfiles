@@ -2,14 +2,22 @@
 # mouse — the pointer in logical pixels, through dots-pointer.
 #
 #   mouse to X Y                         put the pointer at logical (X,Y) (= grim -s 1 pixels)
-#   mouse click X Y [button] [COUNT]     move there, then click (left, right, middle); COUNT 2 = double, 3 = triple
-#   mouse drag X1 Y1 X2 Y2               left-press at 1, glide, release at 2
+#   mouse click X Y [button] [COUNT] [--any]   move there, then click (left, right, middle); COUNT 2 = double, 3 = triple
+#   mouse drag X1 Y1 X2 Y2 [--any]       left-press at 1, glide, release at 2
 #   mouse scroll X Y up|down|left|right [N]   N wheel notches (default 3)
 #
 # dots-pointer moves to an exact logical point on niri's own virtual
 # pointer, so one process presses, glides and releases. Targets are clamped
 # 2 px inside the screen so a landing never rests in a hot corner: niri's
 # bottom-left one or the shell's top-right one.
+#
+# A press goes only over an agent window (scripts/desk): first niri's
+# pick-window names the window under the point, taking one press that the
+# window never gets, and anything else exits 3 printing the refusal and the
+# window seen: a window of Saiful's, a shell surface or nothing ("no
+# window"), or no answer in 500 ms. niri focuses the window under every
+# press, so a refusal puts focus back. --any skips the check when a brief
+# grants it. Usage exits 2.
 #
 # Screen geometry comes from `niri msg -j outputs` (rightmost output; these
 # machines drive one display). With the env bin/dots-dev prints sourced,
@@ -41,7 +49,37 @@ clampy() { int "$1"; clamp "$1" $((OY + 2)) $((OY + H - 3)); }
 
 pointer() { dots-pointer "$BOX" "$@"; }
 
+DESK_PY="$(dirname "$(readlink -f "$0")")/desk"
+
+refuse() { # reason [window JSON]
+    jq -nc --arg r "$1" --argjson w "${2:-null}" '{refused: $r} + (if $w then {window: $w} else {} end)'
+    exit 3
+}
+
+# Hit-tests (X,Y) before a press; returns only over an agent window, noting the action, so a dialog it opens joins.
+hit() {
+    ((any)) && return
+    local prev reply id w=null
+    prev=$(niri msg -j focused-window | jq -r '.id // empty')
+    reply=$(pointer move "$1" "$2" pick) || refuse "no answer"
+    id=$(jq -r '.Ok.PickedWindow.id // empty' <<<"$reply")
+    [[ -n $id ]] && w=$("$DESK_PY" window "$id")
+    if [[ $w == null ]] || ! jq -e .agent <<<"$w" >/dev/null; then
+        if [[ -n $prev && $(niri msg -j focused-window | jq -r '.id // empty') != "$prev" ]]; then
+            niri msg action focus-window --id "$prev"
+        fi
+        [[ $w == null ]] && refuse "no window"
+        refuse "not an agent window" "$(jq -c '{id, app_id, title}' <<<"$w")"
+    fi
+    "$DESK_PY" acted "$id"
+}
+
 cmd=${1:-}
+any=0
+if [[ $cmd == click || $cmd == drag ]] && [[ ${!#} == --any ]]; then
+    any=1
+    set -- "${@:1:$#-1}"
+fi
 case "$cmd" in
 to)
     [[ $# -eq 3 ]] || usage
@@ -52,13 +90,16 @@ click)
     button=${4:-left} count=${5:-1}
     [[ $button =~ ^(left|right|middle)$ ]] || die "button: left, right or middle"
     [[ $count =~ ^[1-3]$ ]] || die "count: 1 to 3"
-    ops=(move "$(clampx "$2")" "$(clampy "$3")" click "$button")
+    X=$(clampx "$2") Y=$(clampy "$3")
+    hit "$X" "$Y"
+    ops=(move "$X" "$Y" click "$button")
     for ((i = 1; i < count; i++)); do ops+=(wait 30 click "$button"); done
     pointer "${ops[@]}"
     ;;
 drag)
     [[ $# -eq 5 ]] || usage
     X1=$(clampx "$2") Y1=$(clampy "$3") X2=$(clampx "$4") Y2=$(clampy "$5")
+    hit "$X1" "$Y1"
     # Ten steps between, so a slider or a drag source sees the button move while held.
     ops=(move "$X1" "$Y1" down left wait 50)
     for i in 1 2 3 4 5 6 7 8 9 10; do
