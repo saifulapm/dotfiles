@@ -155,7 +155,9 @@ clicks: they skip the lock, prompt and window checks the scripts make.
 - **JEV.** `screen find "<thing>" --jev` takes a fresh shot (the last shot)
   and prints `{"x":..,"y":..,"confidence":..,"on_screen":..}`, the point in
   shot pixels; exit 4 with `{"found":false,"on_screen":p}` when it is not on
-  screen. `screen check "<yes-or-no question>" --jev` prints
+  screen. Name the thing by text it shows (`"the entry that says Search"`),
+  not by its order: a Box for "the first entry" over two alike lands between
+  them. `screen check "<yes-or-no question>" --jev` prints
   `{"yes":true|false,"probability":p}`, exit 0 either way. Pass `--jev` only
   when the brief says "JEV allowed": each call sends a screenshot off the
   machine, to OpenRouter and TypeSafe, on Saiful's credits. Without it, exit 3
