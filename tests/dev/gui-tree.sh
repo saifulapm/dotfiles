@@ -90,6 +90,7 @@ until_ok 8000 poke_up
 "$gui" tree poke >"$DOTS_DEV_DIR/tree3.json"
 check "a small tree prints no spill" jq -e 'has("spill") | not' "$DOTS_DEV_DIR/tree3.json"
 check "and its count equals its nodes' length" jq -e '.count == (.nodes | length) and .count == 2' "$DOTS_DEV_DIR/tree3.json"
+check "and the spill of the tree before it is gone" test ! -e "$spill2"
 check "gui tree --pid finds the same app" bash -c "'$gui' tree --pid $(jq .pid "$DOTS_DEV_DIR/tree3.json") | jq -e '.app == \"poke\" and .count == 2' >/dev/null"
 
 out=$("$gui" click poke Dead --any)

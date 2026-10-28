@@ -146,6 +146,8 @@ exposes nothing: use pixels. Chromium and Electron need
   frames 100 ms apart match, and adds the look to its JSON, as in
   `{"stable": true, "shot": "/tmp/desk/shot.png"}`. `"stable": false` means
   the screen still moved 2 s after the call (a spinner), which is no failure.
+  It looks as soon as the screen is still, so after `screen launch` it may
+  look before the window maps: wait for that with `screen wait` (section 5).
 - Moving the pointer can close an open surface. Prefer `gui click`, which
   does not move it.
 - When Saiful is active, do focus, check and type in one atomic call, and

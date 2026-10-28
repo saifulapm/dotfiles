@@ -227,12 +227,14 @@ def tree(app, everything):
     nodes = [entry(i, d, n) for i, d, n in numbered(app, None if everything else INTERACTIVE)]
     head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
     whole = dict(head, nodes=nodes)
+    # Every tree replaces the spill before it, whether it spills or not.
+    state = load_desk().state_dir() if os.environ.get("NIRI_SOCKET") else None
+    for old in spill_files(state) if state else []:
+        os.unlink(old)
     if len(nodes) <= INLINE_NODES and len(json.dumps(whole)) < INLINE_BYTES:
         return whole
     state = load_desk().state_dir()
     os.makedirs(state, mode=0o700, exist_ok=True)
-    for old in spill_files(state):
-        os.unlink(old)
     path = os.path.join(state, f"tree-{int(time.time() * 1000)}.json")
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "w") as f:
         json.dump(whole, f)

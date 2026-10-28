@@ -385,3 +385,13 @@ test('the journal keeps --then and its kind, and only the text goes', () => {
   assert.deepEqual(gui.args.slice(4), ['--any', '--then', 'tree']);
   assert.doesNotMatch(readFileSync(journal, 'utf8'), /secret-value/);
 });
+
+// A shot of eDP-1, right of DP-1 at 1.25, maps its point onto eDP-1 and stays there, never pulled onto the focused DP-1.
+test('a point in a shot of another output clicks that output at its own scale', () => {
+  const { env, log } = twoOutputs();
+  const state = join(env.XDG_RUNTIME_DIR, 'desk', 'niri.sock');
+  mkdirSync(state, { recursive: true });
+  writeFileSync(join(state, 'shot'), '1920 0 2048 1280 1280 800\n');
+  spawnSync(screen, ['click', '640', '400', '--any'], { env, encoding: 'utf8' });
+  assert.match(readFileSync(log, 'utf8'), /^dots-pointer 0,0,3968,1280 move 2944 640 click left$/m);
+});

@@ -189,7 +189,7 @@ def watch():
             continue
         write_json(path, windows)
     # The stream ends when niri does, and its state goes with it.
-    for f in ("windows.json", "windows.old", "times", "shot", "gesture.lock", "watch.lock"):
+    for f in ("windows.json", "windows.old", "times", "shot", "settle.png", "gesture.lock", "watch.lock", *(f for f in os.listdir(d) if f.startswith("tree-"))):
         try:
             os.unlink(os.path.join(d, f))
         except OSError:
@@ -322,7 +322,7 @@ def dbus(argv):
 
 
 def a11y_alive():
-    """The a11y bus gui reaches answers for the registry's root; the bus launcher is never run (m48's probe killed the bus)."""
+    """The a11y bus gui reaches answers for the registry's root; the bus launcher is never run, as running it once replaced the live bus."""
     # libatspi takes AT_SPI_BUS_ADDRESS first, as a nested session sets it, and asks org.a11y.Bus only without it.
     addr = os.environ.get("AT_SPI_BUS_ADDRESS") or dbus(["--session", "--dest=org.a11y.Bus", "/org/a11y/bus", "org.a11y.Bus.GetAddress"])
     return bool(addr) and dbus([f"--bus={addr}", "--dest=org.a11y.atspi.Registry", "/org/a11y/atspi/accessible/root", "org.freedesktop.DBus.Properties.Get", "string:org.a11y.atspi.Accessible", "string:ChildCount"]) is not None

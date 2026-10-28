@@ -20,7 +20,7 @@ bare=$(tr : '\n' <<<"$PATH" | while read -r d; do [ -x "$d/dots-pointer" ] || ec
 out=$(PATH=$bare "$screen" doctor)
 check "with dots-pointer off PATH, blockers name it: $out" bash -c "jq -e '.blockers == [\"dots-pointer\"] and .tools.\"dots-pointer\" == false' <<<'$out' >/dev/null"
 
-# An a11y bus that is gone, as when m48's probe replaced the live one.
+# An a11y bus that is gone, as when a probe of the launcher replaced the live one.
 out=$(AT_SPI_BUS_ADDRESS=unix:path=$DOTS_DEV_DIR/no-bus "$screen" doctor)
 check "with no a11y bus, blockers name at-spi: $out" bash -c "jq -e '.at_spi == false and .blockers == [\"at-spi\"]' <<<'$out' >/dev/null"
 

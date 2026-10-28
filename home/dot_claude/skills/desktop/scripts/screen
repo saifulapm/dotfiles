@@ -39,6 +39,8 @@
 # straight through to scripts/mouse.
 
 set -euo pipefail
+# A failing step inside $(...) fails it too, so a look that could not grab a frame is an error, not a stale shot.
+shopt -s inherit_errexit
 ARGV=("$@") T0=$(date +%s%3N) SEEN=
 
 usage() { sed -n '2,17p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -116,7 +118,8 @@ settle() {
 look() {
     local kind=$1 pid=${2:-} file tree
     focused_box
-    mkdir -p "$DIR" "$DESK"
+    mkdir -p "$DIR"
+    mkdir -p -m 700 "${DESK%/*}" "$DESK"
     file=$DESK/settle.png
     [[ $kind == shot ]] && file=$DIR/shot.png
     settle "$file"
@@ -227,7 +230,8 @@ case "$cmd" in
 shot)
     output=
     [[ $# -eq 0 ]] || { [[ $# -eq 2 && $1 == --output ]] && output=$2; } || usage
-    mkdir -p "$DIR" "$DESK"
+    mkdir -p "$DIR"
+    mkdir -p -m 700 "${DESK%/*}" "$DESK"
     g=$(geometry "$output") || { (($? == 2)) && exit 2; die "no output geometry (niri msg failed? set MOUSE_SCREEN=WxH)"; }
     read -r NAME OX OY W H <<<"$g"
     grim -g "$OX,$OY ${W}x$H" -s "$(awk "BEGIN { print $SHOT_W / $W }")" "$DIR/shot.png"
