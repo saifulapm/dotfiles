@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets, o turns the adapter off and on, and s scans.
+# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets, o turns the adapter off and on, s scans, and t trusts.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -80,9 +80,9 @@ until_ok 5000 shell_status >/dev/null
 open_bluetooth
 check "Tab twice is bluetooth" section_is bluetooth
 check "Bluetooth opens on its first row, Test Headphones" state_is '.selected == 0 and .rows[0] == "Test Headphones"'
-until_ok 3000 detail_is "Test Headphones" paired
+until_ok 3000 detail_is "Test Headphones" "paired · trusted"
 echo "     state: $(control_state)"
-check "Test Headphones reads paired" detail_is "Test Headphones" paired
+check "Test Headphones, paired and trusted, reads paired · trusted" detail_is "Test Headphones" "paired · trusted"
 check "before a scan the new Test Speaker is not listed" state_is '.rows | index("Test Speaker") == null'
 
 wtype s
@@ -98,18 +98,31 @@ until_ok 3000 select_row "Test Headphones"
 wtype -k Return
 until_ok 3000 connected_is true
 check "Enter connects Test Headphones (BlueZ reports Connected true)" connected_is true
-until_ok 2000 detail_is "Test Headphones" connected
-check "its row reads connected" detail_is "Test Headphones" connected
+until_ok 2000 detail_is "Test Headphones" "connected · trusted"
+check "its row reads connected · trusted" detail_is "Test Headphones" "connected · trusted"
 # BlueZ adds Battery1 about a second after Connect, so the percentage arrives later than the row.
-until_ok 4000 drawn_detail_is "Test Headphones" "connected · 80%"
-check "its row then draws the headset battery, connected · 80%" drawn_detail_is "Test Headphones" "connected · 80%"
+until_ok 4000 drawn_detail_is "Test Headphones" "connected · trusted · 80%"
+check "its row then draws the headset battery, connected · trusted · 80%" drawn_detail_is "Test Headphones" "connected · trusted · 80%"
 
 until_ok 3000 select_row "Test Headphones"
 wtype -k Return
 until_ok 3000 connected_is false
 check "Enter again disconnects it" connected_is false
+until_ok 2000 detail_is "Test Headphones" "paired · trusted"
+check "its row reads paired · trusted again" detail_is "Test Headphones" "paired · trusted"
+
+trusted_is() { [ "$(bus get-property org.bluez "$headphones" org.bluez.Device1 Trusted 2>/dev/null)" = "b $1" ]; }
+until_ok 3000 select_row "Test Headphones"
+wtype t
+until_ok 3000 trusted_is false
+check "t on Test Headphones untrusts it (BlueZ reports Trusted false)" trusted_is false
 until_ok 2000 detail_is "Test Headphones" paired
-check "its row reads paired again" detail_is "Test Headphones" paired
+check "and trusted leaves its detail" detail_is "Test Headphones" paired
+wtype t
+until_ok 3000 trusted_is true
+check "t again trusts it" trusted_is true
+until_ok 2000 detail_is "Test Headphones" "paired · trusted"
+check "and trusted is back in its detail" detail_is "Test Headphones" "paired · trusted"
 
 # Connecting moves a device to the top, and the selection goes with it.
 until_ok 3000 select_row "Test Speaker"
@@ -145,9 +158,10 @@ check "the hint reads Bluetooth off · o turn on ($(control_state | jq -c .hint)
 check "an adapter that is off lists no devices" state_is '.rows == []'
 before=$(methods)
 wtype s
+wtype t
 wtype -k Return
 sleep 1
-check "s and Enter with the adapter off ask BlueZ for no scan, pair or connect" test "$(methods)" = "$before"
+check "s, t and Enter with the adapter off ask BlueZ for no scan, trust, pair or connect" test "$(methods)" = "$before"
 check "and the scan stays off" discovering_is false
 wtype o
 until_ok 3000 powered_is true

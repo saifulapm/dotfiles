@@ -22,6 +22,7 @@ Item {
                 address: d.address,
                 connected: d.connected,
                 paired: d.paired,
+                trusted: d.trusted,
                 battery: d.battery,
                 batteryAvailable: d.batteryAvailable
             }))
@@ -61,7 +62,9 @@ Item {
                 device.disconnect();
             else
                 device.connect();
-        } else if (event.key === Qt.Key_P)
+        } else if (event.key === Qt.Key_T)
+            device.trusted = !device.trusted;
+        else if (event.key === Qt.Key_P)
             device.pair();
         else if (event.key === Qt.Key_D)
             device.forget();

@@ -19,14 +19,15 @@ export function btOrder(devs, discovering) {
 export function btRow(dev) {
   const percent = Math.round(dev.battery * 100);
   const battery = dev.connected && dev.batteryAvailable && percent >= 0 && percent <= 100 ? ' · ' + percent + '%' : '';
-  return { title: line((dev.name || '').replace(CONTROL, ' ')) || dev.address, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + battery };
+  const trusted = dev.paired && dev.trusted ? ' · trusted' : '';
+  return { title: line((dev.name || '').replace(CONTROL, ' ')) || dev.address, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + trusted + battery };
 }
 
 // With the adapter off its other keys do nothing, so the hint offers only o.
 export function btHint(a) {
   if (!a.adapter) return 'No Bluetooth';
   if (!a.enabled) return 'Bluetooth off · o turn on';
-  return `↵ connect · s ${a.discovering ? 'stop' : 'scan'} · p pair · d forget · o off`;
+  return `↵ connect · s ${a.discovering ? 'stop' : 'scan'} · t trust · p pair · d forget · o off`;
 }
 
 export function wifiOrder(nets) {

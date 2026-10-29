@@ -15,8 +15,8 @@ test('Bluetooth lists connected devices, then paired, then new ones, by name in 
 test('the Bluetooth hint names the keys, or says the adapter is off or missing', () => {
   assert.equal(btHint({ adapter: false, enabled: false }), 'No Bluetooth');
   assert.equal(btHint({ adapter: true, enabled: false }), 'Bluetooth off · o turn on');
-  assert.equal(btHint({ adapter: true, enabled: true, discovering: false }), '↵ connect · s scan · p pair · d forget · o off');
-  assert.equal(btHint({ adapter: true, enabled: true, discovering: true }), '↵ connect · s stop · p pair · d forget · o off');
+  assert.equal(btHint({ adapter: true, enabled: true, discovering: false }), '↵ connect · s scan · t trust · p pair · d forget · o off');
+  assert.equal(btHint({ adapter: true, enabled: true, discovering: true }), '↵ connect · s stop · t trust · p pair · d forget · o off');
 });
 
 test('new devices list only while a scan runs, and a connected one always', () => {
@@ -43,6 +43,13 @@ test('a Bluetooth row names the device and reads connected, paired or new', () =
   assert.deepEqual(btRow({ name: 'Test Headphones', connected: true, paired: true }), { title: 'Test Headphones', detail: 'connected' });
   assert.deepEqual(btRow({ name: 'Test Headphones', connected: false, paired: true }), { title: 'Test Headphones', detail: 'paired' });
   assert.deepEqual(btRow({ name: 'Test Speaker', connected: false, paired: false }), { title: 'Test Speaker', detail: 'new' });
+});
+
+test('a trusted paired device adds trusted to its detail, before any battery', () => {
+  assert.equal(btRow({ name: 'H', connected: false, paired: true, trusted: true }).detail, 'paired · trusted');
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, trusted: true }).detail, 'connected · trusted');
+  assert.equal(btRow({ name: 'H', connected: true, paired: true, trusted: true, batteryAvailable: true, battery: 0.8 }).detail, 'connected · trusted · 80%');
+  assert.equal(btRow({ name: 'H', connected: false, paired: false, trusted: true }).detail, 'new');
 });
 
 test('a connected Bluetooth device with a battery reads its percentage', () => {
