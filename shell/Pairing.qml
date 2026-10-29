@@ -26,7 +26,6 @@ Singleton {
     } : null
     // The device Control asked to pair, until its pair ends.
     property var device: null
-    property bool devicePairing: false
 
     signal failed(string device)
 
@@ -84,37 +83,33 @@ Singleton {
         return true;
     }
 
-    // Pairs a new device, then trusts and connects it once BlueZ reports it paired.
+    // Pairs a new device, then trusts and connects it. Quickshell's own pair gives up at D-Bus's 25 s default while the agent's question still shows, so Pair runs here with room for the agent's 60 s and says by its exit how it ended.
     function pairTrustConnect(d) {
+        if (pairer.running)
+            return;
         device = d;
-        devicePairing = d.pairing;
-        d.pair();
+        pairer.command = ["gdbus", "call", "--system", "--timeout", "90", "--dest", "org.bluez", "--object-path", d.dbusPath, "--method", "org.bluez.Device1.Pair"];
+        pairer.running = true;
     }
 
-    Connections {
-        target: pairing.device
-        function onPairedChanged() {
-            const d = pairing.device;
-            if (!d.paired)
-                return;
-            pairing.device = null;
-            d.trusted = true;
-            d.connect();
+    Process {
+        id: pairer
+        stderr: StdioCollector {
+            id: pairErr
         }
-        function onPairingChanged() {
+        onExited: code => {
             const d = pairing.device;
-            const was = {
-                pairing: pairing.devicePairing
-            };
-            pairing.devicePairing = d.pairing;
-            if (P.pairFailed(was, {
-                pairing: d.pairing,
-                paired: d.paired
-            })) {
-                pairing.device = null;
-                pairing.dropFor(d.address);
-                pairing.failed(d.deviceName || d.address);
+            pairing.device = null;
+            if (!d)
+                return;
+            if (code === 0) {
+                d.trusted = true;
+                d.connect();
+                return;
             }
+            console.warn("pairing: Pair on " + d.address + " failed: " + pairErr.text.trim());
+            pairing.dropFor(d.address);
+            pairing.failed(P.deviceName(d.deviceName, d.address));
         }
     }
 

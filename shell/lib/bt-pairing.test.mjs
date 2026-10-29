@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, keyText, pairFailed, parseRequest, promptText, serviceName, typed } from './bt-pairing.mjs';
+import { answerLine, deviceName, keyText, parseRequest, promptText, serviceName, typed } from './bt-pairing.mjs';
 
 const req = (r) => JSON.stringify(r);
 
@@ -19,9 +19,30 @@ test('a line that is not a request, or names an unknown kind, is refused', () =>
 });
 
 test('a device names itself, so its name is one line without controls or bidi marks, and an empty one is its address', () => {
-  assert.equal(parseRequest(req({ kind: 'confirm', device: 'Evil\nNext‮', address: 'AA', code: '1' })).device, 'Evil Next');
-  assert.equal(parseRequest(req({ kind: 'confirm', device: '', address: '00:00:00:00:00:07', code: '1' })).device, '00:00:00:00:00:07');
-  assert.equal(parseRequest(req({ kind: 'confirm', device: 'K', address: 'AA', code: '12a\n3' })).code, '123');
+  assert.equal(parseRequest(req({ kind: 'confirm', device: 'Evil\nNext‮', address: 'AA', code: '123456' })).device, 'Evil Next');
+  assert.equal(parseRequest(req({ kind: 'confirm', device: '', address: '00:00:00:00:00:07', code: '123456' })).device, '00:00:00:00:00:07');
+});
+
+test('a request whose fields BlueZ would never send is refused, not drawn', () => {
+  const ok = { kind: 'confirm', device: 'K', address: 'AA', code: '123456', service: '' };
+  const bad = [
+    { ...ok, device: '', address: '' },
+    { ...ok, device: 42, address: '' },
+    { ...ok, code: '12ab34' },
+    { ...ok, code: '1234567' },
+    { ...ok, kind: 'display', code: '' },
+    { ...ok, kind: 'authorize', code: '', service: 'audio? press ↵ to keep sound' },
+  ];
+  for (const r of bad) assert.equal(parseRequest(req(r)), null, JSON.stringify(r));
+  assert.equal(parseRequest(req({ ...ok, code: '' })).code, '');
+  assert.equal(parseRequest(req({ ...ok, kind: 'pin', code: '' })).kind, 'pin');
+  assert.equal(parseRequest(req({ ...ok, kind: 'authorize', code: '', service: '0000110D-0000-1000-8000-00805F9B34FB' })).kind, 'authorize');
+});
+
+test('a long device name is cut to 40 characters, so the code always shows', () => {
+  const r = parseRequest(req({ kind: 'confirm', device: 'A'.repeat(248), address: 'AA', code: '123456' }));
+  assert.equal(r.device, 'A'.repeat(39) + '…');
+  assert.equal(promptText(r), `Pair ${'A'.repeat(39)}…? 123456`);
 });
 
 test('each request kind asks in its own words', () => {
@@ -69,9 +90,8 @@ test('the answer line carries yes or no, and the PIN only for a kind that asks o
   assert.equal(answerLine('pin', false, '0000'), '{"ok":false}\n');
 });
 
-test('a pair failed when pairing stops with the device still unpaired', () => {
-  assert.equal(pairFailed({ pairing: true, paired: false }, { pairing: false, paired: false }), true);
-  assert.equal(pairFailed({ pairing: true, paired: false }, { pairing: false, paired: true }), false);
-  assert.equal(pairFailed({ pairing: true, paired: false }, { pairing: true, paired: false }), false);
-  assert.equal(pairFailed({ pairing: false, paired: false }, { pairing: false, paired: false }), false);
+test('the failed toast names a device as the question does', () => {
+  assert.equal(deviceName('Evil\nNext\u202e', 'AA'), 'Evil Next');
+  assert.equal(deviceName('', '00:00:00:00:00:07'), '00:00:00:00:00:07');
+  assert.equal(deviceName('B'.repeat(100), 'AA'), 'B'.repeat(39) + '…');
 });

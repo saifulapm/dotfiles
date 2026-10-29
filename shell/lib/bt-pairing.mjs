@@ -8,6 +8,18 @@ const str = (v) => (typeof v === 'string' ? v : '');
 // A device sends its own name, so it is drawn as one line of plain text.
 const oneLine = (s) => line(str(s).replace(CONTROL, ' ').replace(MARK, ''));
 
+// BlueZ's codes are six digits, a confirm's may be empty (RequestAuthorization) and a service is a 128-bit UUID, so a line that breaks this did not come from the agent.
+const SIX = /^[0-9]{6}$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// A name is up to 248 bytes, which would wrap the question past its code.
+const NAME_MAX = 40;
+
+// A device's name as one line, cut to fit, or its address when it sent none.
+export function deviceName(name, address) {
+  const n = oneLine(name);
+  return n.length > NAME_MAX ? n.slice(0, NAME_MAX - 1) + '…' : n || oneLine(address);
+}
+
 export function parseRequest(text) {
   let r;
   try {
@@ -17,13 +29,14 @@ export function parseRequest(text) {
   }
   if (!r || typeof r !== 'object' || Array.isArray(r) || KINDS.indexOf(r.kind) < 0) return null;
   const address = oneLine(r.address);
-  return {
-    kind: r.kind,
-    device: oneLine(r.device) || address,
-    address: address,
-    code: str(r.code).replace(/\D/g, ''),
-    service: str(r.service),
-  };
+  const device = deviceName(r.device, r.address);
+  const code = str(r.code);
+  const service = str(r.service);
+  if (!device) return null;
+  if (r.kind === 'display' && !SIX.test(code)) return null;
+  if (r.kind === 'confirm' && code !== '' && !SIX.test(code)) return null;
+  if (r.kind === 'authorize' && !UUID.test(service)) return null;
+  return { kind: r.kind, device: device, address: address, code: code, service: service };
 }
 
 // The services a device asks for most, by their 16-bit number on the Bluetooth base UUID.
@@ -91,6 +104,3 @@ export function typed(kind, pin, text) {
 }
 
 export const answerLine = (kind, ok, pin) => JSON.stringify(ok && (kind === 'pin' || kind === 'passkey') ? { ok: true, pin: pin } : { ok: ok }) + '\n';
-
-// Quickshell gives QML no error from a pair, so a pair failed when its pairing stops with the device still unpaired.
-export const pairFailed = (was, now) => was.pairing && !now.pairing && !now.paired;
