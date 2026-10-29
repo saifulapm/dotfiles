@@ -442,6 +442,11 @@ arch = "all"
 why = "gi, which bin/dots-portal and the dev-fake D-Bus services import"
 
 [[package]]
+name = "python3-dbus"
+arch = "all"
+why = "dbus, which bin/dots-bt-agent and bin/dev-fake-bluez import"
+
+[[package]]
 name = "just"
 arch = "all"
 why = "runs this repo's justfile recipes"
