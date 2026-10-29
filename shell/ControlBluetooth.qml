@@ -1,5 +1,6 @@
 import Quickshell.Bluetooth
 import QtQuick
+import "." as Root
 import "lib/control-net.mjs" as Lib
 import "lib/voice.mjs" as V
 
@@ -10,6 +11,9 @@ Item {
     required property var theme
     property int selected: 0
     readonly property var look: V.listLook(theme.tokens)
+    // A pairing request in the island takes every key while this tab shows, since Control holds the keyboard.
+    readonly property bool typing: Root.Pairing.question !== null
+    readonly property var typingKeys: Root.Pairing.question?.keys ?? []
 
     readonly property var adapter: Bluetooth.defaultAdapter
     readonly property bool on: adapter?.enabled ?? false
@@ -42,6 +46,8 @@ Item {
     }
 
     function key(event) {
+        if (typing)
+            return Root.Pairing.key(event);
         if (event.key === Qt.Key_O && adapter) {
             adapter.enabled = !adapter.enabled;
             return true;
@@ -60,6 +66,8 @@ Item {
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (device.connected)
                 device.disconnect();
+            else if (!device.paired)
+                Root.Pairing.pairTrustConnect(device);
             else
                 device.connect();
         } else if (event.key === Qt.Key_T)

@@ -26,7 +26,7 @@ Item {
     readonly property var section: sections[current]
     readonly property var rows: section.rows
     readonly property var look: V.listLook(theme.tokens)
-    readonly property var legend: look.keys(section.typing ? [["↵", "join"], ["ctrl+v", "paste"], ["esc", "cancel"]] : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
+    readonly property var legend: look.keys(section.typing ? (section.typingKeys ?? [["↵", "join"], ["ctrl+v", "paste"], ["esc", "cancel"]]) : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
     readonly property Root.Motion motion: Root.Motion {
         shown: control.shown
         tokens: control.theme.tokens

@@ -124,16 +124,17 @@ check "t again trusts it" trusted_is true
 until_ok 2000 detail_is "Test Headphones" "paired · trusted"
 check "and trusted is back in its detail" detail_is "Test Headphones" "paired · trusted"
 
-# Connecting moves a device to the top, and the selection goes with it.
+# Enter on a new device that asks nothing pairs, trusts and connects it, which moves it to the top, and the selection goes with it.
 until_ok 3000 select_row "Test Speaker"
 wtype -k Return
 until_ok 3000 bash -c "busctl --address=\"$DBUS_SESSION_BUS_ADDRESS\" get-property org.bluez $speaker org.bluez.Device1 Connected | grep -q true"
-until_ok 2000 detail_is "Test Speaker" connected
+until_ok 2000 detail_is "Test Speaker" "connected · trusted"
+check "Enter on the new Test Speaker pairs, trusts and connects it" detail_is "Test Speaker" "connected · trusted"
 on_speaker() { state_is '.rows[.selected] == "Test Speaker"'; }
 check "the selection stays on Test Speaker as it moves to the top" on_speaker
 wtype -k Return
-until_ok 2000 detail_is "Test Speaker" new
-check "so Enter again disconnects Test Speaker, not Test Headphones" detail_is "Test Speaker" new
+until_ok 2000 detail_is "Test Speaker" "paired · trusted"
+check "so Enter again disconnects Test Speaker, not Test Headphones" detail_is "Test Speaker" "paired · trusted"
 
 until_ok 3000 select_row "Test Speaker"
 wtype d

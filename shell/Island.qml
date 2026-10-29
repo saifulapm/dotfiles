@@ -25,8 +25,8 @@ PanelWindow {
     required property var lock
     // A theme switch's failure, shown in place of the clock for 5 s.
     property string notice: ""
-    // What the island may show; each is null while it has nothing to show.
-    readonly property var question: questions.current
+    // What the island may show; each is null while it has nothing to show. A Bluetooth pairing request asks ahead of an agent's question, since it times out.
+    readonly property var question: Root.Pairing.question ?? questions.current
     // The month the calendar shows, {year, month}, while Mod+I has it open.
     property var calendar: null
     readonly property var grid: heldCalendar ? I.monthGrid(heldCalendar.year, heldCalendar.month, clockLook.grid.weekStart) : null
@@ -607,6 +607,17 @@ PanelWindow {
         };
     }
 
+    // A pairing request's kind, what has been typed and its keys as drawn, or null.
+    function pairingState() {
+        if (mode !== "question" || !question.pairing)
+            return null;
+        return {
+            kind: question.pairing,
+            pin: pinText.text,
+            keys: question.keys.map(k => k.join(" "))
+        };
+    }
+
     // Room for the widest shadow, Artboard's soft one, beside and below the box.
     readonly property int padSide: 32
     readonly property int padBelow: 44
@@ -681,6 +692,13 @@ PanelWindow {
     // Only the box takes clicks, not the shadow around it.
     mask: Region {
         item: box
+    }
+
+    Connections {
+        target: Root.Pairing
+        function onFailed(device) {
+            island.showToast("Pairing failed: " + device);
+        }
     }
 
     Connections {
@@ -2353,7 +2371,7 @@ PanelWindow {
                             id: hint
                             textFormat: Text.PlainText
                             anchors.right: parent.right
-                            text: island.focused ? "1-9 pick · r reply · Esc" : "Mod+I to answer"
+                            text: island.heldQuestion?.pairing ? "" : island.focused ? "1-9 pick · r reply · Esc" : "Mod+I to answer"
                             color: Qt.alpha(box.style.text, 0.65)
                             font.family: island.theme.tokens?.type.mono ?? ""
                             font.pixelSize: 11
@@ -2379,12 +2397,13 @@ PanelWindow {
                         visible: !island.replying
 
                         Repeater {
-                            model: (island.heldQuestion?.options ?? []).slice(0, 9).concat(["Reply…"])
+                            // A pairing request names the keys that answer it in place of options.
+                            model: island.heldQuestion?.pairing ? island.heldQuestion.keys.map(k => k.join(" ")) : (island.heldQuestion?.options ?? []).slice(0, 9).concat(["Reply…"])
 
                             Rectangle {
                                 required property string modelData
                                 required property int index
-                                readonly property bool isReply: index === Math.min(island.heldQuestion?.options.length ?? 0, 9)
+                                readonly property bool isReply: !island.heldQuestion?.pairing && index === Math.min(island.heldQuestion?.options.length ?? 0, 9)
                                 width: Math.min(chip.implicitWidth + 24, ask.width)
                                 height: chip.implicitHeight + 12
                                 radius: 8
@@ -2398,12 +2417,36 @@ PanelWindow {
                                     anchors.centerIn: parent
                                     width: Math.min(implicitWidth, parent.width - 24)
                                     elide: Text.ElideRight
-                                    text: (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData
+                                    text: island.heldQuestion?.pairing ? parent.modelData : (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData
                                     color: parent.index === 0 && !parent.isReply ? box.style.fill : box.style.text
                                     font.family: island.theme.tokens?.type.ui ?? ""
                                     font.pixelSize: 13
                                 }
                             }
+                        }
+                    }
+
+                    // The PIN or passkey as typed, for a request that asks one.
+                    Rectangle {
+                        visible: ["pin", "passkey"].indexOf(island.heldQuestion?.pairing) >= 0
+                        width: parent.width
+                        height: 32
+                        radius: 8
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Qt.alpha(box.style.text, 0.5)
+
+                        Text {
+                            id: pinText
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            verticalAlignment: Text.AlignVCenter
+                            textFormat: Text.PlainText
+                            text: Root.Pairing.pin
+                            color: box.style.text
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 13
                         }
                     }
 
@@ -2515,6 +2558,10 @@ PanelWindow {
                 const q = island.question;
                 if (!q)
                     return;
+                if (q.pairing) {
+                    Root.Pairing.key(event);
+                    return;
+                }
                 if (event.key === Qt.Key_Escape) {
                     island.questions.putAway(q.id);
                 } else if (event.key === Qt.Key_R) {
