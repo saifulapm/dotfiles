@@ -197,3 +197,16 @@ test('RegisterAgent with its path sent as a string finds no method, as BlueZ ans
   assert.match(r.stderr, /signature "ss"/);
   assert.equal((await b.knob('Calls')).stdout, '(@as [],)');
 });
+
+test('a passkey typed wrong on the device fails the Pair without cancelling the agent', async (t) => {
+  const b = await scratch(t);
+  await b.agent();
+  await b.gdbus(HCI0, 'org.bluez.Adapter1.StartDiscovery');
+  await b.knob('SetPairing', KEYBOARD, 'display', '654321');
+  const pair = b.gdbus(KEYBOARD, 'org.bluez.Device1.Pair');
+  await b.until(() => b.agentCalls().some((c) => c[0] === 'DisplayPasskey'));
+  await b.knob('Mistyped', KEYBOARD);
+  assert.match((await pair).stderr, /org\.bluez\.Error\.AuthenticationFailed/);
+  assert.equal(await b.prop(KEYBOARD, 'org.bluez.Device1', 'Paired'), '(<false>,)');
+  assert.equal(b.agentCalls().some((c) => c[0] === 'Cancel'), false);
+});

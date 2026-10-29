@@ -117,6 +117,17 @@ check "typed on the device, Test Mouse pairs and connects" prop_is "$mouse" Conn
 until_ok 3000 no_question
 check "and the question goes" no_question
 
+# A code typed wrong on the device fails the pair, and BlueZ sends no Cancel, so the shell drops the dead question itself.
+knob SetPairing osu "$phone" display 111111
+until_ok 3000 select_row "Test Phone"
+wtype -k Return
+until_ok 3000 asks "Type 111111 on Test Phone"
+check "a passkey to type reads Type 111111 on Test Phone" asks "Type 111111 on Test Phone"
+knob Mistyped o "$phone"
+until_ok 3000 toast_is "Pairing failed: Test Phone"
+check "typed wrong on the device, the question goes and the island shows Pairing failed: Test Phone ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: Test Phone"
+check "and Control's keys move again" state_is '.legend | ascii_downcase | contains("move")'
+
 # A PIN typed in the island.
 knob SetPairing osu "$phone" pin 0
 until_ok 3000 select_row "Test Phone"

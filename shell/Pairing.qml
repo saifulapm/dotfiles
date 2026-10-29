@@ -60,6 +60,13 @@ Singleton {
         }
     }
 
+    // A pair that failed on the device side gets no Cancel for a code it only showed, so its questions go here; each hang-up reaches hungUp.
+    function dropFor(address) {
+        for (const c of waiting.concat(current ? [current] : []))
+            if (c.request.address === address)
+                c.socket.connected = false;
+    }
+
     // Enter answers yes, Esc no; a PIN or passkey takes typed characters and Backspace; a code shown on the device has only Esc.
     function key(event) {
         if (!current)
@@ -105,6 +112,7 @@ Singleton {
                 paired: d.paired
             })) {
                 pairing.device = null;
+                pairing.dropFor(d.address);
                 pairing.failed(d.deviceName || d.address);
             }
         }

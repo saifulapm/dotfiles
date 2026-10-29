@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them, and a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device; Pair plays the device's request against the registered agent, and org.dots.FakeBluez on /org/bluez sets that request (SetPairing), types a shown passkey on the device (Typed), asks for a service (Authorize), lists what agents did (Calls) and what was asked of BlueZ (Methods).
+# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them, and a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device; Pair plays the device's request against the registered agent, and org.dots.FakeBluez on /org/bluez sets that request (SetPairing), types a shown passkey on the device, right (Typed) or wrong (Mistyped), asks for a service (Authorize), lists what agents did (Calls) and what was asked of BlueZ (Methods).
 import os
 import sys
 
@@ -171,6 +171,13 @@ class Device(Object):
             self.waiting = None
             paired()
 
+    # A wrong code typed on the device fails the bond, and BlueZ sends the agent no Cancel for a code it only showed.
+    def mistyped(self):
+        if self.waiting is not None:
+            _, fail = self.waiting
+            self.waiting = None
+            fail(error("AuthenticationFailed"))
+
 
 class Adapter(Object):
     def __init__(self, bus, root):
@@ -294,6 +301,10 @@ class Manager(dbus.service.Object):
     @dbus.service.method(KNOB, in_signature="o")
     def Typed(self, path):
         self.root.objects[str(path)].typed()
+
+    @dbus.service.method(KNOB, in_signature="o")
+    def Mistyped(self, path):
+        self.root.objects[str(path)].mistyped()
 
     # Answers allowed, or the error name the agent refused with.
     @dbus.service.method(KNOB, in_signature="os", out_signature="s", async_callbacks=("ok", "fail"))
