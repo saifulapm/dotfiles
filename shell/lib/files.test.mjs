@@ -97,6 +97,21 @@ test('the path line shows the find query in place of the counts while one is typ
   assert.equal(F.findText('bracket', 'a\nb'), '/ a b');
 });
 
+test('a z jump asks zoxide for the typed words, and none asks nothing', () => {
+  assert.deepEqual(F.jumpWords('  dot  files '), ['dot', 'files']);
+  assert.deepEqual(F.jumpWords('-x'), ['-x']);
+  assert.deepEqual(F.jumpWords(' '), []);
+});
+
+test('the path line shows a z jump\'s words and where they go, or that they go nowhere', () => {
+  assert.equal(F.jumpText('caps', '/home/s', 'dotf', '/home/s/Codes/dotfiles'), 'z dotf → ~/Codes/dotfiles');
+  assert.equal(F.jumpText('caps', '/home/s', 'dotf', null), 'z dotf');
+  assert.equal(F.jumpText('caps', '/home/s', 'qq', ''), 'z qq · no match');
+  assert.equal(F.jumpText('bracket', '/home/s', 'qq', ''), 'z qq · NO MATCH');
+  assert.equal(F.jumpText('caps', '/home/s', '', ''), 'z ');
+  assert.equal(F.jumpText('caps', '/home/s', 'a\nb', '/x\ny'), 'z a b → /x y');
+});
+
 test('rename selects the name without its extension; a folder or a dotfile is selected whole', () => {
   assert.equal(F.stemLength({ name: 'invoice-0912.pdf', dir: false }), 12);
   assert.equal(F.stemLength({ name: 'a.tar.gz', dir: false }), 5);

@@ -22,6 +22,13 @@ ShellRoot {
     // / starts a find: typed letters narrow the rows, or open the one place they start (#NYNGZ3NC).
     property bool finding: false
     property string query: ""
+    // z jumps through zoxide: the typed words, the folder zoxide ranks first for them, and the words that answer is for.
+    property bool jumping: false
+    property string jumpQuery: ""
+    property string jumpTo: ""
+    property string jumpFor: ""
+    // An Enter typed before zoxide answered the last words jumps once it does.
+    property bool jumpGo: false
     // The cursor file's width and height, read from its header off the render loop.
     property var dims: ({
             path: "",
@@ -144,6 +151,8 @@ ShellRoot {
         entries = [];
         listed = false;
         list();
+        // Each folder opened ranks it in zoxide, as yazi's do.
+        Quickshell.execDetached(["zoxide", "add", "--", path]);
     }
 
     function up() {
@@ -201,6 +210,45 @@ ShellRoot {
             query = "";
         } else
             enter(allPlaces[at].path);
+    }
+
+    function startJump() {
+        jumping = true;
+        jumpGo = false;
+        setJump("");
+    }
+
+    function setJump(q) {
+        jumpQuery = q;
+        lookup();
+    }
+
+    // One zoxide query at a time; words typed during it are asked for once it ends.
+    function lookup() {
+        const words = F.jumpWords(jumpQuery);
+        if (!words.length) {
+            jumpTo = "";
+            jumpFor = jumpQuery;
+            return;
+        }
+        if (jumper.running)
+            return;
+        jumper.asked = jumpQuery;
+        jumper.command = ["zoxide", "query", "--exclude", folder, "--"].concat(words);
+        jumper.running = true;
+    }
+
+    // Enter: into the folder the words go to; with none, the bar stays for more words.
+    function jump() {
+        if (jumpFor !== jumpQuery) {
+            jumpGo = true;
+            return;
+        }
+        jumpGo = false;
+        if (!jumpTo)
+            return;
+        jumping = false;
+        enter(jumpTo);
     }
 
     // One header read at a time; a cursor that moved on during it asks again for the file it rests on.
@@ -492,6 +540,27 @@ ShellRoot {
         }
     }
 
+    Process {
+        id: jumper
+        property string asked: ""
+        stdout: StdioCollector {
+            id: jumpOut
+        }
+        onExited: code => {
+            if (!app.jumping)
+                return;
+            if (asked !== app.jumpQuery) {
+                Qt.callLater(app.lookup);
+                return;
+            }
+            // zoxide exits 1 when no folder matches.
+            app.jumpTo = code === 0 ? jumpOut.text.trim() : "";
+            app.jumpFor = asked;
+            if (app.jumpGo)
+                app.jump();
+        }
+    }
+
     // A rename, a new folder or a trash, then the folder listed again with the cursor on what it made.
     Process {
         id: doer
@@ -585,6 +654,7 @@ ShellRoot {
                 count: countLabel.text,
                 finding: app.finding,
                 query: app.query,
+                jumping: app.jumping,
                 hidden: app.hidden,
                 renaming: app.renaming,
                 renameSelected: app.renameSelected,
@@ -711,6 +781,18 @@ ShellRoot {
                     event.accepted = true;
                     return;
                 }
+                if (app.jumping) {
+                    if (k === Qt.Key_Escape)
+                        app.jumping = false;
+                    else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                        app.jump();
+                    else if (k === Qt.Key_Backspace)
+                        app.setJump(app.jumpQuery.slice(0, -1));
+                    else if (t !== "" && t.charCodeAt(0) >= 32)
+                        app.setJump(app.jumpQuery + t);
+                    event.accepted = true;
+                    return;
+                }
                 const g = app.gHeld;
                 app.gHeld = false;
                 if (t === "g") {
@@ -721,6 +803,8 @@ ShellRoot {
                 }
                 else if (t === "G")
                     app.rowKey("bottom");
+                else if (t === "z")
+                    app.startJump();
                 else if (t === "/") {
                     // A new find starts empty, as yazi's and vim's do.
                     app.setQuery("");
@@ -878,8 +962,8 @@ ShellRoot {
                 Text {
                     id: countLabel
                     textFormat: Text.PlainText
-                    text: app.finding || app.query ? F.findText(app.voice, app.query) : F.countText(app.voice, app.rows.length, app.hidden)
-                    color: app.finding ? c.accent ?? "red" : look.small.color
+                    text: app.jumping ? F.jumpText(app.voice, app.home, app.jumpQuery, app.jumpFor === app.jumpQuery ? app.jumpTo : null) : app.finding || app.query ? F.findText(app.voice, app.query) : F.countText(app.voice, app.rows.length, app.hidden)
+                    color: app.finding || app.jumping ? c.accent ?? "red" : look.small.color
                     font.family: look.small.font
                     font.pixelSize: bracket ? 10 : 11
                     font.letterSpacing: look.small.spacing

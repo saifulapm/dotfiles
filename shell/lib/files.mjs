@@ -114,6 +114,16 @@ export function findPlace(places, query) {
 
 export const findText = (voice, query) => `/ ${oneLine(query)}`;
 
+// z jumps where zoxide ranks the typed words first, as its z does in the shell.
+export const jumpWords = (query) => query.split(/\s+/).filter(Boolean);
+
+// to: the folder the words go to, '' for none, or null while zoxide is still asked.
+export function jumpText(voice, home, query, to) {
+  const typed = `z ${oneLine(query)}`;
+  if (to) return `${typed} → ${oneLine(tilde(home, to))}`;
+  return to === '' && jumpWords(query).length ? typed + say(voice, ' · no match') : typed;
+}
+
 // How much of a name r selects: up to its last dot, so a rename keeps the extension; a folder or a dotfile whole.
 export function stemLength(row) {
   const dot = row.name.lastIndexOf('.');
