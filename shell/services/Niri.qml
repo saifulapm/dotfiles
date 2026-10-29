@@ -19,6 +19,10 @@ Scope {
         return N.urgentWorkspaces(state, output);
     }
 
+    function column(output) {
+        return N.columnPosition(state, output);
+    }
+
     function shares(ownPid) {
         return N.shares(state, ownPid);
     }

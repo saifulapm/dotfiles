@@ -544,6 +544,14 @@ test('the margin draws a window title on one line, with no control characters or
 // The marks as drawn: each segment's text joined, without the gap that sets them off from the title.
 const marks = (name, idxs) => margin(name).marks(idxs).map((s) => s.text).join('').trim();
 
+test("the focused column reads 2 / 3 after the workspace number, [2 / 3] in Blueprint's brackets", () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).column({ at: 2, of: 3 })), ['  2 / 3', '  2 / 3', ' [2 / 3]']);
+});
+
+test('a lone column or no tiled window draws no column', () => {
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [margin(n).column({ at: 1, of: 1 }), margin(n).column(null)]), [['', ''], ['', ''], ['', '']]);
+});
+
 test('the urgency marks read !05 !07, • 05  • 07 and [!05][!07]', () => {
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => marks(n, [5, 7])), ['!05 !07', '• 05  • 07', '[!05][!07]']);
 });

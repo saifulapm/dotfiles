@@ -87,7 +87,7 @@ PanelWindow {
     function drawnState() {
         const right = [syncLabel, goalLabel, mailLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
         return {
-            left: number.text + tail.text,
+            left: number.text + column.text + tail.text,
             marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join("").trim(),
             markColors: Array.from(marks.children).filter(l => l.text !== undefined).map(l => String(l.color)),
             right: right,
@@ -111,10 +111,16 @@ PanelWindow {
             font.weight: root.voice.numberWeight
         }
 
+        // Which of the shown workspace's columns has the focus, read from niri's column numbers since niri reports no scroll position.
+        Label {
+            id: column
+            text: root.voice.column(root.niri.column(root.screen.name))
+        }
+
         Label {
             id: tail
             text: root.voice.tail(root.view)
-            width: Math.min(implicitWidth, Math.max(0, root.lineEnd - 32 - number.width - marks.width))
+            width: Math.min(implicitWidth, Math.max(0, root.lineEnd - 32 - number.width - column.width - marks.width))
             elide: Text.ElideRight
         }
 

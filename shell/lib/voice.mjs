@@ -638,6 +638,8 @@ export function marginLook(tokens) {
     number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? `[${pad2(idx)}]` : pad2(idx)),
     numberColor: bracket ? c.accent : c.ink,
     numberWeight: plain ? 600 : bracket ? 400 : 700,
+    // The focused column of its columns, after the number; a workspace of one column draws none.
+    column: (pos) => (!pos || pos.of < 2 ? '' : bracket ? ` [${pos.at} / ${pos.of}]` : `  ${pos.at} / ${pos.of}`),
     tail(view) {
       if (view.app === null && view.title === null) return '';
       // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
