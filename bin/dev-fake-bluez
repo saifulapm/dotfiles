@@ -259,14 +259,21 @@ class Root(dbus.service.Object):
         pass
 
 
+def strict(message, signature):
+    if message.get_signature() != signature:
+        raise dbus.DBusException('Method "%s" with signature "%s" doesn\'t exist' % (message.get_member(), message.get_signature()), name="org.freedesktop.DBus.Error.UnknownMethod")
+
+
 class Manager(dbus.service.Object):
     def __init__(self, bus, root):
         super().__init__(bus, "/org/bluez")
         self.bus = bus
         self.root = root
 
-    @dbus.service.method("org.bluez.AgentManager1", in_signature="os", sender_keyword="sender")
-    def RegisterAgent(self, path, capability, sender):
+    # BlueZ matches a method by its signature, so a path sent as a string finds no method.
+    @dbus.service.method("org.bluez.AgentManager1", in_signature="os", sender_keyword="sender", message_keyword="message")
+    def RegisterAgent(self, path, capability, sender, message):
+        strict(message, "os")
         self.root.calls.append("RegisterAgent %s %s" % (path, capability))
         self.root.agent = dbus.Interface(self.bus.get_object(sender, path, introspect=False), AGENT)
 
@@ -275,8 +282,9 @@ class Manager(dbus.service.Object):
         self.root.calls.append("UnregisterAgent %s" % path)
         self.root.agent = None
 
-    @dbus.service.method("org.bluez.AgentManager1", in_signature="o")
-    def RequestDefaultAgent(self, path):
+    @dbus.service.method("org.bluez.AgentManager1", in_signature="o", message_keyword="message")
+    def RequestDefaultAgent(self, path, message):
+        strict(message, "o")
         self.root.calls.append("RequestDefaultAgent %s" % path)
 
     @dbus.service.method(KNOB, in_signature="osu")

@@ -216,9 +216,9 @@ def on_owner(owner):
         log("could not register with BlueZ: %s" % error)
 
     def default():
-        manager.RequestDefaultAgent(AGENT_PATH, reply_handler=lambda: log("registered as the default agent"), error_handler=failed)
+        manager.RequestDefaultAgent(dbus.ObjectPath(AGENT_PATH), reply_handler=lambda: log("registered as the default agent"), error_handler=failed)
 
-    manager.RegisterAgent(AGENT_PATH, "KeyboardDisplay", reply_handler=default, error_handler=failed)
+    manager.RegisterAgent(dbus.ObjectPath(AGENT_PATH), "KeyboardDisplay", reply_handler=default, error_handler=failed)
 
 
 DBusGMainLoop(set_as_default=True)

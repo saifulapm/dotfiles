@@ -56,7 +56,7 @@ async function scratch(t) {
   const until = async (cond) => {
     for (let i = 0; i < 100 && !(await cond()); i++) await sleep(50);
   };
-  return { gdbus, prop, set, objects, knob, agent, agentCalls, until };
+  return { address, gdbus, prop, set, objects, knob, agent, agentCalls, until };
 }
 
 test('a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device, which BlueZ keeps after the scan stops', async (t) => {
@@ -186,4 +186,14 @@ test('Methods lists each scan, pair, connect and property set asked of it, refus
     (await b.knob('Methods')).stdout,
     `(['Set ${HCI0} Powered', 'StartDiscovery ${HCI0}', 'Pair ${HEADPHONES}', 'Connect ${HEADPHONES}', 'Set ${HEADPHONES} Trusted'],)`,
   );
+});
+
+test('RegisterAgent with its path sent as a string finds no method, as BlueZ answers', async (t) => {
+  const b = await scratch(t);
+  const r = await new Promise((resolve) =>
+    execFile('busctl', [`--address=${b.address}`, 'call', 'org.bluez', '/org/bluez', 'org.bluez.AgentManager1', 'RegisterAgent', 'ss', '/x', 'KeyboardDisplay'], (err, stdout, stderr) => resolve({ err, stderr })),
+  );
+  assert.ok(r.err);
+  assert.match(r.stderr, /signature "ss"/);
+  assert.equal((await b.knob('Calls')).stdout, '(@as [],)');
 });
