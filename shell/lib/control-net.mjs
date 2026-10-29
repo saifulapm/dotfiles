@@ -5,9 +5,14 @@ const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const btRank = (d) => (d.connected ? 0 : d.paired ? 1 : 2);
 const wifiRank = (n) => (n.connected ? 0 : n.known ? 1 : 2);
 
-// Ties break on name or signal, since QML's sort is not promised to be stable.
-export function btOrder(devs) {
-  return devs.map((d, i) => i).sort((a, b) => btRank(devs[a]) - btRank(devs[b]) || devs[a].name.localeCompare(devs[b].name));
+// New devices list only while a scan runs; a nameless one sorts after the named ones beside it, by address. Ties break on name or signal, since QML's sort is not promised to be stable.
+export function btOrder(devs, discovering) {
+  const key = (d) => [btRank(d), d.name ? 0 : 1, d.name || d.address || ''];
+  const cmp = (a, b) => {
+    const [ka, kb] = [key(devs[a]), key(devs[b])];
+    return ka[0] - kb[0] || ka[1] - kb[1] || ka[2].localeCompare(kb[2]);
+  };
+  return devs.map((d, i) => i).filter((i) => discovering || btRank(devs[i]) < 2).sort(cmp);
 }
 
 // A headset sends its own name and battery, so the name is one line without controls, and a percentage past 0-100 is not drawn.
@@ -21,7 +26,7 @@ export function btRow(dev) {
 export function btHint(a) {
   if (!a.adapter) return 'No Bluetooth';
   if (!a.enabled) return 'Bluetooth off · o turn on';
-  return '↵ connect · p pair · d forget · o off';
+  return `↵ connect · s ${a.discovering ? 'stop' : 'scan'} · p pair · d forget · o off`;
 }
 
 export function wifiOrder(nets) {

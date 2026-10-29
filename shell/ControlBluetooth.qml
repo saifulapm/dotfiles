@@ -15,12 +15,19 @@ Item {
     readonly property bool on: adapter?.enabled ?? false
     // An adapter that is off lists nothing, though BlueZ still holds its devices.
     readonly property var all: on ? adapter.devices.values : []
-    readonly property var devices: Lib.btOrder(all.map(d => ({
-                    name: d.name,
-                    connected: d.connected,
-                    paired: d.paired
-                }))).map(i => all[i])
-    readonly property var rows: devices.map(d => Lib.btRow(d))
+    readonly property bool discovering: on && adapter.discovering
+    // A device that sent no name has only BlueZ's alias of its address, so it reads as nameless.
+    readonly property var plain: all.map(d => ({
+                name: d.deviceName ? d.name : "",
+                address: d.address,
+                connected: d.connected,
+                paired: d.paired,
+                battery: d.battery,
+                batteryAvailable: d.batteryAvailable
+            }))
+    readonly property var order: Lib.btOrder(plain, discovering)
+    readonly property var devices: order.map(i => all[i])
+    readonly property var rows: order.map(i => Lib.btRow(plain[i]))
 
     // The item a key last acted on: the reorder its connect causes keeps the selection on it, and moving away lets it go.
     property var picked: null
@@ -41,6 +48,10 @@ Item {
         // Off, s, t and Enter do nothing, and are still taken so they act on nothing else.
         if (!on)
             return [Qt.Key_Return, Qt.Key_Enter, Qt.Key_S, Qt.Key_T].indexOf(event.key) >= 0;
+        if (event.key === Qt.Key_S) {
+            adapter.discovering = !adapter.discovering;
+            return true;
+        }
         const device = devices[selected];
         if (!device)
             return false;
@@ -59,11 +70,18 @@ Item {
         return true;
     }
 
+    // Control closing ends a scan it may have started.
+    function stopScan() {
+        if (discovering)
+            adapter.discovering = false;
+    }
+
     function state() {
         return {
             details: rows.map(r => r.detail),
             hint: hint.text,
-            powered: on
+            powered: on,
+            discovering: discovering
         };
     }
 
@@ -75,7 +93,8 @@ Item {
         leftPadding: 20
         text: section.look.tabText(Lib.btHint({
             adapter: !!section.adapter,
-            enabled: section.on
+            enabled: section.on,
+            discovering: section.discovering
         }))
         color: section.look.small.color
         font.family: section.look.small.font

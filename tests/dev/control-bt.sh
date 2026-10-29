@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets, and o turns the adapter off and on.
+# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets, o turns the adapter off and on, and s scans.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -27,6 +27,7 @@ bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
 headphones=/org/bluez/hci0/dev_00_00_00_00_00_02
 speaker=/org/bluez/hci0/dev_00_00_00_00_00_03
 connected_is() { [ "$(bus get-property org.bluez "$headphones" org.bluez.Device1 Connected 2>/dev/null)" = "b $1" ]; }
+discovering_is() { [ "$(bus get-property org.bluez /org/bluez/hci0 org.bluez.Adapter1 Discovering 2>/dev/null)" = "b $1" ]; }
 powered_is() { [ "$(bus get-property org.bluez /org/bluez/hci0 org.bluez.Adapter1 Powered 2>/dev/null)" = "b $1" ]; }
 # Each scan, pair, connect and property set the shell asked of the fake.
 methods() { bus call org.bluez /org/bluez org.dots.FakeBluez Methods; }
@@ -82,7 +83,16 @@ check "Bluetooth opens on its first row, Test Headphones" state_is '.selected ==
 until_ok 3000 detail_is "Test Headphones" paired
 echo "     state: $(control_state)"
 check "Test Headphones reads paired" detail_is "Test Headphones" paired
-check "Test Speaker reads new" detail_is "Test Speaker" new
+check "before a scan the new Test Speaker is not listed" state_is '.rows | index("Test Speaker") == null'
+
+wtype s
+until_ok 3000 discovering_is true
+check "s starts a scan (BlueZ reports Discovering true)" discovering_is true
+until_ok 3000 detail_is "Test Mouse" new
+check "the scan lists Test Mouse as new" detail_is "Test Mouse" new
+check "Test Speaker reads new while the scan runs" detail_is "Test Speaker" new
+check "the nameless device shows its address, last and after Test Mouse ($(control_state | jq -c .rows))" state_is '.rows[-1] == "00:00:00:00:00:07" and (.rows | index("00:00:00:00:00:07")) > (.rows | index("Test Mouse"))'
+check "the hint offers s stop ($(control_state | jq -c .hint))" state_is '.hint | ascii_downcase | contains("s stop")'
 
 until_ok 3000 select_row "Test Headphones"
 wtype -k Return
@@ -121,6 +131,12 @@ until_ok 2000 state_is '.rows | index("Test Speaker") == null'
 check "its row goes" state_is '.rows | index("Test Speaker") == null'
 echo "     state: $(control_state)"
 
+wtype s
+until_ok 3000 discovering_is false
+check "s again stops the scan" discovering_is false
+until_ok 2000 state_is '.rows | index("Test Mouse") == null'
+check "and Test Mouse leaves the list" state_is '.rows | index("Test Mouse") == null'
+
 wtype o
 until_ok 3000 powered_is false
 check "o turns the adapter off (BlueZ reports Powered false)" powered_is false
@@ -128,14 +144,23 @@ until_ok 2000 hint_is "bluetooth off · o turn on"
 check "the hint reads Bluetooth off · o turn on ($(control_state | jq -c .hint))" hint_is "bluetooth off · o turn on"
 check "an adapter that is off lists no devices" state_is '.rows == []'
 before=$(methods)
+wtype s
 wtype -k Return
 sleep 1
-check "Enter with the adapter off asks BlueZ for no pair or connect" test "$(methods)" = "$before"
+check "s and Enter with the adapter off ask BlueZ for no scan, pair or connect" test "$(methods)" = "$before"
+check "and the scan stays off" discovering_is false
 wtype o
 until_ok 3000 powered_is true
 check "o again turns it on" powered_is true
 until_ok 3000 state_is '.rows | index("Test Headphones") != null'
 check "the paired devices' rows are back" state_is '.rows | index("Test Headphones") != null'
+
+wtype s
+until_ok 3000 discovering_is true
+check "a scan runs again" discovering_is true
+wtype -k Escape
+until_ok 3000 discovering_is false
+check "Esc closing Control mid-scan stops the scan" discovering_is false
 
 exit $((fails > 0))
 }

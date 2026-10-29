@@ -9,13 +9,34 @@ test('Bluetooth lists connected devices, then paired, then new ones, by name in 
     { name: 'Keyboard', connected: true, paired: true },
     { name: 'Headphones', connected: false, paired: true },
   ];
-  assert.deepEqual(btOrder(devs), [2, 3, 1, 0]);
+  assert.deepEqual(btOrder(devs, true), [2, 3, 1, 0]);
 });
 
 test('the Bluetooth hint names the keys, or says the adapter is off or missing', () => {
   assert.equal(btHint({ adapter: false, enabled: false }), 'No Bluetooth');
   assert.equal(btHint({ adapter: true, enabled: false }), 'Bluetooth off · o turn on');
-  assert.equal(btHint({ adapter: true, enabled: true }), '↵ connect · p pair · d forget · o off');
+  assert.equal(btHint({ adapter: true, enabled: true, discovering: false }), '↵ connect · s scan · p pair · d forget · o off');
+  assert.equal(btHint({ adapter: true, enabled: true, discovering: true }), '↵ connect · s stop · p pair · d forget · o off');
+});
+
+test('new devices list only while a scan runs, and a connected one always', () => {
+  const devs = [
+    { name: 'Mouse', connected: false, paired: false },
+    { name: 'Speaker', connected: true, paired: false },
+    { name: 'Headphones', connected: false, paired: true },
+  ];
+  assert.deepEqual(btOrder(devs, false), [1, 2]);
+  assert.deepEqual(btOrder(devs, true), [1, 2, 0]);
+});
+
+test('a nameless device sorts after the named ones beside it, by address', () => {
+  const devs = [
+    { name: '', address: '00:00:00:00:00:09', connected: false, paired: false },
+    { name: 'Zebra Mouse', address: '00:00:00:00:00:04', connected: false, paired: false },
+    { name: '', address: '00:00:00:00:00:07', connected: false, paired: false },
+    { name: 'Headphones', address: '00:00:00:00:00:02', connected: false, paired: true },
+  ];
+  assert.deepEqual(btOrder(devs, true), [3, 1, 2, 0]);
 });
 
 test('a Bluetooth row names the device and reads connected, paired or new', () => {
