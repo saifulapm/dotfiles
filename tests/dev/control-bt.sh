@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets.
+# Control's Bluetooth section lists a fake BlueZ's devices; Enter connects and disconnects, d forgets, and o turns the adapter off and on.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -27,6 +27,39 @@ bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
 headphones=/org/bluez/hci0/dev_00_00_00_00_00_02
 speaker=/org/bluez/hci0/dev_00_00_00_00_00_03
 connected_is() { [ "$(bus get-property org.bluez "$headphones" org.bluez.Device1 Connected 2>/dev/null)" = "b $1" ]; }
+powered_is() { [ "$(bus get-property org.bluez /org/bluez/hci0 org.bluez.Adapter1 Powered 2>/dev/null)" = "b $1" ]; }
+# Each scan, pair, connect and property set the shell asked of the fake.
+methods() { bus call org.bluez /org/bluez org.dots.FakeBluez Methods; }
+
+control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
+section_not() { ! section_is "$1"; }
+tab_to() {
+  local n s
+  until_ok 3000 state_is '.keyboard' || return 1
+  for n in 1 2 3 4 5 6; do
+    section_is "$1" && return 0
+    s=$(control_state | jq -r .section)
+    wtype -k Tab
+    until_ok 2000 section_not "$s" || return 1
+  done
+  section_is "$1"
+}
+open_bluetooth() {
+  niri msg action spawn -- dots-call control toggle
+  until_ok 3000 section_is audio
+  until_ok 3000 control_focus
+  tab_to bluetooth
+}
+# The hint as drawn, which a caps voice draws upper case.
+hint_is() { state_is --arg h "$1" '(.hint | ascii_downcase) == $h'; }
+
+# With no BlueZ on the bus there is no adapter.
+open_bluetooth
+until_ok 2000 hint_is "no bluetooth"
+check "with no adapter the hint reads No Bluetooth ($(control_state | jq -c .hint))" hint_is "no bluetooth"
+wtype -k Escape
+until_ok 3000 state_is '.open == false'
 
 DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
 fake_pid=$!
@@ -43,24 +76,7 @@ surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-sur
 until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 
-niri msg action spawn -- dots-call control toggle
-control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-until_ok 3000 section_is audio
-until_ok 3000 control_focus
-# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
-section_not() { ! section_is "$1"; }
-tab_to() {
-  local n s
-  until_ok 3000 state_is '.keyboard' || return 1
-  for n in 1 2 3 4 5 6; do
-    section_is "$1" && return 0
-    s=$(control_state | jq -r .section)
-    wtype -k Tab
-    until_ok 2000 section_not "$s" || return 1
-  done
-  section_is "$1"
-}
-tab_to bluetooth
+open_bluetooth
 check "Tab twice is bluetooth" section_is bluetooth
 check "Bluetooth opens on its first row, Test Headphones" state_is '.selected == 0 and .rows[0] == "Test Headphones"'
 until_ok 3000 detail_is "Test Headphones" paired
@@ -104,6 +120,22 @@ check "d on Test Speaker removes it from BlueZ" speaker_gone
 until_ok 2000 state_is '.rows | index("Test Speaker") == null'
 check "its row goes" state_is '.rows | index("Test Speaker") == null'
 echo "     state: $(control_state)"
+
+wtype o
+until_ok 3000 powered_is false
+check "o turns the adapter off (BlueZ reports Powered false)" powered_is false
+until_ok 2000 hint_is "bluetooth off · o turn on"
+check "the hint reads Bluetooth off · o turn on ($(control_state | jq -c .hint))" hint_is "bluetooth off · o turn on"
+check "an adapter that is off lists no devices" state_is '.rows == []'
+before=$(methods)
+wtype -k Return
+sleep 1
+check "Enter with the adapter off asks BlueZ for no pair or connect" test "$(methods)" = "$before"
+wtype o
+until_ok 3000 powered_is true
+check "o again turns it on" powered_is true
+until_ok 3000 state_is '.rows | index("Test Headphones") != null'
+check "the paired devices' rows are back" state_is '.rows | index("Test Headphones") != null'
 
 exit $((fails > 0))
 }

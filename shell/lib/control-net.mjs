@@ -17,6 +17,13 @@ export function btRow(dev) {
   return { title: line((dev.name || '').replace(CONTROL, ' ')) || dev.address, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + battery };
 }
 
+// With the adapter off its other keys do nothing, so the hint offers only o.
+export function btHint(a) {
+  if (!a.adapter) return 'No Bluetooth';
+  if (!a.enabled) return 'Bluetooth off · o turn on';
+  return '↵ connect · p pair · d forget · o off';
+}
+
 export function wifiOrder(nets) {
   return nets.map((n, i) => i).sort((a, b) => wifiRank(nets[a]) - wifiRank(nets[b]) || nets[b].signalStrength - nets[a].signalStrength);
 }

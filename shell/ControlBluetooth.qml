@@ -11,7 +11,10 @@ Item {
     property int selected: 0
     readonly property var look: V.listLook(theme.tokens)
 
-    readonly property var all: Bluetooth.defaultAdapter ? Bluetooth.defaultAdapter.devices.values : []
+    readonly property var adapter: Bluetooth.defaultAdapter
+    readonly property bool on: adapter?.enabled ?? false
+    // An adapter that is off lists nothing, though BlueZ still holds its devices.
+    readonly property var all: on ? adapter.devices.values : []
     readonly property var devices: Lib.btOrder(all.map(d => ({
                     name: d.name,
                     connected: d.connected,
@@ -31,6 +34,13 @@ Item {
     }
 
     function key(event) {
+        if (event.key === Qt.Key_O && adapter) {
+            adapter.enabled = !adapter.enabled;
+            return true;
+        }
+        // Off, s, t and Enter do nothing, and are still taken so they act on nothing else.
+        if (!on)
+            return [Qt.Key_Return, Qt.Key_Enter, Qt.Key_S, Qt.Key_T].indexOf(event.key) >= 0;
         const device = devices[selected];
         if (!device)
             return false;
@@ -51,7 +61,9 @@ Item {
 
     function state() {
         return {
-            details: rows.map(r => r.detail)
+            details: rows.map(r => r.detail),
+            hint: hint.text,
+            powered: on
         };
     }
 
@@ -61,7 +73,10 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: section.look.tabText(Bluetooth.defaultAdapter ? "↵ connect · p pair · d forget" : "No Bluetooth")
+        text: section.look.tabText(Lib.btHint({
+            adapter: !!section.adapter,
+            enabled: section.on
+        }))
         color: section.look.small.color
         font.family: section.look.small.font
         font.pixelSize: section.look.small.size

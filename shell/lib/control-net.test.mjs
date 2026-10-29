@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { btOrder, btRow, wifiOrder, wifiRow } from './control-net.mjs';
+import { btHint, btOrder, btRow, wifiOrder, wifiRow } from './control-net.mjs';
 
 test('Bluetooth lists connected devices, then paired, then new ones, by name in each', () => {
   const devs = [
@@ -10,6 +10,12 @@ test('Bluetooth lists connected devices, then paired, then new ones, by name in 
     { name: 'Headphones', connected: false, paired: true },
   ];
   assert.deepEqual(btOrder(devs), [2, 3, 1, 0]);
+});
+
+test('the Bluetooth hint names the keys, or says the adapter is off or missing', () => {
+  assert.equal(btHint({ adapter: false, enabled: false }), 'No Bluetooth');
+  assert.equal(btHint({ adapter: true, enabled: false }), 'Bluetooth off · o turn on');
+  assert.equal(btHint({ adapter: true, enabled: true }), '↵ connect · p pair · d forget · o off');
 });
 
 test('a Bluetooth row names the device and reads connected, paired or new', () => {

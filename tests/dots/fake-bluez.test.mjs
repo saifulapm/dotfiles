@@ -174,3 +174,16 @@ test('Authorize answers the error an agent that refuses gives', async (t) => {
   await b.gdbus(HCI0, 'org.bluez.Adapter1.StartDiscovery');
   assert.equal((await b.knob('Authorize', PHONE, '0000110d-0000-1000-8000-00805f9b34fb')).stdout, "('org.bluez.Error.Rejected',)");
 });
+
+test('Methods lists each scan, pair, connect and property set asked of it, refused ones too', async (t) => {
+  const b = await scratch(t);
+  await b.set(HCI0, 'org.bluez.Adapter1', 'Powered', '<false>');
+  await b.gdbus(HCI0, 'org.bluez.Adapter1.StartDiscovery');
+  await b.gdbus(HEADPHONES, 'org.bluez.Device1.Pair');
+  await b.gdbus(HEADPHONES, 'org.bluez.Device1.Connect');
+  await b.set(HEADPHONES, 'org.bluez.Device1', 'Trusted', '<false>');
+  assert.equal(
+    (await b.knob('Methods')).stdout,
+    `(['Set ${HCI0} Powered', 'StartDiscovery ${HCI0}', 'Pair ${HEADPHONES}', 'Connect ${HEADPHONES}', 'Set ${HEADPHONES} Trusted'],)`,
+  );
+});
