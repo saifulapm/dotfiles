@@ -108,13 +108,14 @@ test('fish writes its history to the file dots sync reads', () => {
   assert.deepEqual(files(join(env.XDG_DATA_HOME, 'fish')), ['fish_history']);
 });
 
-test('the prompt shows the directory\'s name, the git branch and a failed status', () => {
-  const r = run('fish', ['-i', '-c', 'mkdir -p ~/code/proj; cd ~/code/proj; git init -q -b main; false; fish_prompt']);
+test('the prompt is starship\'s, as in v1: the directory, the git branch behind its Nerd Font symbol, then ❯', () => {
+  const r = run('fish', ['-i', '-c', 'mkdir -p ~/code/proj; cd ~/code/proj; git init -q -b main; fish_prompt']);
   assert.equal(r.status, 0, r.stderr);
-  // set_color's escapes aside, the words are the prompt.
-  assert.equal(r.stdout.replace(/\x1b\[[0-9;:]*m|\x1b\(B/g, ''), 'proj main [1] › ');
-  const ok = run('fish', ['-i', '-c', 'cd ~; true; fish_prompt']);
-  assert.equal(ok.stdout.replace(/\x1b\[[0-9;:]*m|\x1b\(B/g, ''), '~ › ');
+  // Colour escapes and fish's %{ %} wrappers aside, the words are the prompt.
+  const words = r.stdout.replace(/\x1b\[[0-9;:]*[mJ]|\x1b\(B|%\{|%\}/g, '');
+  // Inside a repo starship names the directory from the repo's root.
+  assert.match(words, /^proj on \uf418 main $/m);
+  assert.match(words, /❯ $/);
 });
 
 test('git has one excludes file under ~/.config/git and both accounts rewrite', () => {

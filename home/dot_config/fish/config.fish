@@ -37,5 +37,7 @@ set -q SSH_CONNECTION; and set -gx PINENTRY_USER_DATA curses
 
 if status is-interactive
     command -q mise; and mise activate fish | source
+    # starship draws the prompt, with v1's starship.toml; its colours are ANSI names, so the theme's terminal palette colours it.
+    command -q starship; and starship init fish --print-full-init | source
     command -q zoxide; and zoxide init fish | source
 end

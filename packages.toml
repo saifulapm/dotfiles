@@ -170,6 +170,12 @@ arch = "all"
 why = "fish's cd jumps to directories by frecency"
 
 [[package]]
+name = "starship"
+arch = "all"
+copr = "atim/starship"
+why = "fish's prompt, as in v1"
+
+[[package]]
 name = "mise"
 arch = "all"
 copr = "jdxcode/mise"
