@@ -33,13 +33,14 @@ check "printing the window list with the factory focused: $out" bash -c "jq -e '
 read -r lx ly lleft < <(word Lorem)
 check "page 2 shows its Lorem text view ($lx,$ly)" test -n "${ly:-}"
 "$screen" click $((lleft - 2)) "$ly" >/dev/null
-out=$("$screen" type 'hello ' --then shot)
+# The text cursor draws in the space after the last word typed, where OCR reads it as a letter, so a second word keeps it off hello; the toolbar's icons can read as text ahead of it on the same line.
+out=$("$screen" type 'hello world ' --then shot)
 rc=$?
 check "screen type hello --then shot exits 0 (got $rc)" test "$rc" = 0
 check "with a still screen and the shot's path: $out" bash -c "jq -e '.stable == true and .shot == \"/tmp/desk/shot.png\"' <<<'$out' >/dev/null"
 # The shot itself, doubled: tesseract misses text as small as a 1280 px shot of this output draws it.
 python3 -c 'import gi, sys; gi.require_version("GdkPixbuf", "2.0"); from gi.repository import GdkPixbuf as P; p = P.Pixbuf.new_from_file(sys.argv[1]); p.scale_simple(p.get_width() * 2, p.get_height() * 2, P.InterpType.BILINEAR).savev(sys.argv[2], "png", [], [])' /tmp/desk/shot.png "$DOTS_DEV_DIR/typed.png"
-check "whose OCR reads hello" bash -c "tesseract '$DOTS_DEV_DIR/typed.png' - 2>/dev/null | grep -q '^hello Lorem'"
+check "whose OCR reads hello" bash -c "tesseract '$DOTS_DEV_DIR/typed.png' - 2>/dev/null | grep -qE '(^| )hello world Lorem'"
 
 # Page 1's two spinners and pulsing bar change every frame.
 "$screen" click "$p1x" "$p1y" >/dev/null
