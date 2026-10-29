@@ -58,8 +58,8 @@ systemctl --user restart "$DOTS_DEV_UNIT"
 surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
-# The agent asks the nested shell, by this session's WAYLAND_DISPLAY, and gives up on a request in 4 s rather than 60.
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS DOTS_BT_AGENT_TIMEOUT_S=4 "$repo/bin/dots-bt-agent" &
+# The agent asks the nested shell, by this session's WAYLAND_DISPLAY, and gives up on a request in 32 s rather than 60: past D-Bus's 25 s default, which once ended a pair early.
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS DOTS_BT_AGENT_TIMEOUT_S=32 "$repo/bin/dots-bt-agent" &
 agent_pid=$!
 cleanup() {
   kill "$agent_pid" "$fake_pid" 2>/dev/null
@@ -83,6 +83,9 @@ until_ok 3000 asks "Pair Test Keyboard? 123456"
 check "Enter on Test Keyboard asks Pair Test Keyboard? 123456 ($(island | jq -c '{mode, text}'))" asks "Pair Test Keyboard? 123456"
 check "the island names its keys, ↵ yes and esc no" island_is '.pairing.keys == ["↵ yes", "esc no"]'
 check "Control's legend names them too ($(control_state | jq -c .legend))" state_is '.legend | ascii_downcase | contains("yes") and contains("no")'
+# A person may take a while to compare the code: the answer still counts after D-Bus's 25 s default.
+sleep 27
+check "27 s on, the question still shows" asks "Pair Test Keyboard? 123456"
 wtype -k Return
 until_ok 3000 prop_is "$keyboard" Connected true
 check "Enter pairs it (Paired true)" prop_is "$keyboard" Paired true
@@ -187,8 +190,8 @@ until_ok 3000 select_row "00:00:00:00:00:07"
 wtype -k Return
 until_ok 3000 asks "Pair 00:00:00:00:00:07? 333333"
 check "the nameless device asks by its address" asks "Pair 00:00:00:00:00:07? 333333"
-until_ok 6000 toast_is "Pairing failed: 00:00:00:00:00:07"
-check "left 4 s, the island shows Pairing failed: 00:00:00:00:00:07 ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: 00:00:00:00:00:07"
+until_ok 36000 toast_is "Pairing failed: 00:00:00:00:00:07"
+check "left 32 s, the island shows Pairing failed: 00:00:00:00:00:07 ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: 00:00:00:00:00:07"
 check "and the device stays unpaired" prop_is "$nameless" Paired false
 gone_in_2s() { until_ok 2500 no_toast; }
 no_toast() { ! island_is '.mode == "toast"'; }
@@ -202,6 +205,11 @@ until_ok 3000 toast_is "Pairing failed: Test Speaker"
 check "a failed pair shows Pairing failed: Test Speaker" toast_is "Pairing failed: Test Speaker"
 until_ok 2000 detail_is "Test Speaker" new
 check "and Test Speaker reads new" detail_is "Test Speaker" new
+
+# Only the agent writes the socket, so a line BlueZ would never cause is refused, not drawn.
+forged=$(printf '%s\n' '{"kind":"confirm","device":"","address":"","code":"123456","service":""}' | timeout 2 socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-bt-$WAYLAND_DISPLAY.sock")
+check "a forged request naming no device is answered no ($forged)" test "$forged" = '{"ok":false}'
+check "and the island asks nothing" no_question
 
 exit $((fails > 0))
 }
