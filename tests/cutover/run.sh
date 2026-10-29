@@ -74,7 +74,7 @@ as_user '
   mkdir -p ~/.config/systemd/user/graphical-session.target.wants
   ln -s $d/imapnotify@.service ~/.config/systemd/user/imapnotify@icloud.service
   ln -s $d/imapnotify@.service ~/.config/systemd/user/graphical-session.target.wants/imapnotify@icloud.service
-  # v1 ran bt-agent from the session and kept dufs off; v2 ships both under the same names, and v1 wanted bt-agent by its own file.
+  # v1 ran bt-agent from the session and kept dufs off; v2 ships dufs under the same name and replaces bt-agent with dots-bt-agent, and v1 wanted bt-agent by its own file.
   printf "[Service]\nExecStart=/bin/sleep infinity\n[Install]\nWantedBy=graphical-session.target\n" > $d/bt-agent.service
   printf "[Service]\nExecStart=/bin/sleep infinity\n" > $d/dufs.service
   ln -s $d/bt-agent.service $d/dufs.service ~/.config/systemd/user/
@@ -159,7 +159,7 @@ check "2 goals are done, 1 is active, and they hold 9 tasks (got '$goals')" test
 entries=$(as_user "grep -c '^- cmd: ' ~/.local/share/fish/fish_history")
 check "v1's fish history is in fish_history (got '$entries' entries)" test "$entries" = 3
 
-for u in qshell.service qshell-sync.timer update-all.timer; do
+for u in qshell.service qshell-sync.timer update-all.timer bt-agent.service; do
   got=$(unit_state $u)
   check "v1's $u is neither enabled nor active (got '$got')" bash -c "[[ '$got' != enabled* && '$got' != *' active' ]]"
 done
@@ -173,14 +173,14 @@ got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value imap
 check "imapnotify@icloud.service loads from v2's template (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/imapnotify@.service"
 got=$(as_user "systemctl --user is-enabled imapnotify@icloud.service")
 check "imapnotify@icloud.service stays enabled for the next login (got '$got')" test "$got" = enabled
-got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value bt-agent.service)")
-check "bt-agent.service loads from v2's unit (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/bt-agent.service"
+got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value dots-bt-agent.service)")
+check "dots-bt-agent.service loads from v2's unit (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/dots-bt-agent.service"
 # Started as a login would start it, the condition skips it.
-as_user "systemctl --user start bt-agent.service"
-got=$(unit_state bt-agent.service)
-check "with no Bluetooth adapter, bt-agent.service is enabled and inactive (got '$got')" test "$got" = "enabled inactive"
-got=$(as_user "systemctl --user is-failed bt-agent.service")
-check "bt-agent.service is not failed (got '$got')" test "$got" = inactive
+as_user "systemctl --user start dots-bt-agent.service"
+got=$(unit_state dots-bt-agent.service)
+check "with no Bluetooth adapter, dots-bt-agent.service is enabled and inactive (got '$got')" test "$got" = "enabled inactive"
+got=$(as_user "systemctl --user is-failed dots-bt-agent.service")
+check "dots-bt-agent.service is not failed (got '$got')" test "$got" = inactive
 got=$(as_user "readlink -f \$(systemctl --user show -p FragmentPath --value dufs.service)")
 check "dufs.service loads from v2's unit (got '$got')" test "$got" = "$home/Codes/dotfiles/home/dot_config/systemd/user/dufs.service"
 # Before dots secrets writes its config, a login's start skips it.
