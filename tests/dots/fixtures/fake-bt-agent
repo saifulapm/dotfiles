@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+# An Agent1 that registers with the BlueZ on $DBUS_SYSTEM_BUS_ADDRESS, logs each call to $FAKE_AGENT_REC as a JSON line, and rejects every request when $FAKE_AGENT_ANSWER is reject; a PIN is 0000 and a passkey 1234.
+import json
+import os
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+AGENT = "org.bluez.Agent1"
+PATH = "/test/agent"
+reject = os.environ.get("FAKE_AGENT_ANSWER") == "reject"
+
+
+def log(*call):
+    with open(os.environ["FAKE_AGENT_REC"], "a") as f:
+        f.write(json.dumps([str(c) if isinstance(c, str) else int(c) for c in call]) + "\n")
+
+
+def answer():
+    if reject:
+        raise dbus.DBusException("rejected", name="org.bluez.Error.Rejected")
+
+
+class Agent(dbus.service.Object):
+    @dbus.service.method(AGENT, in_signature="ou")
+    def RequestConfirmation(self, device, passkey):
+        log("RequestConfirmation", device, passkey)
+        answer()
+
+    @dbus.service.method(AGENT, in_signature="ouq")
+    def DisplayPasskey(self, device, passkey, entered):
+        log("DisplayPasskey", device, passkey, entered)
+
+    @dbus.service.method(AGENT, in_signature="o", out_signature="s")
+    def RequestPinCode(self, device):
+        log("RequestPinCode", device)
+        answer()
+        return "0000"
+
+    @dbus.service.method(AGENT, in_signature="o", out_signature="u")
+    def RequestPasskey(self, device):
+        log("RequestPasskey", device)
+        answer()
+        return dbus.UInt32(1234)
+
+    @dbus.service.method(AGENT, in_signature="os")
+    def AuthorizeService(self, device, uuid):
+        log("AuthorizeService", device, uuid)
+        answer()
+
+    @dbus.service.method(AGENT)
+    def Cancel(self):
+        log("Cancel")
+
+
+DBusGMainLoop(set_as_default=True)
+bus = dbus.bus.BusConnection(os.environ["DBUS_SYSTEM_BUS_ADDRESS"])
+Agent(bus, PATH)
+manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez"), "org.bluez.AgentManager1")
+manager.RegisterAgent(dbus.ObjectPath(PATH), "KeyboardDisplay")
+manager.RequestDefaultAgent(dbus.ObjectPath(PATH))
+log("registered")
+GLib.MainLoop().run()

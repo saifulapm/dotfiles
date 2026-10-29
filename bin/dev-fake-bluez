@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them.
+# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them, and a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device; Pair plays the device's request against the registered agent, and org.dots.FakeBluez on /org/bluez sets that request (SetPairing), types a shown passkey on the device (Typed), asks for a service (Authorize) and lists what agents did (Calls).
 import os
 import sys
 
@@ -18,7 +18,13 @@ DEVICE = "org.bluez.Device1"
 PROPS = "org.freedesktop.DBus.Properties"
 MANAGER = "org.freedesktop.DBus.ObjectManager"
 BATTERY = "org.bluez.Battery1"
+AGENT = "org.bluez.Agent1"
 HCI0 = "/org/bluez/hci0"
+KNOB = "org.dots.FakeBluez"
+
+
+def error(name, text=""):
+    return dbus.DBusException(text or name, name="org.bluez.Error." + name)
 
 
 class Object(dbus.service.Object):
@@ -56,16 +62,18 @@ class Object(dbus.service.Object):
         pass
 
 
-# Test Headphones reports a Battery1 of 80% a second after Connect and drops it on Disconnect, as BlueZ does once the HFP link is up.
+# Test Headphones reports a Battery1 of 80% a second after Connect and drops it on Disconnect, as BlueZ does once the HFP link is up; a device that sent no name has no Name, and BlueZ makes its Alias the address in dashes.
 class Device(Object):
-    def __init__(self, bus, root, mac, name, paired, battery=None):
+    def __init__(self, bus, root, mac, name, paired, battery=None, pairing=("none", 0)):
         self.root = root
         self.battery = battery
         self.battery_timer = None
-        super().__init__(bus, HCI0 + "/dev_" + mac.replace(":", "_"), DEVICE, {
+        # The request Pair plays, (kind, code), and the Pair waiting on a passkey typed on the device.
+        self.pairing = pairing
+        self.waiting = None
+        props = {
             "Address": dbus.String(mac),
-            "Name": dbus.String(name),
-            "Alias": dbus.String(name),
+            "Alias": dbus.String(name or mac.replace(":", "-")),
             "Icon": dbus.String("audio-headphones"),
             "Adapter": dbus.ObjectPath(HCI0),
             "Paired": dbus.Boolean(paired),
@@ -74,7 +82,10 @@ class Device(Object):
             "Blocked": dbus.Boolean(False),
             "WakeAllowed": dbus.Boolean(False),
             "Connected": dbus.Boolean(False),
-        })
+        }
+        if name:
+            props["Name"] = dbus.String(name)
+        super().__init__(bus, HCI0 + "/dev_" + mac.replace(":", "_"), DEVICE, props)
 
     @dbus.service.method(DEVICE)
     def Connect(self):
@@ -99,17 +110,66 @@ class Device(Object):
         self.root.InterfacesAdded(dbus.ObjectPath(self.path), {BATTERY: dbus.Dictionary(props, signature="sv")})
         return False
 
-    @dbus.service.method(DEVICE)
-    def Pair(self):
-        self.change(Paired=dbus.Boolean(True), Bonded=dbus.Boolean(True))
+    # BlueZ answers Pair only once the agent has answered the request the device makes, as each kind of device makes one.
+    @dbus.service.method(DEVICE, async_callbacks=("ok", "fail"))
+    def Pair(self, ok, fail):
+        kind, code = self.pairing
+        if not self.root.adapter.props["Powered"]:
+            return fail(error("NotReady"))
+        if self.props["Paired"]:
+            return fail(error("AlreadyExists"))
+        if kind == "fail":
+            return fail(error("ConnectionAttemptFailed"))
+
+        def paired(*_):
+            self.change(Paired=dbus.Boolean(True), Bonded=dbus.Boolean(True))
+            ok()
+
+        if kind == "none":
+            return paired()
+        agent = self.root.agent
+        if agent is None:
+            return fail(error("AuthenticationFailed"))
+        path = dbus.ObjectPath(self.path)
+
+        def answered(*reply):
+            if kind in ("pin", "passkey"):
+                self.root.calls.append("Request%s %s %s" % ("PinCode" if kind == "pin" else "Passkey", self.path, reply[0]))
+            paired()
+
+        def refused(e):
+            fail(error("AuthenticationRejected", str(e)))
+
+        ask = dict(reply_handler=answered, error_handler=refused, timeout=120)
+        if kind == "confirm":
+            agent.RequestConfirmation(path, dbus.UInt32(code), **ask)
+        elif kind == "pin":
+            agent.RequestPinCode(path, **ask)
+        elif kind == "passkey":
+            agent.RequestPasskey(path, **ask)
+        elif kind == "display":
+            self.waiting = (paired, fail)
+            agent.DisplayPasskey(path, dbus.UInt32(code), dbus.UInt16(0), reply_handler=lambda: None, error_handler=lambda e: None)
 
     @dbus.service.method(DEVICE)
     def CancelPairing(self):
-        pass
+        if self.waiting is None:
+            return
+        _, fail = self.waiting
+        self.waiting = None
+        self.root.agent.Cancel(reply_handler=lambda: None, error_handler=lambda e: None)
+        fail(error("AuthenticationCanceled"))
+
+    def typed(self):
+        if self.waiting is not None:
+            paired, _ = self.waiting
+            self.waiting = None
+            paired()
 
 
 class Adapter(Object):
     def __init__(self, bus, root):
+        self.bus_conn = bus
         super().__init__(bus, HCI0, ADAPTER, {
             "Address": dbus.String("00:00:00:00:00:01"),
             "Name": dbus.String("dots-fake"),
@@ -123,9 +183,28 @@ class Adapter(Object):
         })
         self.root = root
 
+    # Powering off stops a scan and drops every connection, as BlueZ does.
+    def change(self, **changed):
+        super().change(**changed)
+        if changed.get("Powered") is not None and not changed["Powered"]:
+            if self.props["Discovering"]:
+                super().change(Discovering=dbus.Boolean(False))
+            for obj in list(self.root.objects.values()):
+                if isinstance(obj, Device) and obj.props["Connected"]:
+                    obj.Disconnect()
+
+    # The scan's devices stay once it stops, since BlueZ keeps what it found for a while.
     @dbus.service.method(ADAPTER)
     def StartDiscovery(self):
+        if not self.props["Powered"]:
+            raise error("NotReady")
         self.change(Discovering=dbus.Boolean(True))
+        for mac, name, pairing in FOUND:
+            path = HCI0 + "/dev_" + mac.replace(":", "_")
+            if path not in self.root.objects:
+                device = Device(self.bus_conn, self.root, mac, name, False, pairing=pairing)
+                self.root.add(device)
+                self.root.InterfacesAdded(dbus.ObjectPath(path), device.managed())
 
     @dbus.service.method(ADAPTER)
     def StopDiscovery(self):
@@ -138,10 +217,23 @@ class Adapter(Object):
         self.root.InterfacesRemoved(path, dbus.Array([DEVICE], signature="s"))
 
 
+# What a scan finds: (address, name, the request Pair plays).
+FOUND = [
+    ("00:00:00:00:00:04", "Test Mouse", ("none", 0)),
+    ("00:00:00:00:00:05", "Test Keyboard", ("confirm", 123456)),
+    ("00:00:00:00:00:06", "Test Phone", ("confirm", 222222)),
+    ("00:00:00:00:00:07", "", ("none", 0)),
+]
+
+
 class Root(dbus.service.Object):
     def __init__(self, bus):
         super().__init__(bus, "/")
         self.objects = {}
+        self.adapter = None
+        # The default agent's proxy, and each call agents made of the manager or answered with a code.
+        self.agent = None
+        self.calls = []
 
     def add(self, obj):
         self.objects[obj.path] = obj
@@ -159,10 +251,52 @@ class Root(dbus.service.Object):
         pass
 
 
+class Manager(dbus.service.Object):
+    def __init__(self, bus, root):
+        super().__init__(bus, "/org/bluez")
+        self.bus = bus
+        self.root = root
+
+    @dbus.service.method("org.bluez.AgentManager1", in_signature="os", sender_keyword="sender")
+    def RegisterAgent(self, path, capability, sender):
+        self.root.calls.append("RegisterAgent %s %s" % (path, capability))
+        self.root.agent = dbus.Interface(self.bus.get_object(sender, path, introspect=False), AGENT)
+
+    @dbus.service.method("org.bluez.AgentManager1", in_signature="o")
+    def UnregisterAgent(self, path):
+        self.root.calls.append("UnregisterAgent %s" % path)
+        self.root.agent = None
+
+    @dbus.service.method("org.bluez.AgentManager1", in_signature="o")
+    def RequestDefaultAgent(self, path):
+        self.root.calls.append("RequestDefaultAgent %s" % path)
+
+    @dbus.service.method(KNOB, in_signature="osu")
+    def SetPairing(self, path, kind, code):
+        self.root.objects[str(path)].pairing = (str(kind), int(code))
+
+    @dbus.service.method(KNOB, in_signature="o")
+    def Typed(self, path):
+        self.root.objects[str(path)].typed()
+
+    # Answers allowed, or the error name the agent refused with.
+    @dbus.service.method(KNOB, in_signature="os", out_signature="s", async_callbacks=("ok", "fail"))
+    def Authorize(self, path, uuid, ok, fail):
+        if self.root.agent is None:
+            return ok("no agent")
+        self.root.agent.AuthorizeService(path, uuid, reply_handler=lambda: ok("allowed"), error_handler=lambda e: ok(e.get_dbus_name()), timeout=120)
+
+    @dbus.service.method(KNOB, out_signature="as")
+    def Calls(self):
+        return dbus.Array(self.root.calls, signature="s")
+
+
 DBusGMainLoop(set_as_default=True)
 bus = dbus.bus.BusConnection(address)
 root = Root(bus)
-root.add(Adapter(bus, root))
+root.adapter = Adapter(bus, root)
+root.add(root.adapter)
+Manager(bus, root)
 root.add(Device(bus, root, "00:00:00:00:00:02", "Test Headphones", True, 80))
 root.add(Device(bus, root, "00:00:00:00:00:03", "Test Speaker", False))
 name = dbus.service.BusName("org.bluez", bus, do_not_queue=True)
