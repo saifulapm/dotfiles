@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, configNotifies, reconnected } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, columnPosition, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -160,6 +160,28 @@ test('a window keeps the urgency niri last reported for it', () => {
 
 test('before any event no workspace is urgent', () => {
   assert.deepEqual(urgentWorkspaces(initial, 'eDP-1'), []);
+});
+
+// niri 26.04 numbers each tiled window's column from 1 in pos_in_scrolling_layout and gives a floating window none.
+const win = (id, col, workspace = 1) => ({ id, title: 'foot', app_id: 'foot', workspace_id: workspace, is_focused: false, is_floating: col === null, is_urgent: false, layout: { pos_in_scrolling_layout: col === null ? null : [col, 1], tile_pos_in_workspace_view: null } });
+const windows = (...list) => JSON.stringify({ WindowsChanged: { windows: list } });
+const activeWindow = (id) => JSON.stringify({ WorkspaceActiveWindowChanged: { workspace_id: 1, active_window_id: id } });
+const shown = workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'));
+
+test("the margin's column reads the shown workspace's focused column of its columns", () => {
+  assert.deepEqual(columnPosition(run([shown, windows(win(1, 1), win(2, 2), win(3, 3), win(4, 1, 2)), activeWindow(2)]), 'eDP-1'), { at: 2, of: 3 });
+});
+
+test('a column move reaches the margin as WindowLayoutsChanged', () => {
+  const s = run([shown, windows(win(1, 1), win(2, 2), win(3, 3)), activeWindow(2)]);
+  const moved = JSON.stringify({ WindowLayoutsChanged: { changes: [[2, win(2, 3).layout], [3, win(3, 2).layout]] } });
+  assert.deepEqual(columnPosition(run([moved], s), 'eDP-1'), { at: 3, of: 3 });
+});
+
+test('a floating window, an empty workspace or no event yet has no column', () => {
+  assert.equal(columnPosition(run([shown, windows(win(1, 1), win(2, null)), activeWindow(2)]), 'eDP-1'), null);
+  assert.equal(columnPosition(run([shown, windows(win(1, 1, 2))]), 'eDP-1'), null);
+  assert.equal(columnPosition(initial, 'eDP-1'), null);
 });
 
 // Each line a ConfigLoaded, as niri sends it on every load and once in the first burst; counts the notifications along the way.

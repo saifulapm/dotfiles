@@ -37,6 +37,11 @@ export function reduce(state, event) {
     }
     case 'WindowFocusChanged':
       return set(state, { windows: state.windows.map((w) => set(w, { is_focused: w.id === e.id })) });
+    case 'WindowLayoutsChanged': {
+      // niri reports a column move or a shift into a closed window's place here, not in WindowOpenedOrChanged.
+      const layouts = new Map(e.changes);
+      return set(state, { windows: state.windows.map((w) => (layouts.has(w.id) ? set(w, { layout: layouts.get(w.id) }) : w)) });
+    }
     case 'WindowClosed':
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
     case 'WorkspaceUrgencyChanged':
@@ -84,6 +89,16 @@ export function urgentWorkspaces(state, output) {
     .filter((w) => w.output === output && w.is_urgent)
     .map((w) => w.idx)
     .sort((a, b) => a - b);
+}
+
+// The focused column of the output's shown workspace, of its tiled columns; null while a floating window or none is focused there.
+export function columnPosition(state, output) {
+  const ws = state.workspaces.find((w) => w.output === output && w.is_active);
+  const at = ws && state.windows.find((w) => w.id === ws.active_window_id)?.layout.pos_in_scrolling_layout?.[0];
+  if (!at) return null;
+  // niri shifts the columns before it reports the closed window, so for one event two windows share a number; the highest is the count.
+  const cols = state.windows.filter((w) => w.workspace_id === ws.id && w.layout.pos_in_scrolling_layout).map((w) => w.layout.pos_in_scrolling_layout[0]);
+  return { at, of: Math.max(...cols) };
 }
 
 export function focusedOutput(state) {
