@@ -22,3 +22,6 @@
 .local/bin/libinput-gestures
 # v2's first prompt, a native fish_prompt, which starship replaced.
 .config/fish/functions/fish_prompt.fish
+# v2's bt-agent, which dots-bt-agent replaced.
+.config/systemd/user/bt-agent.service
+.config/systemd/user/bluetooth.target.wants/bt-agent.service

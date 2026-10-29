@@ -20,3 +20,8 @@ test('no bt-agent unit or link is left in home/', () => {
   assert.equal(existsSync(join(units, 'bt-agent.service')), false);
   assert.equal(existsSync(join(units, 'bluetooth.target.wants')), false);
 });
+
+test('a machine that ran bt-agent has its unit and link removed', () => {
+  const removed = readFileSync(join(repo, 'home/.chezmoiremove'), 'utf8').split('\n');
+  for (const f of ['.config/systemd/user/bt-agent.service', '.config/systemd/user/bluetooth.target.wants/bt-agent.service']) assert.ok(removed.includes(f), f);
+});

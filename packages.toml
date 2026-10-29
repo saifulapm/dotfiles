@@ -649,11 +649,6 @@ arch = "all"
 why = "a docker command that runs podman, for agents and scripts that type docker"
 
 [[package]]
-name = "bluez-tools"
-arch = "all"
-why = "bt-agent, which answers Bluetooth pairing for Control"
-
-[[package]]
 name = "upower"
 arch = "all"
 why = "the battery the margin and Control's Power section read"

@@ -34,11 +34,13 @@ test('the AVD firmware and VA driver build tools are declared for the Macs only'
 
 // The tools Saiful and his agents reach for (v2.2): delta and difft for diffs, gm, shellcheck, dig and docker for the agents.
 test('the everyday CLI tools are declared for every arch, and eza is not', () => {
-  for (const name of ['git-delta', 'difftastic', 'tree', 'yq', 'glow', 'gum', 'tokei', 'trash-cli', 'uv', 'ShellCheck', 'GraphicsMagick', 'bind-utils', 'podman-docker', 'bluez-tools']) {
+  for (const name of ['git-delta', 'difftastic', 'tree', 'yq', 'glow', 'gum', 'tokei', 'trash-cli', 'uv', 'ShellCheck', 'GraphicsMagick', 'bind-utils', 'podman-docker']) {
     assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
     assert.match(byName.get(name).why, /\w/, `${name} why`);
   }
   assert.equal(byName.has('eza'), false);
+  // dots-bt-agent replaced bt-agent, bluez-tools' only use.
+  assert.equal(byName.has('bluez-tools'), false);
 });
 
 // The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them.
