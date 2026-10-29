@@ -1,0 +1,229 @@
+#!/usr/bin/python3
+# dots-bt-agent: the default BlueZ pairing agent, as KeyboardDisplay, that asks the shell over its socket, one connection per request, and rejects what nobody answers in 60 s.
+
+# dbus-python on the GLib main loop, since every request waits on a person: BlueZ's call is answered later, when the shell's connection gives a line, hangs up or times out.
+import json
+import os
+import re
+import socket
+import subprocess
+import sys
+
+import dbus
+import dbus.service
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+
+AGENT = "org.bluez.Agent1"
+DEVICE = "org.bluez.Device1"
+PROPS = "org.freedesktop.DBus.Properties"
+AGENT_PATH = "/org/dots/btagent"
+TIMEOUT_MS = int(float(os.environ.get("DOTS_BT_AGENT_TIMEOUT_S", "60")) * 1000)
+
+open_requests = set()
+# The display request open for each device, since BlueZ calls DisplayPasskey again as each key is typed.
+showing = {}
+
+
+def log(message):
+    print("dots-bt-agent: %s" % message, file=sys.stderr, flush=True)
+
+
+def rejected():
+    return dbus.DBusException("Rejected", name="org.bluez.Error.Rejected")
+
+
+# A default.target unit starts before the compositor exports WAYLAND_DISPLAY, so the user manager's copy is read at each request.
+def socket_path():
+    display = os.environ.get("WAYLAND_DISPLAY", "")
+    if not display:
+        try:
+            out = subprocess.run(["systemctl", "--user", "show-environment"], capture_output=True, text=True, timeout=2).stdout
+            display = next((line.split("=", 1)[1] for line in out.splitlines() if line.startswith("WAYLAND_DISPLAY=")), "")
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return os.path.join(os.environ.get("XDG_RUNTIME_DIR", ""), "dots-bt-%s.sock" % display)
+
+
+class Request:
+    """One request waiting on its own connection to the shell; settle gets the shell's yes, or None for anything else."""
+
+    def __init__(self, device, kind, settle, code="", service=""):
+        self.device = device
+        self.kind = kind
+        self.settle = settle
+        self.closed = False
+        self.sock = None
+        self.buffer = b""
+        self.watch = None
+        self.timer = None
+        open_requests.add(self)
+        try:
+            props = bus.get_object("org.bluez", device, introspect=False).GetAll(DEVICE, dbus_interface=PROPS, timeout=5)
+            request = {"kind": kind, "device": str(props.get("Name") or props["Address"]), "address": str(props["Address"]), "code": code, "service": service}
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock.connect(socket_path())
+            self.sock.sendall((json.dumps(request) + "\n").encode())
+        except (dbus.DBusException, KeyError, OSError) as error:
+            # No socket file, or one a killed shell left behind: no one is there to ask.
+            log("could not ask the shell: %s" % error)
+            self.end(None)
+            return
+        self.sock.setblocking(False)
+        self.watch = GLib.io_add_watch(self.sock.fileno(), GLib.PRIORITY_DEFAULT, GLib.IO_IN | GLib.IO_HUP | GLib.IO_ERR, self.on_readable)
+        self.timer = GLib.timeout_add(TIMEOUT_MS, self.on_timeout)
+
+    def on_readable(self, _fd, _cond):
+        try:
+            chunk = self.sock.recv(4096)
+        except BlockingIOError:
+            return True
+        except OSError:
+            chunk = b""
+        self.buffer += chunk
+        if b"\n" not in self.buffer and chunk:
+            return True
+        self.watch = None
+        try:
+            answer = json.loads(self.buffer.split(b"\n", 1)[0]) if b"\n" in self.buffer else None
+        except ValueError:
+            answer = None
+        self.end(answer if isinstance(answer, dict) and answer.get("ok") is True else None)
+        return False
+
+    def on_timeout(self):
+        self.timer = None
+        log("no answer for %s in time" % self.device)
+        self.end(None)
+        return False
+
+    # BlueZ cancelled the request or it ended on the device, so nothing goes back to BlueZ but a rejection of a call still waiting.
+    def close(self):
+        self.closed = True
+        self.end(None)
+
+    def end(self, answer):
+        if self not in open_requests:
+            return
+        open_requests.discard(self)
+        if self.watch is not None:
+            GLib.source_remove(self.watch)
+        if self.timer is not None:
+            GLib.source_remove(self.timer)
+        if self.sock is not None:
+            self.sock.close()
+        self.settle(self, answer)
+
+
+def ask(device, kind, reply, fail, code="", service=""):
+    def settle(_request, answer):
+        try:
+            if answer is None:
+                raise ValueError("no yes from the shell")
+            reply(answer)
+        except ValueError as error:
+            log("rejecting %s for %s: %s" % (kind, device, error))
+            fail(rejected())
+
+    Request(str(device), kind, settle, code, service)
+
+
+def pin_of(answer):
+    pin = answer.get("pin")
+    if not isinstance(pin, str) or not pin:
+        raise ValueError("no pin in the answer")
+    return pin
+
+
+def passkey_of(answer):
+    pin = pin_of(answer)
+    if not re.fullmatch(r"[0-9]{1,6}", pin):
+        raise ValueError("passkey %r is not up to six digits" % pin)
+    return dbus.UInt32(int(pin))
+
+
+# A code shown for the person to type on the device returns at once; a no, a hang-up or the timeout cancels the pairing, and it closes once the device reads Paired.
+def show(device, code):
+    device = str(device)
+    if device in showing:
+        return
+
+    def changed(interface, props, _invalidated):
+        if interface == DEVICE and props.get("Paired") and device in showing:
+            showing[device].close()
+
+    match = bus.add_signal_receiver(changed, "PropertiesChanged", PROPS, "org.bluez", device)
+
+    def settle(request, answer):
+        match.remove()
+        showing.pop(device, None)
+        if answer is None and not request.closed:
+            bus.get_object("org.bluez", device, introspect=False).CancelPairing(
+                dbus_interface=DEVICE, reply_handler=lambda: None, error_handler=lambda e: log("CancelPairing on %s failed: %s" % (device, e))
+            )
+
+    request = Request(device, "display", settle, code)
+    if request in open_requests:
+        showing[device] = request
+
+
+class Agent(dbus.service.Object):
+    @dbus.service.method(AGENT)
+    def Release(self):
+        pass
+
+    @dbus.service.method(AGENT, in_signature="o", out_signature="s", async_callbacks=("ok", "fail"))
+    def RequestPinCode(self, device, ok, fail):
+        ask(device, "pin", lambda a: ok(pin_of(a)), fail)
+
+    @dbus.service.method(AGENT, in_signature="os")
+    def DisplayPinCode(self, device, code):
+        show(device, str(code))
+
+    @dbus.service.method(AGENT, in_signature="o", out_signature="u", async_callbacks=("ok", "fail"))
+    def RequestPasskey(self, device, ok, fail):
+        ask(device, "passkey", lambda a: ok(passkey_of(a)), fail)
+
+    @dbus.service.method(AGENT, in_signature="ouq")
+    def DisplayPasskey(self, device, passkey, _entered):
+        show(device, "%06d" % passkey)
+
+    @dbus.service.method(AGENT, in_signature="ou", async_callbacks=("ok", "fail"))
+    def RequestConfirmation(self, device, passkey, ok, fail):
+        ask(device, "confirm", lambda a: ok(), fail, code="%06d" % passkey)
+
+    @dbus.service.method(AGENT, in_signature="o", async_callbacks=("ok", "fail"))
+    def RequestAuthorization(self, device, ok, fail):
+        ask(device, "confirm", lambda a: ok(), fail)
+
+    @dbus.service.method(AGENT, in_signature="os", async_callbacks=("ok", "fail"))
+    def AuthorizeService(self, device, uuid, ok, fail):
+        ask(device, "authorize", lambda a: ok(), fail, service=str(uuid))
+
+    @dbus.service.method(AGENT)
+    def Cancel(self):
+        for request in list(open_requests):
+            request.close()
+
+
+# bluetoothd forgets its agents when it restarts, so each new owner of org.bluez is registered with again; an empty owner means it is gone.
+def on_owner(owner):
+    if not owner:
+        return
+    manager = dbus.Interface(bus.get_object("org.bluez", "/org/bluez", introspect=False), "org.bluez.AgentManager1")
+
+    def failed(error):
+        log("could not register with BlueZ: %s" % error)
+
+    def default():
+        manager.RequestDefaultAgent(AGENT_PATH, reply_handler=lambda: log("registered as the default agent"), error_handler=failed)
+
+    manager.RegisterAgent(AGENT_PATH, "KeyboardDisplay", reply_handler=default, error_handler=failed)
+
+
+DBusGMainLoop(set_as_default=True)
+# libdbus reads DBUS_SYSTEM_BUS_ADDRESS, so tests and the nested session put the agent on their private bus.
+bus = dbus.SystemBus()
+Agent(bus, AGENT_PATH)
+bus.watch_name_owner("org.bluez", on_owner)
+GLib.MainLoop().run()
