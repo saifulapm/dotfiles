@@ -1,0 +1,12 @@
+[Unit]
+Description=dots Bluetooth pairing agent that asks the shell
+# A machine with no adapter, or a container, leaves the agent inactive, never failed; the agent itself waits for bluetoothd.
+ConditionDirectoryNotEmpty=/sys/class/bluetooth
+
+[Service]
+ExecStart=%h/Codes/dotfiles/bin/dots-bt-agent
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
