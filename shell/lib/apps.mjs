@@ -417,6 +417,19 @@ export function renderImv(t) {
   ].join('\n');
 }
 
+// wl-kbptr's labels in ink in the theme's face, the typed part and the pointer in accent, over a screen washed in paper; what it leaves out keeps wl-kbptr's default.
+export function renderKbptr(t) {
+  const c = t.color;
+  const [ink, muted, line, paper, surface, accent] = [c.ink, c.muted, c.line, c.paper, c.surface, c.accent].map(lower);
+  const base = [['label_color', `${ink}ff`], ['label_font_family', t.type.ui], ['unselectable_bg_color', `${paper}99`]];
+  const sections = {
+    tile: [...base, ['label_select_color', `${accent}ff`], ['selectable_bg_color', `${surface}66`], ['selectable_border_color', `${line}ff`]],
+    floating: [...base, ['label_select_color', `${accent}ff`], ['selectable_bg_color', `${surface}cc`], ['selectable_border_color', `${accent}ff`]],
+    bisect: [...base, ['pointer_color', `${accent}ff`], ['even_area_bg_color', `${surface}66`], ['even_area_border_color', `${line}ff`], ['odd_area_bg_color', `${accent}22`], ['odd_area_border_color', `${line}ff`], ['history_border_color', `${muted}99`]],
+  };
+  return Object.entries(sections).map(([mode, pairs]) => [`[mode_${mode}]`, ...pairs.map(([k, v]) => `${k}=${v}`)].join('\n')).join('\n\n') + '\n';
+}
+
 // The coding agents draw inside foot, so each sits on surface with ink text; Claude Code, pi and amx name the theme dots.
 function agentColors(t) {
   const c = t.color;

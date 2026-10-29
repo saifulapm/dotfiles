@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { parseToml } from './toml.mjs';
 import { validateTheme, contrast } from './theme.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv } from './apps.mjs';
+import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const blueprint = load('blueprint');
@@ -344,4 +344,21 @@ test('the imv config sits the image on paper with the overlay in ink on surface,
   assert.match(imv, /^overlay_font = Maple Mono:14$/m);
   assert.match(imv, /^\[binds\]\n<Ctrl\+x> = exec gio trash -- "\$imv_current_file"; quit\n<Ctrl\+Shift\+X> = exec gio trash -- "\$imv_current_file"; close$/m);
   assert.match(renderImv(paper), /^background = f1e9d8$/m);
+});
+
+// wl-kbptr's labels and boxes in the theme's colours and face: ink labels, the typed part in accent, the screen washed in paper.
+test('the wl-kbptr config draws its labels in ink and the theme\'s face, picks in accent and washes the screen in paper', () => {
+  const k = renderKbptr(blueprint);
+  for (const mode of ['tile', 'floating', 'bisect']) {
+    const section = k.split(/^(?=\[)/m).find((s) => s.startsWith(`[mode_${mode}]`));
+    assert.ok(section, mode);
+    assert.match(section, /^label_color=#d6f4f8ff$/m);
+    assert.match(section, /^label_font_family=Maple Mono$/m);
+    assert.match(section, /^unselectable_bg_color=#0c1a2e99$/m);
+  }
+  assert.match(k, /^\[mode_floating\]\n(?:.*\n)*?selectable_border_color=#7fe3f0ff$/m);
+  assert.match(k, /^label_select_color=#7fe3f0ff$/m);
+  assert.match(k, /^pointer_color=#7fe3f0ff$/m);
+  assert.doesNotMatch(k, /^\[general\]/m);
+  assert.match(renderKbptr(paper), /^unselectable_bg_color=#f1e9d899$/m);
 });
