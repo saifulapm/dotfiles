@@ -154,6 +154,9 @@ PanelWindow {
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
+    // The action chips draw as the legend's key chips, and only while the app still holds the notification.
+    readonly property var keyLook: V.listLook(theme.tokens)
+    readonly property var noteChips: heldNotification && notifs.live[heldNotification.key] ? N.chipsOf(heldNotification.actions) : []
     // True from a drag's start to its drop; the toast holds while it is. Drag.active falls as the platform drag takes the pointer, so its start and finish set this.
     property bool noteDragging: false
     // The notification's hold waits while the pointer is on the box, Mod+I focuses it or a drag holds it.
@@ -623,6 +626,7 @@ PanelWindow {
             chip: shownChip ? shownChip.text : null,
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,
+            actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn),
             dragging: noteDragging,
             frame: [box.style.frame.width, String(box.style.frame.color)],
             faceUrl: noteFace.url
@@ -669,6 +673,13 @@ PanelWindow {
         if (notification)
             notifs.act(notification.key);
         putAway();
+    }
+
+    // 1 to 9 runs the chip with that number, which the app dismisses unless the notification is resident.
+    function runChip(key) {
+        const chip = noteChips.find(c => c.key === key);
+        if (chip)
+            notifs.runAction(notification.key, chip.identifier);
     }
 
     // Leaves the island only: the notification stays in the Mod+A history.
@@ -1930,6 +1941,53 @@ PanelWindow {
                                 empty: island.noteDragging
                             }
                         }
+
+                        Row {
+                            visible: island.noteChips.length > 0
+                            topPadding: 6
+                            spacing: island.keyLook.legend("").chips ? 8 : 14
+
+                            Repeater {
+                                id: actionRepeater
+                                model: island.noteChips
+
+                                Rectangle {
+                                    id: actionChip
+                                    required property var modelData
+                                    readonly property string drawn: actionKey.text + " " + actionWord.text
+                                    width: actionPair.implicitWidth + (island.keyLook.legend("").chips ? 14 : 0)
+                                    height: actionPair.implicitHeight + (island.keyLook.legend("").chips ? 6 : 0)
+                                    radius: 6
+                                    color: island.keyLook.chip.fill
+
+                                    Row {
+                                        id: actionPair
+                                        anchors.centerIn: parent
+                                        spacing: island.keyLook.legend("").chips ? 6 : 5
+
+                                        Text {
+                                            id: actionKey
+                                            textFormat: Text.PlainText
+                                            text: island.keyLook.keyText(actionChip.modelData.key)
+                                            color: island.keyLook.chip.key
+                                            font.family: island.theme.tokens?.type.mono ?? ""
+                                            font.pixelSize: island.keyLook.small.size
+                                            font.letterSpacing: island.keyLook.small.spacing
+                                            font.bold: true
+                                        }
+                                        Text {
+                                            id: actionWord
+                                            textFormat: Text.PlainText
+                                            text: island.keyLook.tabText(V.line(actionChip.modelData.text))
+                                            color: island.noteLook.head.color
+                                            font.family: island.keyLook.small.font
+                                            font.pixelSize: island.keyLook.small.size
+                                            font.letterSpacing: island.keyLook.small.spacing
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Artboard's chip is a column of its own at the card's right.
@@ -2587,6 +2645,8 @@ PanelWindow {
                         island.openNotification();
                     else if (event.key === Qt.Key_D || event.key === Qt.Key_Escape)
                         island.putAway();
+                    else
+                        island.runChip(event.text);
                     return;
                 }
                 const q = island.question;

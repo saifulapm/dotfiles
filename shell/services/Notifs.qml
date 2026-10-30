@@ -172,6 +172,10 @@ Scope {
         return true;
     }
 
+    function runAction(key, identifier) {
+        live[key]?.actions.find(a => a.identifier === identifier)?.invoke();
+    }
+
     function save() {
         store.setText(N.storeText({
             dnd,

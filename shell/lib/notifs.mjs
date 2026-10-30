@@ -53,6 +53,13 @@ const stayText = (ms) => (ms === 0 ? 'until dismissed' : ms / 1000 + ' s');
 
 export const ruleText = (rule) => (rule?.muted ? ' · muted' : '') + (rule?.dnd ? ' · through DND' : '') + (rule?.stays >= 0 ? ' · stays ' + stayText(rule.stays) : '');
 
+// The actions drawn as chips under a notification, keyed 1 to 3: default is Enter and a click on the card, and Chromium's per-site settings action is dropped.
+export const chipsOf = (actions) =>
+  (actions || [])
+    .filter((a) => a.identifier !== 'default' && a.identifier !== 'settings')
+    .slice(0, 3)
+    .map((a, i) => ({ key: String(i + 1), identifier: a.identifier, text: a.text }));
+
 export const addEntry =(history, entry) => [entry].concat(history).slice(0, LIMIT);
 
 const isEntry = (e) =>

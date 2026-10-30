@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -276,4 +276,15 @@ test('an app named after an inherited member has no rule until it gets one, and 
 
 test('an entry from an app named after an inherited member holds by its own timeout', () => {
   assert.deepEqual(setAside([], Object.assign(critical(1), { app: 'constructor' }), 'k2').map((e) => e.key), ['k1']);
+});
+
+test('the chips are the first three actions, numbered from 1, never default or settings', () => {
+  const a = (identifier, text) => ({ identifier, text });
+  assert.deepEqual(chipsOf([a('default', 'Open'), a('yes', 'Yes'), a('settings', 'Settings'), a('no', 'No'), a('later', 'Later'), a('never', 'Never')]), [
+    { key: '1', identifier: 'yes', text: 'Yes' },
+    { key: '2', identifier: 'no', text: 'No' },
+    { key: '3', identifier: 'later', text: 'Later' },
+  ]);
+  assert.deepEqual(chipsOf([a('default', 'Open')]), []);
+  assert.deepEqual(chipsOf(undefined), []);
 });
