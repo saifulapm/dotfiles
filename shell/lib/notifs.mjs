@@ -2,8 +2,8 @@
 
 export const LIMIT = 200;
 
-// How long an entry holds the island in ms, 0 until dismissed: its app's expireTimeout, where -1 asks for the default 5 s.
-export const holdMs = (entry) => (entry.timeout < 0 ? 5000 : entry.timeout);
+// How long an entry holds the island in ms, 0 until dismissed: its app's expireTimeout, where -1 asks for the default, 5 s or until dismissed for a critical.
+export const holdMs = (entry) => (entry.timeout >= 0 ? entry.timeout : entry.critical ? 0 : 5000);
 
 export const addEntry = (history, entry) => [entry].concat(history).slice(0, LIMIT);
 

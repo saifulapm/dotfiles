@@ -134,3 +134,8 @@ test("an app's timeout decides the hold: -1 is 5 s, 0 is until dismissed, a posi
   assert.equal(holdMs(Object.assign(entry(1), { timeout: 0 })), 0);
   assert.equal(holdMs(Object.assign(entry(1), { timeout: 2000 })), 2000);
 });
+
+test('a critical with no timeout of its own holds until dismissed; one with a timeout keeps it', () => {
+  assert.equal(holdMs(Object.assign(entry(1), { critical: true, timeout: -1 })), 0);
+  assert.equal(holdMs(Object.assign(entry(1), { critical: true, timeout: 3000 })), 3000);
+});

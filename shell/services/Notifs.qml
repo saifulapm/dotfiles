@@ -13,7 +13,7 @@ Scope {
     property var current: null
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
-    // While on, a notification goes to the history only, and the island stays at rest.
+    // While on, a notification goes to the history only, and the island stays at rest; a critical one still shows.
     property bool dnd: false
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})
@@ -65,7 +65,7 @@ Scope {
 
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
     function show(e) {
-        if (dnd)
+        if (dnd && !e.critical)
             return;
         current = e;
         hold.stop();

@@ -20,10 +20,10 @@ check "the island is back to the clock after 5.0 ± 0.3 s (${held} ms)" test "$h
 
 notify-send -u critical stop
 until_ok 2000 mode_is notification
-state=$(island)
-until_ok 8000 mode_is rest
-held=$(($(island | jq .since) - $(jq .since <<<"$state")))
-check "a critical notification is back to the clock after 5.0 ± 0.3 s too (${held} ms)" test "$held" -ge 4700 -a "$held" -le 5300
+sleep 6
+check "a critical notification outlasts the 5 s that end any other" eval 'island | jq -e ".text | test(\"stop\")" >/dev/null'
+timeout 0.5 qs ipc call notifs clear
+until_ok 2000 mode_is rest
 
 start=$(now_ms)
 for i in $(seq 1 20); do notify-send "seq $i"; done
