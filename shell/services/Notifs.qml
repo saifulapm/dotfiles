@@ -153,6 +153,20 @@ Scope {
         show(e);
     }
 
+    // A newer notification in an older one's stack takes its key, as a replace does, and the older one's app hears it expired.
+    function restack(n, key) {
+        const older = live[key];
+        const kept = {};
+        for (const k in live) {
+            if (k !== key)
+                kept[k] = live[k];
+        }
+        kept[key] = n;
+        live = kept;
+        older?.expire();
+        replaced(n, key);
+    }
+
     function remove(key) {
         gone(key);
         const kept = {};
@@ -228,9 +242,19 @@ Scope {
             }
             n.tracked = true;
             const e = notifs.entry(n);
-            notifs.remember(e, n);
-            notifs.show(e);
-            n.closed.connect(() => notifs.closed(e.key));
+            const older = N.stacked(notifs.history, e);
+            if (older) {
+                e.key = older;
+                notifs.restack(n, older);
+            } else {
+                notifs.remember(e, n);
+                notifs.show(e);
+            }
+            // Once a newer one in its stack holds its key, its close is not that key's.
+            n.closed.connect(() => {
+                if (notifs.live[e.key] === n)
+                    notifs.closed(e.key);
+            });
             // A replace sets each field in turn within one call, so the entry is rebuilt once, after the last.
             let pending = false;
             const changed = () => {

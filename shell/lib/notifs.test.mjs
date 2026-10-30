@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon, stacked } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -358,4 +358,14 @@ test("an app with no icon takes its desktop entry's: the hinted one, else one wh
   assert.equal(entryIcon(entries, 'blank', 'Blank'), '');
   assert.equal(entryIcon(entries, '', 'Unknown Thing'), '');
   assert.equal(entryIcon(entries, '', ''), '');
+});
+
+test("a notification replaces its own app's older one in the same stack, and no other", () => {
+  const h = [Object.assign(entry(3, 'dl'), { stack: 'b' }), Object.assign(entry(2, 'other'), { stack: 'a' }), Object.assign(entry(1, 'dl'), { stack: 'a' }), entry(0, 'dl')];
+  assert.equal(stacked(h, { app: 'dl', stack: 'a' }), 'k1');
+  assert.equal(stacked(h, { app: 'other', stack: 'a' }), 'k2');
+  assert.equal(stacked(h, { app: 'DL', stack: 'a' }), null);
+  assert.equal(stacked(h, { app: 'dl', stack: 'c' }), null);
+  assert.equal(stacked(h, { app: 'dl', stack: '' }), null);
+  assert.equal(stacked(h, { app: 'dl' }), null);
 });

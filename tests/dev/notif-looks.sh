@@ -67,5 +67,34 @@ notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png -a Art themed
 shown themed
 check "an icon theme's file in image-path is the icon, not a picture ($(note picture))" state_is '.note.picture == null and .note.icon != null'
 
+# A stack tag keeps one notification per app and tag, on the island and in the history.
+notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+held() { notifs | jq --arg s "$1" '[.summaries[] | select(. == $s)] | length'; }
+timeout 0.5 qs ipc call notifs clear >/dev/null
+for p in 20 60 100; do
+  notify-send -a dl -h int:value:$p -h string:x-dunst-stack-tag:dl Download
+  until_ok 2000 state_is ".note.bar == $((p / 5))"
+done
+check "three sends in one stack leave one Download in the history ($(held Download))" test "$(held Download)" = 1
+sleep 1
+check "and its card stays on the island, full ($(note bar))" state_is '.mode == "notification" and .note.bar == 20'
+notify-send -a other -h string:x-dunst-stack-tag:dl Download
+until_ok 2000 eval '[ "$(held Download)" = 2 ]'
+check "the same tag from another app makes a second entry ($(held Download))" test "$(held Download)" = 2
+for v in 30 70; do
+  notify-send -a vol -h int:value:$v -h string:x-canonical-private-synchronous:volume Volume
+  until_ok 2000 state_is ".note.bar == $((v / 5))"
+done
+check "x-canonical-private-synchronous keeps one too ($(held Volume))" test "$(held Volume)" = 1
+# The older one's app hears it closed as expired, reason 1, not as dismissed by the user.
+bus=$(mktemp)
+gdbus monitor --session --dest org.freedesktop.Notifications >"$bus" &
+monitor=$!
+cleanup() { kill "$monitor" 2>/dev/null; rm -f "$pic" "$bus"; }
+first=$(notify-send -p -a vol -h string:x-canonical-private-synchronous:volume Volume)
+notify-send -a vol -h string:x-canonical-private-synchronous:volume Volume
+expired() { grep -q "NotificationClosed (uint32 $first, uint32 1)" "$bus"; }
+check "the replaced one's app hears it expired" until_ok 2000 expired
+
 exit $((fails > 0))
 }

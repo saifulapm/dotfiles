@@ -68,6 +68,9 @@ export function raiseTarget(windows, entry) {
   return mine.length ? mine.reduce((a, b) => (at(b) > at(a) ? b : a)).id : null;
 }
 
+// The older entry a notification replaces: one from its app, by the exact name, in the same stack.
+export const stacked = (history, entry) => (entry.stack ? history.find((h) => h.app === entry.app && h.stack === entry.stack)?.key ?? null : null);
+
 export const addEntry =(history, entry) => [entry].concat(history).slice(0, LIMIT);
 
 const isEntry = (e) =>
