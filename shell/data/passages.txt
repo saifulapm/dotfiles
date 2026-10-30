@@ -1,0 +1,199 @@
+# Ayat, as deen api ayah takes them
+ayah 94:6
+ayah 2:152
+ayah 3:139
+ayah 2:153
+ayah 16:128
+ayah 3:200
+ayah 3:102
+ayah 33:41
+ayah 49:10
+ayah 55:60
+ayah 39:53
+ayah 93:3
+ayah 42:19
+ayah 15:49
+ayah 10:57
+ayah 31:17
+ayah 17:9
+ayah 4:147
+ayah 35:3
+ayah 29:2
+ayah 3:92
+ayah 18:46
+ayah 64:11
+ayah 9:51
+ayah 49:13
+ayah 16:97
+ayah 1:2
+ayah 7:55
+ayah 21:35
+ayah 57:3
+
+# Hadith, as deen hadith show takes them
+hadith bukhari:1
+hadith bukhari:6013
+hadith bukhari:7376
+hadith bukhari:6125
+hadith bukhari:6446
+hadith bukhari:6412
+hadith bukhari:1302
+hadith bukhari:13
+hadith bukhari:10
+hadith bukhari:5027
+hadith bukhari:6114
+hadith bukhari:1426
+hadith bukhari:6014
+hadith bukhari:4006
+hadith bukhari:2320
+hadith bukhari:6005
+hadith bukhari:6508
+hadith bukhari:1898
+hadith bukhari:6488
+hadith bukhari:5373
+hadith muslim:6602
+hadith muslim:6970
+hadith muslim:152
+hadith muslim:6514
+hadith muslim:6643
+hadith muslim:6927
+hadith muslim:1083
+hadith muslim:6524
+hadith muslim:6934
+hadith muslim:7121
+
+# Duas from Hisn al-Muslim, as deen dua show takes them
+dua 1
+dua 3
+dua 5
+dua 14
+dua 16
+dua 49
+dua 59
+dua 61
+dua 211
+dua 193
+dua 144
+dua 88
+dua 216
+dua 105
+dua 108
+dua 124
+dua 128
+dua 136
+dua 139
+dua 154
+dua 169
+dua 176
+dua 177
+dua 180
+dua 182
+dua 183
+dua 190
+dua 198
+dua 213
+dua 235
+
+# v1's quotes, each split at its last ' — '
+quote The best way to get started is to quit talking and begin doing. — Walt Disney
+quote It does not matter how slowly you go as long as you do not stop. — Confucius
+quote We are what we repeatedly do. Excellence, then, is not an act, but a habit. — Will Durant
+quote The only way to do great work is to love what you do. — Steve Jobs
+quote Whether you think you can, or you think you can't — you're right. — Henry Ford
+quote It always seems impossible until it's done. — Nelson Mandela
+quote Success is not final, failure is not fatal: it is the courage to continue that counts. — Winston Churchill
+quote The secret of getting ahead is getting started. — Mark Twain
+quote Do what you can, with what you have, where you are. — Theodore Roosevelt
+quote Everything you've ever wanted is on the other side of fear. — George Addair
+quote Hard choices, easy life. Easy choices, hard life. — Jerzy Gregorek
+quote You do not rise to the level of your goals. You fall to the level of your systems. — James Clear
+quote How we spend our days is, of course, how we spend our lives. — Annie Dillard
+quote Amateurs sit and wait for inspiration, the rest of us just get up and go to work. — Stephen King
+quote Discipline equals freedom. — Jocko Willink
+quote What we fear doing most is usually what we most need to do. — Tim Ferriss
+quote The impediment to action advances action. What stands in the way becomes the way. — Marcus Aurelius
+quote Waste no more time arguing about what a good man should be. Be one. — Marcus Aurelius
+quote You have power over your mind — not outside events. Realize this, and you will find strength. — Marcus Aurelius
+quote We suffer more often in imagination than in reality. — Seneca
+quote Luck is what happens when preparation meets opportunity. — Seneca
+quote It is not that we have a short time to live, but that we waste a lot of it. — Seneca
+quote No man is free who is not master of himself. — Epictetus
+quote First say to yourself what you would be; and then do what you have to do. — Epictetus
+quote Make it work, make it right, make it fast. — Kent Beck
+quote Simplicity is the ultimate sophistication. — Leonardo da Vinci
+quote Perfection is achieved, not when there is nothing more to add, but when there is nothing left to take away. — Antoine de Saint-Exupéry
+quote Real artists ship. — Steve Jobs
+quote Stay hungry, stay foolish. — Stewart Brand
+quote The best time to plant a tree was twenty years ago. The second best time is now. — Chinese proverb
+quote Fall down seven times, stand up eight. — Japanese proverb
+quote A journey of a thousand miles begins with a single step. — Lao Tzu
+quote When you reach the top of the mountain, keep climbing. — Zen proverb
+quote Before enlightenment: chop wood, carry water. After enlightenment: chop wood, carry water. — Zen proverb
+quote The obstacle is the path. — Zen proverb
+quote Genius is one percent inspiration and ninety-nine percent perspiration. — Thomas Edison
+quote I have not failed. I've just found ten thousand ways that won't work. — Thomas Edison
+quote Many of life's failures are people who did not realize how close they were to success when they gave up. — Thomas Edison
+quote If I have seen further it is by standing on the shoulders of giants. — Isaac Newton
+quote An expert is a person who has made all the mistakes that can be made in a very narrow field. — Niels Bohr
+quote The noblest pleasure is the joy of understanding. — Leonardo da Vinci
+quote Learning never exhausts the mind. — Leonardo da Vinci
+quote Live as if you were to die tomorrow. Learn as if you were to live forever. — Mahatma Gandhi
+quote The future depends on what you do today. — Mahatma Gandhi
+quote Be the change that you wish to see in the world. — Mahatma Gandhi
+quote The best revenge is massive success. — Frank Sinatra
+quote Opportunities don't happen. You create them. — Chris Grosser
+quote Don't watch the clock; do what it does. Keep going. — Sam Levenson
+quote The harder I work, the luckier I get. — Samuel Goldwyn
+quote Quality is not an act, it is a habit. — attributed to Aristotle
+quote Well begun is half done. — Aristotle
+quote Courage is not the absence of fear, but rather the judgment that something else is more important than fear. — Ambrose Redmoon
+quote He who has a why to live can bear almost any how. — Friedrich Nietzsche
+quote That which does not kill us makes us stronger. — Friedrich Nietzsche
+quote In the middle of difficulty lies opportunity. — Albert Einstein
+quote Anyone who has never made a mistake has never tried anything new. — Albert Einstein
+quote Strive not to be a success, but rather to be of value. — Albert Einstein
+quote Imagination is more important than knowledge. — Albert Einstein
+quote If you're going through hell, keep going. — Winston Churchill
+quote Perfection is not attainable, but if we chase perfection we can catch excellence. — Vince Lombardi
+quote It's not whether you get knocked down, it's whether you get up. — Vince Lombardi
+quote The only limit to our realization of tomorrow is our doubts of today. — Franklin D. Roosevelt
+quote You miss 100% of the shots you don't take. — Wayne Gretzky
+quote I've failed over and over and over again in my life. And that is why I succeed. — Michael Jordan
+quote Champions keep playing until they get it right. — Billie Jean King
+quote It ain't about how hard you hit. It's about how hard you can get hit and keep moving forward. — Rocky Balboa
+quote Twenty years from now you will be more disappointed by the things you didn't do than by the ones you did. — H. Jackson Brown Jr.
+quote Whatever you do, do it well. — Walt Disney
+quote The way to get started is to quit talking and begin doing. — Walt Disney
+quote All our dreams can come true, if we have the courage to pursue them. — Walt Disney
+quote Do one thing every day that scares you. — Eleanor Roosevelt
+quote No one can make you feel inferior without your consent. — Eleanor Roosevelt
+quote The future belongs to those who believe in the beauty of their dreams. — Eleanor Roosevelt
+quote What you get by achieving your goals is not as important as what you become by achieving your goals. — Zig Ziglar
+quote You don't have to be great to start, but you have to start to be great. — Zig Ziglar
+quote People often say that motivation doesn't last. Well, neither does bathing — that's why we recommend it daily. — Zig Ziglar
+quote Either write something worth reading or do something worth writing. — Benjamin Franklin
+quote Energy and persistence conquer all things. — Benjamin Franklin
+quote Never confuse motion with action. — Benjamin Franklin
+quote Everything should be made as simple as possible, but not simpler. — attributed to Albert Einstein
+quote Talk is cheap. Show me the code. — Linus Torvalds
+quote Programs must be written for people to read, and only incidentally for machines to execute. — Harold Abelson
+quote Premature optimization is the root of all evil. — Donald Knuth
+quote Deleted code is debugged code. — Jeff Sickel
+quote The cheapest, fastest, and most reliable components are those that aren't there. — Gordon Bell
+quote Weeks of coding can save you hours of planning. — Unknown
+quote Make each program do one thing well. — Doug McIlroy
+quote The most effective debugging tool is still careful thought, coupled with judiciously placed print statements. — Brian Kernighan
+quote Vision without execution is just hallucination. — attributed to Thomas Edison
+quote Action is the foundational key to all success. — Pablo Picasso
+quote Every artist was first an amateur. — Ralph Waldo Emerson
+quote What lies behind us and what lies before us are tiny matters compared to what lies within us. — Ralph Waldo Emerson
+quote Do not go where the path may lead, go instead where there is no path and leave a trail. — Ralph Waldo Emerson
+quote Adopt the pace of nature: her secret is patience. — Ralph Waldo Emerson
+quote The mind is everything. What you think you become. — attributed to Buddha
+quote Each morning we are born again. What we do today is what matters most. — attributed to Buddha
+quote Rivers know this: there is no hurry. We shall get there some day. — A. A. Milne
+quote Start where you are. Use what you have. Do what you can. — Arthur Ashe
+quote Success is the sum of small efforts, repeated day in and day out. — Robert Collier
+quote Great things are done by a series of small things brought together. — Vincent van Gogh
+quote If you hear a voice within you say "you cannot paint," then by all means paint, and that voice will be silenced. — Vincent van Gogh
+quote I would rather die of passion than of boredom. — Vincent van Gogh
