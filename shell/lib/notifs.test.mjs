@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -251,4 +251,29 @@ test('a critical whose app stays 3 s is not set aside, and one whose app stays u
 test('a paused hold resumes by the stay of its app', () => {
   assert.equal(resumeMs(Object.assign(entry(1), { timeout: 0 }), 400, { stays: 3000 }), 1500);
   assert.equal(resumeMs(Object.assign(entry(1), { timeout: 2000 }), 400, { stays: 0 }), 0);
+});
+
+// Any sender can name itself after a member every object inherits.
+const forged = ['__proto__', 'constructor', 'toString', 'hasOwnProperty'];
+
+test('an app named after an inherited member gets its own group', () => {
+  const groups = group(forged.map((app, i) => entry(i, app)).concat([entry(9, 'mail')]));
+  assert.deepEqual(groups.map((g) => [g.app, g.entries.length]), [['mail', 1]].concat(forged.slice().reverse().map((a) => [a, 1])));
+});
+
+test('an app named after an inherited member has no rule until it gets one, and its rule stays its own', () => {
+  for (const app of forged) {
+    assert.equal(ruleOf({}, app), undefined);
+    const rules = toggle({ mail: { dnd: true } }, app, 'muted');
+    assert.deepEqual(ruleOf(rules, app), { muted: true });
+    assert.deepEqual(ruleOf(rules, 'mail'), { dnd: true });
+    assert.equal(ruleOf(rules, 'muted'), undefined);
+    assert.deepEqual(ruleOf(cycleStay(rules, app), app), { muted: true, stays: 3000 });
+    assert.deepEqual(ruleOf(parseStore(storeText({ dnd: false, rules, history: [] })).rules, app), { muted: true });
+    assert.deepEqual(Object.keys(toggle(rules, app, 'muted')), ['mail']);
+  }
+});
+
+test('an entry from an app named after an inherited member holds by its own timeout', () => {
+  assert.deepEqual(setAside([], Object.assign(critical(1), { app: 'constructor' }), 'k2').map((e) => e.key), ['k1']);
 });

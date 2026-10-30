@@ -40,7 +40,7 @@ Item {
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
                         entry: e,
                         head: i === 0 ? look.groupHead(g.app, g.entries.length) : "",
-                        rule: i === 0 ? Lib.ruleText(notifs.rules[g.app]) : ""
+                        rule: i === 0 ? Lib.ruleText(Lib.ruleOf(notifs.rules, g.app)) : ""
                     }))), [])
 
     function open(t0) {

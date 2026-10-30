@@ -83,12 +83,12 @@ Scope {
 
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
     function show(e) {
-        if (!N.shows(e, rules[e.app], dnd))
+        if (!N.shows(e, N.ruleOf(rules, e.app), dnd))
             return;
         waiting = N.setAside(waiting, current, e.key, rules);
         current = e;
         hold.stop();
-        left = N.holdMs(e, rules[e.app]);
+        left = N.holdMs(e, N.ruleOf(rules, e.app));
         run();
     }
 
@@ -109,7 +109,7 @@ Scope {
             hold.stop();
             left = holdUntil - Date.now();
         } else if (!on && current) {
-            left = N.resumeMs(current, left, rules[current.app]);
+            left = N.resumeMs(current, left, N.ruleOf(rules, current.app));
             run();
         }
     }
@@ -124,7 +124,7 @@ Scope {
     function next() {
         current = null;
         hold.stop();
-        const e = waiting.find(w => N.shows(w, rules[w.app], dnd));
+        const e = waiting.find(w => N.shows(w, N.ruleOf(rules, w.app), dnd));
         if (e)
             show(e);
     }

@@ -138,9 +138,19 @@ key_on_newest -k j -k m
 check "j, m on the C row mutes C ($(notifs | jq -c .rules.C))" state_is '.rules.C.muted'
 check "as N leaves, D's critical comes back past the muted C's" until_ok 7000 shows d2
 
+# Any sender can name itself after a member every object inherits.
+notify-send -t 1 -a __proto__ p1
+until_ok 2000 listed p1
+until_ok 2000 mode_is rest
+key_on_newest -k m
+check "an app named __proto__ groups and mutes on its own ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "__proto__ · 1 · muted"
+notify-send -a constructor k1
+check "and one named constructor still shows" until_ok 2000 shows k1
+until_ok 7000 mode_is rest
+
 store=$XDG_STATE_HOME/dots/notifications.json
 store_is() { jq -e "$1" "$store" >/dev/null; }
-check "notifications.json holds rules with key T beside dnd ($(jq -c .rules "$store"))" store_is '(.rules.T == {dnd: true, stays: 3000}) and (.rules.slack == {muted: true}) and has("dnd")'
+check "notifications.json holds rules with key T beside dnd ($(jq -c .rules "$store"))" store_is '(.rules.T == {dnd: true, stays: 3000}) and (.rules.slack == {muted: true}) and (.rules["__proto__"] == {muted: true}) and has("dnd")'
 key_on_newest
 before=$(jq -c '[.heads[].text]' <<<"$seen")
 check "the legend shows m mute, i DND and s stay ($(jq -c .legend <<<"$seen"))" eval 'jq -e ".legend | ascii_downcase | contains(\"m mute  i dnd  s stay\")" <<<"$seen" >/dev/null'

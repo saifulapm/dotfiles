@@ -8,7 +8,7 @@ export const holdMs = (entry, rule) => (rule?.stays >= 0 ? rule.stays : entry.ti
 // The undismissed criticals waiting to take the island back, newest first: the one leaving joins them when it stays until dismissed, and the one arriving leaves them.
 export function setAside(waiting, leaving, arriving, rules = {}) {
   const kept = waiting.filter((e) => e.key !== arriving);
-  if (leaving && leaving.key !== arriving && leaving.critical && holdMs(leaving, rules[leaving.app]) === 0) kept.push(leaving);
+  if (leaving && leaving.key !== arriving && leaving.critical && holdMs(leaving, ruleOf(rules, leaving.app)) === 0) kept.push(leaving);
   return kept.sort((a, b) => b.time - a.time);
 }
 
@@ -18,16 +18,21 @@ export const resumeMs = (entry, left, rule) => (holdMs(entry, rule) > 0 ? Math.m
 // Whether an entry takes the island, given its app's rule: a muted app's never do, criticals included; under Do Not Disturb only criticals and apps let through do.
 export const shows = (entry, rule, dnd) => !rule?.muted && (!dnd || entry.critical || rule?.dnd === true);
 
-// Rules key on the exact app name; a rule left with nothing on is dropped.
+// Rules key on the exact app name, which a sender may make __proto__ or constructor, so a name is only ever an own key.
+export const ruleOf = (rules, app) => (Object.prototype.hasOwnProperty.call(rules, app) ? rules[app] : undefined);
+
+const put = (o, key, value) => Object.defineProperty(o, key, { value, enumerable: true, writable: true, configurable: true });
+
+// A rule left with nothing on is dropped.
 function withRule(rules, app, rule) {
-  const kept = Object.assign({}, rules);
-  if (Object.keys(rule).length > 0) kept[app] = rule;
-  else delete kept[app];
+  const kept = {};
+  for (const a of Object.keys(rules)) if (a !== app) put(kept, a, rules[a]);
+  if (Object.keys(rule).length > 0) put(kept, app, rule);
   return kept;
 }
 
 export function toggle(rules, app, field) {
-  const rule = Object.assign({}, rules[app]);
+  const rule = Object.assign({}, ruleOf(rules, app));
   if (rule[field]) delete rule[field];
   else rule[field] = true;
   return withRule(rules, app, rule);
@@ -37,7 +42,7 @@ export function toggle(rules, app, field) {
 const STAYS = [3000, 10000, 0];
 
 export function cycleStay(rules, app) {
-  const rule = Object.assign({}, rules[app]);
+  const rule = Object.assign({}, ruleOf(rules, app));
   const next = STAYS[STAYS.indexOf(rule.stays) + 1];
   if (next === undefined) delete rule.stays;
   else rule.stays = next;
@@ -79,7 +84,7 @@ export function parseStore(text) {
 function validRules(rules) {
   let kept = {};
   if (rules === null || typeof rules !== 'object' || Array.isArray(rules)) return kept;
-  for (const app in rules) {
+  for (const app of Object.keys(rules)) {
     const r = rules[app] !== null && typeof rules[app] === 'object' ? rules[app] : {};
     const rule = {};
     if (r.muted === true) rule.muted = true;
@@ -101,13 +106,13 @@ export function visible(history, query) {
 // One group per app, the app with the newest entry first, each group newest first.
 export function group(entries) {
   const groups = [];
-  const byApp = {};
+  const byApp = new Map();
   for (const e of entries.slice().sort((a, b) => b.time - a.time)) {
-    if (!byApp[e.app]) {
-      byApp[e.app] = { app: e.app, entries: [] };
-      groups.push(byApp[e.app]);
+    if (!byApp.has(e.app)) {
+      byApp.set(e.app, { app: e.app, entries: [] });
+      groups.push(byApp.get(e.app));
     }
-    byApp[e.app].entries.push(e);
+    byApp.get(e.app).entries.push(e);
   }
   return groups;
 }
