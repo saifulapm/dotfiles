@@ -60,6 +60,14 @@ export const chipsOf = (actions) =>
     .slice(0, 3)
     .map((a, i) => ({ key: String(i + 1), identifier: a.identifier, text: a.text }));
 
+// The window an action raises: the app's most recently focused one, whose app id is the desktop entry or the app name, ignoring case; null when it has none.
+export function raiseTarget(windows, entry) {
+  const names = [entry.desktopEntry, entry.app].filter((n) => n).map((n) => n.toLowerCase().replace(/\.desktop$/, ''));
+  const at = (w) => (w.focus_timestamp ? w.focus_timestamp.secs * 1e9 + w.focus_timestamp.nanos : -1);
+  const mine = windows.filter((w) => names.includes((w.app_id || '').toLowerCase()));
+  return mine.length ? mine.reduce((a, b) => (at(b) > at(a) ? b : a)).id : null;
+}
+
 export const addEntry =(history, entry) => [entry].concat(history).slice(0, LIMIT);
 
 const isEntry = (e) =>

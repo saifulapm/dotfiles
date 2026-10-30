@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -287,4 +287,15 @@ test('the chips are the first three actions, numbered from 1, never default or s
   ]);
   assert.deepEqual(chipsOf([a('default', 'Open')]), []);
   assert.deepEqual(chipsOf(undefined), []);
+});
+
+test("an action raises the app's most recently focused window, by desktop entry or app name against the app id", () => {
+  const w = (id, app_id, secs, nanos = 0) => ({ id, app_id, focus_timestamp: { secs, nanos } });
+  const windows = [w(1, 'foot', 100), w(2, 'chromium-browser', 300), w(3, 'foot', 200, 5), w(4, 'foot', 200, 1), { id: 5, app_id: 'foot', focus_timestamp: null }];
+  assert.equal(raiseTarget(windows, { app: 'foot', desktopEntry: '' }), 3);
+  assert.equal(raiseTarget(windows, { app: 'Chromium', desktopEntry: 'chromium-browser' }), 2);
+  assert.equal(raiseTarget(windows, { app: 'Foot', desktopEntry: '' }), 3);
+  assert.equal(raiseTarget(windows, { app: 'x', desktopEntry: 'foot.desktop' }), 3);
+  assert.equal(raiseTarget(windows, { app: 'Slack', desktopEntry: 'slack' }), null);
+  assert.equal(raiseTarget([{ id: 6, app_id: null, focus_timestamp: null }], { app: '', desktopEntry: '' }), null);
 });

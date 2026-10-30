@@ -31,6 +31,7 @@ Scope {
             key: Date.now() + "-" + n.id,
             id: n.id,
             app: n.appName,
+            desktopEntry: n.desktopEntry,
             icon: notifs.iconOf(n.appIcon || n.hints["image-path"] || ""),
             summary: n.summary,
             body: n.body,
@@ -165,15 +166,17 @@ Scope {
 
     // True when the entry's app is still there to take its default action.
     function act(key) {
-        const action = live[key]?.actions.find(a => a.identifier === "default");
-        if (!action)
-            return false;
-        action.invoke();
-        return true;
+        return runAction(key, "default");
     }
 
     function runAction(key, identifier) {
-        live[key]?.actions.find(a => a.identifier === identifier)?.invoke();
+        const action = live[key]?.actions.find(a => a.identifier === identifier);
+        if (!action)
+            return false;
+        raising.entry = history.find(e => e.key === key);
+        action.invoke();
+        raising.running = true;
+        return true;
     }
 
     function save() {
@@ -228,6 +231,26 @@ Scope {
             n.bodyChanged.connect(changed);
             n.urgencyChanged.connect(changed);
             n.expireTimeoutChanged.connect(changed);
+        }
+    }
+
+    // An action lands in the app: niri's windows are read when it runs, and the app's last focused one takes focus.
+    Process {
+        id: raising
+        property var entry: null
+        command: ["niri", "msg", "-j", "windows"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let windows = [];
+                try {
+                    windows = JSON.parse(text);
+                } catch (e) {
+                    return;
+                }
+                const id = N.raiseTarget(windows, raising.entry);
+                if (id !== null)
+                    Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(id)]);
+            }
         }
     }
 
