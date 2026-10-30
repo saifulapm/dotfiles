@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -245,4 +245,57 @@ test("each pid's comm reads back by pid, with only its own trailing newline take
 test('brightness takes a step like 5%+ or an absolute 1% to 100%, and nothing else', () => {
   for (const step of ['5%+', '5%-', '1%+', '1%', '100%', '45%']) assert.equal(brightnessStep(step), true, step);
   for (const step of ['0%', '101%', '5;rm', '5', '%', '-5%', '5%+;rm', '']) assert.equal(brightnessStep(step), false, step);
+});
+
+// A capture stream as ControlAudio-style reads give it: Quickshell hands properties over as strings.
+const rec = (id, props = {}) => ({ id, capture: true, props: { 'object.serial': String(100 + id), ...props } });
+const from = (source, target, active = true) => ({ source, target, active });
+const MIC = 7;
+
+test('an app recording from the default source puts its name in the mic slot', () => {
+  const streams = [rec(40, { 'application.name': 'Test Recorder' })];
+  assert.deepEqual(micApps(streams, [from(MIC, 40)], MIC, 0), ['Test Recorder']);
+  assert.equal(islandText('mic', { mic: ['Test Recorder'] }, AT), '● MIC · Test Recorder');
+});
+
+test('with two apps the newest by serial is named and the rest counted', () => {
+  const streams = [rec(52, { 'application.name': 'Other', 'object.serial': '900' }), rec(40, { 'application.name': 'Test Recorder', 'object.serial': '300' })];
+  const apps = micApps(streams, [from(MIC, 40), from(MIC, 52)], MIC, 0);
+  assert.deepEqual(apps, ['Other', 'Test Recorder']);
+  assert.equal(islandText('mic', { mic: apps }, AT), '● MIC · Other +1');
+  // Node ids are reused, serials are not, so a reused low id that is newer still comes first.
+  const reused = [rec(40, { 'application.name': 'Old', 'object.serial': '300' }), rec(3, { 'application.name': 'New', 'object.serial': '901' })];
+  assert.deepEqual(micApps(reused, [from(MIC, 40), from(MIC, 3)], MIC, 0), ['New', 'Old']);
+});
+
+test('without an application name the node description names it, on one line', () => {
+  assert.deepEqual(micApps([rec(40, { 'node.description': 'Voice\nMemo' })], [from(MIC, 40)], MIC, 0), ['Voice Memo']);
+});
+
+test('only an active link from the default source into a capture stream counts', () => {
+  const s = [rec(40, { 'application.name': 'A' })];
+  assert.deepEqual(micApps(s, [from(MIC, 40, false)], MIC, 0), []);
+  assert.deepEqual(micApps(s, [from(8, 40)], MIC, 0), []);
+  assert.deepEqual(micApps([{ ...s[0], capture: false }], [from(MIC, 40)], MIC, 0), []);
+  assert.deepEqual(micApps(s, [from(MIC, 40)], -1, 0), []);
+});
+
+test("monitor and passive streams and the shell's own recorder never count", () => {
+  const links = [from(MIC, 40)];
+  for (const props of [{ 'stream.monitor': 'true' }, { 'node.passive': 'true' }, { 'media.category': 'Monitor' }, { 'application.process.id': '4242' }])
+    assert.deepEqual(micApps([rec(40, { 'application.name': 'A', ...props })], links, MIC, 4242), [], JSON.stringify(props));
+  assert.deepEqual(micApps([rec(40, { 'application.name': 'A', 'stream.monitor': 'false', 'node.passive': 'false', 'application.process.id': '17' })], links, MIC, 4242), ['A']);
+});
+
+test('a link whose target has gone, read as id -1, counts nothing', () => {
+  assert.deepEqual(micApps([rec(40, { 'application.name': 'A' })], [from(MIC, -1), from(-1, 40)], MIC, 0), []);
+});
+
+test('the mic slot shows right after sharing, above the lease and the recording timer, and is compact', () => {
+  const mic = ['A'];
+  assert.equal(pick({ sharing: [share()], mic }), 'sharing');
+  assert.equal(pick({ notification: note, mic }), 'notification');
+  assert.equal(pick({ mic, lease: { who: 'claude', left: 1 }, recording: '00:01', osd: { kind: 'volume', value: 1 } }), 'mic');
+  assert.equal(pick({ mic: null, recording: '00:01' }), 'recording');
+  assert.equal(isCompact('mic'), true);
 });

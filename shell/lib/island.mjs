@@ -4,8 +4,8 @@ import { clockText } from './margins.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
+// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
+const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -58,6 +58,17 @@ export function commNames(text) {
 // niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
 export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
 
+// The apps recording from the default source, newest first: a capture stream with an active link from it, but no monitor, passive stream or the shell's own recorder, whose pid is ownPid (A1KE151A, Q24TQVMB). A link's end that has gone reads -1. Serials are never reused, as node ids are (TJKMQNCR).
+export function micApps(streams, links, sourceId, ownPid) {
+  const counted = (p) => p['stream.monitor'] !== 'true' && (p['node.passive'] ?? 'false') === 'false' && p['media.category'] !== 'Monitor' && !(ownPid > 0 && p['application.process.id'] === String(ownPid));
+  return streams
+    .filter((s) => s.capture && counted(s.props) && sourceId >= 0 && links.some((l) => l.active && l.source === sourceId && l.target === s.id))
+    .sort((a, b) => Number(b.props['object.serial'] ?? b.id) - Number(a.props['object.serial'] ?? a.id))
+    .map((s) => oneLine(s.props['application.name'] || s.props['node.description'] || s.props['node.name'] || ''));
+}
+
+const micText = (apps) => `● MIC · ${apps[0]}${apps.length > 1 ? ` +${apps.length - 1}` : ''}`;
+
 // What reaches brightnessctl's argv: a step like 5%+, or an absolute 1% to 100%, which the Shift brightness keys send (YD0H5332).
 export const brightnessStep = (step) => /^[0-9]{1,3}%[+-]$/.test(step) || (/^[0-9]{1,3}%$/.test(step) && parseInt(step) >= 1 && parseInt(step) <= 100);
 
@@ -81,6 +92,8 @@ export function islandText(mode, slots, now) {
       return joined([slots.notification.app, slots.notification.summary, slots.notification.body]);
     case 'sharing':
       return liveText(slots.sharing);
+    case 'mic':
+      return micText(slots.mic);
     case 'recording':
       return `REC ${slots.recording}`;
     case 'osd':
@@ -119,7 +132,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'recording', 'toast', 'capture'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'mic', 'recording', 'toast', 'capture'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;
