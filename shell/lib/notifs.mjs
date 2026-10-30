@@ -138,10 +138,13 @@ export const clampSelected = (selected, length) => Math.max(0, Math.min(length -
 const isPath = (p) => typeof p === 'string' && p.startsWith('/');
 const validFiles = (f) => Array.isArray(f) && f.every(isPath);
 
-// Temp files and icon theme images are never the file a notification is about; ".." could walk out of a folder checked by prefix.
+// An image in an icon theme's folder is an app's icon: never a picture, nor the file a notification is about.
+const inIconDir = (path, home) => ['/usr/share/icons/', '/usr/share/pixmaps/', home + '/.local/share/icons/', home + '/.icons/'].some((d) => path.startsWith(d));
+
+// Temp files and icons are never the file a notification is about; ".." could walk out of a folder checked by prefix.
 function userFile(path, home) {
   if (!isPath(path) || path.split('/').includes('..') || path.startsWith('/tmp/')) return false;
-  return !['/usr/share/icons/', '/usr/share/pixmaps/', home + '/.local/share/icons/', home + '/.icons/'].some((d) => path.startsWith(d));
+  return !inIconDir(path, home);
 }
 
 function hintPath(value) {
@@ -162,6 +165,28 @@ export function filesOf(hints, home) {
 }
 
 export const fileUri = (path) => 'file://' + path.split('/').map(encodeURIComponent).join('/');
+
+// notify-send -i and -h string:image-path both send image-path alone, so there an icon's name or an icon theme's file is the icon, and any other file is the notification's picture.
+export function iconName(appIcon, imagePath, home) {
+  const path = hintPath(imagePath);
+  return appIcon || (isPath(path) && !inIconDir(path, home) ? '' : imagePath);
+}
+
+// Quickshell's image is image://icon/ before an icon's name or a file's path, and image://qsimage/ for image data; a picture of the app icon's own file, or of an icon theme's, is an icon.
+export function pictureOf(image, appIcon, home) {
+  if (typeof image !== 'string') return '';
+  if (image.startsWith('image://qsimage/')) return image;
+  const file = hintPath(image.replace(/^image:\/\/icon\//, ''));
+  return isPath(file) && !inIconDir(file, home) && file !== hintPath(appIcon) ? fileUri(file) : '';
+}
+
+export const progressOf = (hints) => (typeof hints.value === 'number' ? Math.round(Math.max(0, Math.min(100, hints.value))) : null);
+
+// The stack a notification replaces its app's older one in: dunst's tag, else notify-osd's.
+export function stackOf(hints) {
+  const tag = hints['x-dunst-stack-tag'] ?? hints['x-canonical-private-synchronous'];
+  return typeof tag === 'string' ? tag : '';
+}
 
 // RFC 2483: each URI ends with CRLF.
 export const uriList = (files) => files.map((f) => fileUri(f) + '\r\n').join('');

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -298,4 +298,50 @@ test("an action raises the app's most recently focused window, by desktop entry 
   assert.equal(raiseTarget(windows, { app: 'x', desktopEntry: 'foot.desktop' }), 3);
   assert.equal(raiseTarget(windows, { app: 'Slack', desktopEntry: 'slack' }), null);
   assert.equal(raiseTarget([{ id: 6, app_id: null, focus_timestamp: null }], { app: '', desktopEntry: '' }), null);
+});
+
+test("an app icon is the icon, and image-path is the icon only when it names one or is an icon theme's file", () => {
+  assert.equal(iconName('slack', '/home/u/a.png', '/home/u'), 'slack');
+  assert.equal(iconName('', 'firefox', '/home/u'), 'firefox');
+  assert.equal(iconName('', '/usr/share/icons/hicolor/48x48/apps/foot.png', '/home/u'), '/usr/share/icons/hicolor/48x48/apps/foot.png');
+  assert.equal(iconName('', '/home/u/.local/share/icons/x.png', '/home/u'), '/home/u/.local/share/icons/x.png');
+  assert.equal(iconName('', '/home/u/cover.png', '/home/u'), '');
+  assert.equal(iconName('', 'file:///home/u/cover.png', '/home/u'), '');
+  assert.equal(iconName('', '', '/home/u'), '');
+});
+
+test("a picture is a file or image data, never an icon, nor the app icon's own file", () => {
+  assert.equal(pictureOf('image://icon//home/u/my cover#1.png', '', '/home/u'), 'file:///home/u/my%20cover%231.png');
+  assert.equal(pictureOf('image://icon/file:///home/u/cover.png', '', '/home/u'), 'file:///home/u/cover.png');
+  assert.equal(pictureOf('image://qsimage/6/1', '', '/home/u'), 'image://qsimage/6/1');
+  assert.equal(pictureOf('image://icon/firefox', '', '/home/u'), '');
+  assert.equal(pictureOf('image://icon//usr/share/pixmaps/helix.png', '', '/home/u'), '');
+  assert.equal(pictureOf('image://icon//home/u/a.png', '/home/u/a.png', '/home/u'), '');
+  assert.equal(pictureOf('image://icon//home/u/a.png', 'file:///home/u/a.png', '/home/u'), '');
+  assert.equal(pictureOf('image://icon//home/u/b.png', '/home/u/a.png', '/home/u'), 'file:///home/u/b.png');
+  assert.equal(pictureOf('', '', '/home/u'), '');
+});
+
+test('the value hint is a progress from 0 to 100, and no value or a junk one is none', () => {
+  assert.equal(progressOf({ value: 40 }), 40);
+  assert.equal(progressOf({ value: 140 }), 100);
+  assert.equal(progressOf({ value: -5 }), 0);
+  assert.equal(progressOf({ value: 33.6 }), 34);
+  assert.equal(progressOf({ value: '40' }), null);
+  assert.equal(progressOf({}), null);
+});
+
+test("dunst's stack tag names the stack, else the canonical one, and anything but text is none", () => {
+  assert.equal(stackOf({ 'x-dunst-stack-tag': 'dl' }), 'dl');
+  assert.equal(stackOf({ 'x-canonical-private-synchronous': 'volume' }), 'volume');
+  assert.equal(stackOf({ 'x-dunst-stack-tag': 'dl', 'x-canonical-private-synchronous': 'volume' }), 'dl');
+  assert.equal(stackOf({ 'x-dunst-stack-tag': '' }), '');
+  assert.equal(stackOf({ 'x-dunst-stack-tag': 3 }), '');
+  assert.equal(stackOf({}), '');
+});
+
+test('an entry saved before pictures and progress loads as it was, with neither', () => {
+  const old = { key: 'k1', app: 'a', summary: 's', body: 'b', time: 1, icon: '', actions: [] };
+  const [e] = parseStore(storeText({ dnd: false, rules: {}, history: [old] })).history;
+  assert.deepEqual(e, old);
 });

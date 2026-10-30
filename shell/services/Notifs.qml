@@ -32,7 +32,10 @@ Scope {
             id: n.id,
             app: n.appName,
             desktopEntry: n.desktopEntry,
-            icon: notifs.iconOf(n.appIcon || n.hints["image-path"] || ""),
+            icon: notifs.iconOf(N.iconName(n.appIcon, n.hints["image-path"] || "", Quickshell.env("HOME"))),
+            picture: N.pictureOf(n.image, n.appIcon, Quickshell.env("HOME")),
+            progress: N.progressOf(n.hints),
+            stack: N.stackOf(n.hints),
             summary: n.summary,
             body: n.body,
             files: N.filesOf(n.hints, Quickshell.env("HOME")),
@@ -215,6 +218,7 @@ Scope {
     NotificationServer {
         bodySupported: true
         actionsSupported: true
+        imageSupported: true
         keepOnReload: false
         onNotification: n => {
             // A transient one, such as an agent's ping, shows and is let go: no history, so no actions from Mod+A either.
@@ -242,6 +246,9 @@ Scope {
             n.bodyChanged.connect(changed);
             n.urgencyChanged.connect(changed);
             n.expireTimeoutChanged.connect(changed);
+            n.appIconChanged.connect(changed);
+            n.imageChanged.connect(changed);
+            n.hintsChanged.connect(changed);
         }
     }
 
