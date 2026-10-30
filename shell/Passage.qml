@@ -38,6 +38,9 @@ Scope {
             surahsRead.running = true;
             return;
         }
+        // A run already going keeps its pick; it reads again once it exits.
+        if (entryRead.running)
+            return;
         entryRead.reading = pick;
         entryRead.command = [backend].concat(args);
         entryRead.running = true;
@@ -60,17 +63,18 @@ Scope {
         }
     }
 
-    // A pick that changed while deen ran is read again once it ends, since a running Process ignores a new command.
+    // reading is the pick this run was started for, so a pick that changed while deen ran never takes its answer.
     Process {
         id: entryRead
         property var reading: null
         stdout: StdioCollector {
-            onStreamFinished: {
-                if (entryRead.reading === passage.pick)
-                    passage.text = P.shape(passage.pick.item, text, passage.surahs);
-                else
-                    passage.read();
-            }
+            id: entryOut
+        }
+        onExited: {
+            if (reading === passage.pick)
+                passage.text = P.shape(reading.item, entryOut.text, passage.surahs);
+            else
+                passage.read();
         }
     }
 

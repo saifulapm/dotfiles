@@ -26,6 +26,12 @@ check "2026-11-03 is the first ayah, 94:6 ($(passage | jq -c '[.kind, .entry, .r
 ar=$("$work/deen" api ayah 94:6 | jq -r .ayah.ar)
 check "its Arabic and English are deen's ($(passage | jq -c '[.ar, .en]'))" passage_is --arg ar "$ar" '.ar == $ar and .en == "Indeed, with hardship [will be] ease."'
 
+# A second date set while deen still reads the first ends on the second day's own text, never the first's.
+dots-call passage date 2026-11-11 && dots-call passage date 2026-11-07
+until_ok 3000 passage_is '.date == "2026-11-07" and .en != ""'
+check "two ayah days set inside one deen call end on 2026-11-07's own ayah, 2:152 ($(passage | jq -c '[.date, .ref, .en[0:30]]'))" \
+  passage_is '.date == "2026-11-07" and .ref == "Al-Baqara 2:152" and (.en | startswith("So remember Me"))'
+
 on_day 2026-11-04
 check "2026-11-04 is the first hadith, bukhari:1, in English only ($(passage | jq -c '[.kind, .entry, .ref, .ar]'))" \
   passage_is '.kind == "hadith" and .entry == 0 and (.ref | startswith("Sahih al-Bukhari 1 · ")) and .ar == "" and (.en | startswith("Narrated") | not)'
