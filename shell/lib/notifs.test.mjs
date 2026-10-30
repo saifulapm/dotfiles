@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -127,4 +127,10 @@ test('parseStore keeps a valid files array and drops a malformed one', () => {
     assert.equal(h.length, 1);
     assert.equal('files' in h[0], false);
   }
+});
+
+test("an app's timeout decides the hold: -1 is 5 s, 0 is until dismissed, a positive one as given", () => {
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: -1 })), 5000);
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 0 })), 0);
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 2000 })), 2000);
 });

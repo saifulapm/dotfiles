@@ -9,7 +9,7 @@ import "../lib/notifs.mjs" as N
 Scope {
     id: notifs
 
-    // The island's notification slot, null while none shows; each one, critical too, shows for 5 s.
+    // The island's notification slot, null while none shows; it holds for its app's timeout, 5 s by default.
     property var current: null
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
@@ -28,6 +28,7 @@ Scope {
             body: n.body,
             files: N.filesOf(n.hints, Quickshell.env("HOME")),
             critical: n.urgency === NotificationUrgency.Critical,
+            timeout: Number(n.expireTimeout),
             time: Date.now(),
             actions: n.actions.map(a => ({
                         identifier: a.identifier,
@@ -67,14 +68,17 @@ Scope {
         if (dnd)
             return;
         current = e;
-        hold.restart();
+        hold.stop();
+        hold.interval = N.holdMs(e);
+        if (hold.interval > 0)
+            hold.start();
     }
 
-    // A drag out of the toast holds it: Drag.Automatic runs its own event loop, where the hold would still fire, so the 5 s start again at the drop.
+    // A drag out of the toast holds it: Drag.Automatic runs its own event loop, where the hold would still fire, so its time starts again at the drop.
     function drag(on) {
         if (on)
             hold.stop();
-        else if (current)
+        else if (current && hold.interval > 0)
             hold.restart();
     }
 
@@ -172,12 +176,12 @@ Scope {
             n.summaryChanged.connect(changed);
             n.bodyChanged.connect(changed);
             n.urgencyChanged.connect(changed);
+            n.expireTimeoutChanged.connect(changed);
         }
     }
 
     Root.Tick {
         id: hold
-        interval: 5000
         onTriggered: notifs.current = null
     }
 }
