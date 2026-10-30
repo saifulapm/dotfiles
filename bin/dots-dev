@@ -54,6 +54,7 @@ unset TMUX
 dconf_dir=${XDG_CONFIG_HOME:-$HOME/.config}/dconf
 session=
 pw=
+wp=
 a11y=
 registry=
 
@@ -80,6 +81,7 @@ cleanup() {
     wait "$session" 2>/dev/null || true
   fi
   tmux kill-server 2>/dev/null || true
+  [ -z "$wp" ] || { kill "$wp" 2>/dev/null; wait "$wp" 2>/dev/null; } || true
   [ -z "$pw" ] || { kill "$pw" 2>/dev/null; wait "$pw" 2>/dev/null; } || true
   [ -z "$registry" ] || { kill "$registry" 2>/dev/null; wait "$registry" 2>/dev/null; } || true
   [ -z "$a11y" ] || { kill "$a11y" 2>/dev/null; wait "$a11y" 2>/dev/null; } || true
@@ -114,6 +116,11 @@ until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
   kill -0 "$pw" 2>/dev/null || { cat "$D/pipewire.log" >&2; exit 1; }
   sleep 0.02
 done
+# A check that sets DOTS_DEV_WIREPLUMBER=1 gets a session manager that links streams, off the live bus and with the repo's profile in place of the live user config.
+if [ "${DOTS_DEV_WIREPLUMBER:-}" = 1 ]; then
+  env -u DBUS_SESSION_BUS_ADDRESS XDG_CONFIG_HOME="$repo/dev" wireplumber -p dots-dev 2>"$D/wireplumber.log" &
+  wp=$!
+fi
 
 # SELinux keeps the nested bus's dbus-daemon from starting at-spi-bus-launcher, so the nested apps and the desktop skill's gui share an accessibility bus started here.
 mkdir -p "$D/a11y"
