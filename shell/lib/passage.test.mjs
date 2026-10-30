@@ -149,6 +149,13 @@ test('an answer that leaves a drawn field empty, or no answer, shapes to nothing
   assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, 'deen: no such ayah', SURAHS), null);
 });
 
+test("an answer past the list's 280 characters, in either line, is not drawn", () => {
+  assert.equal(P.within({ ar: '', en: 'x'.repeat(280), ref: 'r' }), true);
+  assert.equal(P.within({ ar: '', en: 'x'.repeat(281), ref: 'r' }), false);
+  assert.equal(P.within({ ar: 'ا'.repeat(281), en: 'x', ref: 'r' }), false);
+  assert.equal(P.within(null), false);
+});
+
 test('the kind label and the reference line speak in each voice', () => {
   assert.deepEqual(P.voiced('caps', 'ayah', 'Ash-Sharh 94:6'), { label: 'AYAH', ref: 'Ash-Sharh 94:6' });
   assert.deepEqual(P.voiced('plain', 'ayah', 'Ash-Sharh 94:6'), { label: 'Ayah', ref: 'Ash-Sharh 94:6' });

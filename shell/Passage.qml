@@ -41,8 +41,12 @@ Scope {
         }
         if (pick.kind === "ayah" && !surahs && surahsFor !== pick) {
             surahsFor = pick;
-            surahsRead.startedAt = Date.now();
-            surahsRead.running = true;
+            // A run already going reads on for this pick when it ends; set running again, it would run twice.
+            if (!surahsRead.running) {
+                surahsRead.startedAt = Date.now();
+                surahsRead.began = false;
+                surahsRead.running = true;
+            }
             return;
         }
         // A run already going keeps its pick; it reads again once it exits.
@@ -51,6 +55,7 @@ Scope {
         entryRead.reading = pick;
         entryRead.command = [backend].concat(args);
         entryRead.startedAt = Date.now();
+        entryRead.began = false;
         entryRead.running = true;
     }
 
@@ -68,13 +73,28 @@ Scope {
         }
     }
 
-    // A day deen could not answer draws its fallback quote instead.
+    // A day deen could not answer, or answered past the list's limits, draws its fallback quote instead.
     function show(day, shaped) {
-        const f = shaped ? null : P.fallback(day.day, entries);
+        const f = P.within(shaped) ? null : P.fallback(day.day, entries);
         text = Object.assign({
             kind: f ? "quote" : day.kind,
             fallback: f !== null
-        }, shaped || P.shape(f.item, "", ""));
+        }, f ? P.shape(f.item, "", "") : shaped);
+    }
+
+    // The surahs read for an ayah day ends, answered or not; only the pick it was for reads on.
+    function surahsDone(answer) {
+        surahs = answer;
+        if (surahsFor === pick)
+            read();
+    }
+
+    // The day's read ends; one for a pick no longer wanted reads the new pick instead.
+    function entryDone(code) {
+        if (entryRead.reading === pick)
+            show(pick, code === 0 ? P.shape(pick.item, entryOut.text, surahs) : null);
+        else
+            read();
     }
 
     FileView {
@@ -87,12 +107,14 @@ Scope {
         id: surahsRead
         // When read() started it; running turns true only once the process is up.
         property real startedAt: 0
+        // Whether it started: a deen that is not there to run ends with no exit and no stream, only running turning false.
+        property bool began: false
         command: [passage.backend, "api", "surahs"]
+        onStarted: began = true
+        onRunningChanged: if (!running && !began)
+            passage.surahsDone("")
         stdout: StdioCollector {
-            onStreamFinished: {
-                passage.surahs = text;
-                passage.read();
-            }
+            onStreamFinished: passage.surahsDone(text)
         }
     }
 
@@ -101,15 +123,14 @@ Scope {
         id: entryRead
         property var reading: null
         property real startedAt: 0
+        property bool began: false
         stdout: StdioCollector {
             id: entryOut
         }
-        onExited: code => {
-            if (reading === passage.pick)
-                passage.show(reading, code === 0 ? P.shape(reading.item, entryOut.text, passage.surahs) : null);
-            else
-                passage.read();
-        }
+        onStarted: began = true
+        onRunningChanged: if (!running && !began)
+            passage.entryDone(-1)
+        onExited: code => passage.entryDone(code)
     }
 
     Root.Ipc {

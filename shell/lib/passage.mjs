@@ -99,6 +99,9 @@ export function shape(item, text, surahsText) {
   return d;
 }
 
+// The list's limits, which a day's answer from deen keeps too, or the day falls back.
+export const within = (d) => d !== null && d.en.length <= 280 && d.ar.length <= 280;
+
 // Paper's tracked capitals, Artboard's frame label, Blueprint's brackets and capitals.
 export function voiced(voice, kind, ref) {
   if (voice === 'plain') return { label: kind.charAt(0).toUpperCase() + kind.slice(1), ref };

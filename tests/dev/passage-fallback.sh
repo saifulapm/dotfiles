@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # A day deen cannot answer: deen exiting 1, a hadith corpus that is missing, an empty dua; each draws a later quote in place of the day, labelled as a quote, read through passage state.
 {
-# The shell asks a deen that does what the mode file says: ok passes to the real deen on dots apply's texts, fail exits 1 with no output, nocorpus answers a hadith with deen's error, empty answers a dua with {}.
+# The shell asks a deen that does what the mode file says: ok passes to the real deen on dots apply's texts, fail exits 1 with no output, nocorpus answers a hadith with deen's error, empty answers a dua with {}, long answers a hadith 100,000 characters long.
 texts=$HOME/.local/share/deen
 work=$(mktemp -d)
 echo fail >"$work/mode"
+printf '{"hit":{"collection":"muslim","name":"x","hadith":{"n":"1","en":"%s"}}}\n' "$(head -c 100000 /dev/zero | tr '\0' x)" >"$work/long.json"
 cat >"$work/deen" <<FAKE
 #!/bin/sh
 echo "\$*" >>$work/calls
@@ -12,6 +13,7 @@ case "\$(cat $work/mode) \$1 \$2" in
   fail*) exit 1 ;;
   "nocorpus hadith show") echo '{"error":"corpus missing"}'; exit 0 ;;
   "empty dua show") echo '{}'; exit 0 ;;
+  "long hadith show") cat $work/long.json; exit 0 ;;
 esac
 DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$texts/hadith exec $(command -v deen) "\$@"
 FAKE
@@ -28,6 +30,14 @@ emerson='.en == "Do not go where the path may lead, go instead where there is no
 
 until_ok 5000 shell_status >/dev/null
 until_ok 5000 passage_is '.en != ""'
+
+# A deen that is not there to run, such as one dots apply has not built yet, never starts, for the surahs or the day.
+mv "$work/deen" "$work/deen.gone"
+on_day 2026-11-15
+check "with no deen to run, ayah day 2026-11-15 falls back ($(passage | jq -c '[.fallback, .kind, .ref]'))" passage_is '.fallback == true and .kind == "ayah"'
+on_day 2026-11-16
+check "and so does hadith day 2026-11-16 ($(passage | jq -c '[.fallback, .kind, .ref]'))" passage_is '.fallback == true and .kind == "hadith"'
+mv "$work/deen.gone" "$work/deen"
 
 # An ayah day asks for the surahs first; a deen that never gave them is asked once for the day, not again and again.
 : >"$work/calls"
@@ -71,6 +81,10 @@ check "with no hadith corpus, ayah day 2026-11-11 draws its ayah ($(passage | jq
 mode empty
 on_day 2026-11-05
 check "with deen answering {} for a dua, dua day 2026-11-05 falls back ($(passage | jq -c '[.fallback, .kind, .ref]'))" passage_is '.fallback == true and .kind == "dua" and .ar == ""'
+
+mode long
+on_day 2026-11-12
+check "with deen answering a hadith 100,000 characters long, 2026-11-12 falls back ($(passage | jq -c '[.fallback, .kind, (.en | length)]'))" passage_is '.fallback == true and .kind == "hadith" and (.en | length) <= 280'
 
 exit $((fails > 0))
 }
