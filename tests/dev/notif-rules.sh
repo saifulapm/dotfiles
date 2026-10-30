@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-app rules from Mod+A: m mutes the selected row's app, by its exact name.
+# Per-app rules from Mod+A on the selected row's app, by its exact name: m mutes it, i lets it through Do Not Disturb.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -69,6 +69,16 @@ key_on_newest -k m
 check "m again: the heading has no suffix ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 1"
 notify-send -a T v
 check "and the next T notification shows" until_ok 2000 shows v
+until_ok 7000 mode_is rest
+
+timeout 0.5 qs ipc call notifs dnd true >/dev/null
+key_on_newest -k i
+check "i under Do Not Disturb: the heading ends · through DND ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 2 · through dnd"
+notify-send -a U u1
+check "a U notification under Do Not Disturb keeps the island at rest" sent_rests u1
+notify-send -a T d1
+check "a T one shows" until_ok 2000 shows d1
+timeout 0.5 qs ipc call notifs dnd false >/dev/null
 
 exit $((fails > 0))
 }

@@ -15,8 +15,8 @@ export function setAside(waiting, leaving, arriving) {
 // A hold paused under the pointer or Mod+I gets back what it had left, but never less than 1.5 s to read it once let go; one paused as its Tick was due has 0 or less left. 0 is until dismissed.
 export const resumeMs = (entry, left) => (holdMs(entry) > 0 ? Math.max(left, 1500) : 0);
 
-// Whether an entry takes the island, given its app's rule: a muted app's never do, criticals included; under Do Not Disturb only criticals do.
-export const shows = (entry, rule, dnd) => !rule?.muted && (!dnd || entry.critical);
+// Whether an entry takes the island, given its app's rule: a muted app's never do, criticals included; under Do Not Disturb only criticals and apps let through do.
+export const shows = (entry, rule, dnd) => !rule?.muted && (!dnd || entry.critical || rule?.dnd === true);
 
 // Rules key on the exact app name; a rule left with nothing on is dropped.
 export function toggle(rules, app, field) {
@@ -29,7 +29,7 @@ export function toggle(rules, app, field) {
   return kept;
 }
 
-export const ruleText = (rule) => (rule?.muted ? ' · muted' : '');
+export const ruleText = (rule) => (rule?.muted ? ' · muted' : '') + (rule?.dnd ? ' · through DND' : '');
 
 export const addEntry =(history, entry) => [entry].concat(history).slice(0, LIMIT);
 

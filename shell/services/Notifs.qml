@@ -15,9 +15,9 @@ Scope {
     property var waiting: []
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
-    // While on, a notification goes to the history only, and the island stays at rest; a critical one still shows.
+    // While on, a notification goes to the history only, and the island stays at rest; a critical one, or one from an app let through, still shows.
     property bool dnd: false
-    // Per-app rules by exact app name, set from Mod+A: a muted app's notifications go to the history only, criticals too.
+    // Per-app rules by exact app name, set from Mod+A: a muted app's notifications go to the history only, criticals too; dnd lets an app through Do Not Disturb.
     property var rules: ({})
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})

@@ -192,3 +192,17 @@ test('a group heading ends with the rule of its app, and no rule adds nothing', 
   assert.equal(ruleText({ muted: true }), ' · muted');
   assert.equal(ruleText(undefined), '');
 });
+
+test('an app let through Do Not Disturb shows under it, and a muted one still does not', () => {
+  assert.equal(shows(entry(1), { dnd: true }, true), true);
+  assert.equal(shows(entry(1), { dnd: true }, false), true);
+  assert.equal(shows(entry(1), { muted: true, dnd: true }, true), false);
+});
+
+test('i lets an app through Do Not Disturb beside its mute, and the heading names both', () => {
+  const both = toggle(toggle({}, 'T', 'muted'), 'T', 'dnd');
+  assert.deepEqual(both, { T: { muted: true, dnd: true } });
+  assert.equal(ruleText(both.T), ' · muted · through DND');
+  assert.equal(ruleText({ dnd: true }), ' · through DND');
+  assert.deepEqual(toggle(both, 'T', 'muted'), { T: { dnd: true } });
+});

@@ -159,7 +159,7 @@ Item {
 
     visible: motion.drawing
 
-    // Holds focus while the list is in use, where plain j/k move and d, D, m and / act.
+    // Holds focus while the list is in use, where plain j/k move and d, D, m, i and / act.
     Item {
         id: keys
         anchors.fill: parent
@@ -177,6 +177,8 @@ Item {
                 centre.dismiss();
             else if (event.key === Qt.Key_M)
                 centre.toggleRule("muted");
+            else if (event.key === Qt.Key_I)
+                centre.toggleRule("dnd");
             else if (event.key === Qt.Key_Slash)
                 input.forceActiveFocus();
             else if (event.key === Qt.Key_Escape)
