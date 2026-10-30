@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 import ".." as Root
+import "../lib/island.mjs" as I
 
 // The island's OSD slot: the default sink's volume when PipeWire reports a change, and brightness after brightnessctl sets it.
 Scope {
@@ -32,9 +33,9 @@ Scope {
         last = value;
     }
 
-    // Only steps like 5%+ reach brightnessctl, as argv, so a call cannot pass it anything else.
+    // Only steps like 5%+ or an absolute 1% to 100% reach brightnessctl, as argv, so a call cannot pass it anything else.
     function brightness(step) {
-        if (!/^[0-9]{1,3}%[+-]$/.test(step) || setter.running)
+        if (!I.brightnessStep(step) || setter.running)
             return;
         setter.command = ["brightnessctl", "-m", "set", step];
         setter.running = true;

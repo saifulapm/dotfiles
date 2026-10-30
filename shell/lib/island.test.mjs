@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -240,4 +240,9 @@ test("each pid's comm reads back by pid, with only its own trailing newline take
   // A pid gone before it was read has no comm, and stays unnamed.
   assert.deepEqual(commNames('9\t\u0000'), {});
   assert.deepEqual(commNames(''), {});
+});
+
+test('brightness takes a step like 5%+ or an absolute 1% to 100%, and nothing else', () => {
+  for (const step of ['5%+', '5%-', '1%+', '1%', '100%', '45%']) assert.equal(brightnessStep(step), true, step);
+  for (const step of ['0%', '101%', '5;rm', '5', '%', '-5%', '5%+;rm', '']) assert.equal(brightnessStep(step), false, step);
 });

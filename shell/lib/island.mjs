@@ -58,6 +58,9 @@ export function commNames(text) {
 // niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
 export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
 
+// What reaches brightnessctl's argv: a step like 5%+, or an absolute 1% to 100%, which the Shift brightness keys send (YD0H5332).
+export const brightnessStep = (step) => /^[0-9]{1,3}%[+-]$/.test(step) || (/^[0-9]{1,3}%$/.test(step) && parseInt(step) >= 1 && parseInt(step) <= 100);
+
 // dots-capture's result, from any caller of the IPC: its kind, a title (empty for a miss, which copied nothing) and a detail, each one line; a colour's detail is its hex, and a #RRGGBB one gives the swatch. No words or an unknown kind shows nothing.
 export function captureOf(kind, title, detail) {
   const t = oneLine(title);

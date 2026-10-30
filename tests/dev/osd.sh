@@ -6,7 +6,9 @@ fake_log=$fake/argv
 cat >"$fake/brightnessctl" <<EOF
 #!/usr/bin/env bash
 echo "\$*" >>"$fake_log"
-echo "fake-bl,backlight,62,62%,100"
+# An absolute step lands on its own value; a relative one on 62%.
+case \$3 in *[+-]) pct=62 ;; *) pct=\${3%\%} ;; esac
+echo "fake-bl,backlight,\$pct,\$pct%,100"
 EOF
 chmod +x "$fake/brightnessctl"
 # bin/dots-dev hands this PATH to the shell, so the shell runs the fake and never the real backlight.
@@ -64,11 +66,24 @@ check "the brightness key runs brightnessctl -m set 5%+" test "$(cat "$fake_log"
 check "the island shows Brightness 62%" state_has '.text == "Brightness 62%"'
 until_ok 3000 mode_is rest
 
-rm -f "$fake_log"
-timeout 2 qs ipc call osd brightness '5;rm' >/dev/null 2>&1
-sleep 0.5
-check "a step of 5;rm is refused and brightnessctl does not run" test ! -e "$fake_log"
-check "a refused step shows no OSD" mode_is rest
+# The Shift brightness keys as binds.kdl spawns them, each an absolute step.
+for pct in 100 1; do
+  rm -f "$fake_log"
+  niri msg action spawn -- dots-call osd brightness "$pct%"
+  until_ok 2000 mode_is osd
+  state=$(island)
+  check "dots-call osd brightness $pct% runs brightnessctl -m set $pct%" test "$(cat "$fake_log" 2>/dev/null)" = "-m set $pct%"
+  check "the island shows Brightness $pct% ($(jq -r .text <<<"$state"))" state_has ".text == \"Brightness $pct%\""
+  until_ok 3000 mode_is rest
+done
+
+for step in '5;rm' 0% 101%; do
+  rm -f "$fake_log"
+  timeout 2 qs ipc call osd brightness "$step" >/dev/null 2>&1
+  sleep 0.5
+  check "a step of $step is refused and brightnessctl does not run" test ! -e "$fake_log"
+  check "a refused $step shows no OSD" mode_is rest
+done
 
 niri msg action spawn -- wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+
 until_ok 2000 mode_is osd

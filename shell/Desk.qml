@@ -52,7 +52,7 @@ Scope {
     Root.Ipc {
         target: "osd"
 
-        // The brightness keys call this; the step is like 5%+ or 5%-.
+        // The brightness keys call this; the step is like 5%+ or 5%-, or an absolute 100% or 1%.
         function brightness(step: string): void {
             osdService.brightness(step);
         }
