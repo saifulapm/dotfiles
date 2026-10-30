@@ -154,9 +154,10 @@ PanelWindow {
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
-    // The action chips draw as the legend's key chips, and only while the app still holds the notification.
+    // The action chips draw as the legend's key chips, for a notification its app held as it arrived; they stay drawn as the card leaves.
     readonly property var keyLook: V.listLook(theme.tokens)
-    readonly property var noteChips: heldNotification && notifs.live[heldNotification.key] ? N.chipsOf(heldNotification.actions) : []
+    property var noteChips: []
+    onHeldNotificationChanged: noteChips = heldNotification && notifs.live[heldNotification.key] ? N.chipsOf(heldNotification.actions) : []
     // True from a drag's start to its drop; the toast holds while it is. Drag.active falls as the platform drag takes the pointer, so its start and finish set this.
     property bool noteDragging: false
     // The notification's hold waits while the pointer is on the box, Mod+I focuses it or a drag holds it.

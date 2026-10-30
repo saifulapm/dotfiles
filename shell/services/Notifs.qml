@@ -122,6 +122,17 @@ Scope {
             next();
     }
 
+    // Its app closed it, or an action dismissed it: Quickshell deletes the object, which still reads truthy, so its entry has no live one left to act on.
+    function closed(key) {
+        gone(key);
+        const kept = {};
+        for (const k in live) {
+            if (k !== key)
+                kept[k] = live[k];
+        }
+        live = kept;
+    }
+
     function next() {
         current = null;
         hold.stop();
@@ -215,7 +226,7 @@ Scope {
             const e = notifs.entry(n);
             notifs.remember(e, n);
             notifs.show(e);
-            n.closed.connect(() => notifs.gone(e.key));
+            n.closed.connect(() => notifs.closed(e.key));
             // A replace sets each field in turn within one call, so the entry is rebuilt once, after the last.
             let pending = false;
             const changed = () => {

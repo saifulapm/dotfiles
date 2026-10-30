@@ -111,6 +111,13 @@ wtype -k 1
 until_ok 2000 printed yes
 check "1 on the row prints yes ($(cat "$out"))" printed yes
 check "and the centre closes" until_ok 2000 centre_is '.open == false'
+# The action dismissed it, so its app holds it no more: its row draws no chips, and 1 there runs nothing.
+open_centre
+check "reopened, the acted row draws no chips ($(row_chips))" test "$(row_chips)" = '[[],[]]'
+wtype -k 1
+sleep 0.5
+check "and 1 there leaves the centre open" centre_is .open
+close_centre
 kill "$older"
 done_asking
 
