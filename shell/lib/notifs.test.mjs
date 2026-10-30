@@ -160,7 +160,14 @@ test('the notification taking the island leaves the set-aside ones, as a replace
 });
 
 test('a paused hold resumes with the time it had left, at least 1.5 s', () => {
-  assert.equal(resumeMs(3200), 3200);
-  assert.equal(resumeMs(400), 1500);
-  assert.equal(resumeMs(-20), 1500);
+  const normal = Object.assign(entry(1), { timeout: -1 });
+  assert.equal(resumeMs(normal, 3200), 3200);
+  assert.equal(resumeMs(normal, 400), 1500);
+});
+
+test('a hold paused as it ran out still resumes, and one until dismissed never does', () => {
+  assert.equal(resumeMs(Object.assign(entry(1), { timeout: -1 }), 0), 1500);
+  assert.equal(resumeMs(Object.assign(entry(1), { timeout: -1 }), -20), 1500);
+  assert.equal(resumeMs(Object.assign(entry(1), { critical: true, timeout: -1 }), 0), 0);
+  assert.equal(resumeMs(Object.assign(entry(1), { timeout: 0 }), 0), 0);
 });

@@ -96,8 +96,8 @@ Scope {
         if (on && hold.running) {
             hold.stop();
             left = holdUntil - Date.now();
-        } else if (!on && current && left > 0) {
-            left = N.resumeMs(left);
+        } else if (!on && current) {
+            left = N.resumeMs(current, left);
             run();
         }
     }
