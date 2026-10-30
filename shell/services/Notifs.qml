@@ -32,7 +32,7 @@ Scope {
             id: n.id,
             app: n.appName,
             desktopEntry: n.desktopEntry,
-            icon: notifs.iconOf(N.iconName(n.appIcon, n.hints["image-path"] || "", Quickshell.env("HOME"))),
+            icon: notifs.iconOf(N.iconName(n.appIcon, n.hints["image-path"] || "", Quickshell.env("HOME")) || N.entryIcon(DesktopEntries.applications.values, n.desktopEntry, n.appName)),
             picture: N.pictureOf(n.image, n.appIcon, Quickshell.env("HOME")),
             progress: N.progressOf(n.hints),
             stack: N.stackOf(n.hints),
@@ -49,7 +49,7 @@ Scope {
         };
     }
 
-    // An app's icon as an image url, "" when it sends none or the theme lacks it; a path stays a path. notify-send -i sends a path as the image-path hint.
+    // An app's icon as an image url, "" when it sends none and has no desktop entry, or the theme lacks it; a path stays a path.
     function iconOf(name) {
         return name.startsWith("/") ? "file://" + name : name.startsWith("file://") ? name : name ? Quickshell.iconPath(name, true) : "";
     }

@@ -180,6 +180,16 @@ export function pictureOf(image, appIcon, home) {
   return isPath(file) && !inIconDir(file, home) && file !== hintPath(appIcon) ? fileUri(file) : '';
 }
 
+// The icon of an app that sends none: the desktop entry its hint names, else one whose id, startup class or name is the app's, ignoring case; "" leaves the letter.
+export function entryIcon(entries, desktopEntry, app) {
+  const lower = (s) => (s || '').toLowerCase();
+  const hinted = lower(desktopEntry).replace(/\.desktop$/, '');
+  const name = lower(app);
+  const hit = (match) => entries.find((e) => e.icon && match(e));
+  const e = (hinted && hit((e) => lower(e.id) === hinted)) || (name && hit((e) => [e.id, e.startupClass, e.name].some((n) => lower(n) === name)));
+  return e ? e.icon : '';
+}
+
 export const progressOf = (hints) => (typeof hints.value === 'number' ? Math.round(Math.max(0, Math.min(100, hints.value))) : null);
 
 // The stack a notification replaces its app's older one in: dunst's tag, else notify-osd's.

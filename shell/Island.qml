@@ -624,6 +624,7 @@ PanelWindow {
             ageStart: age.mapToItem(null, 0, 0).x,
             tileBox: tile.visible ? at(tile) : null,
             glyph: tile.visible && glyph.visible ? glyph.text : null,
+            icon: tile.visible && icon.status === Image.Ready ? String(icon.source) : null,
             chip: shownChip ? shownChip.text : null,
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,

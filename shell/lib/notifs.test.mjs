@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -344,4 +344,18 @@ test('an entry saved before pictures and progress loads as it was, with neither'
   const old = { key: 'k1', app: 'a', summary: 's', body: 'b', time: 1, icon: '', actions: [] };
   const [e] = parseStore(storeText({ dnd: false, rules: {}, history: [old] })).history;
   assert.deepEqual(e, old);
+});
+
+test("an app with no icon takes its desktop entry's: the hinted one, else one whose id, startup class or name is the app's, ignoring case", () => {
+  const d = (id, name, icon, startupClass = '') => ({ id, name, icon, startupClass });
+  const entries = [d('foot', 'Foot', 'foot'), d('org.gnome.Nautilus', 'Files', 'org.gnome.Nautilus', 'org.gnome.Nautilus'), d('code', 'Visual Studio Code', 'vscode', 'Code'), d('blank', 'Blank', '')];
+  assert.equal(entryIcon(entries, 'foot', 'x'), 'foot');
+  assert.equal(entryIcon(entries, 'foot.desktop', 'x'), 'foot');
+  assert.equal(entryIcon(entries, '', 'Foot'), 'foot');
+  assert.equal(entryIcon(entries, '', 'files'), 'org.gnome.Nautilus');
+  assert.equal(entryIcon(entries, '', 'code'), 'vscode');
+  assert.equal(entryIcon(entries, 'nowhere', 'Foot'), 'foot');
+  assert.equal(entryIcon(entries, 'blank', 'Blank'), '');
+  assert.equal(entryIcon(entries, '', 'Unknown Thing'), '');
+  assert.equal(entryIcon(entries, '', ''), '');
 });
