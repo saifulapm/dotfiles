@@ -137,3 +137,35 @@ test('the kind label and the reference line speak in each voice', () => {
   assert.deepEqual(P.voiced('bracket', 'hadith', 'Sahih al-Bukhari 6114 · Abu Huraira'), { label: '[HADITH]', ref: 'SAHIH AL-BUKHARI 6114 · ABU HURAIRA' });
   assert.deepEqual(P.voiced('plain', 'quote', 'Walt Disney'), { label: 'Quote', ref: 'Walt Disney' });
 });
+
+const tokens = (name, voice, display) => ({ name, color: { ink: '#111', muted: '#555', line: '#ccc', accent: '#a00', danger: '#fb4', paper: '#eee', surface: '#fff' }, type: { display, ui: 'Maple Mono', voice } });
+
+test("Paper draws a printed epigraph: tracked capitals in the accent, Arabic, italic serif English, an ink rule and a muted serif reference, centred", () => {
+  const l = P.look(tokens('paper', 'caps', 'Instrument Serif'));
+  assert.deepEqual([l.frame, l.width, l.pad, l.gap], ['none', 1024, [0, 0, 0], 35]);
+  assert.deepEqual(l.label, { font: 'Maple Mono', size: 18, spacing: 5, color: '#a00' });
+  assert.deepEqual(l.ar, { size: 86, align: 'center', glow: '' });
+  assert.deepEqual(l.en, { font: 'Instrument Serif', size: 51, italic: true, height: 1.25, align: 'center' });
+  assert.deepEqual(l.rule, { width: 48, color: '#111' });
+  assert.deepEqual(l.ref, { font: 'Instrument Serif', size: 27, spacing: 0, color: '#555', align: 'center', dimension: false });
+});
+
+test('Artboard draws a selected card with its frame label, right-aligned Arabic, mono English, a line rule and a muted reference', () => {
+  const l = P.look(tokens('artboard', 'plain', 'Maple Mono'));
+  assert.deepEqual([l.frame, l.width, l.pad, l.gap], ['card', 992, [64, 77, 51], 29]);
+  assert.deepEqual(l.label, { font: 'Maple Mono', size: 18, spacing: 0, color: '#a00' });
+  assert.deepEqual(l.ar, { size: 74, align: 'right', glow: '' });
+  assert.deepEqual(l.en, { font: 'Maple Mono', size: 29, italic: false, height: 1.55, align: 'left' });
+  assert.deepEqual(l.rule, { width: -1, color: '#ccc' });
+  assert.deepEqual(l.ref, { font: 'Maple Mono', size: 19, spacing: 0, color: '#555', align: 'left', dimension: false });
+});
+
+test('Blueprint draws crop marks, a bracketed label in the danger pen, glowing Arabic and its reference on a dimension line', () => {
+  const l = P.look(tokens('blueprint', 'bracket', 'Maple Mono'));
+  assert.deepEqual([l.frame, l.width, l.pad, l.gap], ['marks', 1024, [58, 64, 58], 29]);
+  assert.deepEqual(l.label, { font: 'Maple Mono', size: 18, spacing: 3, color: '#fb4' });
+  assert.deepEqual(l.ar, { size: 77, align: 'right', glow: '#a00' });
+  assert.deepEqual(l.en, { font: 'Maple Mono', size: 27, italic: false, height: 1.6, align: 'left' });
+  assert.equal(l.rule, null);
+  assert.deepEqual(l.ref, { font: 'Maple Mono', size: 18, spacing: 3.6, color: '#a00', align: 'center', dimension: true });
+});

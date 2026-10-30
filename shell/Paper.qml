@@ -8,6 +8,8 @@ PanelWindow {
     id: paper
 
     required property var theme
+    // The day's passage, which shell.qml makes after the first frame; each sheet draws it.
+    property var passage: null
     property bool swapped: false
 
     // The back sheet takes each new theme, so the sheet on screen never rebuilds its shader.
@@ -80,6 +82,11 @@ PanelWindow {
             finish();
         else
             ({ slide: slide, zoom: zoom, scan: scan })[kind].start();
+    }
+
+    // What each sheet that shows a passage draws, the one on screen first.
+    function passageDrawn() {
+        return [front, back].filter(s => s.visible && s.words).map(s => s.words.drawn());
     }
 
     function finish() {
@@ -217,6 +224,7 @@ PanelWindow {
         property real offset: 0
         property real cut: 0
         readonly property bool ready: fill.ready
+        readonly property Item words: passageLoader.item
 
         y: offset + cut
         width: paper.width
@@ -232,6 +240,20 @@ PanelWindow {
             dir: paper.theme.dir
             // The zoom fades the sheet, not the fill, so the fill blends by the sheet's opacity.
             blending: sheet.opacity < 1
+        }
+
+        // Inside the sheet, so a theme switch carries the passage with the slide, zoom or scan; a sheet with no tokens draws none.
+        Loader {
+            id: passageLoader
+            y: -sheet.cut
+            width: paper.width
+            height: paper.height
+            active: sheet.tokens !== null && paper.passage !== null && paper.passage.text !== null
+
+            sourceComponent: PaperPassage {
+                tokens: sheet.tokens
+                passage: paper.passage
+            }
         }
     }
 }

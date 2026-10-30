@@ -37,7 +37,7 @@ ShellRoot {
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
         pinentry = compiled("Pinentry.qml").createObject(root, { surfaces: surfacesLoader });
         portal = compiled("Portal.qml").createObject(root, { surfaces: surfacesLoader });
-        passage = compiled("Passage.qml").createObject(root, { theme: themeService });
+        passage = compiled("Passage.qml").createObject(root, { theme: themeService, papers: papers });
         warmStart.start();
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,
@@ -113,6 +113,7 @@ ShellRoot {
             required property var modelData
             screen: modelData
             theme: themeService
+            passage: root.passage
             onFirstFrame: {
                 if (root.firstFrameMs !== null)
                     return;

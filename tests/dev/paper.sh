@@ -23,12 +23,13 @@ paper_layer() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-paper" 
 until_ok 3000 paper_layer
 check "dots-paper is on the Background layer" paper_layer
 
-geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) - 5),\(.y + (.height / 2 | floor) - 5) 10x10"')
+# Mid-height near the left edge, clear of the margins and of the day's passage at the centre.
+geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + 20),\(.y + (.height / 2 | floor) - 5) 10x10"')
 read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
-echo "     centre $geo: $r $g $b"
+echo "     paper $geo: $r $g $b"
 near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
 centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
-check "the output centre is #F1E9D8" centre_is_paper
+check "the output's paper is #F1E9D8" centre_is_paper
 
 # A colour the theme check refuses leaves the last good paper on screen, never black.
 tokens=$XDG_STATE_HOME/dots/theme-out/shell.json

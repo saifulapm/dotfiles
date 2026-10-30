@@ -9,6 +9,8 @@ Scope {
     id: passage
 
     required property var theme
+    // Each output's paper; state reads what each one's sheets drew.
+    required property var papers
     readonly property string backend: Quickshell.env("DOTS_DEEN") || "deen"
     // The date the IPC set; "" is today.
     property string pinned: ""
@@ -78,6 +80,8 @@ Scope {
         function state(): string {
             const p = passage.pick;
             const t = passage.text;
+            const drawn = passage.papers.instances.map(paper => paper.passageDrawn());
+            const shown = drawn.length && drawn[0].length ? drawn[0][0] : null;
             return JSON.stringify({
                 day: p ? p.day : null,
                 date: p ? p.date : "",
@@ -87,7 +91,10 @@ Scope {
                 ref: passage.voiced ? passage.voiced.ref : "",
                 label: passage.voiced ? passage.voiced.label : "",
                 ar: t ? t.ar : "",
-                en: t ? t.en : ""
+                en: t ? t.en : "",
+                family: shown ? shown.family : null,
+                // Per output, what each of its sheets draws; one entry each once a theme switch settles.
+                drawn: drawn
             });
         }
 

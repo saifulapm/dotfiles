@@ -98,3 +98,46 @@ export function voiced(voice, kind, ref) {
   if (voice === 'bracket') return { label: `[${kind.toUpperCase()}]`, ref: ref.toUpperCase() };
   return { label: kind.toUpperCase(), ref };
 }
+
+// Each theme's passage as its board draws it, in logical pixels on a 2048 px wide output: Paper's epigraph, Artboard's selected card, Blueprint's drawing with crop marks.
+export function look(tokens) {
+  const c = tokens.color;
+  const t = tokens.type;
+  if (t.voice === 'plain') {
+    return {
+      frame: 'card',
+      width: 992,
+      pad: [64, 77, 51],
+      gap: 29,
+      label: { font: t.ui, size: 18, spacing: 0, color: c.accent },
+      ar: { size: 74, align: 'right', glow: '' },
+      en: { font: t.ui, size: 29, italic: false, height: 1.55, align: 'left' },
+      rule: { width: -1, color: c.line },
+      ref: { font: t.ui, size: 19, spacing: 0, color: c.muted, align: 'left', dimension: false },
+    };
+  }
+  if (t.voice === 'bracket') {
+    return {
+      frame: 'marks',
+      width: 1024,
+      pad: [58, 64, 58],
+      gap: 29,
+      label: { font: t.ui, size: 18, spacing: 3, color: c.danger },
+      ar: { size: 77, align: 'right', glow: c.accent },
+      en: { font: t.ui, size: 27, italic: false, height: 1.6, align: 'left' },
+      rule: null,
+      ref: { font: t.ui, size: 18, spacing: 3.6, color: c.accent, align: 'center', dimension: true },
+    };
+  }
+  return {
+    frame: 'none',
+    width: 1024,
+    pad: [0, 0, 0],
+    gap: 35,
+    label: { font: t.ui, size: 18, spacing: 5, color: c.accent },
+    ar: { size: 86, align: 'center', glow: '' },
+    en: { font: t.display, size: 51, italic: true, height: 1.25, align: 'center' },
+    rule: { width: 48, color: c.ink },
+    ref: { font: t.display, size: 27, spacing: 0, color: c.muted, align: 'center', dimension: false },
+  };
+}
