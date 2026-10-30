@@ -123,6 +123,16 @@ pw-cli destroy "$(node_id node.name bare-stream)" >/dev/null
 until_ok 3000 rows_are '["Test Player"]'
 check "the stream ending removes its row" rows_are '["Test Player"]'
 check "the selection stays on a row that exists" state_is '.selected < (.rows | length)'
+
+# Apps sit above the inputs, so an app starting or stopping shifts the input rows; the selection keeps its row, and the last row going leaves it on the new last.
+selected_is() { state_is --arg t "$1" '.rows[.selected] == $t'; }
+until_ok 3000 select_row "Dots null source"
+play '{ application.name = "Late Player" node.name = late-player }'
+until_ok 3000 rows_are '["Late Player","Test Player"]'
+check "an app starting keeps the selection on Dots null source" selected_is "Dots null source"
+kill "${players[-1]}"
+until_ok 3000 rows_are '["Test Player"]'
+check "an app stopping keeps it on Dots null source" selected_is "Dots null source"
 timeout 0.5 qs ipc call control close
 check "the live default sink is still ${live_before#*= }" test "$(live_sink)" = "$live_before"
 exit $((fails > 0))

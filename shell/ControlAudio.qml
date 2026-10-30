@@ -64,8 +64,22 @@ Item {
                     device: deviceOf(e.node) ? A.deviceParts(deviceOf(e.node), direction(e.node), cardDevice(e.node)) : []
                 }))
 
-    // An app that stops takes its row, so the selection never points past the last.
-    onRowsChanged: selected = Math.min(selected, Math.max(0, rows.length - 1))
+    // The selected row's node, so an app starting or stopping above it never moves the cursor onto another row; once its node goes, the cursor stays put, never past the last row.
+    property var held: null
+    property bool placing: false
+    onSelectedChanged: {
+        if (!placing)
+            held = entries[selected]?.node ?? null;
+    }
+    onEntriesChanged: {
+        const at = entries.findIndex(e => e.node === held);
+        placing = true;
+        selected = at >= 0 ? at : Math.min(selected, Math.max(0, entries.length - 1));
+        placing = false;
+        // A moving app is between links for a moment, its row gone and its node still there, so the cursor waits to come back to it.
+        if (at < 0 && !streams.includes(held))
+            held = entries[selected]?.node ?? null;
+    }
     onVisibleChanged: readDevices()
     onNodeIdsChanged: readDevices()
 

@@ -116,9 +116,9 @@ until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
   kill -0 "$pw" 2>/dev/null || { cat "$D/pipewire.log" >&2; exit 1; }
   sleep 0.02
 done
-# A check that sets DOTS_DEV_WIREPLUMBER=1 gets a session manager that links streams, off the live bus and with the repo's profile in place of the live user config.
+# A check that sets DOTS_DEV_WIREPLUMBER=1 gets a session manager that links streams, with the repo's profile in place of the live user config; both buses point nowhere, since an unset session bus falls back to the live one at $XDG_RUNTIME_DIR/bus.
 if [ "${DOTS_DEV_WIREPLUMBER:-}" = 1 ]; then
-  env -u DBUS_SESSION_BUS_ADDRESS XDG_CONFIG_HOME="$repo/dev" wireplumber -p dots-dev 2>"$D/wireplumber.log" &
+  DBUS_SESSION_BUS_ADDRESS=unix:path=$D/no-bus DBUS_SYSTEM_BUS_ADDRESS=unix:path=$D/no-bus XDG_CONFIG_HOME="$repo/dev" wireplumber -p dots-dev 2>"$D/wireplumber.log" &
   wp=$!
 fi
 
