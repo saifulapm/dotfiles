@@ -44,12 +44,15 @@ wtype -k Escape
 until_ok 2000 mode_is rest
 check "Esc puts it away too" mode_is rest
 
-notify-send "brief"
+# Mod+I's focus pauses the hold, so the notification leaves by its app closing it.
+id=$(notify-send -p "brief")
 until_ok 2000 mode_is notification
 mod_i
 until_ok 2000 island_focus Exclusive
-until_ok 7000 mode_is rest
-check "a notification whose 5 s run out while focused gives the keyboard back" island_focus None
+gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
+  --method org.freedesktop.Notifications.CloseNotification "$id" >/dev/null
+until_ok 2000 mode_is rest
+check "a notification its app closes while focused gives the keyboard back" island_focus None
 
 exit $((fails > 0))
 }

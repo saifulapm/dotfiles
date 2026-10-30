@@ -156,7 +156,9 @@ PanelWindow {
     readonly property var chipLook: V.chipLook(theme.tokens)
     // True from a drag's start to its drop; the toast holds while it is. Drag.active falls as the platform drag takes the pointer, so its start and finish set this.
     property bool noteDragging: false
-    onNoteDraggingChanged: notifs.drag(noteDragging)
+    // The notification's hold waits while the pointer is on the box, Mod+I focuses it or a drag holds it.
+    readonly property bool noteHeld: mode === "notification" && (noteArea.containsMouse || focused || noteDragging)
+    onNoteHeldChanged: notifs.pause(noteHeld)
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
@@ -2520,6 +2522,7 @@ PanelWindow {
             id: noteArea
             anchors.fill: parent
             enabled: island.mode === "notification"
+            hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
             onClicked: mouse => mouse.button === Qt.RightButton ? island.putAway() : island.openNotification()

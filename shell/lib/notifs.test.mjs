@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -157,4 +157,10 @@ test('a normal notification, a critical with its own timeout, or no notification
 test('the notification taking the island leaves the set-aside ones, as a replace of itself does', () => {
   assert.deepEqual(setAside([critical(1), critical(2)], null, 'k1').map((e) => e.key), ['k2']);
   assert.deepEqual(setAside([], critical(1), 'k1'), []);
+});
+
+test('a paused hold resumes with the time it had left, at least 1.5 s', () => {
+  assert.equal(resumeMs(3200), 3200);
+  assert.equal(resumeMs(400), 1500);
+  assert.equal(resumeMs(-20), 1500);
 });

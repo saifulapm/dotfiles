@@ -12,6 +12,9 @@ export function setAside(waiting, leaving, arriving) {
   return kept.sort((a, b) => b.time - a.time);
 }
 
+// A hold paused under the pointer or Mod+I gets back what it had left, but never less than 1.5 s to read it once let go.
+export const resumeMs = (left) => Math.max(left, 1500);
+
 export const addEntry = (history, entry) => [entry].concat(history).slice(0, LIMIT);
 
 const isEntry = (e) =>

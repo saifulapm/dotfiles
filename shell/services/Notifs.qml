@@ -19,6 +19,10 @@ Scope {
     property bool dnd: false
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})
+    // While the pointer is on the island, Mod+I focuses it or a drag holds it, the hold waits with the ms it has left; 0 is until dismissed.
+    property bool paused: false
+    property real left: 0
+    property real holdUntil: 0
 
     function entry(n) {
         return {
@@ -72,17 +76,30 @@ Scope {
         waiting = N.setAside(waiting, current, e.key);
         current = e;
         hold.stop();
-        hold.interval = N.holdMs(e);
-        if (hold.interval > 0)
-            hold.start();
+        left = N.holdMs(e);
+        run();
     }
 
-    // A drag out of the toast holds it: Drag.Automatic runs its own event loop, where the hold would still fire, so its time starts again at the drop.
-    function drag(on) {
-        if (on)
+    function run() {
+        if (paused || left <= 0)
+            return;
+        hold.interval = left;
+        holdUntil = Date.now() + left;
+        hold.start();
+    }
+
+    // The island pauses the hold for the pointer, Mod+I and a drag: Drag.Automatic runs its own event loop, where the hold would still fire.
+    function pause(on) {
+        if (on === paused)
+            return;
+        paused = on;
+        if (on && hold.running) {
             hold.stop();
-        else if (current && hold.interval > 0)
-            hold.restart();
+            left = holdUntil - Date.now();
+        } else if (!on && current && left > 0) {
+            left = N.resumeMs(left);
+            run();
+        }
     }
 
     // Closed by its app, or dismissed here: it never comes back, and the island goes to the next waiting critical or rests.
