@@ -84,6 +84,8 @@ PanelWindow {
     property bool leaseOpen: false
     readonly property var leaseCard: leaseOpen ? lease : null
     property var osd: null
+    // A paired device that just connected, {name, address, battery}, for its 2 s.
+    property var btConnect: null
     property var toast: null
     // dots-capture's result, {kind, title, detail, swatch}, for the toast's 1.5 s.
     property var capture: null
@@ -130,6 +132,7 @@ PanelWindow {
             mic,
             recording,
             osd,
+            btConnect,
             toast,
             capture,
             sending,

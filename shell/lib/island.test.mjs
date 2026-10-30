@@ -299,3 +299,12 @@ test('the mic slot shows right after sharing, above the lease and the recording 
   assert.equal(pick({ mic: null, recording: '00:01' }), 'recording');
   assert.equal(isCompact('mic'), true);
 });
+
+test('a device connecting shows right after the OSD, compact, as its connect text', () => {
+  const btConnect = { name: 'AirPods', address: 'A', battery: 0.8 };
+  assert.equal(pick({ osd: { kind: 'volume', value: 1 }, btConnect }), 'osd');
+  assert.equal(pick({ recording: '00:01', btConnect }), 'recording');
+  assert.equal(pick({ btConnect, toast: 'Captured', playing: { title: 't' } }), 'btConnect');
+  assert.equal(islandText('btConnect', { btConnect }, AT), 'AirPods connected · 80%');
+  assert.equal(isCompact('btConnect'), true);
+});

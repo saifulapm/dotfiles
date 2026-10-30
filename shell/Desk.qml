@@ -45,6 +45,11 @@ Scope {
         id: networkService
     }
 
+    Services.BluetoothStates {
+        id: btService
+        dnd: desk.notifs.dnd
+    }
+
     Services.Osd {
         id: osdService
     }
@@ -143,6 +148,7 @@ Scope {
         questions: questionsService
         lock: desk.lock
         osd: osdService.current
+        btConnect: btService.current
         playing: mediaService.playing
     }
 

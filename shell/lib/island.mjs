@@ -1,11 +1,12 @@
 // Pure pieces of the island, kept here so node can test them.
 
 import { clockText } from './margins.mjs';
+import { connectText } from './bluetooth.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'toast', 'capture', 'sending', 'playing'];
+// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening, and a device's connect state right after the OSD (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
+const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'btConnect', 'toast', 'capture', 'sending', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -98,6 +99,8 @@ export function islandText(mode, slots, now) {
       return `REC ${slots.recording}`;
     case 'osd':
       return `${slots.osd.kind === 'volume' ? 'Volume' : 'Brightness'} ${slots.osd.value}%`;
+    case 'btConnect':
+      return connectText(slots.btConnect);
     case 'calendar':
       return monthGrid(slots.calendar.year, slots.calendar.month).title;
     case 'toast':
@@ -132,7 +135,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'mic', 'recording', 'toast', 'capture'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'mic', 'recording', 'btConnect', 'toast', 'capture'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;

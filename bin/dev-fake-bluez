@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them, and a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device; Pair plays the device's request against the registered agent, and org.dots.FakeBluez on /org/bluez sets that request (SetPairing), types a shown passkey on the device, right (Typed) or wrong (Mistyped), asks for a service (Authorize), lists what agents did (Calls) and what was asked of BlueZ (Methods).
+# A BlueZ adapter hci0 with a paired "Test Headphones" and a new "Test Speaker" on $DBUS_SYSTEM_BUS_ADDRESS; Connect, Disconnect, Pair and RemoveDevice change them, and a scan finds Test Mouse, Test Keyboard, Test Phone and a nameless device; Pair plays the device's request against the registered agent, and org.dots.FakeBluez on /org/bluez sets that request (SetPairing), types a shown passkey on the device, right (Typed) or wrong (Mistyped), asks for a service (Authorize), sets a device's battery (SetBattery), lists what agents did (Calls) and what was asked of BlueZ (Methods).
 import os
 import sys
 
@@ -113,6 +113,19 @@ class Device(Object):
         self.extra[BATTERY] = props
         self.root.InterfacesAdded(dbus.ObjectPath(self.path), {BATTERY: dbus.Dictionary(props, signature="sv")})
         return False
+
+    # A percentage below 0 is a device that reports no battery; a connected one reports the new one at once, on Battery1 as BlueZ does.
+    def set_battery(self, pct):
+        self.battery = None if pct < 0 else pct
+        if self.battery is None:
+            if BATTERY in self.extra:
+                del self.extra[BATTERY]
+                self.root.InterfacesRemoved(dbus.ObjectPath(self.path), dbus.Array([BATTERY], signature="s"))
+        elif BATTERY in self.extra:
+            self.extra[BATTERY]["Percentage"] = dbus.Byte(pct)
+            self.PropertiesChanged(BATTERY, dbus.Dictionary({"Percentage": dbus.Byte(pct)}, signature="sv"), dbus.Array([], signature="s"))
+        elif self.props["Connected"] and self.battery_timer is None:
+            self.add_battery()
 
     # BlueZ answers Pair only once the agent has answered the request the device makes, as each kind of device makes one.
     @dbus.service.method(DEVICE, async_callbacks=("ok", "fail"))
@@ -312,6 +325,10 @@ class Manager(dbus.service.Object):
         if self.root.agent is None:
             return ok("no agent")
         self.root.agent.AuthorizeService(path, uuid, reply_handler=lambda: ok("allowed"), error_handler=lambda e: ok(e.get_dbus_name()), timeout=120)
+
+    @dbus.service.method(KNOB, in_signature="oi")
+    def SetBattery(self, path, pct):
+        self.root.objects[str(path)].set_battery(int(pct))
 
     @dbus.service.method(KNOB, out_signature="as")
     def Calls(self):

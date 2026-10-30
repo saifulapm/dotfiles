@@ -119,6 +119,9 @@ until_ok 3000 prop_is "$mouse" Connected true
 check "typed on the device, Test Mouse pairs and connects" prop_is "$mouse" Connected true
 until_ok 3000 no_question
 check "and the question goes" no_question
+# A paired device connecting shows its 2 s connect state, which a toast waits behind.
+no_connect() { ! island_is '.mode == "btConnect"'; }
+until_ok 3000 no_connect
 
 # A code typed wrong on the device fails the pair, and BlueZ sends no Cancel, so the shell drops the dead question itself.
 knob SetPairing osu "$phone" display 111111
