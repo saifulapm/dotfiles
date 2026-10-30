@@ -9,7 +9,7 @@ import "../lib/notifs.mjs" as N
 Scope {
     id: notifs
 
-    // The island's notification slot, null while none shows; it holds for its app's timeout, 5 s by default.
+    // The island's notification slot, null while none shows; it holds for its app's rule or timeout, 5 s by default.
     property var current: null
     // Undismissed criticals a newer notification took the island from, newest first; each comes back once the island is free.
     property var waiting: []
@@ -17,7 +17,7 @@ Scope {
     property var history: []
     // While on, a notification goes to the history only, and the island stays at rest; a critical one, or one from an app let through, still shows.
     property bool dnd: false
-    // Per-app rules by exact app name, set from Mod+A: a muted app's notifications go to the history only, criticals too; dnd lets an app through Do Not Disturb.
+    // Per-app rules by exact app name, set from Mod+A: a muted app's notifications go to the history only, criticals too; dnd lets an app through Do Not Disturb; stays holds it 3 s, 10 s or until dismissed (0), over its own timeout.
     property var rules: ({})
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})
@@ -59,6 +59,10 @@ Scope {
         rules = N.toggle(rules, app, field);
     }
 
+    function cycleStay(app) {
+        rules = N.cycleStay(rules, app);
+    }
+
     function remember(e, n) {
         history = N.addEntry(history, e);
         const kept = {};
@@ -79,10 +83,10 @@ Scope {
     function show(e) {
         if (!N.shows(e, rules[e.app], dnd))
             return;
-        waiting = N.setAside(waiting, current, e.key);
+        waiting = N.setAside(waiting, current, e.key, rules);
         current = e;
         hold.stop();
-        left = N.holdMs(e);
+        left = N.holdMs(e, rules[e.app]);
         run();
     }
 
@@ -103,7 +107,7 @@ Scope {
             hold.stop();
             left = holdUntil - Date.now();
         } else if (!on && current) {
-            left = N.resumeMs(current, left);
+            left = N.resumeMs(current, left, rules[current.app]);
             run();
         }
     }

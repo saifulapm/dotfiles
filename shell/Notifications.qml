@@ -82,6 +82,12 @@ Item {
             notifs.toggleRule(row.entry.app, field);
     }
 
+    function cycleStay() {
+        const row = rows[selected];
+        if (row)
+            notifs.cycleStay(row.entry.app);
+    }
+
     function dismiss() {
         const row = rows[selected];
         if (row)
@@ -159,7 +165,7 @@ Item {
 
     visible: motion.drawing
 
-    // Holds focus while the list is in use, where plain j/k move and d, D, m, i and / act.
+    // Holds focus while the list is in use, where plain j/k move and d, D, m, i, s and / act.
     Item {
         id: keys
         anchors.fill: parent
@@ -179,6 +185,8 @@ Item {
                 centre.toggleRule("muted");
             else if (event.key === Qt.Key_I)
                 centre.toggleRule("dnd");
+            else if (event.key === Qt.Key_S)
+                centre.cycleStay();
             else if (event.key === Qt.Key_Slash)
                 input.forceActiveFocus();
             else if (event.key === Qt.Key_Escape)

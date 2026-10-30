@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-app rules from Mod+A on the selected row's app, by its exact name: m mutes it, i lets it through Do Not Disturb.
+# Per-app rules from Mod+A on the selected row's app, by its exact name: m mutes it, i lets it through Do Not Disturb, s sets how long it stays.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -79,6 +79,44 @@ check "a U notification under Do Not Disturb keeps the island at rest" sent_rest
 notify-send -a T d1
 check "a T one shows" until_ok 2000 shows d1
 timeout 0.5 qs ipc call notifs dnd false >/dev/null
+until_ok 7000 mode_is rest
+
+heads=()
+for _ in 1 2 3 4; do
+  key_on_newest -k s
+  heads+=("$(jq -r '.heads[0].text' <<<"$seen")")
+done
+check "s four times: 3 s, 10 s, until dismissed, then no stay ($(printf '%s; ' "${heads[@]}"))" \
+  test "${heads[*],,}" = "t · 3 · through dnd · stays 3 s t · 3 · through dnd · stays 10 s t · 3 · through dnd · stays until dismissed t · 3 · through dnd"
+key_on_newest -k s -k s -k m
+check "all three on one app ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 3 · muted · through dnd · stays 10 s"
+key_on_newest -k m
+
+# Each held time runs from the state read as it showed to the shell's mode change back to rest.
+held_since() { echo $(($(island | jq .since) - $1)); }
+notify-send -t 2000 -a T z
+until_ok 2000 shows z
+since=$(island | jq .since)
+until_ok 12000 mode_is rest
+held=$(held_since "$since")
+check "with stays 10 s, -t 2000 holds 10 s (${held} ms)" test "$held" -ge 9900 -a "$held" -le 10500
+
+key_on_newest -k s
+notify-send -a T z2
+until_ok 2000 shows z2
+sleep 15
+check "with stays until dismissed, it is still shown after 15 s" shows z2
+key_on_newest -k d
+check "d in Mod+A dismisses it" until_ok 2000 mode_is rest
+
+key_on_newest -k s -k s
+check "s twice more: stays 3 s ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 4 · through dnd · stays 3 s"
+notify-send -t 0 -a T w2
+until_ok 2000 shows w2
+since=$(island | jq .since)
+until_ok 5000 mode_is rest
+held=$(held_since "$since")
+check "with stays 3 s, -t 0 leaves after 3 s (${held} ms)" test "$held" -ge 2900 -a "$held" -le 3500
 
 exit $((fails > 0))
 }

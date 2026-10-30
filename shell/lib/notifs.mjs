@@ -2,34 +2,51 @@
 
 export const LIMIT = 200;
 
-// How long an entry holds the island in ms, 0 until dismissed: its app's expireTimeout, where -1 asks for the default, 5 s or until dismissed for a critical.
-export const holdMs = (entry) => (entry.timeout >= 0 ? entry.timeout : entry.critical ? 0 : 5000);
+// How long an entry holds the island in ms, 0 until dismissed: its app's rule, then its expireTimeout, where -1 asks for the default, 5 s or until dismissed for a critical.
+export const holdMs = (entry, rule) => (rule?.stays >= 0 ? rule.stays : entry.timeout >= 0 ? entry.timeout : entry.critical ? 0 : 5000);
 
 // The undismissed criticals waiting to take the island back, newest first: the one leaving joins them when it stays until dismissed, and the one arriving leaves them.
-export function setAside(waiting, leaving, arriving) {
+export function setAside(waiting, leaving, arriving, rules = {}) {
   const kept = waiting.filter((e) => e.key !== arriving);
-  if (leaving && leaving.key !== arriving && leaving.critical && holdMs(leaving) === 0) kept.push(leaving);
+  if (leaving && leaving.key !== arriving && leaving.critical && holdMs(leaving, rules[leaving.app]) === 0) kept.push(leaving);
   return kept.sort((a, b) => b.time - a.time);
 }
 
 // A hold paused under the pointer or Mod+I gets back what it had left, but never less than 1.5 s to read it once let go; one paused as its Tick was due has 0 or less left. 0 is until dismissed.
-export const resumeMs = (entry, left) => (holdMs(entry) > 0 ? Math.max(left, 1500) : 0);
+export const resumeMs = (entry, left, rule) => (holdMs(entry, rule) > 0 ? Math.max(left, 1500) : 0);
 
 // Whether an entry takes the island, given its app's rule: a muted app's never do, criticals included; under Do Not Disturb only criticals and apps let through do.
 export const shows = (entry, rule, dnd) => !rule?.muted && (!dnd || entry.critical || rule?.dnd === true);
 
 // Rules key on the exact app name; a rule left with nothing on is dropped.
-export function toggle(rules, app, field) {
-  const rule = Object.assign({}, rules[app]);
-  if (rule[field]) delete rule[field];
-  else rule[field] = true;
+function withRule(rules, app, rule) {
   const kept = Object.assign({}, rules);
   if (Object.keys(rule).length > 0) kept[app] = rule;
   else delete kept[app];
   return kept;
 }
 
-export const ruleText = (rule) => (rule?.muted ? ' · muted' : '') + (rule?.dnd ? ' · through DND' : '');
+export function toggle(rules, app, field) {
+  const rule = Object.assign({}, rules[app]);
+  if (rule[field]) delete rule[field];
+  else rule[field] = true;
+  return withRule(rules, app, rule);
+}
+
+// How long an app stays, in the order s cycles it; 0 is until dismissed, and past the last the app's own time comes back.
+const STAYS = [3000, 10000, 0];
+
+export function cycleStay(rules, app) {
+  const rule = Object.assign({}, rules[app]);
+  const next = STAYS[STAYS.indexOf(rule.stays) + 1];
+  if (next === undefined) delete rule.stays;
+  else rule.stays = next;
+  return withRule(rules, app, rule);
+}
+
+const stayText = (ms) => (ms === 0 ? 'until dismissed' : ms / 1000 + ' s');
+
+export const ruleText = (rule) => (rule?.muted ? ' · muted' : '') + (rule?.dnd ? ' · through DND' : '') + (rule?.stays >= 0 ? ' · stays ' + stayText(rule.stays) : '');
 
 export const addEntry =(history, entry) => [entry].concat(history).slice(0, LIMIT);
 

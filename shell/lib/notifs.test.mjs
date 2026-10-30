@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, ruleText } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -205,4 +205,37 @@ test('i lets an app through Do Not Disturb beside its mute, and the heading name
   assert.equal(ruleText(both.T), ' · muted · through DND');
   assert.equal(ruleText({ dnd: true }), ' · through DND');
   assert.deepEqual(toggle(both, 'T', 'muted'), { T: { dnd: true } });
+});
+
+test('s cycles how long an app stays: 3 s, 10 s, until dismissed, then its own time again', () => {
+  const stays = [];
+  let rules = {};
+  for (let i = 0; i < 4; i++) {
+    rules = cycleStay(rules, 'T');
+    stays.push(ruleText(rules.T));
+  }
+  assert.deepEqual(stays, [' · stays 3 s', ' · stays 10 s', ' · stays until dismissed', '']);
+  assert.deepEqual(rules, {});
+});
+
+test('a rule that sets all three reads mute, Do Not Disturb, then the stay', () => {
+  assert.equal(ruleText({ muted: true, dnd: true, stays: 10000 }), ' · muted · through DND · stays 10 s');
+});
+
+test('the stay of a rule beats the timeout the app sent, on a critical too', () => {
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 2000 }), { stays: 10000 }), 10000);
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 0 }), { stays: 3000 }), 3000);
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 2000 }), { stays: 0 }), 0);
+  assert.equal(holdMs(critical(1), { stays: 3000 }), 3000);
+  assert.equal(holdMs(Object.assign(entry(1), { timeout: 2000 }), { muted: true }), 2000);
+});
+
+test('a critical whose app stays 3 s is not set aside, and one whose app stays until dismissed is', () => {
+  assert.deepEqual(setAside([], critical(1), 'k2', { 'notify-send': { stays: 3000 } }), []);
+  assert.deepEqual(setAside([], Object.assign(critical(1), { timeout: 3000 }), 'k2', { 'notify-send': { stays: 0 } }).map((e) => e.key), ['k1']);
+});
+
+test('a paused hold resumes by the stay of its app', () => {
+  assert.equal(resumeMs(Object.assign(entry(1), { timeout: 0 }), 400, { stays: 3000 }), 1500);
+  assert.equal(resumeMs(Object.assign(entry(1), { timeout: 2000 }), 400, { stays: 0 }), 0);
 });
