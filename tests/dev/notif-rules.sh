@@ -118,6 +118,26 @@ until_ok 5000 mode_is rest
 held=$(held_since "$since")
 check "with stays 3 s, -t 0 leaves after 3 s (${held} ms)" test "$held" -ge 2900 -a "$held" -le 3500
 
+# A long app name elides before its rule, so the heading still ends with it.
+long=$(printf 'long%.0s' {1..40})
+notify-send -t 1 -a "$long" l1
+until_ok 2000 listed l1
+until_ok 2000 mode_is rest
+key_on_newest -k m
+long_head() { jq -e '. as $s | any(.heads[]; (.text | ascii_downcase | startswith("long")) and .elided and .rule == " · muted" and .ruleRight <= $s.cardRight)' <<<"$seen" >/dev/null; }
+check "a long app name elides and its · muted is drawn whole ($(jq -c '[.heads[] | {text: .text[-12:], elided, rule, ruleRight}] + [{cardRight}]' <<<"$seen"))" long_head
+
+# Criticals set aside come back newest first; a muted app's is passed over, not left blocking the older one.
+notify-send -u critical -a D d2
+until_ok 2000 shows d2
+notify-send -u critical -a C c1
+until_ok 2000 shows c1
+notify-send -a N n1
+until_ok 2000 shows n1
+key_on_newest -k j -k m
+check "j, m on the C row mutes C ($(notifs | jq -c .rules.C))" state_is '.rules.C.muted'
+check "as N leaves, D's critical comes back past the muted C's" until_ok 7000 shows d2
+
 store=$XDG_STATE_HOME/dots/notifications.json
 store_is() { jq -e "$1" "$store" >/dev/null; }
 check "notifications.json holds rules with key T beside dnd ($(jq -c .rules "$store"))" store_is '(.rules.T == {dnd: true, stays: 3000}) and (.rules.slack == {muted: true}) and has("dnd")'

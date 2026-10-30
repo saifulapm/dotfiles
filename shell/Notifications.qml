@@ -39,7 +39,8 @@ Item {
     // One row per entry in group order; the first of each group carries its header.
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
                         entry: e,
-                        head: i === 0 ? look.groupHead(g.app, g.entries.length) + Lib.ruleText(notifs.rules[g.app]) : ""
+                        head: i === 0 ? look.groupHead(g.app, g.entries.length) : "",
+                        rule: i === 0 ? Lib.ruleText(notifs.rules[g.app]) : ""
                     }))), [])
 
     function open(t0) {
@@ -133,7 +134,9 @@ Item {
                         text: d.headItem.text,
                         elided: d.headItem.truncated,
                         lines: d.headItem.lineCount,
-                        right: d.headItem.mapToItem(null, d.headItem.width, 0).x
+                        right: d.headItem.mapToItem(null, d.headItem.width, 0).x,
+                        rule: d.headItem.rule.text,
+                        ruleRight: d.headItem.rule.mapToItem(null, d.headItem.rule.width - d.headItem.rule.rightPadding, 0).x
                     })),
             cardRight: box(card).x + card.width,
             openMs: openMs,
@@ -385,22 +388,45 @@ Item {
                         readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
                         width: list.width
 
-                        // An app name can be any length; it elides inside the card.
-                        Text {
+                        // An app name can be any length; it elides inside the card, before its rule.
+                        Item {
                             id: headLabel
-                            textFormat: Text.PlainText
+                            readonly property string text: headName.text + headRule.text
+                            readonly property bool truncated: headName.truncated
+                            readonly property int lineCount: headName.lineCount
+                            readonly property Text rule: headRule
                             visible: item.modelData.head !== ""
                             width: parent.width
-                            elide: Text.ElideRight
-                            rightPadding: 20
-                            leftPadding: 20
-                            topPadding: 10
-                            bottomPadding: 4
-                            text: item.modelData.head
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: look.small.size
-                            font.letterSpacing: look.small.spacing
+                            implicitHeight: headName.implicitHeight
+
+                            Text {
+                                id: headName
+                                textFormat: Text.PlainText
+                                width: Math.min(implicitWidth, parent.width - headRule.implicitWidth)
+                                elide: Text.ElideRight
+                                leftPadding: 20
+                                topPadding: 10
+                                bottomPadding: 4
+                                text: item.modelData.head
+                                color: look.small.color
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
+
+                            Text {
+                                id: headRule
+                                textFormat: Text.PlainText
+                                x: headName.width
+                                rightPadding: 20
+                                topPadding: 10
+                                bottomPadding: 4
+                                text: item.modelData.rule
+                                color: look.small.color
+                                font.family: look.small.font
+                                font.pixelSize: look.small.size
+                                font.letterSpacing: look.small.spacing
+                            }
                         }
 
                         // The launcher's cursor row: Paper's runs edge to edge, the others sit inset as tiles.
