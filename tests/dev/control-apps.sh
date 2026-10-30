@@ -107,6 +107,17 @@ check "Enter again moves it back to Dots null sink" links_null
 until_ok 2000 detail_is "Test Player" "Dots null sink · 35%"
 check "the detail names Dots null sink" detail_is "Test Player" "Dots null sink · 35%"
 
+# The nested PipeWire holds no device, so p and r on an output with none, or on an app, change nothing.
+until_ok 3000 select_row "Dots null sink"
+before=$(control_state | jq -c '[.rows, .detailsDrawn]')
+wtype p
+wtype r
+until_ok 3000 select_row "Test Player"
+wtype p
+wtype r
+sleep 0.5
+check "p and r change no row without a device" test "$(control_state | jq -c '[.rows, .detailsDrawn]')" = "$before"
+
 until_ok 3000 select_row "Bare stream"
 pw-cli destroy "$(node_id node.name bare-stream)" >/dev/null
 until_ok 3000 rows_are '["Test Player"]'

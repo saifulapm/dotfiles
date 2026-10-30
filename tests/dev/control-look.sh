@@ -36,13 +36,13 @@ check "paper: the cursor row draws ink across its width ($row_ink of 1600 px)" t
 marker=$(near "$(box_geo cursorBox 0 4 50 30)" 200 56 30 40)
 check "paper: the cursor row's ▸ marker is #C8381E ($marker px)" test "$marker" -gt 6 -a "$marker" -lt 200
 check "paper: the legend is tracked caps ($(control_state | jq -c .legend))" state_is '.legend == "TAB SECTION  J/K MOVE  ESC CLOSE" and .legendSpacing > 1'
-check "paper: the section hint reads in caps ($(control_state | jq -c .hint))" state_is '.hint == "H/L VOLUME · ↵ DEFAULT · M MUTE"'
+check "paper: the section hint reads in caps ($(control_state | jq -c .hint))" state_is '.hint == "H/L VOLUME · ↵ DEFAULT OR MOVE · M MUTE · P PROFILE · R PORT"'
 close_control
 
 in_theme artboard
 open_control
 check "artboard: the current tab is the #EEF1FF pill reading Audio ($(control_state | jq -c '[.tabFill, .tabText]'))" state_is '.tabFill == "#eef1ff" and .tabText == "Audio"'
-check "artboard: the section hint reads as written, not in caps ($(control_state | jq -c .hint))" state_is '.hint == "h/l volume · ↵ default · m mute"'
+check "artboard: the section hint reads as written, not in caps ($(control_state | jq -c .hint))" state_is '.hint == "h/l volume · ↵ default or move · m mute · p profile · r port"'
 pill=$(near "$(box_geo tabBox 2 6 6 8)" 238 241 255 3)
 check "artboard: the current tab draws the tint ($pill of 48 px)" test "$pill" -eq 48
 pill_corner=$(near "$(box_geo tabBox 0 0 2 2)" 255 255 255 3)

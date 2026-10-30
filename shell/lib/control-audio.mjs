@@ -68,7 +68,9 @@ export function nextRoute(device, direction, cardDevice) {
   return after(usable, activeRoute(device, direction, cardDevice)?.index);
 }
 
-// The profile and port a row's detail adds, as the device describes them.
+// The profile and port a row's detail adds, as the device describes them; ALSA describes HiFi as Default, which says nothing beside the row's own default.
 export function deviceParts(device, direction, cardDevice) {
-  return [device.profile?.description, activeRoute(device, direction, cardDevice)?.description].filter(Boolean);
+  const p = device.profile;
+  const profile = p && (p.description === 'Default' ? p.name : p.description);
+  return [profile, activeRoute(device, direction, cardDevice)?.description].filter(Boolean);
 }

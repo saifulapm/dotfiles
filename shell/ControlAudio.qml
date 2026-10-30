@@ -44,6 +44,10 @@ Item {
     readonly property PwNode currentSource: Pipewire.defaultAudioSource
     readonly property PwNode defaultSink: preferredSink ?? currentSink
     readonly property PwNode defaultSource: preferredSource ?? currentSource
+    // Every device's profiles and ports, by id, as pw-dump last read them; Quickshell has no API for either.
+    property var devices: ({})
+    // A profile change makes its device's nodes anew, so a new set of nodes is read again.
+    readonly property string nodeIds: all.map(n => n.id).join(",")
     readonly property var rows: entries.map(e => e.sink ? A.appRow({
                     title: A.appTitle(e.node.properties ?? {}),
                     sink: e.sink.description || e.sink.name,
@@ -55,11 +59,47 @@ Item {
                     isSink: e.node.isSink,
                     volume: e.node.audio.volume,
                     muted: e.node.audio.muted,
-                    isDefault: e.node === (e.node.isSink ? defaultSink : defaultSource)
+                    isDefault: e.node === (e.node.isSink ? defaultSink : defaultSource),
+                    device: deviceOf(e.node) ? A.deviceParts(deviceOf(e.node), direction(e.node), cardDevice(e.node)) : []
                 }))
 
     // An app that stops takes its row, so the selection never points past the last.
     onRowsChanged: selected = Math.min(selected, Math.max(0, rows.length - 1))
+    onVisibleChanged: readDevices()
+    onNodeIdsChanged: readDevices()
+
+    // Quickshell hands node properties over as strings.
+    function deviceOf(node) {
+        const id = node.properties?.["device.id"];
+        return id === undefined ? null : devices[id] ?? null;
+    }
+
+    function cardDevice(node) {
+        const d = node.properties?.["card.profile.device"];
+        return d === undefined ? null : Number(d);
+    }
+
+    function direction(node) {
+        return node.isSink ? "Output" : "Input";
+    }
+
+    function readDevices() {
+        if (visible)
+            dumper.running = true;
+    }
+
+    // p takes the device's id, r the node's own, which wpctl resolves to its device.
+    function cycleDevice(node, port) {
+        const device = deviceOf(node);
+        if (!device)
+            return false;
+        const index = port ? A.nextRoute(device, direction(node), cardDevice(node)) : A.nextProfile(device);
+        if (index === null)
+            return false;
+        setter.command = port ? ["wpctl", "set-route", String(node.id), String(index)] : ["wpctl", "set-profile", node.properties["device.id"], String(index)];
+        setter.running = true;
+        return true;
+    }
 
     function key(event) {
         const entry = entries[selected];
@@ -77,7 +117,9 @@ Item {
                 Pipewire.preferredDefaultAudioSink = node;
             else
                 Pipewire.preferredDefaultAudioSource = node;
-        } else
+        } else if (event.key === Qt.Key_P || event.key === Qt.Key_R)
+            return !entry.sink && cycleDevice(node, event.key === Qt.Key_R);
+        else
             return false;
         return true;
     }
@@ -109,6 +151,25 @@ Item {
         id: mover
     }
 
+    Process {
+        id: setter
+        onExited: audio.readDevices()
+    }
+
+    Process {
+        id: dumper
+        command: ["pw-dump"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    audio.devices = A.devices(JSON.parse(text));
+                } catch (e) {
+                    audio.devices = {};
+                }
+            }
+        }
+    }
+
     // A stream's properties, volume and mute, and a link's state, arrive only once bound, so they are bound while the section is drawn.
     PwObjectTracker {
         objects: audio.visible ? audio.streams.concat(Pipewire.linkGroups.values) : []
@@ -118,7 +179,7 @@ Item {
         id: hint
         textFormat: Text.PlainText
         leftPadding: 20
-        text: audio.look.tabText("h/l volume · ↵ default · m mute")
+        text: audio.look.tabText("h/l volume · ↵ default or move · m mute · p profile · r port")
         color: audio.look.small.color
         font.family: audio.look.small.font
         font.pixelSize: audio.look.small.size

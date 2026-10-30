@@ -73,6 +73,12 @@ test("r offers only available routes of the row's direction on its own card devi
 });
 
 test("a device row's detail adds its profile and port", () => {
-  assert.deepEqual(deviceParts(builtin[46], 'Output', 0), ['Default', 'Speakers']);
-  assert.deepEqual(deviceParts(builtin[46], 'Output', 1), ['Default']);
+  const bt = { profile: { name: 'a2dp-sink-aac', description: 'High Fidelity Playback (A2DP Sink, codec AAC)' }, active: [] };
+  assert.deepEqual(deviceParts(bt, 'Output', null), ['High Fidelity Playback (A2DP Sink, codec AAC)']);
+});
+
+// Beside the row's own default, a profile described as Default says nothing, so ALSA's HiFi reads by its name.
+test('a profile described as Default is named instead', () => {
+  assert.deepEqual(deviceParts(builtin[46], 'Output', 0), ['HiFi', 'Speakers']);
+  assert.deepEqual(deviceParts(builtin[46], 'Output', 1), ['HiFi']);
 });
