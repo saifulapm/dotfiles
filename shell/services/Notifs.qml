@@ -184,6 +184,11 @@ Scope {
         actionsSupported: true
         keepOnReload: false
         onNotification: n => {
+            // A transient one, such as an agent's ping, shows and is let go: no history, so no actions from Mod+A either.
+            if (n.transient) {
+                notifs.show(notifs.entry(n));
+                return;
+            }
             n.tracked = true;
             const e = notifs.entry(n);
             notifs.remember(e, n);

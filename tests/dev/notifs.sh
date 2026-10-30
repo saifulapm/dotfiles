@@ -42,5 +42,14 @@ check "the island ends showing the 20th" eval 'island | jq -e ".text | test(\"bu
 timeout 0.5 qs ipc call notifs clear
 check "clear empties the history" eval 'notifs | jq -e ".count == 0" >/dev/null'
 
+notify-send -e -a T blip
+until_ok 2000 eval 'island | jq -e ".text | test(\"blip\")" >/dev/null'
+check "a transient notification shows on the island" eval 'island | jq -e ".text | test(\"blip\")" >/dev/null'
+# A later notification's save is on disk, so one for blip would be too.
+notify-send -a T after
+store=$XDG_STATE_HOME/dots/notifications.json
+until_ok 2000 grep -q after "$store"
+check "and neither the history nor notifications.json holds it" eval '! notifs | jq -e "any(.summaries[]; . == \"blip\")" >/dev/null && ! grep -q blip "$store"'
+
 exit $((fails > 0))
 }
