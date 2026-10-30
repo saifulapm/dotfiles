@@ -45,7 +45,7 @@ PanelWindow {
     // Every niri cast but the shell's own recording; Do Not Disturb never hides it (2N83H6SJ).
     readonly property var shares: niri.shares(Root.State.recordingPid)
     readonly property var sharing: shares.length ? shares : null
-    // Every capture stream, and each link group into one, from the registry alone, so tracking them never changes the list (m53's lesson); a stream's properties and a link's state arrive only once tracked.
+    // Every capture stream, and each link group into one, from the registry alone, so tracking them never changes the list, which would loop; a stream's properties and a link's state arrive only once tracked.
     readonly property var captures: Pipewire.nodes.values.filter(n => n.type === PwNodeType.AudioInStream)
     readonly property var captureLinks: Pipewire.linkGroups.values.filter(g => captures.includes(g.target))
     readonly property PwNode micSource: Pipewire.defaultAudioSource

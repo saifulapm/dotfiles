@@ -308,3 +308,10 @@ test('a device connecting shows right after the OSD, compact, as its connect tex
   assert.equal(islandText('btConnect', { btConnect }, AT), 'AirPods connected · 80%');
   assert.equal(isCompact('btConnect'), true);
 });
+
+test('one app with two capture streams is one app in the mic slot', () => {
+  const streams = [rec(40, { 'application.name': 'Chromium', 'object.serial': '300' }), rec(41, { 'application.name': 'Chromium', 'object.serial': '301' })];
+  assert.deepEqual(micApps(streams, [from(MIC, 40), from(MIC, 41)], MIC, 0), ['Chromium']);
+  const three = [...streams, rec(42, { 'application.name': 'Zoom', 'object.serial': '200' })];
+  assert.equal(islandText('mic', { mic: micApps(three, [from(MIC, 40), from(MIC, 41), from(MIC, 42)], MIC, 0) }, AT), '● MIC · Chromium +1');
+});

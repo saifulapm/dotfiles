@@ -59,13 +59,14 @@ export function commNames(text) {
 // niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
 export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
 
-// The apps recording from the default source, newest first: a capture stream with an active link from it, but no monitor, passive stream or the shell's own recorder, whose pid is ownPid (A1KE151A, Q24TQVMB). A link's end that has gone reads -1. Serials are never reused, as node ids are (TJKMQNCR).
+// The apps recording from the default source, newest first and each named once: a capture stream with an active link from it, but no monitor, passive stream or the shell's own recorder, whose pid is ownPid (A1KE151A, Q24TQVMB). A link's end that has gone reads -1. Serials are never reused, as node ids are (TJKMQNCR).
 export function micApps(streams, links, sourceId, ownPid) {
   const counted = (p) => p['stream.monitor'] !== 'true' && (p['node.passive'] ?? 'false') === 'false' && p['media.category'] !== 'Monitor' && !(ownPid > 0 && p['application.process.id'] === String(ownPid));
-  return streams
+  const names = streams
     .filter((s) => s.capture && counted(s.props) && sourceId >= 0 && links.some((l) => l.active && l.source === sourceId && l.target === s.id))
     .sort((a, b) => Number(b.props['object.serial'] ?? b.id) - Number(a.props['object.serial'] ?? a.id))
     .map((s) => oneLine(s.props['application.name'] || s.props['node.description'] || s.props['node.name'] || ''));
+  return [...new Set(names)];
 }
 
 const micText = (apps) => `● MIC · ${apps[0]}${apps.length > 1 ? ` +${apps.length - 1}` : ''}`;

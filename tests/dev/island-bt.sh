@@ -90,6 +90,17 @@ disconnect "$headphones"
 timeout 0.5 qs ipc call notifs dnd false >/dev/null
 until_ok 2000 dnd_is false
 
+# Do Not Disturb turned on while the connect state shows hides it at once.
+connect "$headphones"
+until_ok 2000 mode_is btConnect
+had=$(island | jq -r .mode)
+timeout 0.5 qs ipc call notifs dnd true >/dev/null
+until_ok 1000 not_mode btConnect
+check "Do Not Disturb turned on during the 2 s hides it ($had, then $(island | jq -r .mode))" eval '[ "$had" = btConnect ] && not_mode btConnect'
+disconnect "$headphones"
+timeout 0.5 qs ipc call notifs dnd false >/dev/null
+until_ok 2000 dnd_is false
+
 # Test Speaker is not paired, so its connecting is no paired device connecting.
 connect "$speaker"
 check "an unpaired device connecting shows nothing" never_connect 2500
@@ -138,5 +149,14 @@ battery "$speaker" 10
 until_ok 2000 warned "Test Speaker battery 10%" 1
 check "two devices low at once send one each: Test Headphones battery 12% and Test Speaker battery 10%" eval 'warned "Test Headphones battery 12%" 1 && warned "Test Speaker battery 10%" 1'
 disconnect "$speaker"
+
+# A device names itself, so a name that starts with a dash is text, never an option of notify-send.
+# The fake does not introspect its properties, so busctl set-property cannot reach them.
+bus call -- org.bluez "$headphones" org.freedesktop.DBus.Properties Set ssv org.bluez.Device1 Alias s "-x Headphones"
+battery "$headphones" 40
+headphones_read
+battery "$headphones" 11
+until_ok 2000 warned "-x Headphones battery 11%" 1
+check "a name starting with a dash still warns: -x Headphones battery 11%" warned "-x Headphones battery 11%" 1
 exit $((fails > 0))
 }

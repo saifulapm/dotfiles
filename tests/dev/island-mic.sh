@@ -123,10 +123,11 @@ niri msg action spawn -- dots-call record toggle
 until_ok 5000 rec_is '.recording | not'
 until_ok 8000 mode_is rest
 
-# A target node destroyed under its link: the slot goes, and the shell still answers.
+# A target node destroyed while it records: the slot goes, and the shell still answers. Whether PipeWire drops the link or the node first is its own; a link left without its node is pinned by island.test.mjs.
 for n in 1 2 3; do
   record "{ application.name = \"Gone $n\" node.name = test-gone-$n }"
   until_ok 2000 reads "● MIC · Gone $n"
+  check "Gone $n reads ● MIC · Gone $n before its node is destroyed" reads "● MIC · Gone $n"
   pw-cli destroy "$(node_id node.name "test-gone-$n")" >/dev/null 2>&1
   until_ok 3000 not_mode mic
 done

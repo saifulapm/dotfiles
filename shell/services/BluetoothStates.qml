@@ -50,11 +50,15 @@ Scope {
                         battery: d.batteryAvailable ? d.battery : null
                     })));
         armed = r.armed;
+        // A device names itself, so -- keeps a name like -x from reading as an option.
         for (const text of r.warn)
-            Quickshell.execDetached(["notify-send", "-u", "normal", "-a", "Bluetooth", text]);
+            Quickshell.execDetached(["notify-send", "-u", "normal", "-a", "Bluetooth", "--", text]);
     }
 
     onStatesChanged: check()
+    // Turned on while a connect state shows, it hides that one too.
+    onDndChanged: if (dnd)
+        device = null
     onBatteriesChanged: checkBatteries()
 
     // BlueZ reports a battery once the device's HFP link is up, a moment after the connect, so its arrival starts the 2 s again.
