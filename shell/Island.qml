@@ -3,6 +3,7 @@ import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Shapes
 import "." as Root
@@ -484,7 +485,7 @@ PanelWindow {
             value: osdValue.text,
             valueFont: [osdValue.font.family, osdValue.font.pixelSize],
             bars: osdLook.bars,
-            lit: osdBars.drawn,
+            lit: osdBars.drawn(),
             valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
         };
     }
@@ -625,7 +626,8 @@ PanelWindow {
             tileBox: tile.visible ? at(tile) : null,
             glyph: tile.visible && glyph.visible ? glyph.text : null,
             icon: tile.visible && icon.status === Image.Ready ? String(icon.source) : null,
-            bar: noteBar.visible ? noteBar.drawn : null,
+            bar: noteBar.visible ? noteBar.drawn() : null,
+            picture: thumb.visible ? at(thumb) : null,
             chip: shownChip ? shownChip.text : null,
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,
@@ -1784,7 +1786,7 @@ PanelWindow {
                     }
 
                     Column {
-                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0) - (columnChip.visible ? columnChip.width + parent.spacing : 0)
+                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0) - (columnChip.visible ? columnChip.width + parent.spacing : 0) - (thumb.visible ? thumb.width + parent.spacing : 0)
                         spacing: island.noteLook.voice === "plain" ? 2 : 4
 
                         Item {
@@ -1954,6 +1956,33 @@ PanelWindow {
                         at: island.chipLook.toast
                         files: island.heldNotification?.files ?? []
                         empty: island.noteDragging
+                    }
+
+                    // The notification's picture, 48 px at the card's far right; Artboard rounds it as it does the tile.
+                    Image {
+                        id: thumb
+                        visible: status === Image.Ready
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 48
+                        height: 48
+                        source: island.heldNotification?.picture ?? ""
+                        asynchronous: true
+                        fillMode: Image.PreserveAspectCrop
+                        sourceSize.width: 96
+                        sourceSize.height: 96
+                        layer.enabled: thumbMask.radius > 0
+                        layer.effect: MultiEffect {
+                            maskEnabled: true
+                            maskSource: thumbMask
+                        }
+
+                        Rectangle {
+                            id: thumbMask
+                            anchors.fill: parent
+                            visible: false
+                            radius: island.noteLook.tile?.radius ?? 0
+                            layer.enabled: true
+                        }
                     }
                 }
 

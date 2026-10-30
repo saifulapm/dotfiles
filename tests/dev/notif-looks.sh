@@ -44,5 +44,28 @@ notify-send -a dl plain
 shown plain
 check "no value draws no bar ($(note bar))" state_is '.note.bar == null'
 
+# A picture draws as a 48 px thumbnail at the card's right, from a file or from image data, but not when it is the app icon's own file.
+pic=$(mktemp --suffix=.png)
+cleanup() { rm -f "$pic"; }
+cp /usr/share/pixmaps/helix.png "$pic"
+right_thumb='.note.picture.w == 48 and .note.picture.h == 48 and .note.picture.x > .note.summaryBox.x + .note.summaryBox.w'
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  notify-send -a Art -h string:image-path:"$pic" "Cover $t"
+  shown "cover $t"
+  check "$t: an image-path PNG draws a 48 px thumbnail at the right ($(note picture))" state_is "$right_thumb"
+done
+notify "Art" 0 "" data "" '[]' '{"image-data": <(2, 2, 8, true, 8, 4, [byte 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255])>}' 5000
+shown data
+check "image data sent by gdbus draws the same ($(note picture))" state_is "$right_thumb"
+in_theme artboard
+notify "Art" 0 "$pic" same "" '[]' "{\"image-path\": <\"$pic\">}" 5000
+shown same
+check "a picture that is the app icon's file draws no thumbnail ($(note picture))" state_is '.note.picture == null'
+check "and draws as the icon in the tile ($(note icon))" state_is '.note.icon != null'
+notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png -a Art themed
+shown themed
+check "an icon theme's file in image-path is the icon, not a picture ($(note picture))" state_is '.note.picture == null and .note.icon != null'
+
 exit $((fails > 0))
 }

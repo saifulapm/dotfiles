@@ -7,10 +7,12 @@ Item {
     required property var look
     property real value: 0
     readonly property int lit: look.litCount(value)
-    // How many of 20 read as lit, from what is drawn.
-    readonly property int drawn: look.bars === "blocks" ? litBlocks.text.length : look.bars === "bars" ? Array.from({ length: 20 }, (_, i) => barRepeater.itemAt(i)).filter(b => b && b.on).length : Math.round(roundFill.width / roundTrack.width * 20)
-
     implicitHeight: 14
+
+    // How many of 20 read as lit, from what is drawn; a function, since a binding would not see the Repeater make its bars.
+    function drawn() {
+        return look.bars === "blocks" ? litBlocks.text.length : look.bars === "bars" ? Array.from({ length: 20 }, (_, i) => barRepeater.itemAt(i)).filter(b => b && b.on).length : Math.round(roundFill.width / roundTrack.width * 20);
+    }
 
     // Paper: 20 bars, the lit ones tall in the accent.
     Row {
