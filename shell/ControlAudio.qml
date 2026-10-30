@@ -1,3 +1,4 @@
+import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
 import "lib/control.mjs" as Lib
@@ -71,14 +72,23 @@ Item {
             node.audio.muted = !node.audio.muted;
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
             if (entry.sink)
-                return false;
-            if (node.isSink)
+                moveApp(entry);
+            else if (node.isSink)
                 Pipewire.preferredDefaultAudioSink = node;
             else
                 Pipewire.preferredDefaultAudioSource = node;
         } else
             return false;
         return true;
+    }
+
+    // The session manager moves a stream to the sink its target.object names, by serial.
+    function moveApp(entry) {
+        const next = sinks.find(n => n.id === A.nextSink(sinks.map(n => n.id), entry.sink.id));
+        if (!next || next === entry.sink)
+            return;
+        mover.command = ["pw-metadata", "-n", "default", String(entry.node.id), "target.object", String(next.properties["object.serial"])];
+        mover.running = true;
     }
 
     function state() {
@@ -93,6 +103,10 @@ Item {
 
     PwObjectTracker {
         objects: audio.all
+    }
+
+    Process {
+        id: mover
     }
 
     // A stream's properties, volume and mute, and a link's state, arrive only once bound, so they are bound while the section is drawn.

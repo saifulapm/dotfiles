@@ -92,6 +92,21 @@ wtype m
 until_ok 2000 volume_of "$player" "Volume: 0.35"
 check "m again unmutes it" volume_of "$player" "Volume: 0.35"
 
+# Two sinks, so one Enter moves on from the first and the other wraps from the last, whichever order PipeWire lists them in.
+target_is() { pw-metadata -n default "$player" target.object 2>/dev/null | grep -q "value:'$1'"; }
+wtype -k Return
+until_ok 3000 target_is "$(serial_of dots-null-2)"
+check "Enter sets Test Player's target.object to Dots second sink's serial" target_is "$(serial_of dots-null-2)"
+until_ok 3000 links_second
+check "the stream links to Dots second sink" links_second
+until_ok 2000 detail_is "Test Player" "Dots second sink · 35%"
+check "the detail names Dots second sink" detail_is "Test Player" "Dots second sink · 35%"
+wtype -k Return
+until_ok 3000 links_null
+check "Enter again moves it back to Dots null sink" links_null
+until_ok 2000 detail_is "Test Player" "Dots null sink · 35%"
+check "the detail names Dots null sink" detail_is "Test Player" "Dots null sink · 35%"
+
 until_ok 3000 select_row "Bare stream"
 pw-cli destroy "$(node_id node.name bare-stream)" >/dev/null
 until_ok 3000 rows_are '["Test Player"]'
