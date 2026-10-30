@@ -86,6 +86,8 @@ check "bukhari:6114 draws English from Allah's Messenger on, no Arabic, Abu Hura
 on_drawn 2027-01-23 '.ref == "Sahih Muslim 6602"'
 check "muslim:6602 draws as given, a space after saying:, no narrator in its reference ($(drawn '[.en[0:90], .ref]'))" \
   drawn_is '(.en | startswith("A'"'"'isha, the wife of Allah'"'"'s Apostle (ﷺ), reported Allah'"'"'s Apostle (ﷺ) as saying: Kindness is not")) and .ref == "Sahih Muslim 6602"'
+# bukhari:6114 holds ﷺ, which a fallback face draws; Qt adds 3 px under the last line of any text, and a wider ﷺ line added 130.
+check "its English lines keep one pitch, ﷺ's line too ($(drawn .enLines))" drawn_is '.enLines.height < .enLines.count * .enLines.pitch + .enLines.pitch / 8'
 on_drawn 2026-11-08 '.ref | startswith("Sahih al-Bukhari 6013")'
 check "bukhari:6013 gains its closing quote ($(drawn '.en[-20:]'))" drawn_is '.en | endswith("mercifully\"")'
 on_drawn 2026-11-21 '.ref == "Hisn al-Muslim 16"'
@@ -96,6 +98,12 @@ on_drawn 2026-12-24 '.ref == "Walt Disney"'
 check "Walt Disney's quote draws its sentence over his name ($(drawn '[.en, .ar]'))" drawn_is '.en == "The best way to get started is to quit talking and begin doing." and .ar == ""'
 on_drawn 2027-01-09 '.ref == "Henry Ford"'
 check "Henry Ford's quote splits at its last dash ($(drawn .en))" drawn_is '.en == "Whether you think you can, or you think you can'"'"'t — you'"'"'re right."'
+
+# 49:13 is the tallest ayah in Paper; it draws smaller, clear of the island and margins.
+on_drawn 2027-02-07 '.ref == "Al-Hujuraat 49:13"'
+fits() { passage | jq -e --argjson o "$out" '.drawn[0][0].box | .y >= 95 and .y + .h <= $o.height - 95' >/dev/null; }
+check "Paper's tallest ayah fits between the island and the bottom margin ($(drawn .box))" fits
+check "and stays centred ($(drawn .box))" centred
 
 on_day 2026-11-02
 dots-call passage date 2026-02-30

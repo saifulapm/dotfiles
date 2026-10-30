@@ -20,6 +20,7 @@ Item {
     // What this sheet draws, for passage state: each line's text and drawn family, and the block's box in the window.
     function drawn() {
         const a = block.mapToItem(null, 0, 0);
+        const b = block.mapToItem(null, block.width, block.height);
         const label = look.frame === "card" ? frameLabel : stackLabel;
         return {
             label: label.text,
@@ -27,7 +28,8 @@ Item {
             en: enText.text,
             ref: refText.text,
             family: { label: label.fontInfo.family, ar: arText.visible ? arText.fontInfo.family : "", en: enText.fontInfo.family, ref: refText.fontInfo.family },
-            box: { x: a.x, y: a.y, w: block.width, h: block.height }
+            enLines: { count: enText.lineCount, height: enText.contentHeight, pitch: enText.font.pixelSize * words.look.en.height },
+            box: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }
         };
     }
 
@@ -36,6 +38,8 @@ Item {
         anchors.centerIn: parent
         width: words.look.width
         height: stack.implicitHeight + words.look.pad[0] + words.look.pad[2]
+        // A passage taller than the paper less 96 px each side, the island's and the margins' room, draws smaller as a whole.
+        scale: Math.min(1, (words.height - 192) / height)
 
         // Artboard: a selected artboard, the card ringed in the accent with its four handles.
         Root.Surface {
@@ -139,7 +143,9 @@ Item {
                 font.family: words.look.en.font
                 font.italic: words.look.en.italic
                 font.pixelSize: words.look.en.size
-                lineHeight: words.look.en.height
+                // A fixed pitch, as the boards' CSS line-height, so a glyph from a fallback face such as ﷺ opens no line wider.
+                lineHeightMode: Text.FixedHeight
+                lineHeight: words.look.en.size * words.look.en.height
             }
 
             Rectangle {
