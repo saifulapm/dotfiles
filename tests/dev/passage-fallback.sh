@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# A day deen cannot answer: deen exiting 1, a hadith corpus that is missing, an empty dua; each draws a later quote in place of the day, labelled as a quote, read through passage state.
+{
+# The shell asks a deen that does what the mode file says: ok passes to the real deen on dots apply's texts, fail exits 1 with no output, nocorpus answers a hadith with deen's error, empty answers a dua with {}.
+texts=$HOME/.local/share/deen
+work=$(mktemp -d)
+echo fail >"$work/mode"
+cat >"$work/deen" <<FAKE
+#!/bin/sh
+echo "\$*" >>$work/calls
+case "\$(cat $work/mode) \$1 \$2" in
+  fail*) exit 1 ;;
+  "nocorpus hadith show") echo '{"error":"corpus missing"}'; exit 0 ;;
+  "empty dua show") echo '{}'; exit 0 ;;
+esac
+DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$texts/hadith exec $(command -v deen) "\$@"
+FAKE
+chmod +x "$work/deen"
+export DOTS_DEV_DEEN=$work/deen
+source "$(dirname "$0")/lib.sh"
+cleanup() { rm -rf "$work"; }
+
+passage() { timeout 0.5 dots-call passage state 2>/dev/null; }
+passage_is() { passage | jq -e "$@" >/dev/null 2>&1; }
+on_day() { dots-call passage date "$1" && until_ok 3000 passage_is --arg d "$1" '.date == $d and .en != ""'; }
+mode() { echo "$1" >"$work/mode"; }
+emerson='.en == "Do not go where the path may lead, go instead where there is no path and leave a trail." and .ref == "Ralph Waldo Emerson"'
+
+until_ok 5000 shell_status >/dev/null
+until_ok 5000 passage_is '.en != ""'
+
+# An ayah day asks for the surahs first; a deen that never gave them is asked once for the day, not again and again.
+: >"$work/calls"
+on_day 2026-11-07
+sleep 2
+surahs=$(grep -c '^api surahs$' "$work/calls")
+check "with deen exiting 1, ayah day 2026-11-07 falls back ($(passage | jq -c '[.fallback, .ref]'))" passage_is '.fallback == true and .kind == "ayah" and .ar == ""'
+check "and asks deen for the surahs once, not again and again ($surahs times)" test "$surahs" = 1
+
+mode ok
+on_day 2026-11-03
+check "with deen answering, 2026-11-03 draws 94:6's Arabic ($(passage | jq -c '[.ref, .fallback, .ar != ""]'))" passage_is '.ref == "Ash-Sharh 94:6" and .fallback == false and .ar != ""'
+
+mode fail
+on_day 2026-11-04
+check "with deen exiting 1, hadith day 2026-11-04 draws quote 92, Emerson's ($(passage | jq -c '[.kind, .entry, .fallback, .en, .ref]'))" \
+  passage_is "$emerson and .fallback == true and .kind == \"hadith\" and .date == \"2026-11-04\""
+check "it leaves no Arabic from the ayah day before ($(passage | jq -c '[.ar, .drawn[0][0].ar]'))" passage_is '.ar == "" and .drawn[0][0].ar == ""'
+check "Paper labels it QUOTE, not HADITH ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "QUOTE" and .drawn[0][0].label == "QUOTE"'
+
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme blueprint
+until_ok 3000 passage_is '.drawn[0][0].label == "[QUOTE]"'
+check "Blueprint labels it [QUOTE] ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "[QUOTE]" and .drawn[0][0].label == "[QUOTE]"'
+in_theme artboard
+until_ok 3000 passage_is '.drawn[0][0].label == "Quote"'
+check "Artboard labels it Quote ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "Quote" and .drawn[0][0].label == "Quote"'
+in_theme paper
+
+on_day 2026-11-02
+check "with deen exiting 1, quote day 2026-11-02 draws its own quote 89 ($(passage | jq -c '[.kind, .entry, .fallback, .en]'))" \
+  passage_is '.kind == "quote" and .entry == 89 and .fallback == false and .en == "Action is the foundational key to all success."'
+
+mode nocorpus
+on_day 2026-11-08
+check "with no hadith corpus, hadith day 2026-11-08 falls back ($(passage | jq -c '[.fallback, .ref]'))" passage_is '.fallback == true and .kind == "hadith"'
+on_day 2026-11-11
+check "with no hadith corpus, ayah day 2026-11-11 draws its ayah ($(passage | jq -c '[.fallback, .ref]'))" passage_is '.fallback == false and .kind == "ayah" and .ar != ""'
+
+mode empty
+on_day 2026-11-05
+check "with deen answering {} for a dua, dua day 2026-11-05 falls back ($(passage | jq -c '[.fallback, .kind, .ref]'))" passage_is '.fallback == true and .kind == "dua" and .ar == ""'
+
+exit $((fails > 0))
+}

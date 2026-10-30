@@ -13,7 +13,7 @@ Item {
     readonly property var look: P.look(tokens)
     readonly property var text: passage.text
     // The sheet's own voice, so an outgoing sheet keeps its theme's words until it goes.
-    readonly property var voiced: P.voiced(tokens.type.voice, passage.pick.kind, text.ref)
+    readonly property var voiced: P.voiced(tokens.type.voice, text.kind, text.ref)
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property real side: look.pad[1]
 

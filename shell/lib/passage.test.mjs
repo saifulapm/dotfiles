@@ -48,7 +48,17 @@ test('the day is the local date counted from 1970-01-01', () => {
 });
 
 test('a date that is not YYYY-MM-DD, or no such day, has no day number', () => {
-  for (const s of ['', '2026-11-3', '2026-02-30', '2026-13-01', 'today']) assert.equal(P.dayOf(s), null, s);
+  for (const s of ['', '2026-11-3', '2026-02-30', '2026-13-01', 'today', '1969-12-31']) assert.equal(P.dayOf(s), null, s);
+});
+
+test('the day turns at local midnight, wherever the machine is', (t) => {
+  const tz = process.env.TZ;
+  t.after(() => (tz === undefined ? delete process.env.TZ : (process.env.TZ = tz)));
+  for (const zone of ['Asia/Dhaka', 'UTC']) {
+    process.env.TZ = zone;
+    assert.equal(P.dayOf(P.today(new Date(2026, 9, 31, 23, 59, 59))), 20757, zone);
+    assert.equal(P.dayOf(P.today(new Date(2026, 10, 1, 0, 0, 0))), 20758, zone);
+  }
 });
 
 const entries = [
@@ -65,6 +75,15 @@ test('the kind turns ayah, hadith, dua, quote, and the entry is the day over 4 w
   assert.deepEqual(at('2026-11-01'), ['2026-11-01', 'dua', 29]);
   assert.deepEqual(at('2026-11-02'), ['2026-11-02', 'quote', 89]);
   assert.equal(P.pick(P.dayOf('2026-11-03'), entries).item.ref, 'a0');
+});
+
+test("a day deen cannot answer falls back to a later block's quote, never its own block's", () => {
+  // 2026-11-04 is a hadith day in block 5190: (5190 + 1 + 1) mod 102.
+  assert.deepEqual(P.fallback(P.dayOf('2026-11-04'), entries), { entry: 92, item: { kind: 'quote', text: 'q92', author: 'x' } });
+  for (let day = 20756; day < 20756 + 4 * 102; day++) {
+    const own = P.pick(Math.floor(day / 4) * 4 + 3, entries).entry;
+    assert.notEqual(P.fallback(day, entries).entry, own, `day ${day}`);
+  }
 });
 
 test('each kind asks deen its own way, and a quote asks nothing', () => {

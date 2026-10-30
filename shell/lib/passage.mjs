@@ -36,12 +36,12 @@ export function parse(text) {
 
 const DAY = 86400000;
 
-// The day number of a YYYY-MM-DD date, counted in whole calendar days, so no time zone moves it; null for anything else.
+// The day number of a YYYY-MM-DD date, counted in whole calendar days, so no time zone moves it; null for anything else, a day before 1970-01-01 too.
 export function dayOf(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
   if (!m) return null;
   const t = Date.UTC(+m[1], m[2] - 1, +m[3]);
-  return new Date(t).toISOString().slice(0, 10) === iso ? t / DAY : null;
+  return t >= 0 && new Date(t).toISOString().slice(0, 10) === iso ? t / DAY : null;
 }
 
 export const dateOf = (day) => new Date(day * DAY).toISOString().slice(0, 10);
@@ -53,6 +53,13 @@ export function pick(day, entries) {
   const of = entries.filter((e) => e.kind === kind);
   const entry = Math.floor(day / 4) % of.length;
   return { day, date: dateOf(day), kind, entry, item: of[entry] };
+}
+
+// The quote a day shows when deen cannot answer it: one the next blocks hold, never this block's own.
+export function fallback(day, entries) {
+  const quotes = entries.filter((e) => e.kind === 'quote');
+  const entry = (Math.floor(day / 4) + 1 + (day % 4)) % quotes.length;
+  return { entry, item: quotes[entry] };
 }
 
 export function deenArgs(item) {

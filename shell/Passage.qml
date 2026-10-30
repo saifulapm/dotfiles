@@ -16,11 +16,12 @@ Scope {
     property string pinned: ""
     readonly property var entries: P.parse(list.text()).entries
     readonly property var pick: entries.length ? P.pick(P.dayOf(pinned || P.today(new Date())), entries) : null
-    // `deen api surahs`, read once, the first time an ayah needs its surah's name.
+    // `deen api surahs`, read once, the first time an ayah needs its surah's name; a day it failed for asks no more, and a later day asks again.
     property string surahs: ""
-    // What the sheets draw, null until deen answers; a new pick clears it, so no sheet draws another day's text.
+    property var surahsFor: null
+    // What the sheets draw, with the kind it is and whether it stands in for a day deen could not answer; null until deen answers, and a new pick clears it, so no sheet draws another day's text.
     property var text: null
-    readonly property var voiced: text && theme.tokens ? P.voiced(theme.tokens.type.voice, pick.kind, text.ref) : null
+    readonly property var voiced: text && theme.tokens ? P.voiced(theme.tokens.type.voice, text.kind, text.ref) : null
 
     onPickChanged: read()
     Component.onCompleted: read()
@@ -31,10 +32,11 @@ Scope {
             return;
         const args = P.deenArgs(pick.item);
         if (!args) {
-            text = P.shape(pick.item, "", "");
+            show(pick, P.shape(pick.item, "", ""));
             return;
         }
-        if (pick.kind === "ayah" && !surahs) {
+        if (pick.kind === "ayah" && !surahs && surahsFor !== pick) {
+            surahsFor = pick;
             surahsRead.running = true;
             return;
         }
@@ -44,6 +46,15 @@ Scope {
         entryRead.reading = pick;
         entryRead.command = [backend].concat(args);
         entryRead.running = true;
+    }
+
+    // A day deen could not answer draws its fallback quote instead.
+    function show(day, shaped) {
+        const f = shaped ? null : P.fallback(day.day, entries);
+        text = Object.assign({
+            kind: f ? "quote" : day.kind,
+            fallback: f !== null
+        }, shaped || P.shape(f.item, "", ""));
     }
 
     FileView {
@@ -70,9 +81,9 @@ Scope {
         stdout: StdioCollector {
             id: entryOut
         }
-        onExited: {
+        onExited: code => {
             if (reading === passage.pick)
-                passage.text = P.shape(reading.item, entryOut.text, passage.surahs);
+                passage.show(reading, code === 0 ? P.shape(reading.item, entryOut.text, passage.surahs) : null);
             else
                 passage.read();
         }
@@ -91,7 +102,7 @@ Scope {
                 date: p ? p.date : "",
                 kind: p ? p.kind : "",
                 entry: p ? p.entry : null,
-                fallback: false,
+                fallback: t ? t.fallback : false,
                 ref: passage.voiced ? passage.voiced.ref : "",
                 label: passage.voiced ? passage.voiced.label : "",
                 ar: t ? t.ar : "",
