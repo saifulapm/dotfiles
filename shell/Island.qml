@@ -628,6 +628,8 @@ PanelWindow {
             chipEmpty: shownChip ? shownChip.empty : false,
             actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn),
             actionBoxes: Array.from({ length: actionRepeater.count }, (_, i) => at(actionRepeater.itemAt(i))),
+            // The first chip's key and word colours, and the fill behind them: the chip's own, else the card's.
+            actionInk: actionRepeater.count ? actionRepeater.itemAt(0).ink : null,
             dragging: noteDragging,
             frame: [box.style.frame.width, String(box.style.frame.color)],
             faceUrl: noteFace.url
@@ -1956,10 +1958,12 @@ PanelWindow {
                                     id: actionChip
                                     required property var modelData
                                     readonly property string drawn: actionKey.text + " " + actionWord.text
+                                    readonly property var ink: [String(actionKey.color), String(actionWord.color), String(color.a > 0 ? color : box.style.fill)]
                                     width: actionPair.implicitWidth + (island.keyLook.legend("").chips ? 14 : 0)
                                     height: actionPair.implicitHeight + (island.keyLook.legend("").chips ? 6 : 0)
                                     radius: 6
-                                    color: island.keyLook.chip.fill
+                                    // On the dark card, Artboard's chip takes the icon tile's fill and the key takes the card's text.
+                                    color: island.keyLook.legend("").chips ? island.noteLook.tile?.fill ?? "transparent" : "transparent"
 
                                     Row {
                                         id: actionPair
@@ -1970,7 +1974,7 @@ PanelWindow {
                                             id: actionKey
                                             textFormat: Text.PlainText
                                             text: island.keyLook.keyText(actionChip.modelData.key)
-                                            color: island.keyLook.chip.key
+                                            color: box.style.text
                                             font.family: island.theme.tokens?.type.mono ?? ""
                                             font.pixelSize: island.keyLook.small.size
                                             font.letterSpacing: island.keyLook.small.spacing

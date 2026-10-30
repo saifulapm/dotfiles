@@ -141,6 +141,8 @@ Item {
             }),
             // Each row's action chips as drawn; only the selected row draws them.
             actions: rows.map((r, i) => list.itemAtIndex(i)?.actionsDrawn ?? []),
+            // The selected row's first chip: its key and word colours, and the fill behind them, the chip's own, else the cursor row's.
+            actionInk: list.itemAtIndex(selected)?.actionInk ?? null,
             // Each group's head as drawn: its text, whether it elides, and how many lines it takes.
             heads: rows.map((r, i) => list.itemAtIndex(i)).filter(d => d && d.headItem.visible).map(d => ({
                         text: d.headItem.text,
@@ -403,6 +405,7 @@ Item {
                         // After a restart no live notification is left behind an entry, so its row draws no chips.
                         readonly property var actionChips: current && centre.notifs.live[modelData.entry.key] ? look.keys(Lib.chipsOf(modelData.entry.actions).map(c => [c.key, V.line(c.text)])) : []
                         readonly property var actionsDrawn: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn)
+                        readonly property var actionInk: actionRepeater.count ? (k => [String(k.keyColor), String(k.wordColor), String(k.color.a > 0 ? k.color : rowBox.color)])(actionRepeater.itemAt(0)) : null
                         width: list.width
 
                         // An app name can be any length; it elides inside the card, before its rule.
@@ -507,10 +510,14 @@ Item {
                                         topPadding: 6
                                         spacing: look.legend("").chips ? 8 : 14
 
+                                        // Only the selected row draws chips, so they take the cursor row's colours.
                                         Repeater {
                                             id: actionRepeater
                                             model: item.actionChips
-                                            KeyChip {}
+                                            KeyChip {
+                                                keyColor: look.cursor.text
+                                                wordColor: look.cursor.detail
+                                            }
                                         }
                                     }
                                 }
@@ -635,6 +642,8 @@ Item {
     component KeyChip: Rectangle {
         required property var modelData
         readonly property string drawn: modelData.key + " " + modelData.word
+        property color keyColor: look.chip.key
+        property color wordColor: c.muted
         width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
         height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
         radius: 6
@@ -648,7 +657,7 @@ Item {
             Text {
                 textFormat: Text.PlainText
                 text: modelData.key
-                color: look.chip.key
+                color: keyColor
                 font.family: fonts.mono
                 font.pixelSize: look.small.size
                 font.letterSpacing: look.small.spacing
@@ -657,7 +666,7 @@ Item {
             Text {
                 textFormat: Text.PlainText
                 text: modelData.word
-                color: c.muted
+                color: wordColor
                 font.family: look.small.font
                 font.pixelSize: look.small.size
                 font.letterSpacing: look.small.spacing

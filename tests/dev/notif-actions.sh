@@ -137,5 +137,22 @@ check "after a shell restart its row draws no chips ($(row_chips))" test "$(row_
 close_centre
 done_asking
 
+# Each theme's chips stand out from what they sit on: the island's dark card, and Mod+A's cursor row.
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
+apart() { jq -e 'map(ascii_downcase) | .[0] != .[2] and .[1] != .[2]' >/dev/null <<<"$1"; }
+for t in paper artboard blueprint; do
+  "$repo/bin/dots" theme "$t" >/dev/null
+  until_ok 8000 status_theme "$t"
+  ask -A yes=Yes ink
+  until_ok 2000 shows ink
+  ink=$(island | jq -c .note.actionInk)
+  check "$t: the card's chip key and word differ from their fill ($ink)" apart "$ink"
+  open_centre
+  ink=$(notifs | jq -c .actionInk)
+  check "$t: the row's chip key and word differ from their fill ($ink)" apart "$ink"
+  close_centre
+  done_asking
+done
+
 exit $((fails > 0))
 }
