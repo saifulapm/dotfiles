@@ -625,6 +625,7 @@ PanelWindow {
             tileBox: tile.visible ? at(tile) : null,
             glyph: tile.visible && glyph.visible ? glyph.text : null,
             icon: tile.visible && icon.status === Image.Ready ? String(icon.source) : null,
+            bar: noteBar.visible ? noteBar.drawn : null,
             chip: shownChip ? shownChip.text : null,
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,
@@ -1882,6 +1883,15 @@ PanelWindow {
                                 files: island.heldNotification?.files ?? []
                                 empty: island.noteDragging
                             }
+                        }
+
+                        // The value hint, in the bar the theme's OSD draws a volume with.
+                        OsdBars {
+                            id: noteBar
+                            visible: typeof island.heldNotification?.progress === "number"
+                            width: parent.width
+                            look: island.osdLook
+                            value: island.heldNotification?.progress ?? 0
                         }
 
                         Row {

@@ -28,5 +28,21 @@ notify "x" 0 "/usr/share/pixmaps/helix.png" given "" '[]' '{"desktop-entry": <"f
 shown given
 check "an app icon given beats the desktop entry ($(note icon))" state_is '(.note.icon // "" | test("helix")) and .note.glyph == null'
 
+# The value hint draws the OSD's bar under the body: 40 lights 8 of 20 in each theme, and a replace moves it.
+for t in paper artboard blueprint; do
+  in_theme "$t"
+  notify-send -a dl -h int:value:40 "Download $t"
+  shown "download $t"
+  check "$t: value 40 lights 8 of 20 ($(note bar))" state_is '.note.bar == 8'
+done
+id=$(notify-send -p -a dl -h int:value:20 Moving)
+shown moving
+check "value 20 lights 4 ($(note bar))" state_is '.note.bar == 4'
+notify-send -r "$id" -a dl -h int:value:60 Moving
+check "a replace with 60 lights 12 ($(note bar))" until_ok 2000 state_is '.note.bar == 12'
+notify-send -a dl plain
+shown plain
+check "no value draws no bar ($(note bar))" state_is '.note.bar == null'
+
 exit $((fails > 0))
 }
