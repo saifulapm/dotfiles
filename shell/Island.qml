@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Pipewire
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
@@ -44,6 +45,21 @@ PanelWindow {
     // Every niri cast but the shell's own recording; Do Not Disturb never hides it (2N83H6SJ).
     readonly property var shares: niri.shares(Root.State.recordingPid)
     readonly property var sharing: shares.length ? shares : null
+    // Every capture stream, and each link group into one, from the registry alone, so tracking them never changes the list (m53's lesson); a stream's properties and a link's state arrive only once tracked.
+    readonly property var captures: Pipewire.nodes.values.filter(n => n.type === PwNodeType.AudioInStream)
+    readonly property var captureLinks: Pipewire.linkGroups.values.filter(g => captures.includes(g.target))
+    readonly property PwNode micSource: Pipewire.defaultAudioSource
+    // The apps recording from the default source, newest first; a link's end that has gone reads -1 (A1KE151A). Do Not Disturb never hides it (N6622XD7).
+    readonly property var micApps: I.micApps(captures.map(n => ({
+                    id: n.id,
+                    capture: true,
+                    props: n.properties ?? {}
+                })), captureLinks.map(g => ({
+                    source: g.source?.id ?? -1,
+                    target: g.target?.id ?? -1,
+                    active: g.state === PwLinkState.Active
+                })), micSource?.id ?? -1, Root.State.recordingPid)
+    readonly property var mic: micApps.length ? micApps : null
     // Mod+I on LIVE opens a card of the shares, with who watches each; Enter stops every PipeWire share, Esc closes (MGX0WWS8).
     property bool sharingOpen: false
     readonly property var sharingCard: sharingOpen && sharing ? sharing : null
@@ -111,6 +127,7 @@ PanelWindow {
             sharingCard,
             notification,
             sharing,
+            mic,
             recording,
             osd,
             toast,
@@ -747,6 +764,10 @@ PanelWindow {
         to: 1
         onRunningChanged: if (!running)
             island.heldHeight = 0
+    }
+
+    PwObjectTracker {
+        objects: island.captures.concat(island.captureLinks)
     }
 
     Process {

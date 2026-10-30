@@ -109,7 +109,13 @@ include "$repo/dev/niri-dev.kdl"
 include "$XDG_STATE_HOME/dots/theme-out/niri.kdl"
 EOF
 
-pipewire -c "$repo/dev/pipewire.conf" 2>"$D/pipewire.log" &
+# WirePlumber makes its own "default" metadata, and Quickshell follows the newest one it hears of, so under WirePlumber the conf's goes and WirePlumber picks the defaults: dots-null by its priority, dots-mic as the only source.
+conf=$repo/dev/pipewire.conf
+if [ "${DOTS_DEV_WIREPLUMBER:-}" = 1 ]; then
+  conf=$D/pipewire.conf
+  grep -v 'factory = metadata' "$repo/dev/pipewire.conf" >"$conf"
+fi
+pipewire -c "$conf" 2>"$D/pipewire.log" &
 pw=$!
 # The shell connects to PipeWire once, as it starts.
 until [ -S "$PIPEWIRE_RUNTIME_DIR/pipewire-0" ]; do
