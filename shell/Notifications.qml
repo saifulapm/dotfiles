@@ -33,7 +33,7 @@ Item {
         tokens: centre.theme.tokens
     }
     // The caps voices write d and D alike, so clear all reads ⇧D.
-    readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["m", "mute"], ["i", "DND"], ["s", "stay"], ["/", "search"], ["esc", "close"]])
+    readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["m", "mute"], ["i", "DND"], ["s", "stay"], ["1-3", "action"], ["/", "search"], ["esc", "close"]])
     readonly property var hintKeys: look.keys([["/", "search"], ["esc", "close"]])
     readonly property var groups: Lib.group(Lib.visible(notifs.history, query))
     // One row per entry in group order; the first of each group carries its header.
@@ -74,6 +74,16 @@ Item {
         const row = rows[selected];
         if (row && notifs.act(row.entry.key))
             close();
+    }
+
+    // 1 to 9 runs the selected row's chip with that number, while its app holds the notification.
+    function runChip(key) {
+        const row = rows[selected];
+        const chip = row && notifs.live[row.entry.key] ? Lib.chipsOf(row.entry.actions).find(c => c.key === key) : null;
+        if (!chip)
+            return;
+        notifs.runAction(row.entry.key, chip.identifier);
+        close();
     }
 
     // m, i and s set a rule for the selected row's app.
@@ -129,6 +139,8 @@ Item {
                 const f = list.itemAtIndex(i)?.fileChip;
                 return f ? { text: f.text, box: box(f) } : null;
             }),
+            // Each row's action chips as drawn; only the selected row draws them.
+            actions: rows.map((r, i) => list.itemAtIndex(i)?.actionsDrawn ?? []),
             // Each group's head as drawn: its text, whether it elides, and how many lines it takes.
             heads: rows.map((r, i) => list.itemAtIndex(i)).filter(d => d && d.headItem.visible).map(d => ({
                         text: d.headItem.text,
@@ -192,6 +204,8 @@ Item {
                 centre.cycleStay();
             else if (event.key === Qt.Key_Slash)
                 input.forceActiveFocus();
+            else if (/^[1-9]$/.test(event.text))
+                centre.runChip(event.text);
             else if (event.key === Qt.Key_Escape)
                 centre.close();
             else
@@ -386,6 +400,9 @@ Item {
                         readonly property string age: ageLabel.text
                         readonly property Item headItem: headLabel
                         readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
+                        // After a restart no live notification is left behind an entry, so its row draws no chips.
+                        readonly property var actionChips: current && centre.notifs.live[modelData.entry.key] ? look.keys(Lib.chipsOf(modelData.entry.actions).map(c => [c.key, V.line(c.text)])) : []
+                        readonly property var actionsDrawn: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn)
                         width: list.width
 
                         // An app name can be any length; it elides inside the card, before its rule.
@@ -484,6 +501,17 @@ Item {
                                         font.italic: look.detail.italic
                                         font.pixelSize: look.detail.size
                                         font.letterSpacing: look.detail.spacing ?? 0
+                                    }
+                                    Row {
+                                        visible: item.actionChips.length > 0
+                                        topPadding: 6
+                                        spacing: look.legend("").chips ? 8 : 14
+
+                                        Repeater {
+                                            id: actionRepeater
+                                            model: item.actionChips
+                                            KeyChip {}
+                                        }
                                     }
                                 }
                                 RowChip {
@@ -606,6 +634,7 @@ Item {
     // A key and its word as the legend draws them, a chip in Artboard.
     component KeyChip: Rectangle {
         required property var modelData
+        readonly property string drawn: modelData.key + " " + modelData.word
         width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
         height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
         radius: 6

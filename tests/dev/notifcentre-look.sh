@@ -52,7 +52,7 @@ row_ink=$(near "$(box_geo cursorBox 60 2 200 4)" 28 25 21 6)
 check "paper: the cursor row draws ink across its width ($row_ink of 800 px)" test "$row_ink" -gt 700
 marker=$(near "$(box_geo cursorBox 0 4 50 30)" 200 56 30 40)
 check "paper: the cursor row's ▸ marker is #C8381E ($marker px)" test "$marker" -gt 3 -a "$marker" -lt 200
-check "paper: the legend is tracked caps with ⇧D for clear all ($(notifs | jq -c '[.legend, .legendSpacing]'))" state_is '.legend == "J/K MOVE  ↵ OPEN  D DISMISS  ⇧D CLEAR ALL  M MUTE  I DND  S STAY  / SEARCH  ESC CLOSE" and .legendSpacing > 1'
+check "paper: the legend is tracked caps with ⇧D for clear all ($(notifs | jq -c '[.legend, .legendSpacing]'))" state_is '.legend == "J/K MOVE  ↵ OPEN  D DISMISS  ⇧D CLEAR ALL  M MUTE  I DND  S STAY  1-3 ACTION  / SEARCH  ESC CLOSE" and .legendSpacing > 1'
 close_centre
 
 in_theme artboard
@@ -79,7 +79,7 @@ check "blueprint: the rule under the header is dashed ($gaps of 280 px read the 
 check "blueprint: the cursor row's fill is #7FE3F0 ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#7fe3f0"'
 cyan=$(near "$(box_geo cursorBox 300 2 8 4)" 127 227 240 3)
 check "blueprint: inside the cursor row reads the accent ($cyan of 32 px)" test "$cyan" -eq 32
-check "blueprint: every legend key is bracketed ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["[J/K]", "[↵]", "[D]", "[⇧D]", "[M]", "[I]", "[S]", "[/]", "[ESC]"]'
+check "blueprint: every legend key is bracketed ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["[J/K]", "[↵]", "[D]", "[⇧D]", "[M]", "[I]", "[S]", "[1-3]", "[/]", "[ESC]"]'
 # The fresh notification's 5 s in the island end first; the ages need no timer of their own.
 until_ok 7000 one_timer
 check "blueprint: with the centre open status still reports one timer ($(shell_status | jq -c .timers))" one_timer

@@ -82,5 +82,60 @@ sleep 1
 check "2 prints nothing" printed ""
 done_asking
 
+# Mod+A's selected row draws the same chips while the app holds its notification, and the same keys run them.
+notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+centre_is() { notifs | jq -e "$@" >/dev/null; }
+centre_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
+open_centre() {
+  niri msg action spawn -- dots-call notifs open
+  until_ok 3000 centre_is .open
+  until_ok 2000 centre_focus Exclusive
+}
+close_centre() {
+  niri msg action spawn -- dots-call notifs close
+  until_ok 2000 centre_is '.open == false'
+}
+row_chips() { notifs | jq -c '[.actions[] | [.[] | ascii_downcase | gsub("[\\[\\]]"; "")]]'; }
+legend() { notifs | jq -r '.legend | ascii_downcase | gsub("[\\[\\]]"; "")'; }
+legend_has() { [[ "$(legend)" == *"$1"* ]]; }
+
+notify-send -a T -A old=Old older >/dev/null &
+older=$!
+until_ok 2000 shows older
+ask -A yes=Yes -A no=No newer
+until_ok 2000 shows newer
+open_centre
+check "the selected row draws its chips and the other none ($(row_chips))" test "$(row_chips)" = '[["1 yes","2 no"],[]]'
+check "the legend names 1-3 action ($(legend))" legend_has "1-3 action"
+wtype -k 1
+until_ok 2000 printed yes
+check "1 on the row prints yes ($(cat "$out"))" printed yes
+check "and the centre closes" until_ok 2000 centre_is '.open == false'
+kill "$older"
+done_asking
+
+ask -A yes=Yes gone
+until_ok 2000 shows gone
+kill "$sender"
+wait "$sender" 2>/dev/null
+sender=
+open_centre
+wtype -k 1
+sleep 1
+check "1 on the row of a killed sender prints nothing" printed ""
+check "and the shell keeps running" shell_status
+close_centre
+done_asking
+
+notify-send -a T -A yes=Yes kept >/dev/null &
+sender=$!
+until_ok 2000 shows kept
+systemctl --user restart "$DOTS_DEV_UNIT"
+until_ok 5000 at_rest
+open_centre
+check "after a shell restart its row draws no chips ($(row_chips))" test "$(row_chips)" = '[[]]'
+close_centre
+done_asking
+
 exit $((fails > 0))
 }
