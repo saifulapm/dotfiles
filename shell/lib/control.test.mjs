@@ -38,3 +38,8 @@ test('a row names the device and reads its kind, volume and default', () => {
     detail: 'Input · muted',
   });
 });
+
+test("a device's row adds its profile and port after the rest", () => {
+  const row = audioRow({ description: 'AirPods', name: 'bluez_output', isSink: true, volume: 0.5, muted: false, isDefault: true, device: ['High Fidelity Playback (A2DP Sink, codec AAC)', 'Headphones'] });
+  assert.equal(row.detail, 'Output · 50% · default · High Fidelity Playback (A2DP Sink, codec AAC) · Headphones');
+});

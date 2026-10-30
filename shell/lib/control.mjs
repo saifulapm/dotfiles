@@ -16,5 +16,6 @@ export function stepVolume(volume, dir) {
 export function audioRow(node) {
   const parts = [node.isSink ? 'Output' : 'Input', node.muted ? 'muted' : Math.round(node.volume * 100) + '%'];
   if (node.isDefault) parts.push('default');
+  parts.push(...(node.device ?? []));
   return { title: node.description || node.name, detail: parts.join(' · ') };
 }
