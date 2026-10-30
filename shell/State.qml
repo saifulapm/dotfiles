@@ -64,7 +64,8 @@ Singleton {
         if (!handler || builtins.includes(name) || /Changed$/.test(name) || !functionNames(handler).includes(name) || handler[name].length !== args.length)
             return { ran: false };
         try {
-            const out = handler[name](...args);
+            // The socket carries text, and a bool parameter takes any text but "" as true; true and false read as qs ipc reads them, and a string parameter turns them back into the same text.
+            const out = handler[name](...args.map(a => a === "true" ? true : a === "false" ? false : a));
             return { ran: true, output: out === undefined || out === null ? "" : String(out) };
         } catch (e) {
             console.warn("ipc " + target + " " + name + " failed: " + e);

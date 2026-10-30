@@ -58,5 +58,14 @@ sleep 0.5
 until_ok 3000 answers
 check "after a hot reload, dots-call still answers over the socket" answers
 
+# The socket carries every argument as text, so a bool reads "false" as false, as qs ipc does.
+dnd_is() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e ".dnd == $1" >/dev/null; }
+socket_only notifs dnd true >/dev/null
+until_ok 2000 dnd_is true
+had=$(timeout 0.5 qs ipc call notifs state | jq .dnd)
+socket_only notifs dnd false >/dev/null
+until_ok 2000 dnd_is false
+check "dots-call notifs dnd true then false turns Do Not Disturb on and off over the socket ($had, then $(timeout 0.5 qs ipc call notifs state | jq .dnd))" eval '[ "$had" = true ] && dnd_is false'
+
 exit $((fails > 0))
 }

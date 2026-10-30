@@ -150,8 +150,7 @@ until_ok 2000 warned "Test Speaker battery 10%" 1
 check "two devices low at once send one each: Test Headphones battery 12% and Test Speaker battery 10%" eval 'warned "Test Headphones battery 12%" 1 && warned "Test Speaker battery 10%" 1'
 disconnect "$speaker"
 
-# A device names itself, so a name that starts with a dash is text, never an option of notify-send.
-# The fake does not introspect its properties, so busctl set-property cannot reach them.
+# A device names itself, so a name that starts with a dash is text, never an option of notify-send; the fake does not introspect its properties, so busctl set-property cannot reach them.
 bus call -- org.bluez "$headphones" org.freedesktop.DBus.Properties Set ssv org.bluez.Device1 Alias s "-x Headphones"
 battery "$headphones" 40
 headphones_read
