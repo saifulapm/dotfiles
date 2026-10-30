@@ -194,10 +194,12 @@ main() {
   case ${1:-} in
     install) install ;;
     theme) theme "${2:-}" ;;
+    # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
+    awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;
     dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
     sync | update | bump | secrets | cutover | claude-account | dns | clean) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-$1" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots update | dots bump | dots secrets | dots theme <name> | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots sync [--only notes|goals|fish|ssh | --adopt local|remote]" >&2
+      echo "usage: dots install | dots update | dots bump | dots secrets | dots theme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots sync [--only notes|goals|fish|ssh | --adopt local|remote]" >&2
       exit 2
       ;;
   esac

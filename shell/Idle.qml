@@ -38,7 +38,7 @@ Scope {
     Process {
         id: flagWriter
         property bool dirty: false
-        // v2 has no stay-awake toggle, so v1's would hold the hub at watching through any idle.
+        // v1's stay-awake flag would hold the hub at watching through any idle; v2's stay awake removes the steps instead, so the idle flag already reads right.
         readonly property string script: 'mkdir -p "$1" && rm -f "$1/stay-awake" || exit 1; set_flag() { if [ "$2" = 1 ]; then [ -e "$1" ] || : >"$1"; else rm -f "$1"; fi; }; set_flag "$1/idle" "$2"; set_flag "$1/locked" "$3"'
         onExited: {
             if (!dirty)
@@ -49,10 +49,22 @@ Scope {
         }
     }
 
-    // An IdleMonitor keeps the timeout it was made with, so new times make new monitors.
+    // An IdleMonitor keeps the timeout it was made with, so new times make new monitors. Stay awake removes them, which lifts a dim at once, and its end makes fresh ones.
     Loader {
         id: monitors
+        active: Root.State.awakeUntil === 0
         sourceComponent: steps
+    }
+
+    // Runs only while stay awake holds; its end brings the steps back.
+    Root.Tick {
+        interval: 1000
+        repeat: true
+        running: Root.State.awakeUntil > 0
+        onTriggered: {
+            if (Date.now() >= Root.State.awakeUntil)
+                Root.State.awakeUntil = 0;
+        }
     }
 
     onTimesChanged: {
@@ -131,8 +143,14 @@ Scope {
                 idle.times = t;
         }
 
+        // `dots awake <minutes>`: hold the steps off that long; off, 0 or anything not whole minutes up to a day ends the hold.
+        function awake(minutes: string): string {
+            Root.State.awakeUntil = Lib.awakeEnd(Date.now(), Lib.awakeMinutes(minutes));
+            return state();
+        }
+
         function state(): string {
-            return JSON.stringify({ dimmed: idle.dimmed, times: idle.times, monitorsOff: idle.monitorsOff });
+            return JSON.stringify({ dimmed: idle.dimmed, times: idle.times, monitorsOff: idle.monitorsOff, awakeUntil: Root.State.awakeUntil });
         }
     }
 }

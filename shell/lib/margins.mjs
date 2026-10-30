@@ -21,7 +21,7 @@ export function marginState(view, now, right) {
   const date = dateText(now);
   return {
     left: { workspace, app, title, text: hasWindow(view) ? `${workspace} · ${app} — ${title}` : workspace },
-    right: { sync: right.sync, goal: right.goal, mail: right.mail, wifi: right.wifi, battery: right.battery, date, text: [right.sync, right.goal, right.mail > 0 && `mail ${right.mail}`, right.wifi, right.battery, date].filter((p) => p).join('  ') },
+    right: { awake: right.awake, sync: right.sync, goal: right.goal, mail: right.mail, wifi: right.wifi, battery: right.battery, date, text: [right.awake, right.sync, right.goal, right.mail > 0 && `mail ${right.mail}`, right.wifi, right.battery, date].filter((p) => p).join('  ') },
   };
 }
 

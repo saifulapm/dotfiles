@@ -60,6 +60,23 @@ wtype n
 until_ok 2000 state_is '.confirming == ""'
 check "any other key cancels the confirm" state_is '.confirming == ""'
 
+# Stay awake steps off, 30 min, 1 h, 2 h, off, and the idle steps read the same hold.
+awake_in() { state_is --argjson m "$1" '.awakeUntil > 0 and ((.awakeUntil - now * 1000) / 60000 | ceil) == $m'; }
+select_row "Stay awake"
+check "Stay awake starts off" state_is '.awakeUntil == 0'
+wtype -k Return
+until_ok 2000 awake_in 30
+check "Enter holds it for 30 min" awake_in 30
+check "and the idle steps hold off as long" bash -c "timeout 0.5 qs ipc call idle state | jq -e --argjson u $(control_state | jq .awakeUntil) '.awakeUntil == \$u'"
+wtype l
+until_ok 2000 awake_in 60
+check "l steps it to 1 h" awake_in 60
+wtype -k Return
+until_ok 2000 awake_in 120
+wtype -k Return
+until_ok 2000 state_is '.awakeUntil == 0'
+check "past 2 h it turns off" state_is '.awakeUntil == 0'
+
 tab_to display
 until_ok 2000 state_is '.rows | index("fake-bl")'
 check "Display lists the fake backlight" state_is '.rows | index("fake-bl")'

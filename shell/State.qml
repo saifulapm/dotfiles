@@ -16,6 +16,8 @@ Singleton {
     property real recordingSince: 0
     // The running recording's wf-recorder, so its own cast never reads as sharing; 0 while nothing records.
     property int recordingPid: 0
+    // Stay awake holds the idle steps off until this time, in ms since the epoch; 0 is off. Kept in memory, so a shell restart falls back to the normal steps.
+    property real awakeUntil: 0
     // How many times slower surfaces move, read once at start; only bin/dots-dev sets it.
     readonly property real slowdown: M.slowdownOf(Quickshell.env("DOTS_MOTION_SLOWDOWN"))
 

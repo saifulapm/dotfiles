@@ -2,10 +2,12 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 import QtQuick
+import "." as Root
 import "lib/control-system.mjs" as Lib
+import "lib/idle.mjs" as Idle
 import "lib/voice.mjs" as V
 
-// Control's Power section: battery, profile, charge limit where the hardware has one, then the session actions, each but Lock waiting for y.
+// Control's Power section: battery, profile, charge limit where the hardware has one, stay awake, then the session actions, each but Lock waiting for y.
 Item {
     id: power
 
@@ -34,7 +36,11 @@ Item {
                     id: "limit",
                     title: "Charge limit",
                     detail: chargeLimit + "%"
-                }] : []).concat(Lib.ACTIONS.map(a => ({
+                }] : []).concat([{
+                id: "awake",
+                title: "Stay awake",
+                detail: Idle.awakeDetail(Root.State.awakeUntil)
+            }]).concat(Lib.ACTIONS.map(a => ({
                 id: a.id,
                 title: a.title,
                 detail: a.id === confirming ? "y to confirm" : ""
@@ -62,6 +68,11 @@ Item {
             PowerProfiles.profile = profiles[(i + (event.key === Qt.Key_H ? profiles.length - 1 : 1)) % profiles.length];
             return true;
         }
+        // Each press steps off, 30 min, 1 h, 2 h, off.
+        if (item.id === "awake" && (event.key === Qt.Key_H || event.key === Qt.Key_L || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            Root.State.awakeUntil = Idle.nextAwake(Date.now(), Root.State.awakeUntil);
+            return true;
+        }
         if (event.key !== Qt.Key_Return && event.key !== Qt.Key_Enter)
             return false;
         const action = Lib.ACTIONS.find(a => a.id === item.id);
@@ -78,7 +89,8 @@ Item {
         return {
             confirming: confirming,
             profile: PowerProfile.toString(PowerProfiles.profile).toLowerCase(),
-            chargeLimit: chargeLimit
+            chargeLimit: chargeLimit,
+            awakeUntil: Root.State.awakeUntil
         };
     }
 

@@ -5,6 +5,7 @@ import "." as Root
 import "services" as Services
 import "lib/margins.mjs" as MarginsLib
 import "lib/goals.mjs" as GoalsLib
+import "lib/idle.mjs" as IdleLib
 
 // The island, the margins and the services behind them; shell.qml loads this after the paper's first frame.
 Scope {
@@ -183,7 +184,7 @@ Scope {
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
             const shown = marginsVariants.instances.find(m => m.screen.name === niriService.focusedOutput);
-            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), mail: shown ? shown.mail : 0, wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null, shown: shown ? shown.visible : false }));
+            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { awake: IdleLib.awakeWord(Root.State.awakeUntil), sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), mail: shown ? shown.mail : 0, wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null, shown: shown ? shown.visible : false }));
         }
     }
 
