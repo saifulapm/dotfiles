@@ -11,6 +11,8 @@ Scope {
 
     // The island's notification slot, null while none shows; it holds for its app's timeout, 5 s by default.
     property var current: null
+    // Undismissed criticals a newer notification took the island from, newest first; each comes back once the island is free.
+    property var waiting: []
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
     // While on, a notification goes to the history only, and the island stays at rest; a critical one still shows.
@@ -67,6 +69,7 @@ Scope {
     function show(e) {
         if (dnd && !e.critical)
             return;
+        waiting = N.setAside(waiting, current, e.key);
         current = e;
         hold.stop();
         hold.interval = N.holdMs(e);
@@ -82,12 +85,18 @@ Scope {
             hold.restart();
     }
 
-    // Closed by its app, or dismissed here: the island rests.
+    // Closed by its app, or dismissed here: it never comes back, and the island goes to the next waiting critical or rests.
     function gone(key) {
-        if (current?.key === key) {
-            current = null;
-            hold.stop();
-        }
+        waiting = waiting.filter(e => e.key !== key);
+        if (current?.key === key)
+            next();
+    }
+
+    function next() {
+        current = null;
+        hold.stop();
+        if (waiting.length)
+            show(waiting[0]);
     }
 
     // A Notify that replaces an earlier one updates that object in place, so its entry is rebuilt under the same key.
@@ -115,6 +124,7 @@ Scope {
 
     function clear() {
         current = null;
+        waiting = [];
         hold.stop();
         for (const k in live)
             live[k]?.dismiss();
@@ -182,6 +192,6 @@ Scope {
 
     Root.Tick {
         id: hold
-        onTriggered: notifs.current = null
+        onTriggered: notifs.next()
     }
 }

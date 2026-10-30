@@ -5,6 +5,13 @@ export const LIMIT = 200;
 // How long an entry holds the island in ms, 0 until dismissed: its app's expireTimeout, where -1 asks for the default, 5 s or until dismissed for a critical.
 export const holdMs = (entry) => (entry.timeout >= 0 ? entry.timeout : entry.critical ? 0 : 5000);
 
+// The undismissed criticals waiting to take the island back, newest first: the one leaving joins them when it stays until dismissed, and the one arriving leaves them.
+export function setAside(waiting, leaving, arriving) {
+  const kept = waiting.filter((e) => e.key !== arriving);
+  if (leaving && leaving.key !== arriving && leaving.critical && holdMs(leaving) === 0) kept.push(leaving);
+  return kept.sort((a, b) => b.time - a.time);
+}
+
 export const addEntry = (history, entry) => [entry].concat(history).slice(0, LIMIT);
 
 const isEntry = (e) =>

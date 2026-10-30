@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -138,4 +138,23 @@ test("an app's timeout decides the hold: -1 is 5 s, 0 is until dismissed, a posi
 test('a critical with no timeout of its own holds until dismissed; one with a timeout keeps it', () => {
   assert.equal(holdMs(Object.assign(entry(1), { critical: true, timeout: -1 })), 0);
   assert.equal(holdMs(Object.assign(entry(1), { critical: true, timeout: 3000 })), 3000);
+});
+
+const critical = (n) => Object.assign(entry(n), { critical: true, timeout: -1 });
+
+test('a critical that stays until dismissed is set aside when a newer notification takes the island, newest first', () => {
+  assert.deepEqual(setAside([], critical(1), 'k2').map((e) => e.key), ['k1']);
+  assert.deepEqual(setAside([critical(1)], critical(2), 'k3').map((e) => e.key), ['k2', 'k1']);
+  assert.deepEqual(setAside([critical(2)], critical(1), 'k3').map((e) => e.key), ['k2', 'k1']);
+});
+
+test('a normal notification, a critical with its own timeout, or no notification at all is not set aside', () => {
+  assert.deepEqual(setAside([], Object.assign(entry(1), { timeout: -1 }), 'k2'), []);
+  assert.deepEqual(setAside([], Object.assign(critical(1), { timeout: 3000 }), 'k2'), []);
+  assert.deepEqual(setAside([], null, 'k2'), []);
+});
+
+test('the notification taking the island leaves the set-aside ones, as a replace of itself does', () => {
+  assert.deepEqual(setAside([critical(1), critical(2)], null, 'k1').map((e) => e.key), ['k2']);
+  assert.deepEqual(setAside([], critical(1), 'k1'), []);
 });

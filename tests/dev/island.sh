@@ -40,8 +40,9 @@ notify-send -u critical "battery low"
 until_ok 1000 eval 'island | jq -e ".text | test(\"battery low\")" >/dev/null'
 notify-send "chat ping"
 until_ok 1000 eval 'island | jq -e ".text | test(\"chat ping\")" >/dev/null'
-until_ok 7000 mode_is rest
-check "a critical notification does not come back once a newer one's 5 s are up" mode_is rest
+until_ok 7000 eval 'island | jq -e ".text | test(\"battery low\")" >/dev/null'
+check "a critical notification comes back once a newer one's 5 s are up" eval 'island | jq -e ".text | test(\"battery low\")" >/dev/null'
+timeout 0.5 qs ipc call notifs clear
 
 id=$(notify-send -p "download 10%")
 until_ok 1000 eval 'island | jq -e ".text | test(\"download 10%\")" >/dev/null'
