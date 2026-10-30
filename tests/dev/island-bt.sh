@@ -58,7 +58,8 @@ until_ok 2000 mode_is btConnect
 check "Test Headphones connecting shows its connect state ($(island_text))" mode_is btConnect
 # The fake reports its 80% a second after the connect, as BlueZ does once the HFP link is up; it arrived after the last poll that missed it and by the one that read it.
 before_pct=$(now_ms)
-until reads "Test Headphones connected · 80%" || (($(now_ms) > before_pct + 3000)); do
+deadline=$((before_pct + 3000))
+until reads "Test Headphones connected · 80%" || (($(now_ms) > deadline)); do
   before_pct=$(now_ms)
   sleep 0.05
 done
@@ -103,5 +104,39 @@ until_ok 10000 shell_status >/dev/null
 check "a device already connected when the shell starts shows nothing" never_connect 3000
 connected_is() { [ "$(bus get-property org.bluez "$headphones" org.bluez.Device1 Connected 2>/dev/null)" = "b true" ]; }
 check "and it is still connected" connected_is
+
+# A low battery notifies once per device, until it reads above 30 %; each one goes to the history at normal urgency.
+until_ok 4000 bash -c '[ "$(timeout 0.5 qs ipc call island state | jq -r .mode)" = rest ]'
+warnings() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -c --arg s "$1" '[.summaries[] | select(. == $s)] | length'; }
+warned() { [ "$(warnings "$1")" = "$2" ]; }
+# A reading that should send nothing is given time to reach the shell before the check.
+headphones_read() { sleep 0.6; }
+battery "$headphones" 25
+headphones_read
+check "at 25 % nothing is sent" warned "Test Headphones battery 25%" 0
+battery "$headphones" 15
+until_ok 2000 warned "Test Headphones battery 15%" 1
+check "at 15 % one notification reads Test Headphones battery 15% ($(warnings "Test Headphones battery 15%"))" warned "Test Headphones battery 15%" 1
+normal() { jq -e --arg s "$1" '[.history[] | select(.summary == $s)] | length > 0 and all(.critical == false)' "$XDG_STATE_HOME/dots/notifications.json" >/dev/null 2>&1; }
+check "it is kept in the history at normal urgency" normal "Test Headphones battery 15%"
+battery "$headphones" 18
+headphones_read
+check "at 18 % no second one" warned "Test Headphones battery 18%" 0
+battery "$headphones" 35
+headphones_read
+battery "$headphones" 15
+until_ok 2000 warned "Test Headphones battery 15%" 2
+check "35 % then 15 % sends a second one" warned "Test Headphones battery 15%" 2
+
+# Two devices low at once send one each.
+connect "$speaker"
+battery "$speaker" 50
+battery "$headphones" 40
+headphones_read
+battery "$headphones" 12
+battery "$speaker" 10
+until_ok 2000 warned "Test Speaker battery 10%" 1
+check "two devices low at once send one each: Test Headphones battery 12% and Test Speaker battery 10%" eval 'warned "Test Headphones battery 12%" 1 && warned "Test Speaker battery 10%" 1'
+disconnect "$speaker"
 exit $((fails > 0))
 }

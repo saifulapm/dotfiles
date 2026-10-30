@@ -14,3 +14,19 @@ export function newlyConnected(seen, devices) {
 
 // A device that reports no battery drops the battery part (7NVWC788).
 export const connectText = (c) => `${deviceName(c.name, c.address)} connected${c.battery === null ? '' : ` · ${Math.round(c.battery * 100)}%`}`;
+
+// A connected device's battery below 20 % warns once, armed again above 30 %, so one hovering at 19-21 % warns once; each device keeps its own arming by address, and one not reporting keeps what it had (FP8P8H89).
+export function lowBatteries(armed, devices) {
+  const next = Object.assign({}, armed);
+  const warn = [];
+  for (const d of devices) {
+    if (!d.connected || d.battery === null) continue;
+    const pct = Math.round(d.battery * 100);
+    if (pct > 30) next[d.address] = true;
+    else if (pct < 20 && next[d.address] !== false) {
+      next[d.address] = false;
+      warn.push(`${deviceName(d.name, d.address)} battery ${pct}%`);
+    }
+  }
+  return { armed: next, warn };
+}

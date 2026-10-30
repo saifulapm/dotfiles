@@ -4,7 +4,7 @@ import QtQuick
 import ".." as Root
 import "../lib/bluetooth.mjs" as B
 
-// The island's Bluetooth states, from BlueZ's own change events: a paired device connecting shows its name and battery for 2 s.
+// The island's Bluetooth states, from BlueZ's own change events: a paired device connecting shows its name and battery for 2 s, and a low battery notifies.
 Scope {
     id: bt
 
@@ -15,6 +15,10 @@ Scope {
     readonly property string states: all.map(d => d.address + (d.connected ? " on" : " off") + (d.paired ? " paired" : "")).join(",")
     // Each device's connected as last seen, by address.
     property var seen: ({})
+    // Each connected device's battery, so a reading runs checkBatteries().
+    readonly property string batteries: all.map(d => d.address + " " + d.connected + " " + (d.batteryAvailable ? d.battery : "none")).join(",")
+    // Whether each device may warn again, by address; armed until its first warning.
+    property var armed: ({})
     // The device whose connect state shows, null while none does.
     property var device: null
     readonly property var current: device ? {
@@ -37,7 +41,21 @@ Scope {
         }
     }
 
+    // A normal-urgency notification, as the laptop's warning is, so it goes to the history (FP8P8H89).
+    function checkBatteries() {
+        const r = B.lowBatteries(armed, all.map(d => ({
+                        address: d.address,
+                        name: d.deviceName ? d.name : "",
+                        connected: d.connected,
+                        battery: d.batteryAvailable ? d.battery : null
+                    })));
+        armed = r.armed;
+        for (const text of r.warn)
+            Quickshell.execDetached(["notify-send", "-u", "normal", "-a", "Bluetooth", text]);
+    }
+
     onStatesChanged: check()
+    onBatteriesChanged: checkBatteries()
 
     // BlueZ reports a battery once the device's HFP link is up, a moment after the connect, so its arrival starts the 2 s again.
     Connections {
