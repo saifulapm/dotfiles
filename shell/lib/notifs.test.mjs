@@ -18,13 +18,26 @@ test('the history keeps 200 entries and drops the oldest', () => {
   assert.equal(h.at(-1).summary, 'n 2');
 });
 
-test('the store round-trips the history and Do Not Disturb', () => {
+test('the store round-trips the history, Do Not Disturb and the per-app rules', () => {
   const h = [entry(2), entry(1)];
-  assert.deepEqual(parseStore(storeText({ dnd: true, history: h })), { dnd: true, history: h });
+  const rules = { T: { muted: true, dnd: true, stays: 10000 }, slack: { stays: 0 } };
+  assert.deepEqual(parseStore(storeText({ dnd: true, rules, history: h })), { dnd: true, rules, history: h });
+  assert.deepEqual(Object.keys(JSON.parse(storeText({ dnd: true, rules, history: h }))), ['dnd', 'rules', 'history']);
+});
+
+test('a store saved before per-app rules loads its history unchanged, with no rules', () => {
+  const h = [entry(2), entry(1)];
+  assert.deepEqual(parseStore(JSON.stringify({ dnd: true, history: h })), { dnd: true, rules: {}, history: h });
+});
+
+test('a stored rule that is not one m, i or s could set is dropped', () => {
+  const rules = { T: { muted: true, stays: 7000 }, U: 'muted', V: { stays: 0 }, W: {}, X: { dnd: 1 }, Y: null };
+  assert.deepEqual(parseStore(JSON.stringify({ history: [], rules })).rules, { T: { muted: true }, V: { stays: 0 } });
+  assert.deepEqual(parseStore(JSON.stringify({ history: [], rules: [] })).rules, {});
 });
 
 test('a missing, broken or foreign store reads as empty', () => {
-  for (const text of ['', '{', '[]', '{"history":3}', 'null']) assert.deepEqual(parseStore(text), { dnd: false, history: [] });
+  for (const text of ['', '{', '[]', '{"history":3}', 'null']) assert.deepEqual(parseStore(text), { dnd: false, rules: {}, history: [] });
 });
 
 test('a stored entry missing its fields is dropped, and a long store is cut to 200', () => {

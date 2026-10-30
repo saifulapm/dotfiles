@@ -61,7 +61,7 @@ export function parseStore(text) {
   } catch (e) {
     data = null;
   }
-  if (data === null || typeof data !== 'object' || !Array.isArray(data.history)) return { dnd: false, history: [] };
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.history)) return { dnd: false, rules: {}, history: [] };
   const seen = {};
   const unique = data.history
     .filter(isEntry)
@@ -72,10 +72,25 @@ export function parseStore(text) {
       delete kept.files;
       return kept;
     });
-  return { dnd: data.dnd === true, history: unique.slice(0, LIMIT) };
+  return { dnd: data.dnd === true, rules: validRules(data.rules), history: unique.slice(0, LIMIT) };
 }
 
-export const storeText = (store) => JSON.stringify({ dnd: store.dnd, history: store.history });
+// A store from before per-app rules has none; a rule keeps only what m, i and s can set.
+function validRules(rules) {
+  let kept = {};
+  if (rules === null || typeof rules !== 'object' || Array.isArray(rules)) return kept;
+  for (const app in rules) {
+    const r = rules[app] !== null && typeof rules[app] === 'object' ? rules[app] : {};
+    const rule = {};
+    if (r.muted === true) rule.muted = true;
+    if (r.dnd === true) rule.dnd = true;
+    if (STAYS.includes(r.stays)) rule.stays = r.stays;
+    kept = withRule(kept, app, rule);
+  }
+  return kept;
+}
+
+export const storeText = (store) => JSON.stringify({ dnd: store.dnd, rules: store.rules, history: store.history });
 
 // The entries a search shows: its text in the app, summary or body, ignoring case.
 export function visible(history, query) {

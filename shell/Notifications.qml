@@ -10,7 +10,7 @@ Item {
     id: centre
 
     required property var theme
-    // The Notifs service: its history, Do Not Disturb and the remove, clear and act calls.
+    // The Notifs service: its history, Do Not Disturb, per-app rules and the remove, clear, act and rule calls.
     required property var notifs
     property bool shown: false
     // True while a row's drag runs, so the surfaces' window lets the pointer through to the app it drops on.
@@ -33,7 +33,7 @@ Item {
         tokens: centre.theme.tokens
     }
     // The caps voices write d and D alike, so clear all reads ⇧D.
-    readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["/", "search"], ["esc", "close"]])
+    readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["m", "mute"], ["i", "DND"], ["s", "stay"], ["/", "search"], ["esc", "close"]])
     readonly property var hintKeys: look.keys([["/", "search"], ["esc", "close"]])
     readonly property var groups: Lib.group(Lib.visible(notifs.history, query))
     // One row per entry in group order; the first of each group carries its header.

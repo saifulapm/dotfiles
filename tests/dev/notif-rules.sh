@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Per-app rules from Mod+A on the selected row's app, by its exact name: m mutes it, i lets it through Do Not Disturb, s sets how long it stays.
+# Per-app rules from Mod+A on the selected row's app, by its exact name: m mutes it, i lets it through Do Not Disturb, s sets how long it stays; notifications.json keeps them.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -21,7 +21,7 @@ seen=
 key_on_newest() {
   niri msg action spawn -- dots-call notifs open
   until_ok 3000 centre_open
-  wtype "${@:-}"
+  [ $# -eq 0 ] || wtype "$@"
   sleep 0.3
   seen=$(notifs)
   wtype -k Escape
@@ -117,6 +117,26 @@ since=$(island | jq .since)
 until_ok 5000 mode_is rest
 held=$(held_since "$since")
 check "with stays 3 s, -t 0 leaves after 3 s (${held} ms)" test "$held" -ge 2900 -a "$held" -le 3500
+
+store=$XDG_STATE_HOME/dots/notifications.json
+store_is() { jq -e "$1" "$store" >/dev/null; }
+check "notifications.json holds rules with key T beside dnd ($(jq -c .rules "$store"))" store_is '(.rules.T == {dnd: true, stays: 3000}) and (.rules.slack == {muted: true}) and has("dnd")'
+key_on_newest
+before=$(jq -c '[.heads[].text]' <<<"$seen")
+check "the legend shows m mute, i DND and s stay ($(jq -c .legend <<<"$seen"))" eval 'jq -e ".legend | ascii_downcase | contains(\"m mute  i dnd  s stay\")" <<<"$seen" >/dev/null'
+systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+# The unit restarts after 500 ms; until then the old instance's socket may still answer.
+sleep 0.8
+until_ok 5000 shell_status >/dev/null
+key_on_newest
+check "after a shell restart the heading suffixes read as before ($before)" test "$(jq -c '[.heads[].text]' <<<"$seen")" = "$before"
+
+# A store saved before v2.6 has no rules.
+printf '{"dnd":false,"history":[{"key":"1-1","id":1,"app":"old","summary":"old 1","body":"b","time":1,"actions":[]}]}\n' >"$store"
+systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+sleep 0.8
+until_ok 5000 shell_status >/dev/null
+check "a notifications.json from before v2.6 loads its history unchanged, with no rules ($(notifs | jq -c '[.summaries, .rules]'))" state_is '.summaries == ["old 1"] and .rules == {} and .dnd == false'
 
 exit $((fails > 0))
 }
