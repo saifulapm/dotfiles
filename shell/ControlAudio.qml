@@ -1,6 +1,7 @@
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import QtQuick
+import "." as Root
 import "lib/control.mjs" as Lib
 import "lib/control-audio.mjs" as A
 import "lib/voice.mjs" as V
@@ -133,6 +134,12 @@ Item {
         mover.running = true;
     }
 
+    function changed(code) {
+        const toast = A.changeToast(code);
+        if (toast)
+            Root.State.toast(toast);
+    }
+
     function state() {
         return {
             defaultSink: defaultSink ? defaultSink.name : null,
@@ -149,11 +156,15 @@ Item {
 
     Process {
         id: mover
+        onExited: code => audio.changed(code)
     }
 
     Process {
         id: setter
-        onExited: audio.readDevices()
+        onExited: code => {
+            audio.changed(code);
+            audio.readDevices();
+        }
     }
 
     Process {

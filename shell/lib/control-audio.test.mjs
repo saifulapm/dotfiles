@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { appStreams, appTitle, appRow, nextSink, devices, nextProfile, nextRoute, deviceParts } from './control-audio.mjs';
+import { appStreams, appTitle, appRow, nextSink, devices, nextProfile, nextRoute, deviceParts, changeToast } from './control-audio.mjs';
 
 // The MacBook's two Built-in Audio cards, as pw-dump read them on 2026-10-30: 45 with off, HiFi and pro-audio, 46 with a route each way.
 const dump = JSON.parse(readFileSync(new URL('./testdata/pw-dump-builtin.json', import.meta.url)));
@@ -81,4 +81,9 @@ test("a device row's detail adds its profile and port", () => {
 test('a profile described as Default is named instead', () => {
   assert.deepEqual(deviceParts(builtin[46], 'Output', 0), ['HiFi', 'Speakers']);
   assert.deepEqual(deviceParts(builtin[46], 'Output', 1), ['HiFi']);
+});
+
+test('a wpctl or pw-metadata call that fails says so, and one that works says nothing', () => {
+  assert.equal(changeToast(3), 'Audio change failed');
+  assert.equal(changeToast(0), null);
 });

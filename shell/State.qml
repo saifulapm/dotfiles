@@ -6,6 +6,9 @@ import "lib/motion.mjs" as M
 
 // Shell-wide state that `qs ipc call shell status` reports.
 Singleton {
+    // A line for the island's toast slot from a surface that has no island of its own.
+    signal toast(string text)
+
     // Names of the surfaces that have loaded; each appends itself when made, in the warm-up after the first frame or on an earlier open.
     property list<string> loaded: []
     property list<QtObject> ticks: []

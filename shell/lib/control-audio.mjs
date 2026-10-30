@@ -74,3 +74,8 @@ export function deviceParts(device, direction, cardDevice) {
   const profile = p && (p.description === 'Default' ? p.name : p.description);
   return [profile, activeRoute(device, direction, cardDevice)?.description].filter(Boolean);
 }
+
+// A change that fails, as on a device removed a moment before, leaves the row as it was and says so in the island for 1.5 s.
+export function changeToast(exitCode) {
+  return exitCode === 0 ? null : 'Audio change failed';
+}

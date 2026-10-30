@@ -702,6 +702,13 @@ PanelWindow {
     }
 
     Connections {
+        target: Root.State
+        function onToast(text) {
+            island.showToast(text);
+        }
+    }
+
+    Connections {
         target: island.theme
         function onNotice(text) {
             island.notice = text;
