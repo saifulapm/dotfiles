@@ -9,7 +9,7 @@ fi
 cd "$(dirname "$0")" || exit 1
 failed=0
 for t in *.sh; do
-  [ "$t" = lib.sh ] || [ "$t" = run.sh ] && continue
+  case $t in lib*.sh | run.sh) continue ;; esac
   echo "== $t"
   bash "$t" || failed=1
 done
