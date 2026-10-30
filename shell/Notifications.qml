@@ -39,7 +39,7 @@ Item {
     // One row per entry in group order; the first of each group carries its header.
     readonly property var rows: groups.reduce((all, g) => all.concat(g.entries.map((e, i) => ({
                         entry: e,
-                        head: i === 0 ? look.groupHead(g.app, g.entries.length) : ""
+                        head: i === 0 ? look.groupHead(g.app, g.entries.length) + Lib.ruleText(notifs.rules[g.app]) : ""
                     }))), [])
 
     function open(t0) {
@@ -73,6 +73,13 @@ Item {
         const row = rows[selected];
         if (row && notifs.act(row.entry.key))
             close();
+    }
+
+    // m, i and s set a rule for the selected row's app.
+    function toggleRule(field) {
+        const row = rows[selected];
+        if (row)
+            notifs.toggleRule(row.entry.app, field);
     }
 
     function dismiss() {
@@ -152,7 +159,7 @@ Item {
 
     visible: motion.drawing
 
-    // Holds focus while the list is in use, where plain j/k move and d, D and / act.
+    // Holds focus while the list is in use, where plain j/k move and d, D, m and / act.
     Item {
         id: keys
         anchors.fill: parent
@@ -168,6 +175,8 @@ Item {
                 centre.notifs.clear();
             else if (event.key === Qt.Key_D)
                 centre.dismiss();
+            else if (event.key === Qt.Key_M)
+                centre.toggleRule("muted");
             else if (event.key === Qt.Key_Slash)
                 input.forceActiveFocus();
             else if (event.key === Qt.Key_Escape)

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, ruleText } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -170,4 +170,25 @@ test('a hold paused as it ran out still resumes, and one until dismissed never d
   assert.equal(resumeMs(Object.assign(entry(1), { timeout: -1 }), -20), 1500);
   assert.equal(resumeMs(Object.assign(entry(1), { critical: true, timeout: -1 }), 0), 0);
   assert.equal(resumeMs(Object.assign(entry(1), { timeout: 0 }), 0), 0);
+});
+
+test('a muted app goes to the history only, its criticals too, and Do Not Disturb still lets criticals through', () => {
+  const muted = { muted: true };
+  assert.equal(shows(entry(1), muted, false), false);
+  assert.equal(shows(critical(1), muted, false), false);
+  assert.equal(shows(entry(1), undefined, false), true);
+  assert.equal(shows(entry(1), undefined, true), false);
+  assert.equal(shows(critical(1), undefined, true), true);
+});
+
+test('m mutes an app by its exact name, and m again leaves it with no rule', () => {
+  const once = toggle({}, 'slack', 'muted');
+  assert.deepEqual(once, { slack: { muted: true } });
+  assert.equal(once.Slack, undefined);
+  assert.deepEqual(toggle(once, 'slack', 'muted'), {});
+});
+
+test('a group heading ends with the rule of its app, and no rule adds nothing', () => {
+  assert.equal(ruleText({ muted: true }), ' · muted');
+  assert.equal(ruleText(undefined), '');
 });

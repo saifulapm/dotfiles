@@ -17,6 +17,8 @@ Scope {
     property var history: []
     // While on, a notification goes to the history only, and the island stays at rest; a critical one still shows.
     property bool dnd: false
+    // Per-app rules by exact app name, set from Mod+A: a muted app's notifications go to the history only, criticals too.
+    property var rules: ({})
     // The live Notification behind each history key, for its actions; dropped with its entry.
     property var live: ({})
     // While the pointer is on the island, Mod+I focuses it or a drag holds it, the hold waits with the ms it has left; 0 is until dismissed.
@@ -53,6 +55,10 @@ Scope {
         save();
     }
 
+    function toggleRule(app, field) {
+        rules = N.toggle(rules, app, field);
+    }
+
     function remember(e, n) {
         history = N.addEntry(history, e);
         const kept = {};
@@ -71,7 +77,7 @@ Scope {
 
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
     function show(e) {
-        if (dnd && !e.critical)
+        if (!N.shows(e, rules[e.app], dnd))
             return;
         waiting = N.setAside(waiting, current, e.key);
         current = e;
@@ -112,8 +118,9 @@ Scope {
     function next() {
         current = null;
         hold.stop();
-        if (waiting.length)
-            show(waiting[0]);
+        const e = waiting.find(w => N.shows(w, rules[w.app], dnd));
+        if (e)
+            show(e);
     }
 
     // A Notify that replaces an earlier one updates that object in place, so its entry is rebuilt under the same key.

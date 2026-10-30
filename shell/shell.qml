@@ -204,7 +204,7 @@ ShellRoot {
         function state(): string {
             const h = notifsService.history;
             const centre = surfacesLoader.item?.notifications?.state() ?? { open: false, query: "", selected: 0, groups: [], hint: false, openMs: null, opens: 0 };
-            return JSON.stringify(Object.assign(centre, { dnd: notifsService.dnd, count: h.length, summaries: h.map(e => e.summary) }));
+            return JSON.stringify(Object.assign(centre, { dnd: notifsService.dnd, rules: notifsService.rules, count: h.length, summaries: h.map(e => e.summary) }));
         }
     }
 
