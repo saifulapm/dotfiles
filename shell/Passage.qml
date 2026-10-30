@@ -11,11 +11,15 @@ Scope {
     required property var theme
     // Each output's paper; state reads what each one's sheets drew.
     required property var papers
+    // The desk's clock, whose per-minute tick turns the day at local midnight.
+    required property var clock
     readonly property string backend: Quickshell.env("DOTS_DEEN") || "deen"
     // The date the IPC set; "" is today.
     property string pinned: ""
     readonly property var entries: P.parse(list.text()).entries
-    readonly property var pick: entries.length ? P.pick(P.dayOf(pinned || P.today(new Date())), entries) : null
+    // A string, so a tick on the same date, or a pinned date at midnight, leaves the pick and its read alone.
+    readonly property string date: pinned || P.today(clock.now)
+    readonly property var pick: entries.length ? P.pick(P.dayOf(date), entries) : null
     // `deen api surahs`, read once, the first time an ayah needs its surah's name; a day it failed for asks no more, and a later day asks again.
     property string surahs: ""
     property var surahsFor: null
@@ -37,6 +41,7 @@ Scope {
         }
         if (pick.kind === "ayah" && !surahs && surahsFor !== pick) {
             surahsFor = pick;
+            surahsRead.startedAt = Date.now();
             surahsRead.running = true;
             return;
         }
@@ -45,7 +50,22 @@ Scope {
             return;
         entryRead.reading = pick;
         entryRead.command = [backend].concat(args);
+        entryRead.startedAt = Date.now();
         entryRead.running = true;
+    }
+
+    // A deen run still going 30 s after it started ends at the clock's tick, so a deen that hangs falls back rather than leaving the paper empty.
+    function endHung() {
+        for (const run of [surahsRead, entryRead])
+            if (run.running && Date.now() - run.startedAt >= 30000)
+                run.running = false;
+    }
+
+    Connections {
+        target: passage.clock
+        function onNowChanged() {
+            passage.endHung();
+        }
     }
 
     // A day deen could not answer draws its fallback quote instead.
@@ -65,6 +85,8 @@ Scope {
 
     Process {
         id: surahsRead
+        // When read() started it; running turns true only once the process is up.
+        property real startedAt: 0
         command: [passage.backend, "api", "surahs"]
         stdout: StdioCollector {
             onStreamFinished: {
@@ -78,6 +100,7 @@ Scope {
     Process {
         id: entryRead
         property var reading: null
+        property real startedAt: 0
         stdout: StdioCollector {
             id: entryOut
         }

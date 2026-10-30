@@ -23,6 +23,8 @@ Scope {
     readonly property alias reminders: remindersService
     // The Surfaces window takes the keyboard while niri's overview is open, which it reads through this.
     readonly property alias niri: niriService
+    // The day's passage turns over on the clock's per-minute tick, which it reads through this.
+    readonly property alias clock: clockService
 
     Services.Niri {
         id: niriService
