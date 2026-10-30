@@ -19,6 +19,7 @@ ShellRoot {
     property var polkit: null
     property var pinentry: null
     property var portal: null
+    property var passage: null
 
     // Qt.createComponent fails quietly, so a file that does not compile names its error in the journal.
     function compiled(url) {
@@ -36,6 +37,7 @@ ShellRoot {
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
         pinentry = compiled("Pinentry.qml").createObject(root, { surfaces: surfacesLoader });
         portal = compiled("Portal.qml").createObject(root, { surfaces: surfacesLoader });
+        passage = compiled("Passage.qml").createObject(root, { theme: themeService });
         warmStart.start();
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,
