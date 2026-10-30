@@ -140,9 +140,9 @@ Item {
                 return f ? { text: f.text, box: box(f) } : null;
             }),
             // Each row's action chips as drawn; only the selected row draws them.
-            actions: rows.map((r, i) => list.itemAtIndex(i)?.actionsDrawn ?? []),
+            actions: rows.map((r, i) => list.itemAtIndex(i)?.actionsDrawn() ?? []),
             // The selected row's first chip: its key and word colours, and the fill behind them, the chip's own, else the cursor row's.
-            actionInk: list.itemAtIndex(selected)?.actionInk ?? null,
+            actionInk: list.itemAtIndex(selected)?.actionInk() ?? null,
             // Each group's head as drawn: its text, whether it elides, and how many lines it takes.
             heads: rows.map((r, i) => list.itemAtIndex(i)).filter(d => d && d.headItem.visible).map(d => ({
                         text: d.headItem.text,
@@ -404,8 +404,8 @@ Item {
                         readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
                         // After a restart no live notification is left behind an entry, so its row draws no chips.
                         readonly property var actionChips: current && centre.notifs.live[modelData.entry.key] ? look.keys(Lib.chipsOf(modelData.entry.actions).map(c => [c.key, V.line(c.text)])) : []
-                        readonly property var actionsDrawn: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn)
-                        readonly property var actionInk: actionRepeater.count ? (k => [String(k.keyColor), String(k.wordColor), String(k.color.a > 0 ? k.color : rowBox.color)])(actionRepeater.itemAt(0)) : null
+                        function actionsDrawn() { return Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn); }
+                        function actionInk() { return actionRepeater.count ? (k => [String(k.keyColor), String(k.wordColor), String(k.color.a > 0 ? k.color : rowBox.color)])(actionRepeater.itemAt(0)) : null; }
                         width: list.width
 
                         // An app name can be any length; it elides inside the card, before its rule.

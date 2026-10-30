@@ -60,3 +60,12 @@ test('no QML file names a method after a JavaScript global', () => {
     [],
   );
 });
+
+// QML does not track itemAt, so a readonly property over it never sees the items a Repeater makes; read them in a function.
+test('no QML file binds a readonly property over itemAt', () => {
+  const files = readdirSync(qml, { recursive: true }).filter((f) => f.endsWith('.qml'));
+  assert.deepEqual(
+    files.filter((f) => /readonly property.*\bitemAt\(/.test(readFileSync(qml + f, 'utf8'))),
+    [],
+  );
+});
