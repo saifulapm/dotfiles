@@ -1,9 +1,10 @@
 import Quickshell.Services.Pipewire
 import QtQuick
 import "lib/control.mjs" as Lib
+import "lib/control-audio.mjs" as A
 import "lib/voice.mjs" as V
 
-// Control's Audio section: every sink, then every source, from PipeWire's own change events.
+// Control's Audio section: every sink, then every playing app, then every source, from PipeWire's own change events.
 Item {
     id: audio
 
@@ -12,7 +13,29 @@ Item {
     readonly property var look: V.listLook(theme.tokens)
 
     readonly property var all: Pipewire.nodes.values.filter(n => n.audio && !n.isStream)
-    readonly property var nodes: all.filter(n => n.isSink).concat(all.filter(n => !n.isSink))
+    readonly property var sinks: all.filter(n => n.isSink)
+    readonly property var sources: all.filter(n => !n.isSink)
+    readonly property var streams: Pipewire.nodes.values.filter(n => n.audio && n.isStream)
+    // A group's node can go a moment before the group does, so each end is read with a null check (research-v26-platform).
+    readonly property var links: Pipewire.linkGroups.values.map(g => ({
+                source: g.source?.id ?? -1,
+                target: g.target?.id ?? -1,
+                active: g.state === PwLinkState.Active
+            }))
+    readonly property var apps: A.appStreams(streams.map(n => ({
+                id: n.id,
+                props: n.properties ?? {}
+            })), links, sinks.map(n => n.id)).map(a => ({
+                node: streams.find(n => n.id === a.id),
+                sink: sinks.find(n => n.id === a.sink)
+            }))
+    // Each row's node, and for an app the sink it plays on.
+    readonly property var entries: sinks.map(n => ({
+                node: n
+            })).concat(apps, sources.map(n => ({
+                node: n
+            })))
+    readonly property var nodes: entries.map(e => e.node)
     // The preferred node is the one Enter sets, which the session manager then makes the default; one binding per Pipewire property, since Quickshell 0.3.2 hands a binding that reads both a freed node while the default vanishes.
     readonly property PwNode preferredSink: Pipewire.preferredDefaultAudioSink
     readonly property PwNode currentSink: Pipewire.defaultAudioSink
@@ -20,24 +43,35 @@ Item {
     readonly property PwNode currentSource: Pipewire.defaultAudioSource
     readonly property PwNode defaultSink: preferredSink ?? currentSink
     readonly property PwNode defaultSource: preferredSource ?? currentSource
-    readonly property var rows: nodes.map(n => Lib.audioRow({
-                name: n.name,
-                description: n.description,
-                isSink: n.isSink,
-                volume: n.audio.volume,
-                muted: n.audio.muted,
-                isDefault: n === (n.isSink ? defaultSink : defaultSource)
-            }))
+    readonly property var rows: entries.map(e => e.sink ? A.appRow({
+                    title: A.appTitle(e.node.properties ?? {}),
+                    sink: e.sink.description || e.sink.name,
+                    volume: e.node.audio.volume,
+                    muted: e.node.audio.muted
+                }) : Lib.audioRow({
+                    name: e.node.name,
+                    description: e.node.description,
+                    isSink: e.node.isSink,
+                    volume: e.node.audio.volume,
+                    muted: e.node.audio.muted,
+                    isDefault: e.node === (e.node.isSink ? defaultSink : defaultSource)
+                }))
+
+    // An app that stops takes its row, so the selection never points past the last.
+    onRowsChanged: selected = Math.min(selected, Math.max(0, rows.length - 1))
 
     function key(event) {
-        const node = nodes[selected];
-        if (!node)
+        const entry = entries[selected];
+        if (!entry)
             return false;
+        const node = entry.node;
         if (event.key === Qt.Key_H || event.key === Qt.Key_L)
             node.audio.volume = Lib.stepVolume(node.audio.volume, event.key === Qt.Key_L ? 1 : -1);
         else if (event.key === Qt.Key_M)
             node.audio.muted = !node.audio.muted;
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (entry.sink)
+                return false;
             if (node.isSink)
                 Pipewire.preferredDefaultAudioSink = node;
             else
@@ -58,7 +92,12 @@ Item {
     implicitHeight: hint.implicitHeight
 
     PwObjectTracker {
-        objects: audio.nodes
+        objects: audio.all
+    }
+
+    // A stream's properties, volume and mute, and a link's state, arrive only once bound, so they are bound while the section is drawn.
+    PwObjectTracker {
+        objects: audio.visible ? audio.streams.concat(Pipewire.linkGroups.values) : []
     }
 
     Text {
