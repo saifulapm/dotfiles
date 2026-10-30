@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, columnPosition, configNotifies, reconnected } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, columnPosition, edgeToEdge, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -182,6 +182,17 @@ test('a floating window, an empty workspace or no event yet has no column', () =
   assert.equal(columnPosition(run([shown, windows(win(1, 1), win(2, null)), activeWindow(2)]), 'eDP-1'), null);
   assert.equal(columnPosition(run([shown, windows(win(1, 1, 2))]), 'eDP-1'), null);
   assert.equal(columnPosition(initial, 'eDP-1'), null);
+});
+
+// eDP-1 is 2048 px wide at scale 1.25: Mod+F leaves a 1984 px tile inside the struts, and Mod+M or fullscreen a 2048 px one.
+const sized = (id, w) => ({ ...win(id, 1), layout: { ...win(id, 1).layout, tile_size: [w, 1196.0] } });
+
+test('only a shown window as wide as its output is edge to edge', () => {
+  assert.equal(edgeToEdge(run([shown, windows(sized(1, 2048.0)), activeWindow(1)]), 'eDP-1', 2048), true);
+  assert.equal(edgeToEdge(run([shown, windows(sized(1, 1984.0)), activeWindow(1)]), 'eDP-1', 2048), false);
+  assert.equal(edgeToEdge(run([shown, windows(sized(1, 2048.0), sized(2, 1984.0)), activeWindow(2)]), 'eDP-1', 2048), false);
+  assert.equal(edgeToEdge(run([shown, windows(sized(1, 2048.0)), activeWindow(1)]), 'HDMI-A-1', 2048), false);
+  assert.equal(edgeToEdge(initial, 'eDP-1', 2048), false);
 });
 
 // Each line a ConfigLoaded, as niri sends it on every load and once in the first burst; counts the notifications along the way.

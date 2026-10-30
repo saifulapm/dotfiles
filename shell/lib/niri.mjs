@@ -101,6 +101,13 @@ export function columnPosition(state, output) {
   return { at, of: Math.max(...cols) };
 }
 
+// Whether the output's shown window spans its whole logical width, as only maximize-window-to-edges and fullscreen do, since the struts keep every tile 32 px in.
+export function edgeToEdge(state, output, width) {
+  const ws = state.workspaces.find((w) => w.output === output && w.is_active);
+  const win = ws && state.windows.find((w) => w.id === ws.active_window_id);
+  return !!win && win.layout.tile_size[0] >= width - 1;
+}
+
 export function focusedOutput(state) {
   return state.workspaces.find((w) => w.is_focused)?.output ?? null;
 }

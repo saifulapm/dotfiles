@@ -20,13 +20,22 @@ edge_is_ink() { edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); [ "$edge
 until_ok 1000 edge_is_ink
 check "niri draws foot's ink frame at x=32 ($edge)" edge_is_ink
 
-# Maximized to edges, foot fills the output below the margins' 41 px zone, so no margin word lands on it.
+# Maximized to edges, foot fills the whole output and the margins and the island hide, as for a fullscreen window.
 niri msg action maximize-window-to-edges
 out_h=$(niri msg -j outputs | jq '.[].logical.height' | head -n1)
-under_margins() { [ "$(niri msg -j focused-window | jq '.layout.tile_size[1] | floor')" = $((out_h - 41)) ]; }
-until_ok 1000 under_margins
-check "a window maximized to edges is $((out_h - 41)) px tall, under the margins" under_margins
+fills() { [ "$(niri msg -j focused-window | jq '.layout.tile_size[1] | floor')" = "$out_h" ]; }
+until_ok 1000 fills
+check "a window maximized to edges is $out_h px tall" fills
+bar_hidden() { margins | jq -e '.shown == false' >/dev/null 2>&1 && island | jq -e '.shown == false' >/dev/null 2>&1; }
+until_ok 1000 bar_hidden
+check "the margins and the island hide over it" bar_hidden
+# foot's own background, not the paper, now sits where the margin rule was.
+strip=$(grim -s 1 -t ppm -g "40,30 10x10" - | mean_rgb)
+check "foot covers the margin strip ($strip)" test "$strip" != "241 233 216"
 niri msg action maximize-window-to-edges
+bar_back() { margins | jq -e '.shown == true' >/dev/null 2>&1 && island | jq -e '.shown == true' >/dev/null 2>&1; }
+until_ok 1000 bar_back
+check "the margins and the island come back once it is unmaximized" bar_back
 
 # foot's shell retitles the window once it starts, so the title is read again on every poll.
 left_is_foot() {

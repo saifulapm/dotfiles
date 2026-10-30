@@ -23,6 +23,10 @@ Scope {
         return N.columnPosition(state, output);
     }
 
+    function edgeToEdge(output, width) {
+        return N.edgeToEdge(state, output, width);
+    }
+
     function shares(ownPid) {
         return N.shares(state, ownPid);
     }

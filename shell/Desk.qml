@@ -183,7 +183,7 @@ Scope {
         function state(): string {
             const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
             const shown = marginsVariants.instances.find(m => m.screen.name === niriService.focusedOutput);
-            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), mail: shown ? shown.mail : 0, wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null }));
+            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), mail: shown ? shown.mail : 0, wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null, shown: shown ? shown.visible : false }));
         }
     }
 
@@ -192,7 +192,7 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks, cities: island.citiesDrawn(), grid: island.gridDrawn() } : null;
-            return JSON.stringify({ mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), capture: island.captureState(), sharing: island.sharingState(), pairing: island.pairingState() });
+            return JSON.stringify({ shown: island.visible, mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), capture: island.captureState(), sharing: island.sharingState(), pairing: island.pairingState() });
         }
 
         function focus(): void {

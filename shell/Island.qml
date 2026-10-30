@@ -722,6 +722,8 @@ PanelWindow {
     onQuestionIdChanged: release()
 
     screen: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
+    // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it.
+    visible: !niri.edgeToEdge(niri.focusedOutput, screen.width)
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-island"
     WlrLayershell.keyboardFocus: focused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

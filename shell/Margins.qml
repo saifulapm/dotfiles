@@ -31,8 +31,9 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-margins"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    // Auto reserves the 41 px strip, so a window maximized to edges stops under the rule; the theme's top strut takes the 41 back for tiled windows.
-    exclusionMode: ExclusionMode.Auto
+    // The margins hide while the shown window runs edge to edge, so they need no zone and a Mod+M window fills the output.
+    exclusionMode: ExclusionMode.Ignore
+    visible: !niri.edgeToEdge(screen.name, screen.width)
     anchors {
         top: true
         left: true
