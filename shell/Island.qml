@@ -484,7 +484,7 @@ PanelWindow {
             value: osdValue.text,
             valueFont: [osdValue.font.family, osdValue.font.pixelSize],
             bars: osdLook.bars,
-            lit: osdLook.bars === "blocks" ? litBlocks.text.length : osdLook.bars === "bars" ? Array.from({ length: 20 }, (_, i) => barRepeater.itemAt(i)).filter(b => b && b.on).length : Math.round(roundFill.width / roundTrack.width * 20),
+            lit: osdBars.drawn,
             valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
         };
     }
@@ -1710,74 +1710,11 @@ PanelWindow {
                         }
                     }
 
-                    Item {
+                    OsdBars {
+                        id: osdBars
                         Layout.fillWidth: true
-                        implicitHeight: 14
-                        readonly property int lit: island.osdLook.litCount(island.heldOsd?.value ?? 0)
-
-                        // Paper: 20 bars, the lit ones tall in the accent.
-                        Row {
-                            visible: island.osdLook.bars === "bars"
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 3
-
-                            Repeater {
-                                id: barRepeater
-                                model: 20
-
-                                Rectangle {
-                                    required property int index
-                                    readonly property bool on: index < parent.parent.lit
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 4
-                                    height: on ? 14 : 8
-                                    color: on ? island.osdLook.lit.color : island.osdLook.unlit.color
-                                }
-                            }
-                        }
-
-                        // Blueprint: a run of ▮ blocks, the unlit ones in the line colour.
-                        Row {
-                            visible: island.osdLook.bars === "blocks"
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            Text {
-                                id: litBlocks
-                                textFormat: Text.PlainText
-                                text: "▮".repeat(parent.parent.lit)
-                                color: island.osdLook.lit.color
-                                font.family: island.osdLook.value.font
-                                font.pixelSize: 12
-                                font.letterSpacing: 0.6
-                            }
-                            Text {
-                                textFormat: Text.PlainText
-                                text: "▮".repeat(20 - parent.parent.lit)
-                                color: island.osdLook.unlit.color
-                                font.family: island.osdLook.value.font
-                                font.pixelSize: 12
-                                font.letterSpacing: 0.6
-                            }
-                        }
-
-                        // Artboard: one rounded bar.
-                        Rectangle {
-                            id: roundTrack
-                            visible: island.osdLook.bars === "round"
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width
-                            height: 6
-                            radius: 3
-                            color: island.osdLook.unlit.color
-
-                            Rectangle {
-                                id: roundFill
-                                width: parent.width * Math.min(Math.max(island.heldOsd?.value ?? 0, 0), 100) / 100
-                                height: parent.height
-                                radius: parent.radius
-                                color: island.osdLook.lit.color
-                            }
-                        }
+                        look: island.osdLook
+                        value: island.heldOsd?.value ?? 0
                     }
 
                     Text {
