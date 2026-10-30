@@ -627,6 +627,7 @@ PanelWindow {
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,
             actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn),
+            actionBoxes: Array.from({ length: actionRepeater.count }, (_, i) => at(actionRepeater.itemAt(i))),
             dragging: noteDragging,
             frame: [box.style.frame.width, String(box.style.frame.color)],
             faceUrl: noteFace.url
@@ -2583,7 +2584,17 @@ PanelWindow {
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: mouse => mouse.button === Qt.RightButton ? island.putAway() : island.openNotification()
+            // A click on an action chip runs that action alone; the area covers the card, so it finds the chip itself.
+            onClicked: mouse => {
+                if (mouse.button === Qt.RightButton)
+                    return island.putAway();
+                for (let i = 0; i < actionRepeater.count; i++) {
+                    const chip = actionRepeater.itemAt(i);
+                    if (chip.contains(chip.mapFromItem(noteArea, mouse.x, mouse.y)))
+                        return island.runChip(chip.modelData.key);
+                }
+                island.openNotification();
+            }
             // A file notification drags from its chip only; one with no file drags its body from anywhere.
             property bool onChip: false
             onPressed: mouse => {

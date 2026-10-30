@@ -180,5 +180,30 @@ check "the centre row's chip drops file://$heic on the window under the centre (
 check "and the centre is still open after the drop" centre_is '.open'
 close_centre
 
+# A click on an action chip runs that action, and the card's own click, the default action, does not run as well. Only a resident notification is still there to take both, and notify-send prints only the first, so a resident one is sent and the bus is read.
+acted=$DOTS_DEV_DIR/acted
+gdbus monitor --session --dest org.freedesktop.Notifications >"$acted" &
+monitor=$!
+gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
+  --method org.freedesktop.Notifications.Notify T 0 "" "click me" "" '["default", "Open", "yes", "Yes"]' '{"resident": <true>}' 0 >/dev/null
+toast_for "click me"
+box=$(island | jq -c '.note.actionBoxes[0]')
+point click "$(jq -r '(.x + .w / 2) | floor' <<<"$box")" "$(jq -r '(.y + .h / 2) | floor' <<<"$box")"
+invoked() { grep -o "ActionInvoked (uint32 [0-9]*, '[a-z]*')" "$acted" | grep -o "'[a-z]*'" | tr -d "'" | paste -sd ' '; }
+invoked_yes() { [ -n "$(invoked)" ]; }
+until_ok 2000 invoked_yes
+sleep 0.5
+check "a click on [1] Yes invokes yes alone, not default ($(invoked))" test "$(invoked)" = yes
+kill "$monitor"
+
+# The file chip still drags with action chips beside it; notify-send -A waits for an action, so it is let go after.
+notify-send -a Tailscale -h "string:x-dots-files:$heic" -A open=Open -A save=Save "Taildrop · acts" "${heic##*/}" >/dev/null &
+sender=$!
+toast_for "Taildrop · acts"
+check "a file notification with actions draws its chips ($(island | jq -c .note.actions))" note_is '(.note.actions | length) == 2'
+drag_to_target "$(island | jq -c .note.chipBox)"
+check "and its file chip drops file://$heic ($(drops -1))" test "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
+kill "$sender"
+
 exit $((fails > 0))
 }
