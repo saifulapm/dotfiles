@@ -47,7 +47,16 @@ check "no value draws no bar ($(note bar))" state_is '.note.bar == null'
 # A picture draws as a 48 px thumbnail at the card's right, from a file or from image data, but not when it is the app icon's own file.
 pic=$(mktemp --suffix=.png)
 cleanup() { rm -f "$pic"; }
-cp /usr/share/pixmaps/helix.png "$pic"
+ffmpeg -loglevel error -y -f lavfi -i color=c=0xff00ff:s=96x96 -frames:v 1 "$pic"
+# Pixels on the whole nested output within 12 of the picture's magenta.
+magenta() {
+  grim -t ppm - | node -e '
+    const b = require("fs").readFileSync(0), head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
+    let n = 0;
+    for (let i = 0; i < head[1] * head[2]; i++) if (px[i * 3] > 242 && px[i * 3 + 1] < 13 && px[i * 3 + 2] > 242) n++;
+    console.log(n);
+  '
+}
 right_thumb='.note.picture.w == 48 and .note.picture.h == 48 and .note.picture.x > .note.summaryBox.x + .note.summaryBox.w'
 for t in paper artboard blueprint; do
   in_theme "$t"
@@ -58,6 +67,19 @@ done
 notify "Art" 0 "" data "" '[]' '{"image-data": <(2, 2, 8, true, 8, 4, [byte 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255])>}' 5000
 shown data
 check "image data sent by gdbus draws the same ($(note picture))" state_is "$right_thumb"
+# Mod+A's rows are text only: with the card gone, the open centre shows none of the picture's pixels.
+notify-send -a Art -h string:image-path:"$pic" "Cover row"
+shown "cover row"
+check "the card's thumbnail is magenta on screen ($(magenta) px)" test "$(magenta)" -gt 1000
+until_ok 7000 state_is '.mode == "rest"'
+notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+niri msg action spawn -- dots-call notifs open
+until_ok 3000 eval 'notifs | jq -e .open >/dev/null'
+sleep 0.5
+check "its Mod+A row draws no picture ($(magenta) px)" test "$(magenta)" = 0
+niri msg action spawn -- dots-call notifs close
+until_ok 2000 eval 'notifs | jq -e ".open == false" >/dev/null'
+
 in_theme artboard
 notify "Art" 0 "$pic" same "" '[]' "{\"image-path\": <\"$pic\">}" 5000
 shown same
@@ -68,7 +90,6 @@ shown themed
 check "an icon theme's file in image-path is the icon, not a picture ($(note picture))" state_is '.note.picture == null and .note.icon != null'
 
 # A stack tag keeps one notification per app and tag, on the island and in the history.
-notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 held() { notifs | jq --arg s "$1" '[.summaries[] | select(. == $s)] | length'; }
 timeout 0.5 qs ipc call notifs clear >/dev/null
 for p in 20 60 100; do
@@ -78,6 +99,12 @@ done
 check "three sends in one stack leave one Download in the history ($(held Download))" test "$(held Download)" = 1
 sleep 1
 check "and its card stays on the island, full ($(note bar))" state_is '.mode == "notification" and .note.bar == 20'
+# The older object's close comes as the newer one takes its key, and must leave the newer one's actions live.
+notify-send -a dl -h string:x-dunst-stack-tag:dl -A yes=Yes Download >/dev/null &
+sender=$!
+check "a stacked send keeps its action chip ($(note actions))" until_ok 2000 state_is '.note.actions | length == 1'
+kill "$sender"
+wait "$sender" 2>/dev/null
 notify-send -a other -h string:x-dunst-stack-tag:dl Download
 until_ok 2000 eval '[ "$(held Download)" = 2 ]'
 check "the same tag from another app makes a second entry ($(held Download))" test "$(held Download)" = 2
