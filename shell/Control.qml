@@ -305,6 +305,8 @@ Item {
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
                                     text: look.title(modelData.title)
+                                    // A right-to-left name would otherwise set itself against the detail.
+                                    horizontalAlignment: Text.AlignLeft
                                     elide: Text.ElideRight
                                     color: on ? look.cursor.text : look.name.color
                                     font.family: look.name.font

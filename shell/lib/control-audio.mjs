@@ -16,8 +16,10 @@ export function appStreams(streams, links, sinkIds) {
   return out;
 }
 
+// An app names its own stream, so its name is drawn on one line whatever it holds.
 export function appTitle(props) {
-  return props['application.name'] || props['node.description'] || props['node.name'] || '';
+  const name = props['application.name'] || props['node.description'] || props['node.name'] || '';
+  return name.replace(/\s+/g, ' ').trim();
 }
 
 export function appRow(app) {

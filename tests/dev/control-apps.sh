@@ -124,6 +124,17 @@ until_ok 3000 rows_are '["Test Player"]'
 check "the stream ending removes its row" rows_are '["Test Player"]'
 check "the selection stays on a row that exists" state_is '.selected < (.rows | length)'
 
+# An app names its own stream: one name holding a newline and right-to-left text keeps its row one line high, give or take the Arabic fallback font's taller line.
+play '{ application.name = "مرحبا\nworld" node.name = rtl-player }'
+check "its title reads مرحبا world" until_ok 3000 select_row "مرحبا world"
+row_h() { control_state | jq '.cursorBox.h'; }
+rtl_h=$(row_h)
+until_ok 3000 select_row "Test Player"
+one_line() { local h; h=$(row_h); ((h > 0 && rtl_h >= h && rtl_h * 2 < h * 3)); }
+check "a name with a newline draws as one line, under 1.5 times Test Player's row ($rtl_h, $(row_h))" one_line
+kill "${players[-1]}"
+until_ok 3000 rows_are '["Test Player"]'
+
 # Apps sit above the inputs, so an app starting or stopping shifts the input rows; the selection keeps its row, and the last row going leaves it on the new last.
 selected_is() { state_is --arg t "$1" '.rows[.selected] == $t'; }
 until_ok 3000 select_row "Dots null source"

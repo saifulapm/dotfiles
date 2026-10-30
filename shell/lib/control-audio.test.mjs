@@ -87,3 +87,9 @@ test('a wpctl or pw-metadata call that fails says so, and one that works says no
   assert.equal(changeToast(3), 'Audio change failed');
   assert.equal(changeToast(0), null);
 });
+
+// An app names its own stream, so a name with a newline or a tab is drawn on one line.
+test("an app's title keeps to one line whatever its name holds", () => {
+  assert.equal(appTitle({ 'application.name': 'مرحبا\nworld' }), 'مرحبا world');
+  assert.equal(appTitle({ 'application.name': ' Test \t\r\n Player ' }), 'Test Player');
+});
