@@ -49,3 +49,156 @@ test('no file reads as a new store; a broken or wrong-shaped one reads null', ()
 test('a store whose file lost saved gets it back', () => {
   assert.deepEqual(P.items(P.parse('{"version":1,"playlists":{}}'), 'saved'), []);
 });
+
+const ids = (s, p) => P.items(s, p).map((v) => v.id);
+const filled = (n, p = 'saved') => {
+  let s = P.emptyStore();
+  for (let i = 1; i <= n; i++) s = P.add(s, p, video('fakeVid000' + i), 1000 + i);
+  return s;
+};
+
+test('a new Playlist is listed with no videos', () => {
+  const s = P.create(P.emptyStore(), 'pl1', '  Study  ', 1000);
+  assert.deepEqual(P.playlists(s), [{ id: 'pl1', name: 'Study', count: 0, secs: 0 }]);
+  assert.deepEqual(s.playlists.pl1, { id: 'pl1', name: 'Study', createdAt: 1000, updatedAt: 1000, deleted: false, items: {} });
+});
+
+test('two Playlists may share a name, oldest first', () => {
+  let s = P.create(P.emptyStore(), 'b', 'Mix', 2000);
+  s = P.create(s, 'a', 'Mix', 3000);
+  assert.deepEqual(P.playlists(s).map((p) => p.id), ['b', 'a']);
+});
+
+test('create refuses a blank name, saved, or an id already there', () => {
+  const s = P.create(P.emptyStore(), 'pl1', 'Study', 1000);
+  assert.equal(P.create(s, 'pl2', '   ', 2000), s);
+  assert.equal(P.create(s, 'saved', 'X', 2000), s);
+  assert.equal(P.create(s, 'pl1', 'Other', 2000), s);
+});
+
+test('rename changes the name and stamps it; saved, blank, deleted or missing stay', () => {
+  const s = P.create(P.emptyStore(), 'pl1', 'Study', 1000);
+  const r = P.rename(s, 'pl1', ' Focus ', 2000);
+  assert.equal(r.playlists.pl1.name, 'Focus');
+  assert.equal(r.playlists.pl1.updatedAt, 2000);
+  assert.equal(P.rename(s, 'saved', 'X', 2000), s);
+  assert.equal(P.rename(s, 'pl1', ' ', 2000), s);
+  assert.equal(P.rename(s, 'nope', 'X', 2000), s);
+  const gone = P.remove(s, 'pl1', 2000);
+  assert.equal(P.rename(gone, 'pl1', 'X', 3000), gone);
+});
+
+test('remove hides a Playlist but keeps a tombstone; saved stays', () => {
+  const s = P.remove(P.create(P.emptyStore(), 'pl1', 'Study', 1000), 'pl1', 2000);
+  assert.deepEqual(P.playlists(s), []);
+  assert.equal(s.playlists.pl1.deleted, true);
+  assert.equal(s.playlists.pl1.updatedAt, 2000);
+  const e = P.emptyStore();
+  assert.equal(P.remove(e, 'saved', 2000), e);
+});
+
+test('add to a deleted Playlist changes nothing', () => {
+  const s = P.remove(P.create(P.emptyStore(), 'pl1', 'Study', 1000), 'pl1', 2000);
+  assert.equal(P.add(s, 'pl1', video('fakeVid0001'), 3000), s);
+});
+
+test('an added item carries addedAt, deleted false, and unavailable only when set', () => {
+  let s = P.add(P.emptyStore(), 'saved', video('fakeVid0001'), 1000);
+  s = P.add(s, 'saved', video('fakeVid0002', { unavailable: 'made private' }), 1001);
+  const it = s.playlists.saved.items;
+  assert.equal(it.fakeVid0001.addedAt, 1000);
+  assert.equal(it.fakeVid0001.deleted, false);
+  assert.equal('unavailable' in it.fakeVid0001, false);
+  assert.equal(P.items(s, 'saved')[1].unavailable, 'made private');
+});
+
+test('removeItem drops the count by one and keeps a tombstone', () => {
+  let s = P.create(P.emptyStore(), 'pl1', 'Study', 1000);
+  s = P.add(P.add(s, 'pl1', video('fakeVid0001'), 1001), 'pl1', video('fakeVid0002'), 1002);
+  s = P.removeItem(s, 'pl1', 'fakeVid0001', 2000);
+  assert.equal(P.playlists(s)[0].count, 1);
+  assert.deepEqual(ids(s, 'pl1'), ['fakeVid0002']);
+  assert.equal(s.playlists.pl1.items.fakeVid0001.deleted, true);
+  assert.equal(s.playlists.pl1.items.fakeVid0001.updatedAt, 2000);
+});
+
+test('a video added again after removal returns at the end, not deleted', () => {
+  let s = filled(2);
+  s = P.removeItem(s, 'saved', 'fakeVid0001', 2000);
+  s = P.add(s, 'saved', video('fakeVid0001'), 3000);
+  assert.deepEqual(ids(s, 'saved'), ['fakeVid0002', 'fakeVid0001']);
+  assert.equal(s.playlists.saved.items.fakeVid0001.deleted, false);
+});
+
+test('holds is true only for a live item', () => {
+  let s = filled(1);
+  assert.equal(P.holds(s, 'saved', 'fakeVid0001'), true);
+  assert.equal(P.holds(s, 'saved', 'fakeVid0009'), false);
+  assert.equal(P.holds(s, 'nope', 'fakeVid0001'), false);
+  s = P.removeItem(s, 'saved', 'fakeVid0001', 2000);
+  assert.equal(P.holds(s, 'saved', 'fakeVid0001'), false);
+});
+
+test('playlists sums live counts and numeric durations', () => {
+  let s = P.create(P.emptyStore(), 'pl1', 'Study', 1000);
+  s = P.addMany(s, 'pl1', [video('fakeVid0001', { duration: 100 }), video('fakeVid0002', { duration: null }), video('fakeVid0003', { duration: 20 })], 1001);
+  assert.deepEqual(P.playlists(s), [{ id: 'pl1', name: 'Study', count: 3, secs: 120 }]);
+});
+
+test('move +1 on the first item makes it second, and the order survives a write', () => {
+  const s = P.move(filled(3), 'saved', 'fakeVid0001', 1, 2000);
+  assert.deepEqual(ids(s, 'saved'), ['fakeVid0002', 'fakeVid0001', 'fakeVid0003']);
+  assert.deepEqual(ids(P.parse(P.serialize(s)), 'saved'), ['fakeVid0002', 'fakeVid0001', 'fakeVid0003']);
+  assert.equal(s.playlists.saved.items.fakeVid0001.pos, 2.5);
+  assert.equal(s.playlists.saved.items.fakeVid0001.updatedAt, 2000);
+  assert.equal(s.playlists.saved.items.fakeVid0002.updatedAt, 1002);
+});
+
+test('move -1 puts an item before its neighbour; past the last, plus one', () => {
+  const s = P.move(filled(3), 'saved', 'fakeVid0003', -1, 2000);
+  assert.deepEqual(ids(s, 'saved'), ['fakeVid0001', 'fakeVid0003', 'fakeVid0002']);
+  const t = P.move(filled(2), 'saved', 'fakeVid0001', 1, 2000);
+  assert.equal(t.playlists.saved.items.fakeVid0001.pos, 3);
+});
+
+test('move off either end returns the same store', () => {
+  const s = filled(3);
+  assert.equal(P.move(s, 'saved', 'fakeVid0001', -1, 2000), s);
+  assert.equal(P.move(s, 'saved', 'fakeVid0003', 1, 2000), s);
+});
+
+test('move steps over tombstones', () => {
+  let s = P.removeItem(filled(3), 'saved', 'fakeVid0002', 1500);
+  s = P.move(s, 'saved', 'fakeVid0001', 1, 2000);
+  assert.deepEqual(ids(s, 'saved'), ['fakeVid0003', 'fakeVid0001']);
+});
+
+test('addMany keeps the given order, skips repeats and videos already there', () => {
+  let s = filled(1);
+  s = P.addMany(s, 'saved', [video('fakeVid0003'), video('fakeVid0001'), video('fakeVid0002'), video('fakeVid0003')], 2000);
+  assert.deepEqual(ids(s, 'saved'), ['fakeVid0001', 'fakeVid0003', 'fakeVid0002']);
+});
+
+test('addMany of 300 keeps the order and 5000 runs well under a second', () => {
+  const vs = (n) => Array.from({ length: n }, (_, i) => video('v' + String(i).padStart(5, '0')));
+  const s = P.addMany(P.emptyStore(), 'saved', vs(300), 1000);
+  assert.deepEqual(ids(s, 'saved'), vs(300).map((v) => v.id));
+  const t0 = performance.now();
+  const big = P.addMany(P.emptyStore(), 'saved', vs(5000), 1000);
+  assert.ok(performance.now() - t0 < 500);
+  assert.equal(ids(big, 'saved').length, 5000);
+});
+
+test('addMany with nothing new returns the same store', () => {
+  const s = filled(1);
+  assert.equal(P.addMany(s, 'saved', [video('fakeVid0001')], 2000), s);
+});
+
+// The file on disk before Playlists could be made has no createdAt, deleted or addedAt.
+test('a store written by the old code parses and its Saved items list', () => {
+  const old = '{"version":1,"playlists":{"saved":{"id":"saved","name":"Saved","updatedAt":5,"items":{"a":{"id":"a","title":"T","channel":"C","duration":9,"thumb":"a","pos":1,"updatedAt":5},"b":{"id":"b","title":"U","channel":"C","duration":9,"thumb":"b","pos":2,"updatedAt":5}}}}}';
+  const s = P.parse(old);
+  assert.deepEqual(ids(s, 'saved'), ['a', 'b']);
+  assert.equal(P.holds(s, 'saved', 'a'), true);
+  assert.deepEqual(ids(P.move(s, 'saved', 'a', 1, 9), 'saved'), ['b', 'a']);
+});
