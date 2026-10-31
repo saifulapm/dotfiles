@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import "lib/notes.mjs" as N
+import "lib/picker.mjs" as Pk
 import "lib/youtube-playlists.mjs" as P
 
 // The YouTube App's Playlists store, XDG_DATA_HOME/dots/youtube/<machine>.json, named per machine as the notes store is so dots sync can merge it.
@@ -16,6 +17,10 @@ Scope {
     // Set once the file is read, or found missing; a save before then would write an empty store over it.
     property bool ready: false
     readonly property var saved: P.items(playlists, "saved")
+    // The Playlists Saiful made, oldest first, each {id, name, count, secs}, its name one plain line.
+    readonly property var lists: P.playlists(playlists).map(l => Object.assign({}, l, {
+            name: Pk.oneLine(l.name)
+        }))
 
     // video is a row as youtube.mjs rows() makes it; a video already in Saved stays one copy.
     function save(video) {

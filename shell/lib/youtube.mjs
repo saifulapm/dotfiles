@@ -65,4 +65,5 @@ export function failure(answer) {
 export const EMPTY = {
   saved: { head: 'Nothing saved yet', key: 's', rest: 'saves a video' },
   playlists: 'n makes one',
+  playlist: { key: 'p', rest: 'adds a video here' },
 };

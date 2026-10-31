@@ -8,6 +8,10 @@ const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', tint: '#EEF
 const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['s', 'save'], ['p', 'add to playlist'], ['d/D', 'download audio/video'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // Blueprint marks the shifted key and spaces the slash in its download pair.
 const BRACKET_DOWNLOAD = { key: '[D/⇧D]', word: 'DOWNLOAD AUDIO / VIDEO' };
+// A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
+const PLAYLIST_KEYS = [['↵', 'play as video'], ['m', 'play in queue'], ['S', 'shuffle'], ['a', 'add to queue'], ['x', 'remove'], ['⇧J/⇧K', 'move'], ['d/D', 'download missing'], ['r', 'repeat'], ['esc', 'back']];
+// Blueprint marks each shifted key.
+const BRACKET_SHIFTED = { '[S]': '[⇧S]', '[D/D]': '[D/⇧D]' };
 const EMPTY_KEYS = [['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 const FAILED_KEYS = [['↵', 'try again']].concat(EMPTY_KEYS);
 
@@ -44,12 +48,17 @@ export function youtubeLook(tokens) {
     repeat: (on) => (bracket ? (on ? 'REPEAT ON' : 'REPEAT OFF') : on ? 'repeat on' : 'repeat off'),
     // A failed search's list is its error block, so only try again and the moves away act on it.
     legend(view, failed) {
+      if (view === 'playlist') {
+        const keys = l.keys(PLAYLIST_KEYS);
+        return bracket ? keys.map((k) => Object.assign({}, k, { key: BRACKET_SHIFTED[k.key] || k.key })) : keys;
+      }
       const keys = l.keys(view !== 'search' ? EMPTY_KEYS : failed ? FAILED_KEYS : SEARCH_KEYS);
       return bracket ? keys.map((k) => (k.word === 'DOWNLOAD AUDIO/VIDEO' ? BRACKET_DOWNLOAD : k)) : keys;
     },
     empty(view) {
       if (view === 'saved') return { head: EMPTY.saved.head, key: EMPTY.saved.key, rest: EMPTY.saved.rest };
       if (view === 'history') return { head: '', key: '↵', rest: 'or m plays a video' };
+      if (view === 'playlist') return { head: '', key: EMPTY.playlist.key, rest: EMPTY.playlist.rest };
       if (view === 'channel') return { head: 'No videos on this channel', key: '', rest: '' };
       return null;
     },

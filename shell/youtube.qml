@@ -8,6 +8,7 @@ import "lib/youtube-look.mjs" as Y
 import "lib/youtube.mjs" as YT
 import "lib/youtube-find.mjs" as F
 import "lib/youtube-queue.mjs" as Q
+import "lib/youtube-playlists.mjs" as P
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
 ShellRoot {
@@ -16,8 +17,18 @@ ShellRoot {
     // Process start to the window's first frame, set once.
     property var firstFrameMs: null
     readonly property string backend: Quickshell.env("DOTS_YOUTUBE") || "dots-youtube-api"
-    // The sidebar's entry the list shows: search, saved or history.
+    // The sidebar's entry the list shows: search, saved, history, or playlist with the Playlist's id in playlistId.
     property string view: "search"
+    property string playlistId: ""
+    readonly property var lists: store.lists
+    // The Playlist the list shows, as YouTubeStore lists it, or null.
+    readonly property var playlist: view === "playlist" ? store.lists.find(l => l.id === playlistId) || null : null
+    readonly property var playlistRows: view === "playlist" ? YT.rows({
+        rows: P.items(store.playlists, playlistId)
+    }) : []
+    // The sidebar's entries top to bottom: the views, then each Playlist as pl:<id>; sideKey is the one the list shows.
+    readonly property var sideKeys: look.places.map(p => p.view).concat(store.lists.map(l => "pl:" + l.id))
+    readonly property string sideKey: view === "playlist" ? "pl:" + playlistId : view
     // Which pane the keys move in while the field is not focused: sidebar or list.
     property string pane: "list"
     readonly property string focusAt: board.fieldFocused ? "field" : pane
@@ -37,7 +48,7 @@ ShellRoot {
         rows: store.saved
     })
     readonly property var historyRows: history.rows
-    readonly property var rows: view === "search" ? results : view === "saved" ? savedRows : historyRows
+    readonly property var rows: view === "search" ? results : view === "saved" ? savedRows : view === "playlist" ? playlistRows : historyRows
     property int cursor: 0
     // Each search's number: an answer from any search but the last is dropped.
     property int searchSeq: 0
@@ -78,12 +89,11 @@ ShellRoot {
         board.focusKeys();
     }
 
-    // j and k: the sidebar's cursor is the view it opens, the list's is a row.
+    // j and k: the sidebar's cursor is the view or Playlist it opens, the list's is a row.
     function move(step) {
-        if (pane === "sidebar") {
-            const names = look.places.map(p => p.view);
-            view = names[Math.max(0, Math.min(names.length - 1, names.indexOf(view) + step))];
-        } else if (rows.length > 0) {
+        if (pane === "sidebar")
+            show(sideKeys[Math.max(0, Math.min(sideKeys.length - 1, sideKeys.indexOf(sideKey) + step))]);
+        else if (rows.length > 0) {
             cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
             pageOn();
         }
@@ -106,6 +116,15 @@ ShellRoot {
             app.setList(F.append(now, answer));
             app.fetchThumbs(app.results.slice(now.rows.length));
         });
+    }
+
+    // A sidebar key: a view's name, or pl:<id> for a Playlist.
+    function show(key) {
+        if (key.startsWith("pl:")) {
+            playlistId = key.slice(3);
+            view = "playlist";
+        } else
+            view = key;
     }
 
     function setList(list) {
@@ -291,9 +310,11 @@ ShellRoot {
 
     // Each view's list starts at its top.
     onViewChanged: cursor = 0
+    onPlaylistIdChanged: cursor = 0
     // Saved and History draw from their files with no search behind them, so a thumbnail no list has fetched yet is asked for here.
     onSavedRowsChanged: fetchThumbs(savedRows.filter(r => !thumbs[r.thumb]))
     onHistoryRowsChanged: fetchThumbs(historyRows.filter(r => !thumbs[r.thumb]))
+    onPlaylistRowsChanged: fetchThumbs(playlistRows.filter(r => !thumbs[r.thumb]))
 
     // One thumbs call for a list's ids; a thumb it does not name keeps its row's placeholder.
     function fetchThumbs(list) {
@@ -313,7 +334,7 @@ ShellRoot {
         return typeof f === "string" && f.startsWith("/") ? "file://" + f : "";
     }
 
-    // Saved and History go back to Search, an opened playlist or channel to the results on the row it opened from; Search has nothing behind it, so Esc there closes the App.
+    // Saved, History and a Playlist go back to Search, an opened playlist or channel to the results on the row it opened from; Search has nothing behind it, so Esc there closes the App.
     function back() {
         if (view !== "search")
             view = "search";
@@ -411,6 +432,8 @@ ShellRoot {
             procStatus.reload();
             return JSON.stringify(Object.assign({
                 view: app.view,
+                playlistId: app.playlistId,
+                playlists: store.lists,
                 focus: app.focusAt,
                 query: app.query,
                 type: app.type,

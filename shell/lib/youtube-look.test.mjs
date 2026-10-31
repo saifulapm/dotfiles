@@ -78,3 +78,11 @@ test('Paper heads only a stale yt-dlp block YOUTUBE CHANGED, not YouTube saying 
   assert.equal(p.failed.kicker({ error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLx: YouTube said: The playlist does not exist.' }), '');
   assert.equal(p.failed.kicker({ error: 'YouTube has no such channel or playlist', kind: 'extraction', raw: 'ERROR: HTTP Error 404: Not Found' }), '');
 });
+
+// The playlist boards: a Playlist's keys act on it whole, x and Shift+J/K on the item; Blueprint marks the shifted S as it marks D.
+test("a Playlist's legend names its whole-playlist keys, and its empty view names p", () => {
+  assert.deepEqual(legend(look('paper'), 'playlist'), ['↵ PLAY AS VIDEO', 'M PLAY IN QUEUE', 'S SHUFFLE', 'A ADD TO QUEUE', 'X REMOVE', '⇧J/⇧K MOVE', 'D/D DOWNLOAD MISSING', 'R REPEAT', 'ESC BACK']);
+  assert.deepEqual(legend(look('artboard'), 'playlist'), ['↵ play as video', 'm play in queue', 'S shuffle', 'a add to queue', 'x remove', '⇧J/⇧K move', 'd/D download missing', 'r repeat', 'esc back']);
+  assert.deepEqual(legend(look('blueprint'), 'playlist'), ['[↵] PLAY AS VIDEO', '[M] PLAY IN QUEUE', '[⇧S] SHUFFLE', '[A] ADD TO QUEUE', '[X] REMOVE', '[⇧J/⇧K] MOVE', '[D/⇧D] DOWNLOAD MISSING', '[R] REPEAT', '[ESC] BACK']);
+  for (const name of ['paper', 'artboard', 'blueprint']) assert.deepEqual(look(name).empty('playlist'), { head: '', key: 'p', rest: 'adds a video here' }, name);
+});

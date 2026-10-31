@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import "lib/youtube-queue.mjs" as Q
+import "lib/youtube.mjs" as YT
 
 // The YouTube window as each theme's board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
 Rectangle {
@@ -37,7 +38,11 @@ Rectangle {
             sidebar.push(libraryLabel.text);
         for (let i = 0; i < placeList.count; i++)
             sidebar.push(placeList.itemAt(i).drawn());
-        sidebar.push(playlistsLabel.text, [noneKey.text, noneRest.text].filter(t => t).join(" "));
+        sidebar.push(playlistsLabel.text);
+        for (let i = 0; i < listList.count; i++)
+            sidebar.push(listList.itemAt(i).drawn());
+        if (noneLine.visible)
+            sidebar.push([noneKey.text, noneRest.text].filter(t => t).join(" "));
         const drawn = [];
         for (let i = 0; i < rowList.count; i++) {
             const row = rowList.itemAtIndex(i);
@@ -120,6 +125,8 @@ Rectangle {
                 board.yt.retry();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
                 board.yt.enter(board.yt.rows[board.yt.cursor]);
+            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                board.yt.focusPane("list");
             else if (t === "s" && board.yt.pane === "list")
                 board.yt.save(board.yt.rows[board.yt.cursor]);
             else if (t === "m" && board.yt.pane === "list")
@@ -172,7 +179,9 @@ Rectangle {
             Text {
                 id: viewName
                 textFormat: Text.PlainText
-                text: look.title.view(board.yt.view)
+                text: board.yt.playlist ? board.yt.playlist.name : look.title.view(board.yt.view)
+                elide: Text.ElideRight
+                Layout.maximumWidth: 600
                 color: c.ink ?? "black"
                 font.family: look.viewFont ?? ""
                 font.pixelSize: look.viewSize
@@ -247,13 +256,47 @@ Rectangle {
 
                     Repeater {
                         id: placeList
-                        model: look.places
+                        model: look.places.map(p => ({
+                                    key: p.view,
+                                    name: p.name,
+                                    count: p.view === "saved" ? String(board.yt.savedCount) : p.view === "history" ? String(board.yt.historyCount) : ""
+                                }))
+                        delegate: sideRow
+                    }
+
+                    Text {
+                        id: playlistsLabel
+                        Layout.leftMargin: plain ? 10 : 12
+                        Layout.topMargin: plain ? 12 : 12
+                        Layout.bottomMargin: plain ? 2 : 6
+                        textFormat: Text.PlainText
+                        text: look.playlists
+                        color: c.muted ?? "gray"
+                        font.family: board.bodyFont
+                        font.pixelSize: plain ? 11 : 10
+                        font.letterSpacing: plain ? 0.66 : 1.4
+                    }
+
+                    // Each Playlist with its count, oldest first; its key is pl:<id>.
+                    Repeater {
+                        id: listList
+                        model: board.yt.lists.map(l => ({
+                                    key: "pl:" + l.id,
+                                    name: l.name,
+                                    count: String(l.count)
+                                }))
+                        delegate: sideRow
+                    }
+
+                    // A view or a Playlist in the sidebar: its icon, its name on one line, and its count.
+                    Component {
+                        id: sideRow
 
                         Rectangle {
                             id: place
                             required property var modelData
-                            readonly property bool chosen: board.yt.view === modelData.view
-                            readonly property string countText: modelData.view === "saved" ? String(board.yt.savedCount) : modelData.view === "history" ? String(board.yt.historyCount) : ""
+                            readonly property bool chosen: board.yt.sideKey === modelData.key
+                            readonly property string countText: modelData.count
 
                             function drawn() {
                                 return [placeName.text, placeCount.text].filter(t => t).join(" ");
@@ -299,7 +342,7 @@ Rectangle {
                                                 search: "M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9 M10.3 10.3L14 14",
                                                 saved: "M4.5 2.5h7v11L8 10.8l-3.5 2.7z",
                                                 history: "M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11 M8 5v3.2l2 1.3"
-                                            })[place.modelData.view]
+                                            })[place.modelData.key] ?? "M3 4.5h10 M3 8h10 M3 11.5h6"
                                         color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
                                     }
                                 }
@@ -308,6 +351,8 @@ Rectangle {
                                     Layout.fillWidth: true
                                     textFormat: Text.PlainText
                                     text: place.modelData.name
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
                                     color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 13
@@ -326,21 +371,10 @@ Rectangle {
                         }
                     }
 
-                    Text {
-                        id: playlistsLabel
-                        Layout.leftMargin: plain ? 10 : 12
-                        Layout.topMargin: plain ? 12 : 12
-                        Layout.bottomMargin: plain ? 2 : 6
-                        textFormat: Text.PlainText
-                        text: look.playlists
-                        color: c.muted ?? "gray"
-                        font.family: board.bodyFont
-                        font.pixelSize: plain ? 11 : 10
-                        font.letterSpacing: plain ? 0.66 : 1.4
-                    }
-
-                    // n makes one: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
+                    // n makes one, while there is none: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
                     Row {
+                        id: noneLine
+                        visible: board.yt.lists.length === 0
                         Layout.leftMargin: 10
                         Layout.topMargin: 8
                         spacing: plain ? 8 : 0
@@ -542,7 +576,7 @@ Rectangle {
 
                     // The list's head: RESULTS and their count on Search, the view's name elsewhere; Paper's empty views draw none, and only Blueprint heads a failed search, with no count.
                     RowLayout {
-                        visible: (board.yt.view === "search" || !caps) && (!board.failing || bracket)
+                        visible: (board.yt.view === "search" || board.yt.playlist !== null || !caps) && (!board.failing || bracket)
                         Layout.fillWidth: true
                         Layout.topMargin: plain ? 8 : 10
                         Layout.preferredHeight: 26
@@ -562,19 +596,20 @@ Rectangle {
                             id: resultsHead
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            // An opened playlist or channel heads its rows with its own name.
-                            text: board.yt.view === "search" ? (board.yt.opened ? board.yt.opened.title : look.results) : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
+                            // An opened playlist or channel, or a Playlist, heads its rows with its own name; a Playlist's is Paper's serif, Artboard's bold, Blueprint's as typed.
+                            text: board.yt.view === "search" ? (board.yt.opened ? board.yt.opened.title : look.results) : board.yt.playlist ? board.yt.playlist.name : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
                             elide: Text.ElideRight
-                            color: (plain && board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
-                            font.family: board.bodyFont
-                            font.pixelSize: plain && board.yt.view !== "search" ? 16 : caps ? 10 : 11
+                            maximumLineCount: 1
+                            color: (board.yt.playlist && !bracket || plain && board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
+                            font.family: board.yt.playlist && caps ? look.viewFont ?? "" : board.bodyFont
+                            font.pixelSize: board.yt.playlist && caps ? 18 : plain && board.yt.view !== "search" ? 16 : caps ? 10 : 11
                             font.weight: plain && board.yt.view !== "search" ? Font.Bold : Font.Normal
-                            font.letterSpacing: plain ? 0 : bracket ? 1.54 : 1.4
+                            font.letterSpacing: plain || board.yt.playlist && caps ? 0 : bracket ? 1.54 : 1.4
                         }
                         Text {
                             id: resultsCount
                             textFormat: Text.PlainText
-                            text: board.failing ? "—" : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
+                            text: board.failing ? "—" : board.yt.playlist ? YT.count(board.yt.playlist.count) + " · " + YT.span(board.yt.playlist.secs) : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: caps ? 10 : 11
@@ -582,7 +617,7 @@ Rectangle {
                         }
                     }
                     Rule {
-                        visible: !plain && (board.yt.view === "search" || !caps) && (!board.failing || bracket)
+                        visible: !plain && (board.yt.view === "search" || board.yt.playlist !== null || !caps) && (!board.failing || bracket)
                         Layout.fillWidth: true
                         dashed: look.ruleDashed
                         color: (caps ? look.tint.rule : c.line) ?? "gray"
@@ -614,6 +649,7 @@ Rectangle {
                             function drawn() {
                                 return {
                                     id: rowItem.modelData.id,
+                                    number: numberText.text,
                                     title: titleText.text,
                                     titleLines: titleText.lineCount,
                                     titleElided: titleText.truncated,
@@ -646,6 +682,18 @@ Rectangle {
                                 anchors.rightMargin: 12
                                 spacing: 14
 
+                                // A Playlist numbers its rows in its own order.
+                                Text {
+                                    id: numberText
+                                    visible: board.yt.playlist !== null
+                                    Layout.preferredWidth: plain ? 22 : 24
+                                    horizontalAlignment: plain ? Text.AlignHCenter : Text.AlignRight
+                                    textFormat: Text.PlainText
+                                    text: visible ? String(rowItem.index + 1) : ""
+                                    color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 12
+                                }
                                 YouTubeThumb {
                                     id: picture
                                     implicitWidth: caps ? 72 : 80
