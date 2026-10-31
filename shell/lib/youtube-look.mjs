@@ -50,6 +50,7 @@ export function youtubeLook(tokens) {
     empty(view) {
       if (view === 'saved') return { head: EMPTY.saved.head, key: EMPTY.saved.key, rest: EMPTY.saved.rest };
       if (view === 'history') return { head: '', key: '↵', rest: 'or m plays a video' };
+      if (view === 'channel') return { head: 'No videos on this channel', key: '', rest: '' };
       return null;
     },
     failed: {

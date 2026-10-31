@@ -18,7 +18,8 @@ Rectangle {
     readonly property color ruleColor: (caps ? c.ink : c.line) ?? "gray"
     readonly property bool fieldFocused: field.activeFocus
     readonly property string queryText: field.text
-    readonly property var emptyText: yt.look.empty(yt.view)
+    // Search draws no empty text but an opened channel's once it has answered with no uploads.
+    readonly property var emptyText: yt.view !== "search" ? yt.look.empty(yt.view) : yt.opened && yt.opened.kind === "channel" && !yt.opened.list.loading && yt.failed === null ? yt.look.empty("channel") : null
     // A failed search's list is its error block.
     readonly property bool failing: yt.view === "search" && yt.failed !== null
 
@@ -116,9 +117,9 @@ Rectangle {
             else if (k === Qt.Key_Escape)
                 board.yt.back();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
-                board.yt.search();
+                board.yt.retry();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
-                board.yt.play(board.yt.rows[board.yt.cursor]);
+                board.yt.enter(board.yt.rows[board.yt.cursor]);
             else if (t === "s" && board.yt.pane === "list")
                 board.yt.save(board.yt.rows[board.yt.cursor]);
             else if (t === "m" && board.yt.pane === "list")
@@ -561,7 +562,9 @@ Rectangle {
                             id: resultsHead
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: board.yt.view === "search" ? look.results : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
+                            // An opened playlist or channel heads its rows with its own name.
+                            text: board.yt.view === "search" ? (board.yt.opened ? board.yt.opened.title : look.results) : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
+                            elide: Text.ElideRight
                             color: (plain && board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: plain && board.yt.view !== "search" ? 16 : caps ? 10 : 11
@@ -571,7 +574,7 @@ Rectangle {
                         Text {
                             id: resultsCount
                             textFormat: Text.PlainText
-                            text: board.failing ? "—" : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : String(board.yt.rows.length)
+                            text: board.failing ? "—" : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: caps ? 10 : 11

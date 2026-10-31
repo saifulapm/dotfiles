@@ -58,6 +58,36 @@ test('a short last page ends the list, and a failed page lets the next move ask 
   assert.equal(F.wants(failed, 19), true);
 });
 
+const channel = { id: 'UCfakeChan00000000000001', kind: 'channel', title: 'Nujabes', channel: '@nujabes', duration: '', secs: null, thumb: '' };
+const playlist = { id: 'PLfakeList0001', kind: 'playlist', title: 'Modal Soul', channel: 'Nujabes', duration: '14 videos', secs: null, thumb: 'fakeVid0001', count: 14 };
+
+test('opening a row shows its name at once over a list that loads, and keeps the results cursor to come back to', () => {
+  const o = F.opening(channel, 7);
+  assert.deepEqual([o.kind, o.id, o.title, o.count, o.list.rows, o.list.loading, o.failed, o.back], ['channel', 'UCfakeChan00000000000001', 'Nujabes', null, [], true, null, 7]);
+  assert.equal(F.opening(playlist, 0).count, 14);
+});
+
+test('a channel answer lists its uploads under the name YouTube gives, paging on like a search', () => {
+  const o = F.opened(F.opening(channel, 0), Object.assign(answer(1, 20, 20), { title: 'Nujabes\nOfficial' }));
+  assert.deepEqual([o.title, o.list.rows.length, o.list.more, o.list.loading, o.failed], ['Nujabes Official', 20, true, false, null]);
+  assert.equal(F.opened(F.opening(channel, 0), answer(1, 3, 3)).title, 'Nujabes', 'no title in the answer keeps the row\'s');
+});
+
+test('a channel with no uploads lists none and is done loading', () => {
+  const o = F.opened(F.opening(channel, 0), { title: null, rows: [], next: 0 });
+  assert.deepEqual([o.list.rows, o.list.more, o.list.loading, o.failed], [[], false, false, null]);
+});
+
+test('a playlist answer is every item at once, under its title and count, so it asks for no next page', () => {
+  const o = F.opened(F.opening(playlist, 2), Object.assign(answer(1, 20, 20), { title: 'Modal Soul', count: 300 }));
+  assert.deepEqual([o.title, o.count, o.list.rows.length, o.list.more, F.wants(o.list, 19), o.back], ['Modal Soul', 300, 20, false, false, 2]);
+});
+
+test('a failed open keeps its name and holds the failure, not an empty list', () => {
+  const o = F.opened(F.opening(playlist, 0), { error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLfakeList0001: YouTube said: The playlist does not exist.' });
+  assert.deepEqual([o.title, o.list.loading, o.failed.error], ['Modal Soul', false, 'The playlist does not exist.']);
+});
+
 test('a playlist or channel row in a page keeps its kind', () => {
   const l = F.page({ rows: [{ id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', kind: 'channel', title: 'Nujabes', channel: '@nujabes', duration: null, thumb: '' }], next: 1 });
   assert.equal(l.rows[0].kind, 'channel');

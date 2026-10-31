@@ -35,6 +35,7 @@ test('an empty view names the key that fills it, and its legend keeps search, si
     assert.deepEqual(l.empty('saved'), { head: 'Nothing saved yet', key: 's', rest: 'saves a video' }, name);
     assert.deepEqual(l.empty('history'), { head: '', key: '↵', rest: 'or m plays a video' }, name);
     assert.equal(l.empty('search'), null, name);
+    assert.deepEqual(l.empty('channel'), { head: 'No videos on this channel', key: '', rest: '' }, name);
     assert.equal(l.noPlaylists, 'n makes one', name);
   }
   assert.deepEqual(legend(look('paper'), 'saved'), ['/ SEARCH', 'TAB SIDEBAR', 'ESC BACK']);

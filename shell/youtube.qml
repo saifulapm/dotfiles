@@ -28,7 +28,11 @@ ShellRoot {
     // The last search as youtube-find.mjs pages it, and the query and type it pages on; its rows, Saved's and History's are as youtube.mjs rows() makes them, and the list draws the view's, with the cursor on one.
     property var found: F.page(null)
     property var searched: null
-    readonly property var results: found.rows
+    // A playlist or channel opened from a row, as youtube-find.mjs opening() makes it: its name, count, list and failure, and the results cursor Esc comes back to; null while the results show.
+    property var opened: null
+    readonly property var results: opened ? opened.list.rows : found.rows
+    // The list head's count: a playlist's own, else the rows listed.
+    readonly property string listCount: opened && opened.kind === "playlist" && YT.count(opened.count) ? YT.count(opened.count) : String(rows.length)
     readonly property var savedRows: YT.rows({
         rows: store.saved
     })
@@ -39,8 +43,9 @@ ShellRoot {
     property int searchSeq: 0
     // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them.
     property var thumbs: ({})
-    // The last search's failure as youtube.mjs failure() reads it, {error, kind, raw}, or null.
-    property var failed: null
+    // The last search's failure as youtube.mjs failure() reads it, {error, kind, raw}, or null; the list shows the opened item's instead while one is open.
+    property var searchFailed: null
+    readonly property var failed: opened ? opened.failed : searchFailed
     // The youtube-video-<n> units this App started, in order.
     property var units: []
     readonly property int savedCount: savedRows.length
@@ -84,19 +89,64 @@ ShellRoot {
         }
     }
 
-    // The cursor on the last 5 rows of a search asks for its next page, once while it loads; the rows on screen stay as they are, the new ones go below.
+    // The cursor on the last 5 rows of a search or a channel's uploads asks for the next page, once while it loads; the rows on screen stay as they are, the new ones go below.
     function pageOn() {
-        if (view !== "search" || failed !== null || !F.wants(found, cursor))
+        const list = opened ? opened.list : found;
+        if (view !== "search" || failed !== null || !F.wants(list, cursor))
             return;
         const seq = searchSeq;
-        found = F.asking(found);
-        api(["search", searched.query, searched.type, String(found.next)], answer => {
+        setList(F.asking(list));
+        const args = opened ? ["channel", opened.id, String(list.next)] : ["search", searched.query, searched.type, String(list.next)];
+        api(args, answer => {
             if (seq !== app.searchSeq)
                 return;
-            const before = app.found.rows.length;
-            app.found = F.append(app.found, answer);
-            app.fetchThumbs(app.found.rows.slice(before));
+            const now = app.opened ? app.opened.list : app.found;
+            app.setList(F.append(now, answer));
+            app.fetchThumbs(app.results.slice(now.rows.length));
         });
+    }
+
+    function setList(list) {
+        if (opened)
+            opened = Object.assign({}, opened, {
+                list: list
+            });
+        else
+            found = list;
+    }
+
+    // Enter on a row: a video plays, a playlist or channel opens in the list.
+    function enter(row) {
+        if (row && row.kind === "video")
+            play(row);
+        else if (row)
+            open(row);
+    }
+
+    // A playlist lists every item, a channel its uploads newest first; the results behind it, and a page of them still loading, wait for Esc.
+    function open(row) {
+        searchSeq += 1;
+        const seq = searchSeq;
+        if (found.loading)
+            found = Object.assign({}, found, {
+                loading: false
+            });
+        opened = F.opening(row, opened ? opened.back : cursor);
+        cursor = 0;
+        api(row.kind === "playlist" ? ["playlist", row.id] : ["channel", row.id, "0"], answer => {
+            if (seq !== app.searchSeq)
+                return;
+            app.opened = F.opened(app.opened, answer);
+            app.fetchThumbs(app.results);
+        });
+    }
+
+    // Enter on a failed list asks again for what failed.
+    function retry() {
+        if (opened)
+            open(opened);
+        else
+            search();
     }
 
     // h and l on Search: the filter moves one type, and a query in the field is searched again under it.
@@ -189,9 +239,10 @@ ShellRoot {
         api(["search", q, type, "0"], answer => {
             if (seq !== app.searchSeq)
                 return;
-            app.failed = YT.failure(answer);
+            app.opened = null;
+            app.searchFailed = YT.failure(answer);
             app.searched = asked;
-            app.found = F.page(app.failed ? null : answer);
+            app.found = F.page(app.searchFailed ? null : answer);
             app.cursor = 0;
             app.fetchThumbs(app.results);
         });
@@ -227,11 +278,15 @@ ShellRoot {
         return typeof f === "string" && f.startsWith("/") ? "file://" + f : "";
     }
 
-    // Saved and History go back to Search; Search has nothing behind it, so Esc there closes the App.
+    // Saved and History go back to Search, an opened playlist or channel to the results on the row it opened from; Search has nothing behind it, so Esc there closes the App.
     function back() {
         if (view !== "search")
             view = "search";
-        else
+        else if (opened) {
+            searchSeq += 1;
+            cursor = opened.back;
+            opened = null;
+        } else
             quit();
     }
 
@@ -327,10 +382,17 @@ ShellRoot {
                 rows: app.rows,
                 cursor: app.cursor,
                 paging: {
-                    next: app.found.next,
-                    more: app.found.more,
-                    loading: app.found.loading
+                    next: (app.opened ? app.opened.list : app.found).next,
+                    more: (app.opened ? app.opened.list : app.found).more,
+                    loading: (app.opened ? app.opened.list : app.found).loading
                 },
+                opened: app.opened ? {
+                    kind: app.opened.kind,
+                    id: app.opened.id,
+                    title: app.opened.title,
+                    count: app.opened.count,
+                    back: app.opened.back
+                } : null,
                 searchSeq: app.searchSeq,
                 units: app.units,
                 queue: app.queue,

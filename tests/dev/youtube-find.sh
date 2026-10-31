@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 yt_qml=$repo/shell/youtube.qml
 work=$(mktemp -d)
 cleanup() {
-  systemctl --user stop 'youtube-video-*' 2>/dev/null
+  systemctl --user stop 'youtube-video-*' youtube-audio 2>/dev/null
   rm -rf "$work"
 }
 log=$work/youtube.log
@@ -35,7 +35,7 @@ chmod +x "$slow"
 "$repo/bin/dots" theme paper >/dev/null
 until_ok 3000 status_theme paper
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_MACHINE=ytcheck DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 check "the filter reads Videos Playlists Channels with Videos on ($(yt_state | jq -c '{type, chips: .look.chips, on: .look.chipsOn}'))" \
@@ -108,6 +108,75 @@ press_j 10
 until_ok 1000 yt_is '.cursor == 43'
 sleep 0.3
 check "the last row asks for no page past the end ($(calls_text))" test "$(searches 'nujabes videos')" = 3
+
+# A channel row opens its uploads, newest first, with the keys a search row has.
+wtype l
+until_ok 3000 yt_is '.type == "playlists" and (.rows | length) == 3'
+wtype l
+until_ok 3000 yt_is '.type == "channels" and (.rows | length) == 3'
+wtype -k Return
+until_ok 3000 yt_is '.opened.kind == "channel" and (.rows | length) == 20'
+check "Enter on the channel Nujabes asks for its uploads ($(calls_text))" logged "channel UCfakeChan00000000000001 0"
+check "its uploads list under its name, the newest first ($(yt_state | jq -c '{head: .look.results, first: [.rows[0:3][].id], cursor}'))" \
+  yt_is '.look.results == ["Nujabes", "20"] and [.rows[0:3][].id] == ["fakeUpl0001", "fakeUpl0002", "fakeUpl0003"] and .cursor == 0'
+press_j 15
+until_ok 3000 yt_is '.rows | length == 25'
+check "row 16 of the uploads asks for their next page ($(calls_text))" logged "channel UCfakeChan00000000000001 20"
+wtype -k Return
+until_ok 3000 yt_is '.units | length == 1'
+check "Enter on an upload plays it in a window ($(yt_state | jq -c .units))" yt_is '.units | length == 1'
+# The video's window takes the keys once it maps, so it goes before the next key.
+mpv_count() { [ "$(niri msg -j windows | jq '[.[] | select(.app_id == "mpv")] | length')" = "$1" ]; }
+yt_focused() { niri msg -j focused-window | jq -e '.app_id == "youtube"' >/dev/null; }
+until_ok 5000 mpv_count 1
+systemctl --user stop "$(yt_state | jq -r '.units[0]').service"
+until_ok 3000 mpv_count 0
+until_ok 3000 yt_focused
+wtype j
+wtype m
+wtype j
+wtype a
+wtype s
+keys_acted() { yt_is '.look.sidebar[1:3] == ["Saved 1", "History 3"]'; }
+until_ok 3000 keys_acted
+check "m, a and s act on uploads as on search rows ($(yt_state | jq -c '.look.sidebar[1:3]'))" keys_acted
+wtype -k Escape
+until_ok 1000 yt_is '.opened == null'
+check "Esc returns to the channel results on the channel's row ($(yt_state | jq -c '{n: (.rows | length), cursor, head: .look.results}'))" \
+  yt_is '(.rows | length) == 3 and .rows[0].kind == "channel" and .cursor == 0 and .look.results == ["RESULTS", "3"]'
+wtype j
+wtype -k Return
+until_ok 3000 yt_is '.opened.id == "UCfakeChan00000000000002" and .paging.loading == false'
+check "a channel with no uploads reads No videos on this channel ($(yt_state | jq -c '{empty, head: .look.results}'))" \
+  yt_is '.empty == ["No videos on this channel"] and .look.results == ["Nujabes - Topic", "0"]'
+wtype -k Escape
+until_ok 1000 yt_is '.opened == null'
+check "Esc comes back to row 2 ($(yt_state | jq -c .cursor))" yt_is '.cursor == 1'
+
+# A playlist row lists every item at once.
+wtype h
+until_ok 3000 yt_is '.type == "playlists" and (.rows | length) == 3 and .opened == null'
+wtype -k Return
+until_ok 3000 yt_is '.opened.kind == "playlist" and (.rows | length) == 14'
+check "Enter on a playlist row lists its items with their durations under its title and count ($(yt_state | jq -c '{head: .look.results, d: [.drawn[0:3][].duration]}'))" \
+  yt_is '.look.results == ["Modal Soul", "14 videos"] and ([.rows[] | select(.duration == "")] | length) == 0 and .drawn[0].duration == "4:27"'
+press_j 13
+sleep 0.3
+check "the playlist's last rows ask for no more ($(calls_text))" test "$(cat "$calls" | grep -c '^playlist ')" = 1
+wtype -k Escape
+until_ok 1000 yt_is '.opened == null'
+wtype j
+wtype j
+wtype -k Return
+until_ok 3000 yt_is '.error != null'
+check "a playlist that does not exist shows YouTube's own line in the list ($(yt_state | jq -c '.failed | {fix, raw}'))" \
+  yt_is '.error.error == "The playlist does not exist." and .failed.fix == "The playlist does not exist." and (.failed.raw | test("YouTube said"))'
+wtype -k Return
+until_ok 3000 test "$(times_logged 'playlist PLfakePrivate1')" = 2
+check "Enter on the failure asks for the playlist again ($(calls_text))" test "$(times_logged 'playlist PLfakePrivate1')" = 2
+wtype -k Escape
+until_ok 1000 yt_is '.opened == null and .error == null'
+check "Esc returns to the playlist results on row 3 ($(yt_state | jq -c '{cursor, n: (.rows | length)}'))" yt_is '.cursor == 2 and (.rows | length) == 3'
 
 wtype -k Escape
 until_ok 3000 yt_gone
