@@ -65,7 +65,7 @@ check "and the file is mode 600" test "$(stat -c %a "$spill")" = 600
 check "the spill holds every node, more than 1000, with no spill key" jq -e '(.nodes | length) > 1000 and (has("spill") | not) and .count == (.nodes | length)' "$spill"
 check "and count is the spill's length" jq -e --slurpfile s "$spill" '.count == $s[0].count' "$DOTS_DEV_DIR/tree1.json"
 check "the inline nodes are the spill's first nodes, index for index" jq -e --slurpfile s "$spill" '.nodes == $s[0].nodes[: (.nodes | length)]' "$DOTS_DEV_DIR/tree1.json"
-check "and the first node is a button with a four-number box" jq -e '.nodes[0].role == "button" and .nodes[0].i >= 0 and (.nodes[0].box | length) == 4 and .app == "flood" and (.pid | type) == "number"' "$DOTS_DEV_DIR/tree1.json"
+check "and the first node is a button, its box null in a tiled GTK4 window" jq -e '.nodes[0].role == "button" and .nodes[0].i >= 0 and .nodes[0].box == null and .nodes[0].box_reason == "no window position" and .app == "flood" and (.pid | type) == "number"' "$DOTS_DEV_DIR/tree1.json"
 
 "$gui" tree flood >"$DOTS_DEV_DIR/tree2.json"
 spill2=$(jq -r '.spill // empty' "$DOTS_DEV_DIR/tree2.json")

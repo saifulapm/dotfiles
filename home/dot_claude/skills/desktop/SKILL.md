@@ -113,7 +113,10 @@ it again: look with `gui tree` or a shot. `type` refuses a field that is not
 editable, or is read-only, with exit 3, and the typed text never appears in
 the output or the journal, only `"matched"`; `get` withholds a password
 field's text. A GTK4 check box offers no action at all, so `click` exits 4
-on it: use pixels.
+on it: use pixels. A GTK4 widget's `box` is where its window sits by niri:
+in a tiled window it is `null` with `"box_reason": "no window position"`,
+so float the window (`niri msg action toggle-window-floating --id N`) for
+boxes.
 
 Wait on the tree, never with `sleep`: `wait` polls every 100 ms for 10 s
 (`--timeout S`, 60 at most) and exits 1 with the last state it saw.
@@ -147,8 +150,9 @@ exposes nothing: use pixels. Chromium and Electron need
   small text at its own size (`hi` as `ni`), so upscale it with `-s 3`.
 - One window: `niri msg action screenshot-window --id N --path /tmp/desk/win.png`
   (an absolute path). It also replaces the clipboard.
-- niri gives a window's size but not its position, so a crop of a tiled
-  window is a guess. Fullscreen it first (`niri msg action fullscreen-window
+- niri places a floating window (`layout.tile_pos_in_workspace_view` in
+  `niri msg -j windows`) but gives no position for a tiled or fullscreen
+  one, so a crop of a tiled window is a guess. Fullscreen it first (`niri msg action fullscreen-window
   --id N`, the same call toggles back) and capture the output:
   `grim -o "$(niri msg -j focused-output | jq -r .name)" ...`.
 - Shell surfaces are layers `dots-island`, `dots-surfaces`, `dots-margins`,
@@ -166,6 +170,9 @@ clicks: they skip the lock, prompt and window checks the scripts make.
 - Keys: `screen type TEXT` (newlines dropped), `screen key Return`,
   `screen key ctrl+s`, `screen key Tab 3` (repeat 1-50). Each key is gated
   alone and the first into a new window is primed for you; do not prime.
+  No combo is blocked: niri runs no bind from the virtual keyboard
+  `screen key` types on, so a Mod combo reaches the window as plain keys
+  and fires nothing of niri's, and keys go only to an agent window anyway.
 - Pointer: `screen click|move|drag|scroll` in `screen shot` pixels, or
   `scripts/mouse to|click|drag|scroll X Y` in `grim -s 1` pixels. It never
   rests within 2 px of an edge, where the hot corners are.

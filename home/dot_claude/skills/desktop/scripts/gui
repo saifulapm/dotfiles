@@ -194,12 +194,60 @@ def walk(node, want=None, path=(), budget=None, below=None):
         return  # a widget can vanish mid-walk; that is not an error
 
 
-def coords(node):
+def coords(node, kind=Atspi.CoordType.SCREEN):
     try:
-        e = Atspi.Component.get_extents(node.get_component(), Atspi.CoordType.SCREEN)
+        e = Atspi.Component.get_extents(node.get_component(), kind)
         return (e.x, e.y, e.width, e.height)
     except Exception:
         return None
+
+
+def gtk4(app):
+    try:
+        return app.get_toolkit_name().lower() == "gtk" and app.get_toolkit_version().startswith("4.")
+    except Exception:
+        return False
+
+
+def niri_json(what):
+    try:
+        return json.loads(subprocess.run(["niri", "msg", "-j", what], capture_output=True, text=True, timeout=5).stdout)
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+class Boxes:
+    """Screen boxes for one app's nodes. GTK4 gives every node 0,0 on screen and its place in its window, so a GTK4 box is that place moved to where niri put the window; niri places a floating window, never a tiled one."""
+
+    def __init__(self, app):
+        self.app, self.gtk4, self.origins = app, gtk4(app), {}
+
+    def origin(self, path):
+        k = path[0] if path else None
+        if k not in self.origins:
+            self.origins[k] = None
+            window = toplevel(self.app, path)
+            title = window.get_name() if window else None
+            wins = [w for w in niri_json("windows") or [] if w.get("pid") == self.app.get_process_id() and w.get("title") == title]
+            spaces = {ws["id"]: ws.get("output") for ws in niri_json("workspaces") or []}
+            outputs = niri_json("outputs") or {}
+            if len(wins) == 1 and (wins[0].get("layout") or {}).get("tile_pos_in_workspace_view"):
+                layout = wins[0]["layout"]
+                out = (outputs.get(spaces.get(wins[0].get("workspace_id"))) or {}).get("logical") or {}
+                (tx, ty), (dx, dy) = layout["tile_pos_in_workspace_view"], layout.get("window_offset_in_tile") or (0, 0)
+                self.origins[k] = (out.get("x", 0) + tx + dx, out.get("y", 0) + ty + dy)
+        return self.origins[k]
+
+    def of(self, path, node):
+        """(box, reason): [x, y, w, h] on screen, or None and why."""
+        if not self.gtk4:
+            box = coords(node)
+            return (list(box) if box else None), None
+        o = self.origin(path)
+        box = coords(node, Atspi.CoordType.WINDOW) if o else None
+        if not box:
+            return None, "no window position"
+        return [round(o[0] + box[0]), round(o[1] + box[1]), box[2], box[3]], None
 
 
 def states(node):
@@ -325,9 +373,9 @@ def target(app, arg):
     return ref(hexid, i), path, node, role, name
 
 
-def entry(i, depth, node):
-    box = coords(node)
-    out = {"i": i, "depth": depth, "role": node.get_role_name(), "name": node.get_name() or "", "box": list(box) if box else None, "states": sorted(states(node) & FLAGS)}
+def entry(i, depth, node, place):
+    box, why = place
+    out = {"i": i, "depth": depth, "role": node.get_role_name(), "name": node.get_name() or "", "box": box, **({"box_reason": why} if why else {}), "states": sorted(states(node) & FLAGS)}
     v = value(node)
     if v is not None:
         out["value"] = v
@@ -341,11 +389,12 @@ def tree(app, everything, depth=None, root=None):
     top = len(root[1]) if root else 0
     rows = walked(app, root and root[2], root[1] if root else (), depth)
     hexid = snapshot(app, rows)
+    boxes = Boxes(app)
     nodes = []
     for i, p, n, role, _ in rows:
         count = n.get_child_count() if depth is not None and len(p) - top == depth else 0
         if everything or role in INTERACTIVE or count > 0:
-            nodes.append(dict(entry(i, len(p), n), ref=ref(hexid, i), **({"children_count": count} if count > 0 else {})))
+            nodes.append(dict(entry(i, len(p), n, boxes.of(p, n)), ref=ref(hexid, i), **({"children_count": count} if count > 0 else {})))
     head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
     whole = dict(head, nodes=nodes)
     # Every tree replaces the spill before it, whether it spills or not; snapshots stay their hour.
@@ -370,10 +419,9 @@ def tree(app, everything, depth=None, root=None):
     return dict(head, nodes=nodes[:kept], spill=path)
 
 
-def describe(node):
+def describe(node, box):
     role = node.get_role_name()
     name = node.get_name() or ""
-    box = coords(node)
     where = f" at {box[0]},{box[1]} {box[2]}x{box[3]}" if box else ""
     v = value(node)
     current = f" = {v:g}" if v is not None else ""
@@ -627,15 +675,16 @@ def main(argv):
         hits = [r for r in walked(app) if matches(r[3], r[4], needle)]
         if not hits:
             nothing(f"nothing matching {needle!r}")
-        for _, _, node, _, _ in hits[:20]:
-            print(describe(node))
+        boxes = Boxes(app)
+        for _, path, node, _, _ in hits[:20]:
+            print(describe(node, boxes.of(path, node)[0]))
         return
 
     if cmd == "get":
         what = argv[4:] or ["text", "states", "box"]
         if len(what) > 1 and len(argv) > 4 or what[0] not in ("text", "states", "box"):
             usage()
-        r, _, node, role, name = target(app, needle)
+        r, path, node, role, name = target(app, needle)
         out = {"widget": widget(r, role, name)}
         if "text" in what:
             # A password field's text never leaves it, whatever asks.
@@ -649,8 +698,8 @@ def main(argv):
         if "states" in what:
             out["states"] = sorted(states(node))
         if "box" in what:
-            box = coords(node)
-            out["box"] = list(box) if box else None
+            box, why = Boxes(app).of(path, node)
+            out.update(box=box, **({"box_reason": why} if why else {}))
         print(json.dumps(out))
         return
 

@@ -1027,3 +1027,11 @@ test('desk jev choice prints none as a choice', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), { choice: 'none', confidence: 0.95, present: 0.05, destructive: 0 });
 });
+
+// The probe found niri places only floating windows (rulings 3D39GSN2, VTHGV2MR), and no combo is blocked because niri runs no bind from a virtual keyboard (W22CGMKB).
+test('SKILL.md says niri places only floating windows, and why screen key blocks no combo', () => {
+  assert.match(doc, /floating window \(`layout\.tile_pos_in_workspace_view`/);
+  assert.match(doc, /no position for a tiled/);
+  assert.doesNotMatch(doc, /niri gives a window's size but not its position/);
+  assert.match(doc, /No combo is blocked: niri runs no bind from the virtual keyboard/);
+});
