@@ -1,30 +1,28 @@
 #!/usr/bin/env bash
-# Deen's Show path on the real deen backend and the data it builds from the deen-data checkout, pointed at the backend's fake editions CDN and fake aladhan: Read surah 36 and hear its first word in mpv, add it to Memorise, reveal an ayah and press 3 so it leaves today's list, see the next prayer's countdown, and get the hadith corpus through a cut and a resume.
+# Deen's Show path on the real deen backend and the data it builds from the deen-data checkout, pointed at the backend's fake aladhan: Read surah 36 and hear its first word in mpv, add it to Memorise, reveal an ayah and press 3 so it leaves today's list, see the next prayer's countdown, and get the hadith corpus joined from the checkout at the first open and browse it.
 {
 source "$(dirname "$0")/lib.sh"
 
 backend=/home/saiful/Codes/deen
 deen_bin=$backend/target/debug/deen
-editions_bin=$backend/target/debug/examples/fake_editions
 aladhan_bin=$backend/target/debug/examples/fake_aladhan
 sources=/home/saiful/Codes/deen-data
 deen_qml=$repo/shell/deen.qml
 entry=$repo/home/dot_local/share/applications/deen.desktop
 work=$(mktemp -d)
 log=$work/deen.log
-editions_pid='' aladhan_pid=''
+aladhan_pid=''
 stop() { [ -z "$1" ] || { kill "$1" 2>/dev/null; wait "$1" 2>/dev/null; }; }
 cleanup() {
-  stop "$editions_pid"
   stop "$aladhan_pid"
   rm -rf "$work"
 }
 
-if ! cargo build --offline -q --manifest-path "$backend/Cargo.toml" --bin deen --example fake_editions --example fake_aladhan; then
+if ! cargo build --offline -q --manifest-path "$backend/Cargo.toml" --bin deen --example fake_aladhan; then
   echo "FAIL the backend at $backend builds"
   exit 1
 fi
-mkdir -p "$work"/{config,cache/deen/audio/wbw,state,data,hadith,editions,mpv}
+mkdir -p "$work"/{config,cache/deen/audio/wbw,state,data,hadith,mpv}
 # The Quran text, its word meanings and Hisn al-Muslim, built by the backend from the deen-data checkout as the pin's apply builds them.
 texts=$work/texts
 if ! DEEN_BIN=$deen_bin "$backend/scripts/build-data" "$sources" "$texts"; then
@@ -40,35 +38,10 @@ printf 'ao=null\n' >"$work/mpv/mpv.conf"
 # 36:1's first word, recorded as the CDN's file would be, so Enter plays it without the network.
 ffmpeg -hide_banner -loglevel error -y -f lavfi -i sine=frequency=440:duration=30 "$work/cache/deen/audio/wbw/036_001_001.mp3"
 
-# Ten collections' editions as the CDN serves them: Bukhari 1 holds the intentions hadith, padded so the cut lands inside it.
-python3 -I - "$work/editions" <<'PY'
-import json, sys
-out = sys.argv[1]
-for c in "bukhari muslim abudawud tirmidhi nasai ibnmajah malik nawawi qudsi dehlawi".split():
-    ar = "إنما الأعمال بالنيات " * 4000 if c == "bukhari" else f"حديث {c}"
-    en = ("Narrated 'Umar bin Al-Khattab: I heard Allah's Messenger saying, \"The reward of deeds depends upon the intentions.\""
-          if c == "bukhari" else f"Narrated someone: a saying from {c}.")
-    langs = [("ara", ar), ("eng", en)] + ([] if c in ("qudsi", "dehlawi") else [("ben", "কাজের ফল নিয়তের উপর নির্ভরশীল")])
-    for lang, text in langs:
-        edition = {"metadata": {"name": f"Collection {c}", "sections": {"1": "Revelation"}},
-                   "hadiths": [{"hadithnumber": 1, "text": text, "grades": [], "reference": {"book": 1, "hadith": 1}}]}
-        json.dump(edition, open(f"{out}/{lang}-{c}.min.json", "w"), ensure_ascii=False)
-PY
-total=$(cat "$work"/editions/*.json | wc -c)
-
-# start_editions [cut bytes]: the fake CDN, cut after that many bytes when given, on the first one's port when there was one; slow enough that the download is seen running.
-start_editions() {
-  env FAKE_LOG="$work/editions.log" FAKE_SLOW_MS=2 FAKE_PORT=${editions_url##*:} ${1:+FAKE_CUT=$1} "$editions_bin" "$work/editions" >"$work/editions.addr" 2>"$work/editions.err" &
-  editions_pid=$!
-  until_ok 10000 test -s "$work/editions.addr" || { echo "FAIL the fake CDN started: $(cat "$work/editions.err")"; exit 1; }
-  editions_url=http://$(head -1 "$work/editions.addr")
-}
 "$aladhan_bin" "$backend/tests/fixtures/aladhan-2026-10.json" "$work/aladhan.log" >"$work/aladhan.addr" 2>"$work/aladhan.err" &
 aladhan_pid=$!
 until_ok 10000 test -s "$work/aladhan.addr"
 aladhan_url=http://127.0.0.1:$(head -1 "$work/aladhan.addr" | grep -oE '[0-9]+$')
-editions_url=:0
-start_editions $((total * 3 / 10))
 
 deen_state() { timeout 0.5 qs ipc -p "$deen_qml" call deen state 2>/dev/null; }
 deen_is() { deen_state | jq -e "$@" >/dev/null 2>&1; }
@@ -99,7 +72,7 @@ mpv_playing() {
 }
 tab_to() { until deen_is --arg t "$1" '.tab == $t'; do wtype -k Tab; sleep 0.2; done; }
 
-env_line="DOTS_DEEN=$deen_bin DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$work/hadith DEEN_STATE=$work/data/hifz.json DEEN_HADITH_URL=$editions_url DEEN_ALADHAN_URL=$aladhan_url DEEN_CONFIG=$work/config/none.toml DOTS_DEEN_NOW=2026-10-23T14:32 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv"
+env_line="DOTS_DEEN=$deen_bin DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$work/hadith DEEN_STATE=$work/data/hifz.json DEEN_SOURCES=$sources DEEN_ALADHAN_URL=$aladhan_url DEEN_CONFIG=$work/config/none.toml DOTS_DEEN_NOW=2026-10-23T14:32 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv"
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 open_deen() { niri msg action spawn -- sh -c "exec env $env_line $exec_line >>'$log' 2>&1"; }
 
@@ -171,23 +144,42 @@ check "Prayer draws Dhaka's five times for 2026-10-23 ($(show '[.prayer.rows[] |
 check "the next prayer is Asr with its countdown ($(show '[.prayer.headline, .prayer.at]'))" deen_is '.prayer.headline == "Asr in 1 h 18 min" and .prayer.at == "15:50 · now 14:32"'
 check "the backend asked aladhan for the Hanafi school" grep -q 'school=1' "$work/aladhan.log"
 
-# Hadith: the download started when Deen opened, the fake CDN cut it, and r resumes it once the CDN is back.
+# Hadith: opening Deen joined the corpus from the deen-data checkout; it browses Bukhari's book 1 in Bangla and finds নিয়ত.
+real() { DEEN_HADITH=$work/hadith "$deen_bin" "$@"; }
+hadith() { deen_state | jq -c ".hadith | $1"; }
+hadith_is() { deen_state | jq -e ".hadith | $1" >/dev/null 2>&1; }
 tab_to hadith
-until_ok 30000 deen_is '.hadith.download.fail != ""'
-check "the cut download keeps what it saved ($(show '[.hadith.download.title, .hadith.download.kept]'))" deen_is '.hadith.download.fail != "" and .hadith.download.kept != ""'
-kept=$(find "$work/hadith" -type f -name '*.part' -o -type f -name '*.min.json' | xargs -r cat | wc -c)
-check "the saved part is on disk ($kept bytes of $total)" test "$kept" -gt 0 -a "$kept" -lt "$total"
-stop "$editions_pid"
-rm -f "$work/editions.addr"
-start_editions
-wtype r
-until_ok 30000 deen_is '.hadith.ready'
-check "r resumes it and the corpus is ready ($(show .hadith.search.foot))" deen_is '.hadith.ready and .hadith.search.shown'
-check "from the saved part, by a Range request ($(grep -m1 'GET /ara-bukhari.min.json bytes=' "$work/editions.log"))" grep -q 'GET /ara-bukhari.min.json bytes=[1-9]' "$work/editions.log"
-wtype intentions
-until_ok 5000 deen_is '(.hadith.search.rows | length) > 0'
-check "searching intentions finds Sahih al-Bukhari 1, offline on the saved corpus ($(show '.hadith.search.rows[0]'))" \
-  deen_is '(.hadith.search.rows[0] | tostring | test("Sahih al-Bukhari")) and (.hadith.search.rows[0] | tostring | test("#1"))'
+until_ok 30000 hadith_is '.ready and .count == 10'
+check "the corpus was joined from the checkout at the first open, its manifest kept ($(real hadith status | jq -c .state))" \
+  eval 'cmp -s "$sources/manifest.toml" "$work/hadith/manifest.toml" && [ "$(real hadith status | jq -r .state)" = ready ]'
+check "the tab opens on the collections, Bukhari first with its count of narrations with text ($(hadith '[.level, .count, .rows[0].text]'))" \
+  hadith_is '.level == "collections" and .count == 10 and .rows[0].text == "সহীহ বুখারী  Sahih al-Bukhari  7583"'
+wtype -k Return
+until_ok 3000 hadith_is '.level == "books" and .count > 0'
+check "Enter lists Bukhari's 97 books then অন্যান্য ($(hadith '[.count, .rows[0].text]'))" hadith_is '.count == 98 and .rows[0].text == "১. ওহীর সূচনা  7"'
+wtype -k Return
+until_ok 3000 hadith_is '.level == "narrations" and .count > 0'
+bn1=$(real hadith show bukhari:1 | jq -c .hit.hadith.bn)
+check "Enter lists book 1's 7 narrations, narration 1 first in its cleaned Bangla ($(hadith '[.count, .rows[0].text[0:40]]'))" \
+  deen_is --argjson bn "$bn1" '.hadith | .count == 7 and .rows[0].text == $bn'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "narration"'
+check "Enter opens it: its Arabic, its Bangla and সহীহ বুখারী ১ ($(hadith '.pane | [.ar[0:20], .reference]'))" \
+  deen_is --argjson h "$(real hadith show bukhari:1 | jq -c .hit.hadith)" '.hadith.pane | .ar == $h.ar and .meaning == $h.bn and .reference == "সহীহ বুখারী ১"'
+wtype -k Escape
+wtype -k Escape
+until_ok 2000 hadith_is '.level == "books"'
+wtype -k Escape
+until_ok 2000 hadith_is '.level == "collections"'
+check "Esc three times returns to the collections" hadith_is '.level == "collections"'
+wtype /
+until_ok 1000 hadith_is '.focus == "field"'
+wtype 'নিয়ত'
+until_ok 5000 hadith_is '.search.count == "38 results"'
+check "/ then নিয়ত finds 38 narrations, each in Bangla ($(hadith '[.search.count, .rows[0].text[0:40]]'))" \
+  hadith_is '.search.count == "38 results" and .rows[0].english == false'
+wtype -k Escape
+until_ok 2000 hadith_is '.level == "collections"'
 
 wtype -k Escape
 until_ok 3000 deen_gone
