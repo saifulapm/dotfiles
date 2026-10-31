@@ -88,7 +88,7 @@ out=$("$gui" get click Secret)
 check "with no property it still withholds the text: $out" jq -e '.text == null and .withheld == true and (.states | type) == "array" and has("box")' <<<"$out"
 check "the secret is in no output" bash -c "! grep -q hunter2 <<<'$out'"
 out=$("$gui" get click Plain box)
-check "gui get box prints the box alone: $out" jq -e '(keys - ["widget"]) == ["box"]' <<<"$out"
+check "gui get box prints the box alone, with its reason when null: $out" jq -e '(keys - ["widget", "box_reason"]) == ["box"]' <<<"$out"
 
 until_ok 10000 test "$(window_count)" = 3
 until_ok 5000 bash -c "'$gui' find click Three >/dev/null 2>&1"
