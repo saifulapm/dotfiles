@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deen's Show path on the real deen backend, pointed at the backend's fake editions CDN and fake aladhan: Read surah 36 and hear its first word in mpv, add it to Memorise, reveal an ayah and press 3 so it leaves today's list, see the next prayer's countdown, and get the hadith corpus through a cut and a resume.
+# Deen's Show path on the real deen backend and the data it builds from the deen-data checkout, pointed at the backend's fake editions CDN and fake aladhan: Read surah 36 and hear its first word in mpv, add it to Memorise, reveal an ayah and press 3 so it leaves today's list, see the next prayer's countdown, and get the hadith corpus through a cut and a resume.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -7,7 +7,7 @@ backend=/home/saiful/Codes/deen
 deen_bin=$backend/target/debug/deen
 editions_bin=$backend/target/debug/examples/fake_editions
 aladhan_bin=$backend/target/debug/examples/fake_aladhan
-texts=$HOME/.local/share/deen
+sources=/home/saiful/Codes/deen-data
 deen_qml=$repo/shell/deen.qml
 entry=$repo/home/dot_local/share/applications/deen.desktop
 work=$(mktemp -d)
@@ -24,11 +24,13 @@ if ! cargo build --offline -q --manifest-path "$backend/Cargo.toml" --bin deen -
   echo "FAIL the backend at $backend builds"
   exit 1
 fi
-# The pin's apply puts the Quran text, its word meanings and Hisn al-Muslim here; the check reads them as the App would.
-for f in quran words duas; do
-  [ -s "$texts/$f.json" ] || { echo "FAIL $texts/$f.json is there (dots apply fetches it)"; exit 1; }
-done
 mkdir -p "$work"/{config,cache/deen/audio/wbw,state,data,hadith,editions,mpv}
+# The Quran text, its word meanings and Hisn al-Muslim, built by the backend from the deen-data checkout as the pin's apply builds them.
+texts=$work/texts
+if ! "$backend/scripts/build-data" "$sources" "$texts"; then
+  echo "FAIL the backend builds its data from $sources"
+  exit 1
+fi
 ln -s "$DOTS_DEV_DIR/state/dots" "$work/state/dots"
 printf 'ao=null\n' >"$work/mpv/mpv.conf"
 # 36:1's first word, recorded as the CDN's file would be, so Enter plays it without the network.
@@ -111,8 +113,8 @@ until_ok 2000 deen_is '.read.picker.text == "36"'
 wtype -k Return
 until_ok 5000 deen_is '.read.ayat == 83'
 check "s, 36, Enter opens Ya-Sin with its 83 ayat ($(show '[.read.heading, .read.meta, .read.ayat]'))" deen_is '.read.ayat == 83 and (.read.meta | startswith("83 ayat · Makki · juz 22"))'
-check "its first word shows with its meaning, from words.json ($(show '.read.ayah.words[0] | [.ar, .en, .boxed]'))" \
-  deen_is '.read.ayah.words[0].ar == "يسٓ" and .read.ayah.words[0].en == "Ya Seen" and .read.ayah.words[0].boxed'
+check "its first word shows with its Bangla meaning, from the built words.json ($(show '.read.ayah.words[0] | [.ar, .bn, .boxed]'))" \
+  deen_is '.read.ayah.words[0].ar == "يسٓ" and .read.ayah.words[0].bn == "ইয়া-সীন।" and .read.ayah.words[0].boxed'
 check "and its Arabic draws in an Arabic face ($(show '.read.ayah.words[0].family'))" deen_is '.read.ayah.words[0].family == "Amiri" or .read.ayah.words[0].family == "Noto Naskh Arabic"'
 wtype -k Return
 until_ok 5000 mpv_playing 036_001_001.mp3
