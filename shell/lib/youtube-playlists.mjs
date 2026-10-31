@@ -97,14 +97,19 @@ export function removeItem(store, playlistId, videoId, now) {
 export function move(store, playlistId, videoId, step, now) {
   const list = store.playlists[playlistId];
   if (!list || list.deleted) return store;
-  const order = live(list);
+  let order = live(list);
   const at = order.findIndex((it) => it.id === videoId);
+  if (at < 0 || !order[at + step]) return store;
+  const items = Object.assign({}, list.items);
+  // Two machines can each add a video at one position, and no position lands between two equal ones, so the list is numbered again first; each item whose number changed is stamped, so the merge carries it.
+  if (order.some((it, i) => i > 0 && num(it.pos) <= num(order[i - 1].pos))) {
+    order = order.map((it, i) => (it.pos === i + 1 ? it : (items[it.id] = Object.assign({}, it, { pos: i + 1, updatedAt: now }))));
+  }
   const over = order[at + step];
-  if (at < 0 || !over) return store;
   const beyond = order[at + 2 * step];
   const pos = beyond ? (over.pos + beyond.pos) / 2 : over.pos + step;
-  const moved = Object.assign({}, order[at], { pos, updatedAt: now });
-  return put(store, playlistId, Object.assign({}, list, { items: Object.assign({}, list.items, { [videoId]: moved }) }));
+  items[videoId] = Object.assign({}, order[at], { pos, updatedAt: now });
+  return put(store, playlistId, Object.assign({}, list, { items }));
 }
 
 // A Playlist's videos in their order, each as its five fields, and the reason a video is unavailable when it has one.

@@ -298,3 +298,17 @@ test('a store written by the old code merges with a new one without losing an it
   assert.deepEqual(P.playlists(m).map((l) => l.name), ['Focus', 'Gym']);
   assert.equal(P.serialize(P.mergeStores(old, old)), P.serialize(old));
 });
+
+test('after two machines add at one position, a move still moves the video one step each time', () => {
+  const base = P.addMany(P.create(P.emptyStore(), 'focus', 'Focus', 100), 'focus', [video('a1'), video('a2')], 100);
+  const m = P.mergeStores(P.add(base, 'focus', video('p9'), 1000), P.add(base, 'focus', video('q9'), 1001));
+  assert.deepEqual(ids(m, 'focus'), ['a1', 'a2', 'p9', 'q9']);
+  let s = m;
+  for (const want of [['a1', 'p9', 'a2', 'q9'], ['a1', 'p9', 'q9', 'a2']]) {
+    s = P.move(s, 'focus', 'a2', 1, 2000);
+    assert.deepEqual(ids(s, 'focus'), want);
+  }
+  assert.equal(P.move(s, 'focus', 'a2', 1, 2001), s);
+  // Every stamp the move set travels, so the other machine ends in the same order.
+  assert.deepEqual(ids(P.mergeStores(m, s), 'focus'), ['a1', 'p9', 'q9', 'a2']);
+});
