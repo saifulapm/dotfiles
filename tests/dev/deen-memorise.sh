@@ -29,7 +29,9 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
-open_deen() { niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"; }
+# A backend script as $1 answers in place of the fake deen.
+open_deen() { niri msg action spawn -- sh -c "${1:+DOTS_DEEN=$1 }exec $exec_line >>'$log' 2>&1"; }
+no_data="Bangla data is not on this machine: gh auth login, then dots update"
 
 in_theme paper
 open_deen
@@ -59,8 +61,13 @@ check "and no grade was asked for" bash -c "! grep -q '^hifz grade' '$calls'"
 
 wtype -k space
 until_ok 2000 mem_is '.memorise.revealed == true'
-check "space reveals the whole ayah and its meaning ($(mem '.card | [.arabic, .meaning]'))" \
-  mem_is --arg full "$full12" '.memorise.card | .arabic == $full and .meaning == "[All] praise is [due] to Allah, Lord of the worlds -" and .badge == "2 · REVEALED" and .blanks == 0'
+# Zakaria's 1:2, whose হাম্‌দ and আল্লাহ্‌র keep the zero-width non-joiner after their hasanta.
+bn12=$(printf 'সকল ‘হাম্\u200cদ’ আল্লাহ্\u200cর , যিনি সৃষ্টিকুলের রব')
+check "space reveals the whole ayah and its Bangla meaning ($(mem '.card | [.arabic, .meaning]'))" \
+  mem_is --arg full "$full12" --arg bn "$bn12" '.memorise.card | .arabic == $full and .meaning == $bn and .badge == "2 · REVEALED" and .blanks == 0'
+no_english() { ! deen_state | jq -c .memorise | grep -q 'praise'; }
+check "and no English line: 1:2's 'praise' is nowhere in Memorise's state" no_english
+check "paper: the meaning draws in Noto Serif Bengali ($(mem .card.meaningFamily))" mem_is '.memorise.card.meaningFamily == "Noto Serif Bengali"'
 check "the four ratings read the card's next ($(mem '.card.ratings | map([.key, .word, .next])'))" \
   mem_is '.memorise.card.ratings | map([.key, .word, .next]) == [["1","again","10 min"],["2","hard","1 day"],["3","good","1 day"],["4","easy","1 day"]]'
 check "Paper heads the ratings in capitals ($(mem .card.ask))" mem_is '.memorise.card.ask == "HOW DID IT GO · NEXT REVIEW"'
@@ -87,7 +94,7 @@ check "and rated nothing" bash -c "! grep -q 'hifz grade 1:4' '$calls'"
 wtype -k space
 until_ok 2000 mem_is '.memorise.revealed == true'
 check "a meaning with a newline, an override and an escape draws on one clean line ($(mem .card.meaning))" \
-  mem_is '.memorise.card.meaning == "Master of the Day of Judgment, the real [31m end" and .memorise.card.meaningLines == 1'
+  mem_is '.memorise.card.meaning == "বিচার দিনের মালিক, আসল সত্য [31m শেষ" and .memorise.card.meaningLines == 1'
 wtype s
 until_ok 2000 mem_is '.memorise.card.heading == "Al-Faatiha · ayah 6"'
 wtype -k space
@@ -103,6 +110,7 @@ until_ok 3000 deen_is '.voice == "plain"'
 check "artboard: a rounded white card with an accent outline, tinted badge and rounded tiles ($(mem '.card | [.radius, .border, .fill, .borderColor, .badgeFill, .badge, .ask]'))" \
   mem_is '.memorise.card | .radius == 14 and .border == 1.5 and .fill == "#ffffff" and .borderColor == "#3d5afe" and .badgeFill == "#eef1ff" and .badge == "2 · revealed" and .ask == "How did it go · next review" and (.ratings | all(.radius == 12))'
 check "artboard: the count reads in sentence case ($(mem '[.count, .line]'))" mem_is '.memorise.count == "5 due today"'
+check "artboard: the meaning draws in Noto Sans Bengali ($(mem .card.meaningFamily))" mem_is '.memorise.card.meaningFamily == "Noto Sans Bengali"'
 
 in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
@@ -110,6 +118,7 @@ check "blueprint: a square 1px card in the accent, bracketed badge, capitals and
   mem_is '.memorise.card | .radius == 0 and .border == 1 and .borderColor == "#7fe3f0" and .badge == "[2 · REVEALED]" and .ask == "HOW DID IT GO · NEXT REVIEW" and .askFont == "Maple Mono"'
 check "blueprint: the count and the ratings read in capitals and the key strip in brackets ($(mem '[.count, .card.ratings[0].next, .keys[0]]'))" \
   mem_is '.memorise.count == "5 DUE TODAY" and .memorise.card.ratings[0].next == "10 MIN" and .memorise.keys[0] == ["[SPACE]","REVEAL"] and .memorise.keys[7] == ["[ESC]","CLOSE"]'
+check "blueprint: the meaning draws in Noto Sans Bengali ($(mem .card.meaningFamily))" mem_is '.memorise.card.meaningFamily == "Noto Sans Bengali"'
 
 in_theme paper
 until_ok 3000 deen_is '.voice == "caps"'
@@ -120,6 +129,36 @@ until_ok 3000 deen_gone
 check "Esc closes the window" deen_gone
 until_ok 3000 no_deen_process
 check "and within 3 s no qs with -p .../shell/deen.qml is left" no_deen_process
+
+# Without the Quran text deen answers its no-data error, and the page says how to get it; a deck that fails for another reason says it could not be read.
+cat >"$work/no-quran" <<'SCRIPT'
+#!/bin/sh
+echo '{"error":"cannot read the Quran text at /nonexistent/quran.json: No such file or directory (os error 2)"}'
+exit 1
+SCRIPT
+cat >"$work/no-state" <<SCRIPT
+#!/bin/sh
+[ "\$1 \$2" = "hifz due" ] || exec "$repo/bin/dev-fake-deen" "\$@"
+echo '{"error":"no state dir"}'
+exit 1
+SCRIPT
+chmod +x "$work/no-quran" "$work/no-state"
+for backend in no-quran no-state; do
+  want=$no_data
+  [ "$backend" = no-state ] && want="Could not read the deck."
+  open_deen "$work/$backend"
+  until_ok 5000 deen_up
+  wtype -k Shift_L
+  wtype -k Tab
+  until_ok 2000 deen_is '.tab == "memorise"'
+  until_ok 3000 mem_is '.memorise.message != ""'
+  check "$backend: Memorise reads '$want' in place of its body ($(mem '[.status, .message, .card.shown]'))" \
+    mem_is --arg m "$want" '.memorise.message == $m and .memorise.card.shown == false and .memorise.count == ""'
+  wtype -k Escape
+  until_ok 3000 deen_gone
+  until_ok 3000 no_deen_process
+  check "$backend: Esc closes the window and no deen qs is left" no_deen_process
+done
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Deen's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"

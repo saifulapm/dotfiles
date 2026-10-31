@@ -161,6 +161,25 @@ until_ok 3000 deen_gone
 until_ok 3000 no_deen_process
 check "Esc closes the window and no deen qs is left" no_deen_process
 
+# Without the duas deen answers its no-data error, and the page says how to get the Bangla data.
+cat >"$work/no-duas" <<'SCRIPT'
+#!/bin/sh
+echo '{"error":"cannot read the duas at /nonexistent/duas.json: No such file or directory (os error 2)"}'
+exit 1
+SCRIPT
+chmod +x "$work/no-duas"
+open_deen "$work/no-duas"
+until_ok 5000 deen_up
+wtype -k Shift_L
+wtype -k Tab -k Tab
+until_ok 5000 duas_is '.failed != ""'
+check "no duas: the page reads the Bangla data line in place of its body ($(duas .failed))" \
+  duas_is '.failed == "Bangla data is not on this machine: gh auth login, then dots update" and .rows == [] and .pane.shown == false'
+wtype -k Escape
+until_ok 3000 deen_gone
+until_ok 3000 no_deen_process
+check "Esc closes the window and no deen qs is left" no_deen_process
+
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Deen's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
 
