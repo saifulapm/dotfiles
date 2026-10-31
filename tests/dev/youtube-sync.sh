@@ -67,6 +67,18 @@ check "s on a row afterwards makes Saved 3 ($(yt_state | jq -c '.look.sidebar[1]
 check "the file still holds Focus's two videos ($(jq -c '.playlists.pl1.items | keys' "$store" 2>/dev/null))" store_ids pl1 '["fakeVid0002","fakeVid0003"]'
 check "and Saved's three ($(jq -c '.playlists.saved.items | keys' "$store" 2>/dev/null))" store_ids saved '["fakeVid0001","fakeVid0002","fakeVid0003"]'
 
+# Another machine added a video at the position this one gave fakeVid0003, so the two tie; Shift+J must still move the cursor's video one row each time.
+jq --argjson it "$(item fakeVid0004 2)" '.playlists.pl1.items.fakeVid0004 = $it' "$store" >"$store.sync"
+mv --exchange "$store.sync" "$store"
+rm -f "$store.sync"
+until_ok 2000 focus_ids '["fakeVid0002","fakeVid0003","fakeVid0004"]'
+wtype J
+until_ok 2000 focus_ids '["fakeVid0003","fakeVid0002","fakeVid0004"]'
+check "Shift+J moves fakeVid0002 past one of two videos at one position ($(yt_state | jq -c '[.drawn[].id]'))" focus_ids '["fakeVid0003","fakeVid0002","fakeVid0004"]'
+wtype J
+until_ok 2000 focus_ids '["fakeVid0003","fakeVid0004","fakeVid0002"]'
+check "and again past the other ($(yt_state | jq -c '[.drawn[].id]'))" focus_ids '["fakeVid0003","fakeVid0004","fakeVid0002"]'
+
 wtype -k Escape
 until_ok 3000 yt_gone
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")

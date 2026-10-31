@@ -103,7 +103,11 @@ export function move(store, playlistId, videoId, step, now) {
   const items = Object.assign({}, list.items);
   // Two machines can each add a video at one position, and no position lands between two equal ones, so the list is numbered again first; each item whose number changed is stamped, so the merge carries it.
   if (order.some((it, i) => i > 0 && num(it.pos) <= num(order[i - 1].pos))) {
-    order = order.map((it, i) => (it.pos === i + 1 ? it : (items[it.id] = Object.assign({}, it, { pos: i + 1, updatedAt: now }))));
+    order = order.map((it, i) => {
+      if (it.pos === i + 1) return it;
+      items[it.id] = Object.assign({}, it, { pos: i + 1, updatedAt: now });
+      return items[it.id];
+    });
   }
   const over = order[at + step];
   const beyond = order[at + 2 * step];
