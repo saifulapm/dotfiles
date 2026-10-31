@@ -31,6 +31,10 @@ if ! DEEN_BIN=$deen_bin "$backend/scripts/build-data" "$sources" "$texts"; then
   echo "FAIL the backend builds its data from $sources"
   exit 1
 fi
+# What the backend's engine wrote for Ya-Sin, read back from the files it built.
+built_name=$(jq -r '.surahs[35].bn' "$texts/quran.json")
+built_pron=$(jq -r '.ayahs[] | select(.s == 36 and .a == 1) | .bn_pron' "$texts/quran.json")
+built_word=$(jq -r '.["36:1"].words[0].bn_pron' "$texts/words.json")
 ln -s "$DOTS_DEV_DIR/state/dots" "$work/state/dots"
 printf 'ao=null\n' >"$work/mpv/mpv.conf"
 # 36:1's first word, recorded as the CDN's file would be, so Enter plays it without the network.
@@ -115,6 +119,8 @@ until_ok 5000 deen_is '.read.ayat == 83'
 check "s, 36, Enter opens Ya-Sin with its 83 ayat ($(show '[.read.heading, .read.meta, .read.ayat]'))" deen_is '.read.ayat == 83 and (.read.meta | startswith("83 ayat · Makki · juz 22"))'
 check "its first word shows with its Bangla meaning, from the built words.json ($(show '.read.ayah.words[0] | [.ar, .bn, .boxed]'))" \
   deen_is '.read.ayah.words[0].ar == "يسٓ" and .read.ayah.words[0].bn == "ইয়া-সীন।" and .read.ayah.words[0].boxed'
+check "its heading is the surah's Bangla name, and the ayah and word read in the engine's Bangla pronunciation ($(show '[.read.heading, .read.ayah.pron, .read.ayah.words[0].pron]'))" \
+  deen_is --arg name "$built_name" --arg pron "$built_pron" --arg word "$built_word" '($name | startswith("সূরা ")) and .read.heading == $name and $pron != "" and .read.ayah.pron == $pron and .read.ayah.words[0].pron == $word'
 check "and its Arabic draws in an Arabic face ($(show '.read.ayah.words[0].family'))" deen_is '.read.ayah.words[0].family == "Amiri" or .read.ayah.words[0].family == "Noto Naskh Arabic"'
 wtype -k Return
 until_ok 5000 mpv_playing 036_001_001.mp3
@@ -128,10 +134,11 @@ tab_to memorise
 until_ok 5000 deen_is '.memorise.count == "40 due today" or .memorise.count == "83 due today"'
 check "Memorise counts today's cards ($(show '[.memorise.count, .memorise.line]'))" deen_is '.memorise.count == "83 due today" and (.memorise.line | startswith("83 new · 1 of 83"))'
 check "the card shows only the start of 36:1 ($(show '[.memorise.card.heading, .memorise.card.arabic, .memorise.revealed]'))" \
-  deen_is '.memorise.revealed == false and (.memorise.card.heading | test("ayah 1$")) and .memorise.card.meaning == ""'
+  deen_is '.memorise.revealed == false and (.memorise.card.heading | endswith("৩৬:১")) and .memorise.card.meaning == ""'
 wtype ' '
 until_ok 2000 deen_is '.memorise.revealed'
-check "space reveals the ayah and its meaning ($(show '[.memorise.card.arabic, .memorise.card.meaning]'))" deen_is '.memorise.revealed and .memorise.card.meaning != ""'
+check "space reveals the ayah, its pronunciation and its meaning ($(show '[.memorise.card.arabic, .memorise.card.pron, .memorise.card.meaning]'))" \
+  deen_is --arg pron "$built_pron" '.memorise.revealed and .memorise.card.pron == $pron and .memorise.card.meaning != ""'
 wtype 3
 until_ok 5000 deen_is '.memorise.count == "82 due today"'
 check "3 takes it off today's list: the count reads one less ($(show .memorise.count))" deen_is '.memorise.count == "82 due today" and .memorise.revealed == false'
