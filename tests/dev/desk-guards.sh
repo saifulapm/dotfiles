@@ -139,7 +139,9 @@ chmod +x "$DOTS_DEV_DIR/callshim/dots-call"
 until_ok 8000 has_window org.gtk.WidgetFactory4
 found() { "$scripts/gui" find gtk4-widget-factory checkbutton >/dev/null 2>&1; }
 until_ok 8000 found
-out=$(PATH=$DOTS_DEV_DIR/callshim:$PATH "$scripts/gui" click gtk4-widget-factory checkbutton)
+# Five check boxes share the name, and GTK4's offer no action, so the click goes to one toggle by its ref.
+toggle=$("$scripts/gui" tree gtk4-widget-factory | jq -r '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].ref')
+out=$(PATH=$DOTS_DEV_DIR/callshim:$PATH "$scripts/gui" click gtk4-widget-factory "$toggle")
 rc=$?
 check "a polkit prompt reading open after gui click's agent-window check refuses it (got $rc: $out)" refused "$rc" "$out" "auth prompt"
 check "on its second read of polkit state" test "$(wc -l <"$DOTS_DEV_DIR/polkit.reads")" = 2

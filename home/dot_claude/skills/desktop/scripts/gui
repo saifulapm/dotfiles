@@ -6,7 +6,7 @@ no focus stealing. Works for GTK/Qt apps that expose AT-SPI; Electron and
 Chromium need --force-renderer-accessibility to appear.
 
   gui apps                      apps currently on the a11y bus
-  gui tree <app> [--all]        interactive widgets as one JSON object (--all = every node)
+  gui tree <app> [--all]        interactive widgets as one JSON object, each with a ref (--all = every node)
   gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
   gui get <app> <text> [text|states|box]   one property, or all three (a password field's text is withheld)
@@ -14,8 +14,12 @@ Chromium need --force-renderer-accessibility to appear.
   gui type <app> <text> <val> [--any] [--then shot|windows|tree]  set an entry's text
   gui text <app>                all readable text in the app
 
-<app> and <text> match case-insensitively on a substring, so `gui click
-files 'Save'` is enough. click and type act only in an agent window: the
+<app> and <text> match case-insensitively on a substring of the name and
+role, so `gui click files 'Save'` is enough; where a text matches an
+interactive widget, only those count, and two or more print {"ambiguous":
+[...]} with up to 10 refs, exit 4. A ref `s<hex>:<i>` from `gui tree` names
+one node until the app changes: re-found by its path, it must keep its role
+and name, else {"stale": "<cause>"}, exit 4. Nothing acts in either case. click and type act only in an agent window: the
 element's app pid and window title must match one `screen launch` opened
 (scripts/desk), else they exit 3 printing the refusal; --any lifts that for
 a brief that grants it. click and type print {"ok": ...} with the result the
@@ -32,6 +36,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -57,7 +62,9 @@ INTERACTIVE = {
 MAX_NODES = 4000  # a deep tree must not hang the caller
 INLINE_NODES = 1000  # what gui tree prints before it spills
 INLINE_BYTES = 32768  # the printed object, newline included
-SPILL_KEEP_S = 3600  # a spill older than this goes on the next gui call
+SPILL_KEEP_S = 3600  # a spill or snapshot older than this goes on the next gui call
+AMBIGUOUS_SHOWN = 10
+REF = re.compile(r"^s([0-9a-f]{4}):([0-9]+)$")
 CALL_MS = 3000  # every AT-SPI call; a stopped app never answers, and libatspi would wait 25 s
 READ_FROM_S, READ_EVERY_S, READ_UNTIL_S = 0.3, 0.1, 2.0  # a write's effect lands a beat after its reply
 seen = None  # the window an action saw, for its journal line
@@ -202,37 +209,109 @@ def value(node):
 FLAGS = {"checked", "pressed", "selected", "focused", "expanded", "sensitive"}
 
 
-def numbered(app, want=None):
-    """Yield (i, path, node) for every node under app; i counts the whole walk, whatever want keeps."""
-    i = 0
+def walked(app):
+    """[(i, path, node, role, name)] for every node under app, i its place in the walk."""
+    rows = []
     for path, node in walk(app):
-        if node is app:
-            continue
-        if want is None or node.get_role_name() in want:
-            yield i, path, node
-        i += 1
+        if node is not app:
+            try:
+                rows.append((len(rows), path, node, node.get_role_name(), node.get_name() or ""))
+            except Exception:
+                continue  # gone mid-walk
+    return rows
 
 
-def spill_files(state):
+def state_files(state, prefix):
     try:
-        return [os.path.join(state, f) for f in os.listdir(state) if f.startswith("tree-") and f.endswith(".json")]
+        return [os.path.join(state, f) for f in os.listdir(state) if f.startswith(prefix) and f.endswith(".json")]
     except OSError:
         return []
 
 
 def sweep():
-    """Removes spills older than an hour; any gui call, and never a reason to fail."""
+    """Removes spills and snapshots older than an hour; any gui call, and never a reason to fail."""
     try:
         state = load_desk().state_dir()
-        for path in spill_files(state):
+        for path in state_files(state, "tree-") + state_files(state, "snap-"):
             if time.time() - os.stat(path).st_mtime > SPILL_KEEP_S:
                 os.unlink(path)
     except (Exception, SystemExit):
         pass
 
 
-def widget(i, node):
-    return {"i": i, "role": node.get_role_name(), "name": node.get_name() or ""}
+def snapshot(app, rows):
+    """Writes each node's path, role and name under a fresh 4-hex id, returned; None off niri, where refs have nowhere to live."""
+    if not os.environ.get("NIRI_SOCKET"):
+        return None
+    state = load_desk().state_dir()
+    os.makedirs(state, mode=0o700, exist_ok=True)
+    body = {"app": app.get_name() or "", "pid": app.get_process_id(), "nodes": [[list(p), role, name] for _, p, _, role, name in rows]}
+    while True:
+        hexid = os.urandom(2).hex()
+        try:
+            fd = os.open(os.path.join(state, f"snap-{hexid}.json"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            break
+        except FileExistsError:
+            continue
+    with os.fdopen(fd, "w") as f:
+        json.dump(body, f)
+    return hexid
+
+
+def ref(hexid, i):
+    return f"s{hexid}:{i}" if hexid else None
+
+
+def widget(r, role, name):
+    return {"ref": r, "role": role, "name": name}
+
+
+def refuse4(out):
+    print(json.dumps(out))
+    sys.exit(4)
+
+
+def target(app, arg):
+    """(ref, path, node, role, name) for a ref still naming what it named, or a text one widget matches; else exits 4 saying why, acting on nothing."""
+    m = REF.match(arg)
+    if m:
+        try:
+            with open(os.path.join(load_desk().state_dir(), f"snap-{m[1]}.json")) as f:
+                snap = json.load(f)
+        except (OSError, ValueError, SystemExit):
+            refuse4({"stale": "snapshot_gone"})
+        i = int(m[2])
+        if snap.get("pid") != app.get_process_id() or i >= len(snap["nodes"]):
+            refuse4({"stale": "path_gone"})
+        path, role, name = snap["nodes"][i]
+        node = app
+        try:
+            for k in path:
+                node = node.get_child_at_index(k) if k < node.get_child_count() else None
+                if node is None:
+                    refuse4({"stale": "path_gone"})
+            now_role, now_name = node.get_role_name(), node.get_name() or ""
+        except Exception:
+            refuse4({"stale": "path_gone"})
+        if now_role != role:
+            refuse4({"stale": "role_changed"})
+        if now_name != name:
+            refuse4({"stale": "name_changed"})
+        return arg, tuple(path), node, role, name
+    if not arg:
+        usage()
+    rows = walked(app)
+    hits = [r for r in rows if matches(r[3], r[4], arg)]
+    # A GTK4 button's label is a node of its own name, so a widget a person acts on wins over the text around it.
+    if any(r[3] in INTERACTIVE for r in hits):
+        hits = [r for r in hits if r[3] in INTERACTIVE]
+    if not hits:
+        nothing(f"nothing matching {arg!r}")
+    hexid = snapshot(app, rows)
+    if len(hits) > 1:
+        refuse4({"ambiguous": [widget(ref(hexid, i), role, name) for i, _, _, role, name in hits[:AMBIGUOUS_SHOWN]]})
+    i, path, node, role, name = hits[0]
+    return ref(hexid, i), path, node, role, name
 
 
 def entry(i, depth, node):
@@ -245,13 +324,15 @@ def entry(i, depth, node):
 
 
 def tree(app, everything):
-    """The app's widgets as a dict; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file."""
-    nodes = [entry(i, len(p), n) for i, p, n in numbered(app, None if everything else INTERACTIVE)]
+    """The app's widgets as a dict, each with its ref; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file."""
+    rows = walked(app)
+    hexid = snapshot(app, rows)
+    nodes = [dict(entry(i, len(p), n), ref=ref(hexid, i)) for i, p, n, role, _ in rows if everything or role in INTERACTIVE]
     head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
     whole = dict(head, nodes=nodes)
-    # Every tree replaces the spill before it, whether it spills or not.
+    # Every tree replaces the spill before it, whether it spills or not; snapshots stay their hour.
     state = load_desk().state_dir() if os.environ.get("NIRI_SOCKET") else None
-    for old in spill_files(state) if state else []:
+    for old in state_files(state, "tree-") if state else []:
         os.unlink(old)
     if len(nodes) <= INLINE_NODES and len(json.dumps(whole)) < INLINE_BYTES:
         return whole
@@ -302,9 +383,9 @@ def delivery(how, cause=None, matched=None):
     return out
 
 
-def write(node, editable, value):
+def write(node, role, editable, value):
     """Sets the text, then judges it by what the field reads after, never by the reply."""
-    secure = node.get_role_name() == "password text"
+    secure = role == "password text"
     before = None
     if not secure:
         try:
@@ -370,9 +451,8 @@ def press(node, action, index):
         time.sleep(READ_EVERY_S)
 
 
-def matches(node, text):
-    haystack = (node.get_name() or "") + " " + (node.get_role_name() or "")
-    return text.lower() in haystack.lower()
+def matches(role, name, text):
+    return text.lower() in f"{name} {role}".lower()
 
 
 def finish(out, then, app):
@@ -447,12 +527,12 @@ def main(argv):
     if len(argv) < 4:
         usage()
     needle = argv[3]
-    hits = [(i, p, n) for i, p, n in numbered(app) if matches(n, needle)]
 
     if cmd == "find":
+        hits = [r for r in walked(app) if matches(r[3], r[4], needle)]
         if not hits:
             nothing(f"nothing matching {needle!r}")
-        for _, _, node in hits[:20]:
+        for _, _, node, _, _ in hits[:20]:
             print(describe(node))
         return
 
@@ -460,13 +540,11 @@ def main(argv):
         what = argv[4:] or ["text", "states", "box"]
         if len(what) > 1 and len(argv) > 4 or what[0] not in ("text", "states", "box"):
             usage()
-        if not hits:
-            nothing(f"nothing matching {needle!r}")
-        i, _, node = hits[0]
-        out = {"widget": widget(i, node)}
+        r, _, node, role, name = target(app, needle)
+        out = {"widget": widget(r, role, name)}
         if "text" in what:
             # A password field's text never leaves it, whatever asks.
-            if node.get_role_name() == "password text":
+            if role == "password text":
                 out.update(text=None, withheld=True)
             else:
                 try:
@@ -482,49 +560,42 @@ def main(argv):
         return
 
     if cmd == "click":
-        for i, path, node in hits:
-            try:
-                action = node.get_action()
-                names = [
-                    Atspi.Action.get_action_name(action, i)
-                    for i in range(Atspi.Action.get_n_actions(action))
-                ]
-            except Exception:
-                continue
-            if not names:
-                continue
-            # "click" where offered, else the first action the widget has.
-            index = names.index("click") if "click" in names else 0
-            w = widget(i, node)
-            if not anywhere:
-                confine(app, path)
-            guard()
-            finish({**press(node, action, index), "action": names[index], "widget": w}, then, app)
-        nothing(f"nothing clickable matching {needle!r}")
+        r, path, node, role, name = target(app, needle)
+        try:
+            action = node.get_action()
+            names = [Atspi.Action.get_action_name(action, k) for k in range(Atspi.Action.get_n_actions(action))]
+        except Exception:
+            names = []
+        if not names:
+            nothing(f"{role} {name!r} offers no action (a GTK4 check box offers none)")
+        # "click" where offered, else the first action the widget has.
+        index = names.index("click") if "click" in names else 0
+        w = widget(r, role, name)
+        if not anywhere:
+            confine(app, path)
+        guard()
+        finish({**press(node, action, index), "action": names[index], "widget": w}, then, app)
 
     if cmd == "type":
         if len(argv) < 5:
             usage()
         value = argv[4]
-        for i, path, node in hits:
-            try:
-                editable = node.get_editable_text()
-            except Exception:
-                continue
-            if editable is None:
-                continue
-            # Read before the write: an app that stops on it answers nothing after.
-            w = widget(i, node)
-            if not anywhere:
-                confine(app, path)
-            guard()
-            # Editable set and read-only clear, whatever interfaces the widget has.
-            st = states(node)
-            if "editable" not in st or "read-only" in st:
-                print(json.dumps({"refused": "not editable", "widget": w}))
-                sys.exit(3)
-            finish({**write(node, editable, value), "typed": len(value), "widget": w}, then, app)
-        nothing(f"no editable widget matching {needle!r}")
+        # Role and name come from the walk: an app that stops on the write answers nothing after.
+        r, path, node, role, name = target(app, needle)
+        w = widget(r, role, name)
+        if not anywhere:
+            confine(app, path)
+        guard()
+        try:
+            editable = node.get_editable_text()
+        except Exception:
+            editable = None
+        # Editable set and read-only clear, whatever interfaces the widget has.
+        st = states(node)
+        if editable is None or "editable" not in st or "read-only" in st:
+            print(json.dumps({"refused": "not editable", "widget": w}))
+            sys.exit(3)
+        finish({**write(node, role, editable, value), "typed": len(value), "widget": w}, then, app)
 
     usage()
 

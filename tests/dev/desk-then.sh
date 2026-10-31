@@ -55,13 +55,15 @@ check "2.0-2.3 s after the call ($took ms)" test "$took" -ge 2000 -a "$took" -le
 out=$("$repo/home/dot_claude/skills/desktop/scripts/mouse" to 20 20 --then windows)
 check "mouse to --then windows prints the window list too: $(cut -c1-80 <<<"$out")" bash -c "jq -e '(.stable | type) == \"boolean\" and (.windows | map(.id) | index($factory)) != null' <<<'$out' >/dev/null"
 
-# A toggle button: GTK4's check boxes offer no action, and Page 2's Inform opens a dialog that takes the clicks after it.
-had=$("$gui" tree widget | jq '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].states | index("pressed") != null')
-out=$("$gui" click widget "togglebutton toggle button" --then tree)
+# A toggle button, by its ref since four share the name: GTK4's check boxes offer no action, and Page 2's Inform opens a dialog that takes the clicks after it.
+"$gui" tree widget >"$DOTS_DEV_DIR/before.json"
+had=$(jq '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].states | index("pressed") != null' "$DOTS_DEV_DIR/before.json")
+toggle=$(jq -r '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].ref' "$DOTS_DEV_DIR/before.json")
+out=$("$gui" click widget "$toggle" --then tree)
 rc=$?
 check "gui click on a toggle button --then tree exits 0 (got $rc)" test "$rc" = 0
 pid=$(niri msg -j windows | jq ".[] | select(.id == $factory) | .pid")
-i=$(jq '.widget.i' <<<"$out")
+i=$(jq '.widget.ref | split(":")[1] | tonumber' <<<"$out")
 check "printing the click's result and the factory's tree: $(cut -c1-120 <<<"$out")" bash -c "jq -e '.ok == true and .action == \"click\" and (.stable | type) == \"boolean\" and .tree.pid == $pid' <<<'$out' >/dev/null"
 # The tree is the one after the click: the toggle it pressed reads pressed there, and did not before.
 check "where the toggle reads pressed, as it did not before ($had)" bash -c "[ '$had' = false ] && jq -e '.tree.nodes[] | select(.i == $i) | .states | index(\"pressed\") != null' <<<'$out' >/dev/null"

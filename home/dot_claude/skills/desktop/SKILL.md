@@ -112,9 +112,17 @@ the output or the journal, only `"matched"`; `get` withholds a password
 field's text. A GTK4 check box offers no action at all, so `click` exits 4
 on it: use pixels.
 
+Each `tree` node has a `"ref"` such as `s3fa1:42`; pass it where a text
+goes (`gui click <app> s3fa1:42`) to reach a widget with no name, or one of
+several alike. A ref keeps for an hour, and only while the app keeps that
+widget where it was: after a page switch or a closed dialog it answers
+`{"stale": "<cause>"}`, exit 4, and acts on nothing; take a fresh `tree`.
+A text that matches two or more widgets a person would act on answers
+`{"ambiguous": [...]}` with up to 10 refs, exit 4; pick one by its ref.
+
 `tree` prints at most 1000 nodes and 32 KB; a longer tree is written whole
-to the file its `"spill"` names, with the same `i` for each node. Read the
-file with `jq`, not whole.
+to the file its `"spill"` names, with the same `i` and `ref` for each node.
+Read the file with `jq`, not whole.
 
 An app missing from `gui apps`, or whose `tree` is empty (Qt Quick apps),
 exposes nothing: use pixels. Chromium and Electron need
