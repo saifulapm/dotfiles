@@ -126,8 +126,8 @@ function merge(unit, path, files) {
   fail(`${unit}: the local store kept changing, so this round left it alone`, 1);
 }
 
-// A Playlist's own stamps: when it was last changed, and when it was named.
-const newest = (l) => Math.max(l.updatedAt || 0, l.nameAt || 0);
+// A Playlist's own stamps: when it was last changed, when it was named, and when it was made, which stands for its naming until a rename.
+const newest = (l) => Math.max(l.updatedAt || 0, l.nameAt || 0, l.createdAt || 0);
 
 // fn gives each Playlist back changed, or null to leave it out.
 function eachPlaylist(store, fn) {
@@ -149,6 +149,7 @@ function fixList(l, limit, now, count) {
   count();
   const out = Object.assign({}, l);
   if (l.nameAt > limit) out.nameAt = now;
+  if (l.createdAt > limit) out.createdAt = now;
   if (l.updatedAt > limit) out.updatedAt = now;
   return out;
 }

@@ -170,3 +170,21 @@ test('an App save that lands just before the merge puts its result in place is k
   assert.ok(existsSync(hook + '.done'), 'the hook ran');
   assert.deepEqual([ids(store(a), 'saved'), ids(store(a), 'focus')], [['early', 'late'], ['v1', 'v2', 'v3', 'from-b']]);
 });
+
+// A Playlist made while a's clock ran ahead carries that time as when it was made, which also stands for when it was named.
+test('a Playlist made while the clock ran ahead is re-stamped whole, so a later rename and add on b win on both and both rounds settle', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(storePath(a), P.add(P.create(P.emptyStore(), 'gym', 'Gym', FAR), 'gym', video('g1'), FAR));
+  await ok(a, ['--only', 'youtube']);
+  await ok(b, ['--only', 'youtube']);
+  write(storePath(b), P.add(P.rename(store(b), 'gym', 'Lifting', Date.now()), 'gym', video('g2'), Date.now()));
+  for (let i = 0; i < 2; i++) {
+    await ok(b, ['--only', 'youtube']);
+    await ok(a, ['--only', 'youtube']);
+  }
+  for (const m of [a, b]) {
+    assert.deepEqual([P.playlists(store(m)).map((l) => l.name), ids(store(m), 'gym')], [['Lifting'], ['g1', 'g2']], m.id);
+    assert.ok(store(m).playlists.gym.createdAt <= Date.now(), m.id);
+  }
+});
