@@ -20,8 +20,12 @@ ShellRoot {
     property string pane: "list"
     readonly property string focusAt: board.fieldFocused ? "field" : pane
     readonly property string query: board.queryText
-    // The rows the list draws, as youtube.mjs rows() makes them, and the one under the cursor.
-    property var rows: []
+    // The last search's rows and Saved's, as youtube.mjs rows() makes them; the list draws the view's, with the cursor on one.
+    property var results: []
+    readonly property var savedRows: YT.rows({
+        rows: store.saved
+    })
+    readonly property var rows: view === "search" ? results : view === "saved" ? savedRows : []
     property int cursor: 0
     // Each search's number: an answer from any search but the last is dropped.
     property int searchSeq: 0
@@ -31,7 +35,7 @@ ShellRoot {
     property var failed: null
     // The youtube-video-<n> units this App started, in order.
     property var units: []
-    property int savedCount: 0
+    readonly property int savedCount: savedRows.length
     property int historyCount: 0
     // What the Queue plays, as the now-playing line writes it; empty while it is stopped.
     property string nowPlaying: ""
@@ -100,11 +104,22 @@ ShellRoot {
             if (seq !== app.searchSeq)
                 return;
             app.failed = YT.failure(answer);
-            app.rows = app.failed ? [] : YT.rows(answer);
+            app.results = app.failed ? [] : YT.rows(answer);
             app.cursor = 0;
-            app.fetchThumbs(app.rows);
+            app.fetchThumbs(app.results);
         });
     }
+
+    // s on a row: Saved keeps it in the store, at most once.
+    function save(row) {
+        if (row)
+            store.save(row);
+    }
+
+    // Each view's list starts at its top.
+    onViewChanged: cursor = 0
+    // Saved draws from the store with no search behind it, so a thumbnail no list has fetched yet is asked for here.
+    onSavedRowsChanged: fetchThumbs(savedRows.filter(r => !thumbs[r.thumb]))
 
     // One thumbs call for a list's ids; a thumb it does not name keeps its row's placeholder.
     function fetchThumbs(list) {
@@ -134,6 +149,10 @@ ShellRoot {
 
     Services.Theme {
         id: theme
+    }
+
+    YouTubeStore {
+        id: store
     }
 
     Component {

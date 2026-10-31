@@ -105,6 +105,8 @@ Rectangle {
                 board.yt.search();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
                 board.yt.play(board.yt.rows[board.yt.cursor]);
+            else if (t === "s" && board.yt.pane === "list")
+                board.yt.save(board.yt.rows[board.yt.cursor]);
             else
                 return;
             event.accepted = true;
