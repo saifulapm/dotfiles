@@ -57,7 +57,10 @@ MAX_NODES = 4000  # a deep tree must not hang the caller
 INLINE_NODES = 1000  # what gui tree prints before it spills
 INLINE_BYTES = 32768  # the printed object, newline included
 SPILL_KEEP_S = 3600  # a spill older than this goes on the next gui call
+CALL_MS = 3000  # every AT-SPI call; a stopped app never answers, and libatspi would wait 25 s
+READ_FROM_S, READ_EVERY_S, READ_UNTIL_S = 0.3, 0.1, 2.0  # a write's effect lands a beat after its reply
 seen = None  # the window an action saw, for its journal line
+delivered = None  # an action's delivery, for its journal line
 STARTED_MS = int(time.time() * 1000)  # the 2 s a --then look waits count from here
 
 
@@ -280,6 +283,59 @@ def describe(node):
     return f"{role:14} {name!r}{current}{where}{marks}"
 
 
+def timed_out(e):
+    return "Did not receive a reply" in str(e)
+
+
+def read_text(node):
+    """The field's text, or raises: a widget with no Text interface has none to read."""
+    return Atspi.Text.get_text(node, 0, -1)
+
+
+def delivery(how, cause=None, matched=None):
+    """An action's delivery fields; only a write that never landed is safe to send again."""
+    out = {"ok": how != "not_delivered", "delivery": how, "retry_safe": how == "not_delivered"}
+    if cause:
+        out["cause"] = cause
+    if matched is not None:
+        out["matched"] = matched
+    return out
+
+
+def write(node, editable, value):
+    """Sets the text, then judges it by what the field reads after, never by the reply."""
+    secure = node.get_role_name() == "password text"
+    before = None
+    if not secure:
+        try:
+            before = read_text(node)
+        except Exception as e:
+            if timed_out(e):
+                return delivery("not_delivered", "timeout", False)
+    try:
+        Atspi.EditableText.set_text_contents(editable, value)
+    except Exception as e:
+        if timed_out(e):
+            return delivery("unverified", "timeout", False)
+    if secure:
+        return delivery("unverified", "secure_field", False)
+    t0, now = time.monotonic(), None
+    time.sleep(READ_FROM_S)
+    while True:
+        try:
+            now = read_text(node)
+        except Exception as e:
+            return delivery("unverified", "timeout" if timed_out(e) else None, False)
+        if now == value:
+            return delivery("verified", matched=True)
+        if time.monotonic() - t0 >= READ_UNTIL_S:
+            break
+        time.sleep(READ_EVERY_S)
+    if now == before:
+        return delivery("not_delivered", "write_ignored", False)
+    return delivery("unverified", matched=False)
+
+
 def matches(node, text):
     haystack = (node.get_name() or "") + " " + (node.get_role_name() or "")
     return text.lower() in haystack.lower()
@@ -287,6 +343,8 @@ def matches(node, text):
 
 def finish(out, then, app):
     """Prints an action's JSON, with the look --then asked for once it worked; exit 1 when it did not."""
+    global delivered
+    delivered = out.get("delivery")
     if out["ok"] and then:
         screen = os.path.join(os.path.dirname(os.path.realpath(__file__)), "screen")
         r = subprocess.run([screen, "look", then, str(app.get_process_id())], capture_output=True, text=True, env={**os.environ, "DESK_T0": str(STARTED_MS)})
@@ -315,6 +373,7 @@ def main(argv):
         usage()
     cmd = argv[1]
     sweep()
+    Atspi.set_timeout(CALL_MS, CALL_MS)
 
     if cmd == "apps":
         Atspi.init()
@@ -398,14 +457,17 @@ def main(argv):
                 continue
             if editable is None:
                 continue
+            # Read before the write: an app that stops on it answers nothing after.
+            w = widget(i, node)
             if not anywhere:
                 confine(app, node)
             guard()
-            try:
-                ok = bool(Atspi.EditableText.set_text_contents(editable, value))
-            except Exception:
-                ok = False
-            finish({"ok": ok, "typed": len(value), "widget": widget(i, node)}, then, app)
+            # Editable set and read-only clear, whatever interfaces the widget has.
+            st = states(node)
+            if "editable" not in st or "read-only" in st:
+                print(json.dumps({"refused": "not editable", "widget": w}))
+                sys.exit(3)
+            finish({**write(node, editable, value), "typed": len(value), "widget": w}, then, app)
         nothing(f"no editable widget matching {needle!r}")
 
     usage()
@@ -422,4 +484,4 @@ if __name__ == "__main__":
     finally:
         # click and type are actions, and each leaves one journal line, refusals included.
         if sys.argv[1:2] in (["click"], ["type"]):
-            load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:])
+            load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:], delivery=delivered)

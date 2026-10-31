@@ -303,14 +303,14 @@ def redact(tool, args):
     return args
 
 
-def journal(tool, rc, ms, window, args, sent=None):
-    """Appends one line, with what JEV answered when it was sent; a usage error is no action and leaves none."""
+def journal(tool, rc, ms, window, args, sent=None, delivery=None):
+    """Appends one line, with what JEV answered when it was sent and what a read showed of gui's action; a usage error is no action and leaves none."""
     if rc == 2:
         return
     path = journal_path()
     os.makedirs(os.path.dirname(path), mode=0o700, exist_ok=True)
     now = datetime.datetime.now().astimezone()
-    line = json.dumps({"ts": now.isoformat(timespec="milliseconds"), "tool": tool, "args": redact(tool, args), "outcome": OUTCOMES.get(rc, "error"), "ms": ms, "window": window, **({"jev": sent} if sent is not None else {})})
+    line = json.dumps({"ts": now.isoformat(timespec="milliseconds"), "tool": tool, "args": redact(tool, args), "outcome": OUTCOMES.get(rc, "error"), "ms": ms, "window": window, **({"jev": sent} if sent is not None else {}), **({"delivery": delivery} if delivery else {})})
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_APPEND, 0o600)
     with os.fdopen(fd, "r+") as f:
         fcntl.flock(f, fcntl.LOCK_EX)
