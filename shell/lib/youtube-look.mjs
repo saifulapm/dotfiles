@@ -45,6 +45,7 @@ export function youtubeLook(tokens) {
     noPlaylists: EMPTY.playlists,
     placeholder: 'Search YouTube',
     namePlaceholder: 'Playlist name',
+    unavailable: (why) => `Video unavailable · ${why}`,
     toast: { saved: (n) => `Saved as a playlist · ${count(n)}` },
     // A snapshot's new Playlist, marked in the sidebar: Paper sets it in caps as its board's CSS does.
     fresh: plain ? 'new' : 'NEW',

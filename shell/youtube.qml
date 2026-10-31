@@ -295,25 +295,48 @@ ShellRoot {
         run([backend].concat(args), done);
     }
 
-    // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window; it pauses the Queue first, and nothing resumes the Queue by itself.
+    // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window; it pauses the Queue first, and nothing resumes the Queue by itself. A video YouTube marks unavailable never reaches a player.
     function play(row) {
-        if (!row || row.kind !== "video")
+        if (!row || row.kind !== "video" || row.unavailable)
             return;
         history.add(row);
+        playVideos([row.id]);
+    }
+
+    // Enter in a Playlist plays its items straight through in one window; a whole Playlist adds nothing to History.
+    function playPlaylist() {
+        const ids = playlistRows.filter(r => !r.unavailable).map(r => r.id);
+        if (ids.length > 0)
+            playVideos(ids);
+    }
+
+    function playVideos(ids) {
         queueCommand(Q.setPauseLine(true));
         // The repo's bin is on the session PATH only through fish, so the player is found beside the shell.
-        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video", row.id], answer => {
+        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video"].concat(ids), answer => {
             if (answer && typeof answer.unit === "string")
                 app.units = app.units.concat([answer.unit]);
         });
     }
 
-    // m plays a row in the Queue in place of what it holds, a appends it; the first ask with no Queue connected starts youtube-audio, and what follows waits for its socket.
+    // m plays a row in the Queue in place of what it holds, a appends it.
     function queueItem(row, how) {
-        if (!row || row.kind !== "video")
+        if (!row || row.kind !== "video" || row.unavailable)
             return;
         history.add(row);
-        const lines = Q.itemLines(queue, row, how);
+        sendQueue(Q.itemLines(queue, row, how));
+    }
+
+    // m, a and S on a Playlist: its items in order, appended, or shuffled, by DOTS_YOUTUBE_SEED when a check sets one; none of them goes to History.
+    function queuePlaylist(how) {
+        const rows = playlistRows;
+        sendQueue(how === "shuffle" ? Q.shuffledLines(queue, rows, parseInt(Quickshell.env("DOTS_YOUTUBE_SEED") || "", 10)) : Q.listLines(queue, rows, how));
+    }
+
+    // The first ask with no Queue connected starts youtube-audio, and what follows waits for its socket.
+    function sendQueue(lines) {
+        if (lines.length === 0)
+            return;
         queue = Q.asked(queue);
         const r = Q.send(link, lines);
         link = r.link;

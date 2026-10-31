@@ -127,3 +127,7 @@ test('an opened playlist names s save as a playlist, and a snapshot toasts its c
   assert.equal(look('artboard').toast.saved(300), 'Saved as a playlist · 300 videos');
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => look(n).fresh), ['NEW', 'new', 'NEW']);
 });
+
+test('an unavailable item reads Video unavailable and its reason', () => {
+  for (const name of ['paper', 'artboard', 'blueprint']) assert.equal(look(name).unavailable('made private'), 'Video unavailable · made private', name);
+});

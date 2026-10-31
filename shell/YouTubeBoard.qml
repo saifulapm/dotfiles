@@ -172,12 +172,16 @@ Rectangle {
                 board.yt.back();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
                 board.yt.retry();
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.yt.playlist)
+                board.yt.playPlaylist();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
                 board.yt.enter(board.yt.rows[board.yt.cursor]);
             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                 board.yt.focusPane("list");
             else if (t === "s" && board.yt.pane === "list")
                 board.yt.save(board.yt.rows[board.yt.cursor]);
+            else if ((t === "m" || t === "a" || t === "S") && board.yt.playlist)
+                board.yt.queuePlaylist(t === "m" ? "play" : t === "a" ? "add" : "shuffle");
             else if (t === "m" && board.yt.pane === "list")
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
             else if (t === "a" && board.yt.pane === "list")
@@ -869,6 +873,7 @@ Rectangle {
                                     title: titleText.text,
                                     titleLines: titleText.lineCount,
                                     titleElided: titleText.truncated,
+                                    dimmed: rowItem.opacity < 1,
                                     channel: channelText.text,
                                     channelElided: channelText.truncated,
                                     duration: durationText.text,
@@ -877,6 +882,7 @@ Rectangle {
                             }
                             width: ListView.view.width
                             height: plain ? 54 : bracket ? 55 : 52
+                            opacity: modelData.unavailable && !lit ? 0.6 : 1
                             radius: look.rowRadius
                             color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
                             // Artboard outlines the lit row in its accent.
@@ -929,7 +935,8 @@ Rectangle {
                                         id: titleText
                                         Layout.fillWidth: true
                                         textFormat: Text.PlainText
-                                        text: rowItem.modelData.title
+                                        // A video gone from YouTube stays in its Playlist, marked, and is skipped.
+                                        text: rowItem.modelData.unavailable ? look.unavailable(rowItem.modelData.unavailable) : rowItem.modelData.title
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
                                         color: (rowItem.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
@@ -960,7 +967,7 @@ Rectangle {
                                     Layout.preferredWidth: Math.max(bracket ? 76 : 64, implicitWidth)
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
-                                    text: rowItem.modelData.duration
+                                    text: rowItem.modelData.unavailable ? "—" : rowItem.modelData.duration
                                     color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 12
