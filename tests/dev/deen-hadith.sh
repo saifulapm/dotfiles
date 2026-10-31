@@ -160,6 +160,17 @@ until_ok 1000 deen_is '.tab == "hadith"'
 until_ok 3000 hadith_is '.ready and .count == 10'
 check "Deen reopens on the collections ($(hadith '[.level, .count]'))" hadith_is '.level == "collections" and .count == 10'
 
+# Keys typed faster than a level loads act in order.
+wtype -k Return -k Return -k Escape -k Escape
+sleep 0.5
+check "Enter, Enter, Esc, Esc typed at once land back on the collections with Deen open ($(hadith '[.level, .count]'))" \
+  eval 'deen_up && hadith_is ".level == \"collections\" and .count == 10"'
+wtype -k Return -k Return -k Return
+until_ok 2000 hadith_is '.level == "narration"'
+check "three Enters typed at once open narration 1 ($(hadith '[.level, .pane.reference]'))" hadith_is '.level == "narration" and .pane.reference == "সহীহ বুখারী ১"'
+wtype -k Escape -k Escape -k Escape
+until_ok 2000 hadith_is '.level == "collections"'
+
 wtype -k Return
 until_ok 2000 hadith_is '.level == "books"'
 wtype /
@@ -273,7 +284,7 @@ wtype -k Tab -k Tab -k Tab
 until_ok 1000 deen_is '.tab == "hadith"'
 until_ok 4000 hadith_is '.download.noData != ""'
 check "with no deen-data the tab reads what to do, not a download ($(hadith '[.download.noData, .download.shown]'))" \
-  hadith_is '.download.noData == "Bangla data is not on this machine: gh auth login, then dots update" and .download.shown == false and .browse == false'
+  hadith_is '.download.noData == "Bangla data is not on this machine: gh auth login, then dots update" and .download.noDataAboveKeys and .download.shown == false and .browse == false'
 rm "$DOTS_DEV_DIR/deen-hadith-nodata"
 wtype -k Escape
 until_ok 3000 deen_gone

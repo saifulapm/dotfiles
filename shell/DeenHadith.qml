@@ -33,6 +33,9 @@ FocusScope {
     property var collections: []
     // Collections, a book list, a book's narrations, an open narration or search, each over the one Esc returns to.
     property var levels: H.LEVELS
+    // The levels an Enter is loading the next level from, and the Enters and Escs typed meanwhile: an Enter counts on, an Esc takes one back, so keys act in the order typed.
+    property var pending: null
+    property int ahead: 0
     readonly property var here: levels[levels.length - 1]
     readonly property var listing: H.listEntry(levels)
     readonly property int cursor: listing.cursor
@@ -91,6 +94,8 @@ FocusScope {
 
     function goTo(s) {
         levels = s;
+        pending = null;
+        ahead = 0;
         failure = "";
         showList();
         if (here.level === "search")
@@ -102,20 +107,34 @@ FocusScope {
     // A level's list is asked of deen; an answer that comes after the cursor or the level moved on is dropped.
     function ask(args, level, has) {
         const from = levels;
+        pending = from;
         deen.api(args, answer => {
-            if (page.levels !== from)
+            if (page.levels !== from || page.pending !== from)
                 return;
-            if (answer && Array.isArray(answer[has]))
+            const more = page.ahead;
+            if (answer && Array.isArray(answer[has])) {
                 page.goTo(H.down(from, {
                     level: level,
                     data: answer
                 }));
-            else
+                if (more > 0) {
+                    page.enter();
+                    if (page.pending)
+                        page.ahead = more - 1;
+                }
+            } else {
+                page.pending = null;
+                page.ahead = 0;
                 page.failure = D.oneLine(answer && answer.error ? answer.error : "deen " + args.slice(0, 2).join(" ") + " gave no answer");
+            }
         });
     }
 
     function enter() {
+        if (pending) {
+            ahead += 1;
+            return;
+        }
         const e = listing;
         if (here.level !== e.level || rows.length === 0)
             return;
@@ -131,6 +150,13 @@ FocusScope {
 
     // Esc goes up one level; on the collections it is left to the frame, which closes Deen.
     function back() {
+        if (pending) {
+            if (ahead > 0)
+                ahead -= 1;
+            else
+                pending = null;
+            return true;
+        }
         const s = H.up(levels);
         if (!s)
             return false;
@@ -256,6 +282,7 @@ FocusScope {
                 left: leftRow.visible ? leftRow.value : "",
                 fail: failText.visible ? failText.text : "",
                 noData: noDataText.visible ? noDataText.text : "",
+                noDataAboveKeys: noDataText.visible && noDataText.mapToItem(page, 0, noDataText.height).y < keyStrip.mapToItem(page, 0, 0).y,
                 savedIn: savedRow.visible ? savedRow.value : "",
                 meanwhile: [meanwhileHead.text, meanwhileLine.drawn(), meanwhileWait.text],
                 keyLine: cardKeys.drawn(),
@@ -310,18 +337,6 @@ FocusScope {
     // The download starts when Deen opens, whether or not this tab shows.
     Component.onCompleted: checkStatus()
 
-    // In place of the tab's body, as Read and Duas draw it.
-    Text {
-        id: noDataText
-        anchors.centerIn: parent
-        visible: !page.ready && H.noData(page.download)
-        textFormat: Text.PlainText
-        text: D.NO_DATA
-        color: page.c.muted ?? "gray"
-        font.family: page.bodyFont
-        font.pixelSize: 14
-    }
-
     // One JSON event per line; fetch that ends without done has failed.
     Process {
         id: fetch
@@ -357,6 +372,23 @@ FocusScope {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
+
+        // In place of the tab's body, as Read and Duas draw it.
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            visible: !page.ready && H.noData(page.download)
+
+            Text {
+                id: noDataText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: D.NO_DATA
+                color: page.c.muted ?? "gray"
+                font.family: page.bodyFont
+                font.pixelSize: 14
+            }
+        }
 
         // Until the corpus is here: the download's progress, or where it stopped.
         ColumnLayout {
