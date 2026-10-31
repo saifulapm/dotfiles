@@ -1,6 +1,5 @@
 #!/bin/bash
-# The data is built from the deen-data pin, which runs just before this; its version and the gh key below re-run this when either changes.
-# deen-data: {{ range (include (joinPath .chezmoi.workingTree "versions.toml") | fromToml).pin }}{{ if eq .name "deen-data" }}{{ .version }}{{ end }}{{ end }}, gh: {{ if stat (joinPath (env "GH_CONFIG_DIR" | default (joinPath .chezmoi.homeDir ".config/gh")) "hosts.yml") }}logged in{{ else }}not logged in{{ end }}
+# deen-data: {{ range (include (joinPath .chezmoi.workingTree "versions.toml") | fromToml).pin }}{{ if eq .name "deen-data" }}{{ .version }}{{ end }}{{ end }}, gh: {{ if stat (joinPath (env "GH_CONFIG_DIR" | default (joinPath .chezmoi.homeDir ".config/gh")) "hosts.yml") }}logged in{{ else }}not logged in{{ end }} (the data is built from the deen-data pin, which runs just before this, so its version and the gh login re-run this when either changes)
 {{ template "lib.sh" . }}
 {{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "deen") }}
 {{ template "cargo.sh" . }}
