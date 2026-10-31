@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-read.mjs" as R
 
-// Deen's Read: a surah word by word, right to left, each word's meaning under it; the boxed word's meaning, transliteration and root show in the bar, and Enter or p plays it.
+// Deen's Read: a surah word by word, right to left, each word's Bangla meaning under it and the ayah's under its words; the boxed word's meaning, transliteration and root show in the bar, and Enter or p plays it.
 FocusScope {
     id: page
 
@@ -26,6 +26,8 @@ FocusScope {
     // The open surah's answer: surah, ayahs and words.
     property var surah: null
     property bool failed: false
+    // deen has no Bangla to draw, so the page says how to fetch it in place of its body.
+    property bool noData: false
     property var cursor: ({
             a: 1,
             i: 1
@@ -47,6 +49,10 @@ FocusScope {
 
     function openSurah(n) {
         deen.api(["api", "surah", String(n)], answer => {
+            if (D.noData(answer)) {
+                page.noData = true;
+                return;
+            }
             // A surah that fails to open while another shows leaves that one on the page, with a note in the bar.
             if (!R.readable(answer)) {
                 if (page.surah)
@@ -177,7 +183,8 @@ FocusScope {
             box: boxed ? boxed.look : null,
             bar: {
                 word: barWord.text,
-                en: barEn.text,
+                bn: barBn.text,
+                bnFamily: barBn.fontInfo.family,
                 line: barLine.text,
                 hint: barHint.text,
                 fill: bar.color.a > 0 ? String(bar.color) : "",
@@ -201,6 +208,8 @@ FocusScope {
         deen.api(["api", "surahs"], answer => {
             if (answer && Array.isArray(answer.surahs) && answer.surahs.length > 0)
                 page.surahs = answer.surahs;
+            else if (D.noData(answer))
+                page.noData = true;
             else
                 page.failed = true;
         });
@@ -266,7 +275,7 @@ FocusScope {
             Layout.topMargin: 14
             Layout.bottomMargin: 10
             spacing: 14
-            visible: !!page.surah
+            visible: !!page.surah && !page.noData
 
             Text {
                 id: headingText
@@ -361,9 +370,9 @@ FocusScope {
             Text {
                 id: failedText
                 anchors.centerIn: parent
-                visible: page.failed
+                visible: page.failed || page.noData
                 textFormat: Text.PlainText
-                text: "The Quran text is not on this machine yet"
+                text: page.noData ? D.NO_DATA : "The Quran text is not on this machine yet"
                 color: page.c.muted ?? "gray"
                 font.family: page.bodyFont
                 font.pixelSize: 13
@@ -374,7 +383,7 @@ FocusScope {
                 id: ayahList
                 anchors.fill: parent
                 clip: true
-                visible: !page.failed
+                visible: !page.failed && !page.noData
                 model: page.surah ? page.surah.words : []
                 boundsBehavior: Flickable.StopAtBounds
 
@@ -387,16 +396,28 @@ FocusScope {
                         const words = [];
                         for (let k = 0; k < wordList.count; k++)
                             words.push(wordList.itemAt(k).drawn());
+                        // The meaning's ink, from the tallest glyph it holds, on its first and last lines, so a check sees a conjunct the row would cut.
+                        const lineHeight = ayahBn.lineCount > 0 ? ayahBn.contentHeight / ayahBn.lineCount : 0;
+                        const ink = bnInk.tightBoundingRect;
+                        const baseline = ayahBn.y + ayahBn.baselineOffset;
                         return {
                             number: ayahNumber.text,
                             words: words,
+                            bn: ayahBn.visible ? ayahBn.text : "",
+                            bnFamily: ayahBn.fontInfo.family,
+                            bnLines: ayahBn.lineCount,
+                            bnTruncated: ayahBn.truncated,
+                            height: ayahRow.height,
+                            wordsBottom: wordFlow.y + wordFlow.height,
+                            inkTop: baseline + ink.y,
+                            inkBottom: baseline + (ayahBn.lineCount - 1) * lineHeight + ink.y + ink.height,
                             ruleDashed: ayahDash.visible,
                             ruleColor: String(ayahDash.visible ? ayahDash.color : ayahRule.color)
                         };
                     }
 
                     width: ayahList.width
-                    height: Math.max(26, wordFlow.implicitHeight) + 9
+                    height: Math.max(26, wordFlow.implicitHeight) + 9 + (ayahBn.visible ? ayahBn.anchors.topMargin + ayahBn.height : 0)
 
                     // Paper squares the number in grey, Artboard rounds it on a tile, Blueprint squares it in its rule colour.
                     Rectangle {
@@ -445,23 +466,24 @@ FocusScope {
                                 function drawn() {
                                     return {
                                         ar: wordArabic.text,
-                                        en: wordEn.text,
+                                        bn: wordBn.text,
                                         x: wordBox.mapToItem(page, 0, 0).x,
                                         boxed: current,
                                         family: wordArabic.fontInfo.family,
-                                        truncated: wordEn.truncated,
-                                        lines: wordEn.lineCount,
+                                        bnFamily: wordBn.fontInfo.family,
+                                        truncated: wordBn.truncated,
+                                        lines: wordBn.lineCount,
                                         look: {
                                             fill: wordBox.color.a > 0 ? String(wordBox.color) : "",
                                             border: wordBox.border.width,
                                             borderColor: String(wordBox.border.color),
                                             radius: wordBox.radius,
-                                            enColor: String(wordEn.color)
+                                            bnColor: String(wordBn.color)
                                         }
                                     };
                                 }
 
-                                width: Math.max(wordArabic.implicitWidth, wordEn.width) + 24
+                                width: Math.max(wordArabic.implicitWidth, wordBn.width) + 24
                                 height: wordColumn.implicitHeight + 16
                                 radius: page.plain ? 10 : 0
                                 color: current ? page.boxFill : "transparent"
@@ -483,21 +505,42 @@ FocusScope {
                                         font.pixelSize: 34
                                     }
                                     Text {
-                                        id: wordEn
+                                        id: wordBn
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         width: Math.min(implicitWidth, 220)
                                         horizontalAlignment: Text.AlignHCenter
                                         textFormat: Text.PlainText
-                                        text: D.oneLine(wordBox.modelData.en)
+                                        text: D.oneLine(wordBox.modelData.bn)
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
                                         color: (wordBox.current && page.plain ? page.look.cursor.text : page.c.muted) ?? "gray"
-                                        font.family: page.bodyFont
-                                        font.pixelSize: page.plain ? 12 : 11
+                                        font.family: page.deen.bengali
+                                        font.pixelSize: 13
                                     }
                                 }
                             }
                         }
+                    }
+
+                    // The ayah's meaning, under its words, wrapping so the row grows with it.
+                    Text {
+                        id: ayahBn
+                        anchors.left: wordFlow.left
+                        anchors.right: wordFlow.right
+                        anchors.top: wordFlow.bottom
+                        anchors.topMargin: 6
+                        visible: text !== ""
+                        textFormat: Text.PlainText
+                        text: D.oneLine(page.surah && page.surah.ayahs[ayahRow.index] ? page.surah.ayahs[ayahRow.index].bn : "")
+                        wrapMode: Text.WordWrap
+                        color: page.c.ink ?? "black"
+                        font.family: page.deen.bengali
+                        font.pixelSize: page.caps ? 16 : 15
+                    }
+                    TextMetrics {
+                        id: bnInk
+                        font: ayahBn.font
+                        text: ayahBn.text
                     }
 
                     Rectangle {
@@ -528,7 +571,7 @@ FocusScope {
             Layout.leftMargin: 18
             Layout.rightMargin: 18
             Layout.bottomMargin: 14
-            visible: !!page.focused
+            visible: !!page.focused && !page.noData
             implicitHeight: barRow.implicitHeight + 24
             radius: page.plain ? 12 : 0
             color: page.plain ? "#F6F7F9" : "transparent"
@@ -555,14 +598,14 @@ FocusScope {
                     spacing: 2
 
                     Text {
-                        id: barEn
+                        id: barBn
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
-                        text: page.focused ? D.oneLine(page.focused.en) : ""
+                        text: page.focused ? D.oneLine(page.focused.bn) : ""
                         elide: Text.ElideRight
                         maximumLineCount: 1
                         color: page.c.ink ?? "black"
-                        font.family: page.bodyFont
+                        font.family: page.deen.bengali
                         font.pixelSize: page.plain ? 15 : 14
                         font.weight: Font.Medium
                     }

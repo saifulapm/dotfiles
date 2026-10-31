@@ -23,6 +23,8 @@ FocusScope {
     // The deck as M.openDeck shapes it, null before the first answer; failed is true when the last answer was no deck.
     property var session: null
     property bool failed: false
+    // deen cannot read the Quran text, so the page says how to fetch it rather than that the deck failed.
+    property bool noData: false
     property bool revealed: false
     // True from a rating's key until the backend answers, so a second key cannot rate the same card twice.
     property bool saving: false
@@ -35,7 +37,7 @@ FocusScope {
     property var back: null
 
     readonly property var head: session ? M.current(session) : null
-    readonly property string status: failed ? "failed" : !session ? "loading" : head ? "card" : session.rated > 0 ? "done" : "empty"
+    readonly property string status: noData ? "nodata" : failed ? "failed" : !session ? "loading" : head ? "card" : session.rated > 0 ? "done" : "empty"
     readonly property var cue: head ? M.firstWords(D.oneLine(head.ayah.ar)) : ({
             shown: "",
             hidden: 0
@@ -47,6 +49,7 @@ FocusScope {
             if (mine !== page.asked)
                 return;
             const next = M.openDeck(answer);
+            page.noData = D.noData(answer);
             page.failed = next === null;
             if (next)
                 page.session = next;
@@ -104,6 +107,7 @@ FocusScope {
                 recite: reciteText.visible ? reciteText.text : "",
                 hint: hintBox.visible ? hintKey.text + " " + hintWord.text : "",
                 meaning: meaningText.visible ? meaningText.text : "",
+                meaningFamily: meaningText.fontInfo.family,
                 meaningLines: meaningText.visible ? meaningText.lineCount : 0,
                 meaningTruncated: meaningText.visible ? meaningText.truncated : false,
                 ask: askText.visible ? askText.text : "",
@@ -165,7 +169,7 @@ FocusScope {
             Layout.topMargin: 16
             Layout.bottomMargin: 6
             spacing: 14
-            visible: page.session !== null && !page.failed
+            visible: page.session !== null && !page.failed && !page.noData
 
             Text {
                 id: countText
@@ -314,13 +318,13 @@ FocusScope {
                         Layout.fillWidth: true
                         visible: page.revealed
                         textFormat: Text.PlainText
-                        text: page.head ? D.oneLine(page.head.ayah.en) : ""
+                        text: page.head ? D.oneLine(page.head.ayah.bn) : ""
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
                         maximumLineCount: 4
                         color: c.ink ?? "black"
-                        font.family: page.bodyFont
-                        font.pixelSize: plain ? 14 : 13
+                        font.family: deen.bengali
+                        font.pixelSize: 15
                     }
 
                     Item {
@@ -471,7 +475,7 @@ FocusScope {
                     id: messageText
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: page.status === "failed" ? page.words.failed : page.status === "empty" ? page.words.nothing : page.status === "done" ? page.words.done(page.session.nextIn) : ""
+                    text: page.status === "nodata" ? D.NO_DATA : page.status === "failed" ? page.words.failed : page.status === "empty" ? page.words.nothing : page.status === "done" ? page.words.done(page.session.nextIn) : ""
                     wrapMode: Text.WordWrap
                     color: c.ink ?? "black"
                     font.family: page.bodyFont

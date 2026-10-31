@@ -1,6 +1,7 @@
 import Quickshell
 import QtQuick
 import QtQuick.Layouts
+import "lib/deen.mjs" as D
 import "lib/deen-duas.mjs" as U
 
 // Deen's Duas: Hisn al-Muslim's chapters on the left, the open dua on the right with its Arabic, transliteration, meaning and source.
@@ -20,6 +21,8 @@ FocusScope {
 
     property bool asked: false
     property bool failed: false
+    // deen cannot read the duas, so the page says how to fetch them.
+    property bool noData: false
     property var book: null
     readonly property var shown: book ? U.filter(book.chapters, field.text) : []
     property int cursor: 0
@@ -34,6 +37,7 @@ FocusScope {
         deen.api(["dua", "list"], answer => {
             const parsed = U.parseList(answer);
             page.failed = parsed === null;
+            page.noData = D.noData(answer);
             page.book = parsed;
         });
     }
@@ -494,7 +498,7 @@ FocusScope {
         anchors.centerIn: parent
         visible: page.failed
         textFormat: Text.PlainText
-        text: "Hisn al-Muslim is not on this machine yet"
+        text: page.noData ? D.NO_DATA : "Hisn al-Muslim is not on this machine yet"
         color: c.muted ?? "gray"
         font.family: page.bodyFont
         font.pixelSize: 14

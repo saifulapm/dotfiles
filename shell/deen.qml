@@ -22,6 +22,7 @@ ShellRoot {
     readonly property var look: L.listLook(theme.tokens)
     readonly property string voice: look.voice
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
+    readonly property string bengali: D.bengaliFamily(voice)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
