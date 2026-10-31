@@ -65,7 +65,7 @@ wtype l
 until_ok 3000 yt_is '.type == "channels" and ([.rows[].kind] | unique) == ["channel"]'
 check "l on the results searches the query again as Channels ($(calls_text))" logged "search nujabes channels 0"
 check "each channel row draws its name over its handle, with no duration ($(yt_state | jq -c '[.drawn[] | [.title, .channel, .duration]]'))" \
-  yt_is '[.drawn[] | [.title, .channel, .duration]] == [["Nujabes", "@nujabes", ""], ["Nujabes - Topic", "", ""], ["Hydeout Productions", "@hydeout", ""]] and .look.chipsOn == [false, false, true]'
+  yt_is '[.drawn[] | [.title, .channel, .duration]] == [["Nujabes", "@nujabes", ""], ["Quiet Corner", "", ""], ["Hydeout Productions", "@hydeout", ""]] and .look.chipsOn == [false, false, true]'
 wtype l
 sleep 0.3
 stays_channels() { yt_is '.type == "channels"' && [ "$(searches)" = 2 ]; }
@@ -148,7 +148,7 @@ wtype j
 wtype -k Return
 until_ok 3000 yt_is '.opened.id == "UCfakeChan00000000000002" and .paging.loading == false'
 check "a channel with no uploads reads No videos on this channel ($(yt_state | jq -c '{empty, head: .look.results}'))" \
-  yt_is '.empty == ["No videos on this channel"] and .look.results == ["Nujabes - Topic", "0"]'
+  yt_is '.empty == ["No videos on this channel"] and .look.results == ["Quiet Corner", "0"]'
 wtype -k Escape
 until_ok 1000 yt_is '.opened == null'
 check "Esc comes back to row 2 ($(yt_state | jq -c .cursor))" yt_is '.cursor == 1'

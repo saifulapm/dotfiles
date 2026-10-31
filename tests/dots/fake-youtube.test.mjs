@@ -72,7 +72,7 @@ test('a channels search lists three channel rows', (t) => {
   assert.equal(next, 3);
   assert.deepEqual(rows.map((r) => [r.id, r.title, r.channel, r.thumb, r.duration]), [
     ['UCfakeChan00000000000001', 'Nujabes', '@nujabes', '', null],
-    ['UCfakeChan00000000000002', 'Nujabes - Topic', '', '', null],
+    ['UCfakeChan00000000000002', 'Quiet Corner', '', '', null],
     ['UCfakeChan00000000000003', 'Hydeout Productions', '@hydeout', '', null],
   ]);
   for (const row of rows) {

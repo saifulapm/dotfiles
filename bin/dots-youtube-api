@@ -99,6 +99,9 @@ def broke(stderr):
     raw = next((line.rstrip() for line in reversed(stderr.splitlines()) if line.startswith("ERROR:")), "")
     if "YouTube said: " in raw:
         fail(raw.split("YouTube said: ", 1)[1], "extraction", raw)
+    # A mistyped handle or a truncated list id: YouTube answers 404 or 400, which no newer yt-dlp mends.
+    if re.search(r"HTTP Error (400|404)\b", raw):
+        fail("YouTube has no such channel or playlist", "extraction", raw)
     if NETWORK.search(stderr):
         fail("No network. Check Wi-Fi, then ↵ to try again.", "network", raw)
     version = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True).stdout.strip()
@@ -206,16 +209,22 @@ def search(query, kind, offset):
 # A channel's uploads, newest first as YouTube lists them; no entry carries a timestamp to sort by, nor a channel, so each takes the top level's.
 def channel(who, offset):
     url = "https://www.youtube.com/%s/videos" % (who if who.startswith("@") else "channel/" + who)
-    data, stderr = ytdlp(["--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE), url])
+    page = ["--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE)]
+    data, stderr = ytdlp([*page, url])
+    title = data.get("channel") if data else None
     if data is None and "does not have a videos tab" in stderr:
-        # A Topic channel or a tiny one has no uploads tab: nothing to list, not a failure.
-        out({"title": None, "rows": [], "next": offset})
-        return
+        # A Topic channel or a tiny one has no videos tab; its uploads are the playlist UU and the rest of its id, as yt-dlp's own extractor falls back to, and only when that fails too is there nothing to list.
+        if who.startswith("UC"):
+            data, stderr = ytdlp([*page, "https://www.youtube.com/playlist?list=UU" + who[2:]])
+        if data is None:
+            out({"title": None, "rows": [], "next": offset})
+            return
+        title = re.sub(r"^Uploads from ", "", data.get("title") or "") or data.get("channel")
     if data is None or not isinstance(data.get("entries"), list):
         broke(stderr)
     entries = data["entries"]
     rows = [video_row(e, data.get("channel")) for e in entries if isinstance(e, dict) and ID.match(str(e.get("id")))]
-    out({"title": data.get("channel"), "rows": rows, "next": offset + len(entries)})
+    out({"title": title, "rows": rows, "next": offset + len(entries)})
 
 
 # Every item of a playlist; YouTube's playlist_count can be missing, and the rows count then.

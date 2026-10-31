@@ -767,7 +767,7 @@ Rectangle {
                                         visible: caps
                                         anchors.verticalCenter: parent.verticalCenter
                                         textFormat: Text.PlainText
-                                        text: board.yt.failed ? look.failed.kicker(board.yt.failed.kind) : ""
+                                        text: board.yt.failed ? look.failed.kicker(board.yt.failed) : ""
                                         color: c.muted ?? "gray"
                                         font.family: board.bodyFont
                                         font.pixelSize: 10

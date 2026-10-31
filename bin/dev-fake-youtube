@@ -32,7 +32,7 @@ channel)
   fail_if_asked
   id=$2
   [ "$id" != @nujabes ] || id=UCfakeChan00000000000001
-  # A channel with no videos tab, and one the fixtures lack, answer an empty page that stays at its offset.
+  # A channel with no uploads at all, and one the fixtures lack, answer an empty page that stays at its offset.
   jq -c -n --arg id "$id" --argjson at "$3" --slurpfile all "$fixtures/uploads.json" '
     ($all[0][$id] // {title: null, rows: []}) as $c
     | $c | (.rows | length) as $n

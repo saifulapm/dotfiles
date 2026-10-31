@@ -58,7 +58,7 @@ export function youtubeLook(tokens) {
       key: bracket ? '[↵]' : '↵',
       word: 'try again',
       // Paper's board heads a stale yt-dlp's block YOUTUBE CHANGED; the other kinds' boards draw no such line.
-      kicker: (kind) => (voice === 'caps' && kind === 'extraction' ? 'YOUTUBE CHANGED' : ''),
+      kicker: (f) => (voice === 'caps' && f.kind === 'extraction' && f.error.startsWith('yt-dlp ') ? 'YOUTUBE CHANGED' : ''),
     },
     fieldRadius: plain ? 14 : 0,
     rowRadius: plain ? 10 : 0,

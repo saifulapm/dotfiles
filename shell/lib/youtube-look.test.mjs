@@ -68,5 +68,13 @@ test('a failed search draws the error block and a legend led by try again, as ea
   assert.deepEqual(failed(b, 'search'), ['[↵] TRY AGAIN', '[/] SEARCH', '[TAB] SIDEBAR', '[ESC] BACK']);
   for (const l of [p, a, b]) assert.equal(l.failed.head, "YouTube didn't give results");
   assert.deepEqual([p.failed.key, p.failed.word, a.failed.key, b.failed.key, b.failed.word], ['↵', 'try again', '↵', '[↵]', 'try again']);
-  assert.deepEqual([p.failed.kicker('extraction'), p.failed.kicker('network'), a.failed.kicker('extraction'), b.failed.kicker('extraction')], ['YOUTUBE CHANGED', '', '', '']);
+  const stale = { error: 'yt-dlp 2026.10.26 may be behind YouTube: run dots bump, then dots update', kind: 'extraction', raw: '' };
+  assert.deepEqual([p.failed.kicker(stale), p.failed.kicker({ error: 'No network.', kind: 'network', raw: '' }), a.failed.kicker(stale), b.failed.kicker(stale)], ['YOUTUBE CHANGED', '', '', '']);
+});
+
+// YouTube's own answer about a missing playlist or channel is no change on YouTube's side (walk, 75MMTQMG).
+test('Paper heads only a stale yt-dlp block YOUTUBE CHANGED, not YouTube saying a playlist or channel is missing', () => {
+  const p = look('paper');
+  assert.equal(p.failed.kicker({ error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLx: YouTube said: The playlist does not exist.' }), '');
+  assert.equal(p.failed.kicker({ error: 'YouTube has no such channel or playlist', kind: 'extraction', raw: 'ERROR: HTTP Error 404: Not Found' }), '');
 });

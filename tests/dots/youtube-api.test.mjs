@@ -205,13 +205,46 @@ test('channel @handle asks for the handle\'s videos tab from the first upload', 
   assert.equal(argv.at(-1), 'https://www.youtube.com/@Nujabes19740207/videos');
 });
 
-// A Topic channel or a tiny one has no videos tab; that is a channel with nothing to list, not a failure.
-test('a channel with no videos tab answers no rows and exits 0', (t) => {
+// A Topic channel or a tiny one has no videos tab; its uploads are the playlist UU and the rest of its id, as yt-dlp's own extractor falls back to (live: UUxQQET-tQsC4cwzLow9ZsuQ, "Uploads from Nujabes - Topic").
+const noTab = (uu) => `for a; do last=$a; done
+case $last in
+*/videos) echo "WARNING: [youtube:tab] some formats may be missing" >&2; echo "ERROR: [youtube:tab] UCxQQET-tQsC4cwzLow9ZsuQ: This channel does not have a videos tab" >&2; exit 1 ;;
+*list=UUxQQET-tQsC4cwzLow9ZsuQ) ${uu} ;;
+esac`;
+
+test('a channel with no videos tab lists its uploads playlist, under the channel\'s name, from the offset', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'uploads.json'), JSON.stringify(Object.assign({}, uploads, { id: 'UUxQQET-tQsC4cwzLow9ZsuQ', title: 'Uploads from Nujabes - Topic' })));
+  act(noTab(`cat "${dir}/uploads.json"`));
+  const r = run('channel', 'UCxQQET-tQsC4cwzLow9ZsuQ', '20');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: 'Nujabes - Topic', rows: uploadRows, next: 23 });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.equal(argv[argv.indexOf('--playlist-start') + 1], '21');
+  assert.equal(argv[argv.indexOf('--playlist-end') + 1], '40');
+  assert.equal(argv.at(-1), 'https://www.youtube.com/playlist?list=UUxQQET-tQsC4cwzLow9ZsuQ');
+});
+
+test('a channel whose uploads playlist fails too answers no rows and exits 0', (t) => {
   const { act, run } = rig(t);
-  act(`echo "WARNING: [youtube:tab] some formats may be missing" >&2\necho "ERROR: [youtube:tab] UCxQQET-tQsC4cwzLow9ZsuQ: This channel does not have a videos tab" >&2\nexit 1`);
+  act(noTab(`echo "ERROR: [youtube:tab] UUxQQET-tQsC4cwzLow9ZsuQ: YouTube said: The playlist does not exist." >&2; exit 1`));
   const r = run('channel', 'UCxQQET-tQsC4cwzLow9ZsuQ', '40');
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), { title: null, rows: [], next: 40 });
+});
+
+// A mistyped handle or a truncated list id is YouTube's 404 or 400, not a yt-dlp behind YouTube (walk, 75MMTQMG).
+test('an HTTP 404 or 400 from yt-dlp says YouTube has no such channel or playlist', (t) => {
+  const { act, run } = rig(t);
+  for (const [args, raw] of [
+    [['channel', '@zzqxnonexistent98765432', '0'], 'ERROR: [youtube:tab] @zzqxnonexistent98765432/videos: Unable to download API page: HTTP Error 404: Not Found (caused by <HTTPError 404: Not Found>)'],
+    [['playlist', 'PL1'], 'ERROR: [youtube:tab] PL1: Unable to download API page: HTTP Error 400: Bad Request (caused by <HTTPError 400: Bad Request>)'],
+  ]) {
+    act(`echo "${raw}" >&2\nexit 1`);
+    const r = run(...args);
+    assert.equal(r.status, 1, args.join(' '));
+    assert.deepEqual(JSON.parse(r.stdout), { error: 'YouTube has no such channel or playlist', kind: 'extraction', raw }, args.join(' '));
+  }
 });
 
 const playlist = (count) => ({
