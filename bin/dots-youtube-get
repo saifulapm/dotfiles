@@ -18,6 +18,8 @@ FORMATS = {
     "audio": ["-f", "bestaudio", "-x", "--embed-thumbnail", "--embed-metadata", "--convert-thumbnails", "jpg"],
     "video": ["-f", "bv*[height<=1080]+ba/b[height<=1080]", "--embed-metadata"],
 }
+# A title's bidi marks and leading dashes or spaces never reach the file's name or tags: a file manager would draw the name reordered, and a shell glob would read a leading dash as an option.
+CLEAN_TITLE = ["--replace-in-metadata", "title", r"^[\s-]+|[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]", ""]
 TEMPLATE = 'download:{"pct":"%(progress._percent_str)s","s":"%(progress.status)s"}'
 # The after_move line's prefix: a progress line starts with {, this one never does.
 SAVED = "file "
@@ -215,7 +217,7 @@ def reason(stderr):
 def download(item):
     global child
     home = folder(item["kind"])
-    args = [os.environ.get("DOTS_YOUTUBE_YTDLP") or "yt-dlp", *FORMATS[item["kind"]], "--no-playlist", "--newline", "--progress", "--progress-template", TEMPLATE,
+    args = [os.environ.get("DOTS_YOUTUBE_YTDLP") or "yt-dlp", *FORMATS[item["kind"]], *CLEAN_TITLE, "--no-playlist", "--newline", "--progress", "--progress-template", TEMPLATE,
             "-o", NAME, "-P", "home:" + home, "-P", "temp:" + temp_dir(item["id"]), "--print", "after_move:" + SAVED + "%(filepath)s"]
     if os.environ.get("DOTS_YOUTUBE_DENO"):
         args += ["--js-runtimes", "deno:" + os.environ["DOTS_YOUTUBE_DENO"]]

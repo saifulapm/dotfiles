@@ -120,6 +120,7 @@ test('an audio enqueue downloads bestaudio with tags and cover into the music fo
   const music = join(ctx.root, 'Music', 'YouTube');
   assert.deepEqual(argvOf(ctx, 'aaaaaaaaaa1'), [
     '-f', 'bestaudio', '-x', '--embed-thumbnail', '--embed-metadata', '--convert-thumbnails', 'jpg',
+    '--replace-in-metadata', 'title', '^[\\s-]+|[\\u200e\\u200f\\u061c\\u202a-\\u202e\\u2066-\\u2069]', '',
     '--no-playlist', '--newline', '--progress', '--progress-template', TEMPLATE,
     '-o', '%(title).70B [%(id)s].%(ext)s', '-P', `home:${music}`, '-P', `temp:${join(ctx.root, 'cache', 'dots', 'youtube-get', 'aaaaaaaaaa1')}`,
     '--print', 'after_move:file %(filepath)s', '--js-runtimes', `deno:${join(ctx.root, 'deno', 'deno')}`,
