@@ -189,3 +189,14 @@ test('no tests/dev script waits on a value read once with until_ok test "$(...)"
   }
   assert.deepEqual(found, [], 'until_ok <ms> <function that reads afresh>');
 });
+
+// The Apps read their theme from XDG_STATE_HOME/dots, so a launch line that moves it leaves the App drawing with no tokens unless the nested session's state is linked in (m71).
+test('a tests/dev script that moves XDG_STATE_HOME links the nested session state/dots into it', () => {
+  const found = readdirSync(dir)
+    .filter((f) => f.endsWith('.sh'))
+    .filter((f) => {
+      const text = readFileSync(dir + f, 'utf8');
+      return /(^|[\s"])XDG_STATE_HOME=/m.test(text) && !/\bln -s "\$DOTS_DEV_DIR\/state\/dots"/.test(text);
+    });
+  assert.deepEqual(found, [], 'drop XDG_STATE_HOME= from the launch line, or ln -s "$DOTS_DEV_DIR/state/dots" into its state dir');
+});
