@@ -97,7 +97,7 @@ FocusScope {
             ayahList.contentY = top + box.height - ayahList.height;
     }
 
-    // A theme change gives every row a new height, which moves the cursor's ayah, so it is brought back once the rows have their new sizes.
+    // A theme change gives every row a new height, which moves the cursor's ayah, so it is brought back once the rows have their new sizes; so does a list that shrinks.
     onCChanged: keepTimer.restart()
 
     Tick {
@@ -416,6 +416,8 @@ FocusScope {
                 visible: !page.failed && !page.noData
                 model: page.surah ? page.surah.words : []
                 boundsBehavior: Flickable.StopAtBounds
+                // The bar under the list grows a line for a word with a root, after the list has followed the word.
+                onHeightChanged: keepTimer.restart()
 
                 delegate: Item {
                     id: ayahRow

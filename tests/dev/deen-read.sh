@@ -222,7 +222,7 @@ check "its long pronunciation wraps inside the row, nothing past its edge ($(rea
 wtype "$(printf 'h%.0s' $(seq 127))"
 until_ok 5000 read_is '.bar.line | startswith("ayah 282, word 128")'
 until_ok 3000 read_is '.listHeight as $lh | .ayah.words[] | select(.boxed) | .top >= 0 and .bottom <= $lh'
-check "h 127 times boxes word 128, and it is in sight ($(read_show '[(.ayah.words[] | select(.boxed) | [.top, .bottom]), .listHeight]'))" \
+check "h 127 times boxes word 128, whose root grows the bar, and it is in sight ($(read_show '[(.ayah.words[] | select(.boxed) | [.top, .bottom]), .listHeight]'))" \
   read_is '.listHeight as $lh | .ayah.words[] | select(.boxed) | .top >= 0 and .bottom <= $lh'
 
 # 36:18 holds যন্ত্রণাদায়ক, whose stacked ন্ত্র is the tallest glyph Read draws; its meaning wraps.
