@@ -258,6 +258,67 @@ test('a failure YouTube explains prints YouTube\'s sentence as the error, with i
   assert.deepEqual(JSON.parse(r.stdout), { error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLmissingmissingmissing: YouTube said: The playlist does not exist.' });
 });
 
+// A video as yt-dlp -J gave it live for hQ5x8pHoIPA, cut to the fields a row reads and a few it must drop.
+const watched = { id: 'hQ5x8pHoIPA', title: 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', channel: 'Nujabes', uploader: 'Nujabes', uploader_id: '@Nujabes19740207', channel_id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', duration: 175, _type: 'video', view_count: 6700000, formats: [], thumbnails: [{ url: 'https://i.ytimg.com/vi/hQ5x8pHoIPA/maxresdefault.jpg', preference: 0, id: '40' }] };
+const featherRow = { id: 'hQ5x8pHoIPA', kind: 'video', title: 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', channel: 'Nujabes', duration: 175, thumb: 'hQ5x8pHoIPA' };
+
+test('resolve reads a watch URL\'s video through its clean URL, so its list= never opens the playlist', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'video.json'), JSON.stringify(watched));
+  act(`cat "${dir}/video.json"`);
+  const r = run('resolve', 'https://www.youtube.com/watch?v=hQ5x8pHoIPA&list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO&t=30');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { kind: 'video', id: 'hQ5x8pHoIPA', rows: [featherRow] });
+  assert.deepEqual(readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n'), [
+    '-J', '--no-playlist', '--skip-download', '--extractor-args', 'youtube:skip=dash,hls,translated_subs;player_skip=js', '--js-runtimes', `deno:${dir}/deno/deno`, 'https://www.youtube.com/watch?v=hQ5x8pHoIPA',
+  ]);
+});
+
+test('resolve places every video URL shape on its id', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'video.json'), JSON.stringify(watched));
+  act(`cat "${dir}/video.json"`);
+  for (const url of [
+    'https://youtu.be/hQ5x8pHoIPA',
+    'https://youtu.be/hQ5x8pHoIPA?si=Xf3kq9&t=12',
+    'youtube.com/watch?v=hQ5x8pHoIPA',
+    'https://m.youtube.com/watch?v=hQ5x8pHoIPA',
+    'https://music.youtube.com/watch?v=hQ5x8pHoIPA&feature=share',
+    'https://www.youtube.com/shorts/hQ5x8pHoIPA',
+    'https://www.youtube.com/live/hQ5x8pHoIPA?si=abc',
+    'https://www.youtube.com/embed/hQ5x8pHoIPA',
+  ]) {
+    rmSync(join(dir, 'argv'), { force: true });
+    const r = run('resolve', url);
+    assert.equal(r.status, 0, `${url}: ${r.stderr}`);
+    assert.deepEqual(JSON.parse(r.stdout), { kind: 'video', id: 'hQ5x8pHoIPA', rows: [featherRow] }, url);
+    assert.equal(readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n').at(-1), 'https://www.youtube.com/watch?v=hQ5x8pHoIPA', url);
+  }
+});
+
+test('resolve places a playlist, an @handle and a /channel/ URL without asking yt-dlp, and another site as none', (t) => {
+  const { dir, act, run } = rig(t);
+  act('echo "{}"');
+  for (const [url, answer] of [
+    ['https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', { kind: 'playlist', id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO' }],
+    ['https://music.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', { kind: 'playlist', id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO' }],
+    ['https://www.youtube.com/@Nujabes19740207', { kind: 'channel', id: '@Nujabes19740207' }],
+    ['youtube.com/@Nujabes19740207/videos', { kind: 'channel', id: '@Nujabes19740207' }],
+    ['https://www.youtube.com/channel/UCO5XcuQe_fLJVI3sZ0LmGCA', { kind: 'channel', id: 'UCO5XcuQe_fLJVI3sZ0LmGCA' }],
+    ['https://m.youtube.com/channel/UCO5XcuQe_fLJVI3sZ0LmGCA/featured', { kind: 'channel', id: 'UCO5XcuQe_fLJVI3sZ0LmGCA' }],
+    ['https://example.com/x', { kind: 'none' }],
+    ['https://example.com/watch?v=hQ5x8pHoIPA', { kind: 'none' }],
+    ['https://www.youtube.com/feed/trending', { kind: 'none' }],
+    ['https://www.youtube.com/watch?v=short', { kind: 'none' }],
+    ['nujabes feather', { kind: 'none' }],
+  ]) {
+    const r = run('resolve', url);
+    assert.equal(r.status, 0, `${url}: ${r.stderr}`);
+    assert.deepEqual(JSON.parse(r.stdout), answer, url);
+  }
+  assert.ok(!existsSync(join(dir, 'argv')), 'no URL here needs yt-dlp');
+});
+
 const denoLine = { error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime', raw: '' };
 
 test('with mise naming no deno, search fails as runtime before yt-dlp searches', (t) => {

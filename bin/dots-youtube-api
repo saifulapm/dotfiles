@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; channel <UC-id|@handle> <offset> prints 20 of a channel's uploads; playlist <id|url> prints every item of a playlist; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call prints one compact JSON object; a failed read prints {error, kind, raw} and exits 1.
+# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; channel <UC-id|@handle> <offset> prints 20 of a channel's uploads; playlist <id|url> prints every item of a playlist; resolve <url> says whether a pasted URL is a video (with its row), a playlist, a channel or none; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call prints one compact JSON object; a failed read prints {error, kind, raw} and exits 1.
 import ctypes
 import json
 import os
@@ -26,7 +26,7 @@ child = None
 
 
 def usage():
-    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | channel <UC-id|@handle> <offset> | playlist <id|url> | thumbs <id>...", file=sys.stderr)
+    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | channel <UC-id|@handle> <offset> | playlist <id|url> | resolve <url> | thumbs <id>...", file=sys.stderr)
     sys.exit(2)
 
 
@@ -235,6 +235,49 @@ def list_id(arg):
     return arg if re.fullmatch(r"[A-Za-z0-9_-]+", arg) else None
 
 
+# What a pasted URL names, read from the URL alone: (kind, id), or ("none", None).
+def place(text):
+    if not re.match(r"[A-Za-z][A-Za-z0-9+.-]*://", text):
+        text = "https://" + text
+    try:
+        u = urllib.parse.urlsplit(text)
+        host = u.hostname or ""
+    except ValueError:
+        return "none", None
+    parts = [p for p in u.path.split("/") if p]
+    query = urllib.parse.parse_qs(u.query)
+    if host == "youtu.be":
+        if parts and ID.match(parts[0]):
+            return "video", parts[0]
+    elif host in ("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com") and parts:
+        v = (query.get("v") or [""])[0]
+        if parts == ["watch"] and ID.match(v):
+            return "video", v
+        if parts[0] in ("shorts", "live", "embed") and len(parts) > 1 and ID.match(parts[1]):
+            return "video", parts[1]
+        if parts == ["playlist"] and re.fullmatch(r"[A-Za-z0-9_-]+", (query.get("list") or [""])[0]):
+            return "playlist", query["list"][0]
+        if re.fullmatch(r"@[\w.-]+", parts[0]):
+            return "channel", parts[0]
+        if parts[0] == "channel" and len(parts) > 1 and re.fullmatch(r"UC[A-Za-z0-9_-]{22}", parts[1]):
+            return "channel", parts[1]
+    return "none", None
+
+
+def resolve(text):
+    kind, found = place(text)
+    if kind == "none":
+        out({"kind": "none"})
+    elif kind != "video":
+        out({"kind": kind, "id": found})
+    else:
+        # Always the clean watch URL, so a list= never opens the playlist; the DASH and HLS manifests and the player JS are no part of a row.
+        data, stderr = ytdlp(["-J", "--no-playlist", "--skip-download", "--extractor-args", "youtube:skip=dash,hls,translated_subs;player_skip=js", "https://www.youtube.com/watch?v=" + found])
+        if data is None or not data.get("id"):
+            broke(stderr)
+        out({"kind": "video", "id": found, "rows": [video_row(data)]})
+
+
 def thumbs(ids):
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     folder = os.path.abspath(os.path.join(cache, "dots", "youtube", "thumbs"))
@@ -274,6 +317,8 @@ def main(args):
         channel(args[1], int(args[2]))
     elif len(args) == 2 and args[0] == "playlist" and list_id(args[1]):
         playlist(list_id(args[1]))
+    elif len(args) == 2 and args[0] == "resolve":
+        resolve(args[1])
     elif len(args) >= 2 and args[0] == "thumbs":
         thumbs(args[1:])
     else:
