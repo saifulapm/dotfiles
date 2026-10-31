@@ -175,9 +175,10 @@ check "Esc three times returns to the collections" hadith_is '.level == "collect
 wtype /
 until_ok 1000 hadith_is '.focus == "field"'
 wtype 'নিয়ত'
-until_ok 5000 hadith_is '.search.count == "38 results"'
-check "/ then নিয়ত finds 38 narrations, each in Bangla ($(hadith '[.search.count, .rows[0].text[0:40]]'))" \
-  hadith_is '.search.count == "38 results" and .rows[0].english == false'
+# 79: the editions write য় both as one code point and as য and its nukta, and search folds the two.
+until_ok 5000 hadith_is '.search.count == "79 results"'
+check "/ then নিয়ত finds 79 narrations, each in Bangla ($(hadith '[.search.count, .rows[0].text[0:40]]'))" \
+  hadith_is '.search.count == "79 results" and .rows[0].english == false'
 wtype -k Escape
 until_ok 2000 hadith_is '.level == "collections"'
 
