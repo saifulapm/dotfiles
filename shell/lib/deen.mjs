@@ -26,3 +26,19 @@ export const oneLine = (s) => pickerLine(String(s ?? '').replace(/[‪-‮⁦-�
 
 // Amiri is the boards' face; until a machine has it, Noto Naskh Arabic, which every machine has, draws the Arabic.
 export const arabicFamily = (families) => (families.indexOf('Amiri') >= 0 ? 'Amiri' : 'Noto Naskh Arabic');
+
+// Paper's serif Bangla matches its Fraunces; Artboard and Blueprint draw sans.
+export const bengaliFamily = (voice) => (voice === 'caps' ? 'Noto Serif Bengali' : 'Noto Sans Bengali');
+
+// Drawn as it is in every theme: Blueprint's capitals would change the commands it names.
+export const NO_DATA = 'Bangla data is not on this machine: gh auth login, then dots update';
+
+const NO_TEXT = ['cannot read the Quran text at ', 'cannot read the duas at '];
+
+// deen cannot read its data files, or its surah's words come from data older than their Bangla meanings.
+export function noData(answer) {
+  if (!answer) return false;
+  if (typeof answer.error === 'string') return NO_TEXT.some((p) => answer.error.startsWith(p));
+  if (!Array.isArray(answer.words) || answer.words.length === 0) return false;
+  return !answer.words.some((ws) => Array.isArray(ws) && ws.some((w) => w && typeof w.bn === 'string' && w.bn !== ''));
+}

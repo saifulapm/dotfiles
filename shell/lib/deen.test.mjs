@@ -31,3 +31,32 @@ test('Arabic draws in Amiri where it is installed, else in Noto Naskh Arabic', (
   assert.equal(D.arabicFamily(['Maple Mono', 'Amiri', 'Noto Naskh Arabic']), 'Amiri');
   assert.equal(D.arabicFamily(['Maple Mono', 'Noto Naskh Arabic']), 'Noto Naskh Arabic');
 });
+
+test('Bangla draws in Noto Serif Bengali on Paper, and in Noto Sans Bengali on Artboard and Blueprint', () => {
+  assert.equal(D.bengaliFamily('caps'), 'Noto Serif Bengali');
+  assert.equal(D.bengaliFamily('plain'), 'Noto Sans Bengali');
+  assert.equal(D.bengaliFamily('bracket'), 'Noto Sans Bengali');
+});
+
+test('a tab without its Bangla data says how to get it', () => {
+  assert.equal(D.NO_DATA, 'Bangla data is not on this machine: gh auth login, then dots update');
+});
+
+test('deen has no Bangla data when it cannot read the Quran text or the duas', () => {
+  assert.equal(D.noData({ error: 'cannot read the Quran text at /home/s/.local/share/deen/quran.json: No such file or directory (os error 2)' }), true);
+  assert.equal(D.noData({ error: 'cannot read the duas at /home/s/.local/share/deen/duas.json: No such file or directory (os error 2)' }), true);
+});
+
+test('a surah whose words carry no Bangla meaning is no Bangla data, but one with some is', () => {
+  const ayahs = [{ a: 1, ar: 'إِنَّ' }];
+  assert.equal(D.noData({ ayahs, words: [[{ i: 1, en: 'Indeed' }], [{ i: 1, en: 'with', bn: '' }]] }), true);
+  assert.equal(D.noData({ ayahs, words: [[{ i: 1, en: 'Indeed', bn: 'নিশ্চয়ই' }]] }), false);
+  assert.equal(D.noData({ ayahs, words: [[{ i: 1, en: 'Indeed' }], [{ i: 1, en: 'with', bn: 'সাথে' }]] }), false);
+});
+
+test('any other failure, or no answer, is not missing Bangla data', () => {
+  assert.equal(D.noData(null), false);
+  assert.equal(D.noData({ error: 'no state dir' }), false);
+  assert.equal(D.noData({ due: [{ reference: '1:2', ayah: { ar: 'ٱلْحَمْدُ', en: 'Praise' } }] }), false);
+  assert.equal(D.noData({ chapters: [{ n: 1, en: 'When waking up' }], duas: [] }), false);
+});
