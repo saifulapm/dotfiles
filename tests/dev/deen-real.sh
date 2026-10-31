@@ -146,6 +146,24 @@ first_due=$(jq '.cards["36:1"].due' "$work/data/hifz.json")
 now_s=$(date +%s)
 check "and the deck brings 36:1 back in a day, by SM-2 ($((first_due - now_s)) s)" test $((first_due - now_s)) -ge 86000 -a $((first_due - now_s)) -le 86400
 
+# Duas: chapter 10's dua 16 reads the Bangla book as the backend joined it, and 229, which the book lacks, the engine's pronunciation and its English.
+tab_to duas
+until_ok 5000 deen_is '(.duas.rows | length) > 0'
+wtype '/leaving the home'
+until_ok 2000 deen_is '(.duas.rows | length) == 1'
+wtype -k Return
+until_ok 2000 deen_is '.duas.pane.title != ""'
+dua_is() { deen_is --slurpfile b "$texts/duas.json" "(\$b[0].duas[] | select(.id == \"$1\")) as \$d | .duas.pane | $2"; }
+check "chapter 10 opens under its Bangla name ($(show '.duas.pane.title'))" deen_is --slurpfile b "$texts/duas.json" '.duas.pane.title == $b[0].chapters[9].bn'
+check "dua 16 reads the Bangla book's pronunciation, meaning and reference ($(show '.duas.pane | [.pron, .meaningLabel, .sourceLabel]'))" \
+  dua_is 16 '.pron == $d.bn_pron and .meaning == $d.bn and .source == $d.bn_ref and (.meaningLabel | ascii_downcase) == "meaning" and (.sourceLabel | ascii_downcase) == "source"'
+wtype '/dogs'
+until_ok 2000 deen_is '(.duas.rows | length) == 1'
+wtype -k Return
+until_ok 2000 deen_is '(.duas.pane.meaningLabel | ascii_downcase) == "english"'
+check "dua 229 reads the engine's pronunciation, then its English meaning and reference under English ($(show '.duas.pane | [.pron, .meaningLabel]'))" \
+  dua_is 229 '.pron == $d.bn_pron and .meaning == $d.en and .source == $d.ref and (.sourceLabel | ascii_downcase) == "english"'
+
 # Prayer: Dhaka's day from the fake aladhan, with Hanafi Asr next at 14:32.
 tab_to prayer
 until_ok 5000 deen_is '(.prayer.rows | length) == 5'
