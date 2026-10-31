@@ -23,6 +23,12 @@ export function count(n) {
   return `${String(n).replace(/\B(?=(\d{3})+$)/g, ',')} ${n === 1 ? 'video' : 'videos'}`;
 }
 
+// A Playlist head says how long it plays: minutes rounded, hours from sixty of them.
+export function span(secs) {
+  const m = typeof secs === 'number' && secs > 0 ? Math.round(secs / 60) : 0;
+  return m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+}
+
 // YouTube's titles and channels are whatever their uploaders typed, so each draws as one plain line. Saved and History keep rows from before kinds, so a row with none is a video.
 export function rows(answer) {
   const list = answer && Array.isArray(answer.rows) ? answer.rows : [];
@@ -40,6 +46,7 @@ export function rows(answer) {
       secs: kind === 'video' && duration(r.duration) ? r.duration : null,
       thumb: VIDEO_ID.test(r.thumb) ? r.thumb : '',
     };
+    if (typeof r.unavailable === 'string' && r.unavailable !== '') row.unavailable = oneLine(r.unavailable);
     if (kind === 'playlist') row.count = count(r.count) ? r.count : null;
     out.push(row);
   }

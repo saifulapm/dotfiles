@@ -100,3 +100,18 @@ test('no answer at all is a failure that names the CLI', () => {
   assert.deepEqual(Y.failure('Traceback'), none);
   assert.deepEqual(Y.failure([1]), none);
 });
+
+test('span draws a Playlist length in minutes, with hours from an hour', () => {
+  assert.equal(Y.span(840), '14 min');
+  assert.equal(Y.span(3600), '1 h 0 min');
+  assert.equal(Y.span(4440), '1 h 14 min');
+  assert.equal(Y.span(89), '1 min');
+  assert.equal(Y.span(0), '0 min');
+  assert.equal(Y.span('x'), '0 min');
+  assert.equal(Y.span(undefined), '0 min');
+});
+
+test('rows keeps an unavailable reason as one line and drops anything else', () => {
+  assert.equal(Y.rows({ rows: [row({ unavailable: 'made\nprivate' })] })[0].unavailable, 'made private');
+  for (const unavailable of ['', 7, null, undefined]) assert.equal('unavailable' in Y.rows({ rows: [row({ unavailable })] })[0], false);
+});
