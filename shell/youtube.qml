@@ -52,8 +52,9 @@ ShellRoot {
     property int cursor: 0
     // Each search's number: an answer from any search but the last is dropped.
     property int searchSeq: 0
-    // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them.
+    // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them, and the ids asked for so far.
     property var thumbs: ({})
+    property var thumbsAsked: ({})
     // The last search's failure as youtube.mjs failure() reads it, {error, kind, raw}, or null; the list shows the opened item's instead while one is open.
     property var searchFailed: null
     readonly property var failed: opened ? opened.failed : searchFailed
@@ -480,16 +481,33 @@ ShellRoot {
     onHistoryRowsChanged: fetchThumbs(historyRows.filter(r => !thumbs[r.thumb]))
     onPlaylistRowsChanged: fetchThumbs(playlistRows.filter(r => !thumbs[r.thumb]))
 
-    // One thumbs call for a list's ids; a thumb it does not name keeps its row's placeholder.
+    // Thumbs calls for a list's ids, 20 at a time, the next once the last answers, so a long list draws its top rows first; an id already asked for is not asked again, unless its call failed. A thumb no call names keeps its row's placeholder.
     function fetchThumbs(list) {
-        const ids = list.map(r => r.thumb).filter((t, i, all) => t && all.indexOf(t) === i);
+        const ids = list.map(r => r.thumb).filter((t, i, all) => t && !thumbsAsked[t] && all.indexOf(t) === i);
         if (ids.length === 0)
             return;
-        api(["thumbs"].concat(ids), answer => {
+        markThumbs(ids, true);
+        fetchBatch(ids);
+    }
+
+    function fetchBatch(ids) {
+        const batch = ids.slice(0, 20);
+        api(["thumbs"].concat(batch), answer => {
             const files = answer && answer.files;
             if (files && typeof files === "object")
                 app.thumbs = Object.assign({}, app.thumbs, files);
+            else
+                app.markThumbs(ids, false);
+            if (files && ids.length > 20)
+                app.fetchBatch(ids.slice(20));
         });
+    }
+
+    function markThumbs(ids, on) {
+        const asked = Object.assign({}, thumbsAsked);
+        for (const t of ids)
+            asked[t] = on;
+        thumbsAsked = asked;
     }
 
     // The file a thumb id draws from, or "" for its placeholder.

@@ -60,6 +60,10 @@ check "the store holds its 300 items in the original order" same_order
 gone_toast() { yt_is '.toast == ""'; }
 until_ok 4000 gone_toast
 check "the toast goes after 3 s" gone_toast
+calls=$DOTS_DEV_DIR/youtube.log
+check "the 300 thumbnails were asked for 20 at a time ($(grep '^thumbs ' "$calls" | awk '{print NF - 1}' | sort -n | uniq -c | tr '\n' ' '))" \
+  bash -c "grep -q fakeLof0300 '$calls' && ! grep '^thumbs ' '$calls' | awk 'NF > 21' | grep -q ."
+check "each once, the snapshot asking again for none ($(grep '^thumbs ' "$calls" | grep -cw fakeLof0001))" test "$(grep '^thumbs ' "$calls" | grep -cw fakeLof0001)" = 1
 
 # The original gains an item: opened again it lists 301, and the snapshot stays at 300.
 touch "$DOTS_DEV_DIR/youtube-grow"
