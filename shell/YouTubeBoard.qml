@@ -45,6 +45,12 @@ Rectangle {
         }
         return {
             drawn: rowList.visible ? drawn : [],
+            // The list's own cursor and the rows at its top and bottom edges, so a check sees that a page landing below kept the cursor in view.
+            listed: {
+                current: rowList.currentIndex,
+                top: rowList.indexAt(1, rowList.contentY + 1),
+                bottom: rowList.indexAt(1, rowList.contentY + rowList.height - 2)
+            },
             failed: failPane.visible ? {
                 kicker: kickerText.text,
                 head: failHead.text,
@@ -591,6 +597,8 @@ Rectangle {
                         cacheBuffer: 20 * 55
                         model: board.yt.rows
                         currentIndex: board.yt.cursor
+                        // A new model resets the view to its first row, so a page landing below would take the cursor's row out of view; the cursor's binding comes back with it.
+                        onCountChanged: currentIndex = Qt.binding(() => board.yt.cursor)
 
                         delegate: Rectangle {
                             id: rowItem

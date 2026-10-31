@@ -23,10 +23,19 @@ times_logged() { grep -cxF -- "$1" "$calls" 2>/dev/null; }
 calls_text() { tail -n 4 "$calls" 2>/dev/null | cut -c1-60 | tr '\n' '|'; }
 searches() { cat "$calls" 2>/dev/null | grep -c "^search ${1:-}"; }
 
+# The second page of a videos search answers 1 s late, as a slow network would, so keys pressed while it loads are seen; every other call is the fake's.
+slow=$work/slow-youtube
+cat >"$slow" <<EOF
+#!/usr/bin/env bash
+[ "\$*" = "search nujabes videos 20" ] && sleep 1
+exec "$repo/bin/dev-fake-youtube" "\$@"
+EOF
+chmod +x "$slow"
+
 "$repo/bin/dots" theme paper >/dev/null
 until_ok 3000 status_theme paper
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 check "the filter reads Videos Playlists Channels with Videos on ($(yt_state | jq -c '{type, chips: .look.chips, on: .look.chipsOn}'))" \
@@ -47,6 +56,10 @@ check "Enter searches playlists ($(calls_text))" logged "search nujabes playlist
 check "each playlist row draws its count where a video draws its duration ($(yt_state | jq -c '[.drawn[] | [.title, .duration]]'))" \
   yt_is '[.rows[].kind] == ["playlist", "playlist", "playlist"] and [.drawn[].duration] == ["14 videos", "300 videos", ""] and [.drawn[].title] == ["Modal Soul", "Lofi Archive", "Private Mix"]'
 check "the list head counts the 3 rows ($(yt_state | jq -c .look.results))" yt_is '.look.results == ["RESULTS", "3"]'
+wtype j
+wtype j
+sleep 0.3
+check "a search of fewer than 20 rows asks for no next page, though the cursor is on its last rows ($(calls_text))" test "$(searches 'nujabes playlists')" = 1
 
 wtype l
 until_ok 3000 yt_is '.type == "channels" and ([.rows[].kind] | unique) == ["channel"]'
@@ -69,6 +82,32 @@ until_ok 3000 yt_is '.type == "videos" and (.rows | length) == 20'
 back_to_videos() { [ "$(times_logged 'search nujabes playlists 0')" = 2 ] && logged "search nujabes videos 0"; }
 check "Left then h come back to Videos, searching each type on the way ($(calls_text))" back_to_videos
 check "Videos lists 20 video rows ($(yt_state | jq -c '[.rows[].kind] | unique'))" yt_is '([.rows[].kind] | unique) == ["video"] and .look.chipsOn == [true, false, false]'
+
+# Paging: the next 20 come when the cursor reaches the last 5 rows, once while they load.
+press_j() { for _ in $(seq "$1"); do wtype j; done; }
+press_j 14
+until_ok 1000 yt_is '.cursor == 14'
+sleep 0.3
+check "row 15 of 20 asks for nothing yet ($(calls_text))" test "$(searches 'nujabes videos 20')" = 0
+first_ids=$(yt_state | jq -c '[.rows[].id]')
+wtype j
+until_ok 1000 yt_is '.paging.loading'
+press_j 4
+until_ok 3000 yt_is '.rows | length > 20'
+check "row 16 asked for offset 20 once, though j went on while it loaded ($(calls_text))" test "$(times_logged 'search nujabes videos 20')" = 1
+check "the list then holds 39 rows, page 2's repeat of fakeVid0007 dropped ($(yt_state | jq -c '{n: (.rows | length), sevens: ([.rows[] | select(.id == "fakeVid0007")] | length)}'))" \
+  yt_is '(.rows | length) == 39 and ([.rows[] | select(.id == "fakeVid0007")] | length) == 1 and ([.rows[].id] | unique | length) == 39'
+check "the first 20 rows keep their order ($(yt_state | jq -c '[.rows[0:3][].id]'))" yt_is --argjson f "$first_ids" '[.rows[0:20][].id] == $f'
+check "the cursor stays on row 20 and in view ($(yt_state | jq -c '{cursor, listed}'))" \
+  yt_is '.cursor == 19 and .listed.current == 19 and .listed.top <= 19 and .listed.bottom >= 19'
+press_j 15
+until_ok 3000 yt_is '.rows | length == 44'
+check "row 35 of 39 asked for offset 40, whose 5 rows end the list ($(calls_text))" \
+  yt_is '(.rows | length) == 44 and .paging.more == false and .rows[43].id == "fakeVid0045"'
+press_j 10
+until_ok 1000 yt_is '.cursor == 43'
+sleep 0.3
+check "the last row asks for no page past the end ($(calls_text))" test "$(searches 'nujabes videos')" = 3
 
 wtype -k Escape
 until_ok 3000 yt_gone

@@ -6,6 +6,7 @@ import "services" as Services
 import "lib/status.mjs" as Status
 import "lib/youtube-look.mjs" as Y
 import "lib/youtube.mjs" as YT
+import "lib/youtube-find.mjs" as F
 import "lib/youtube-queue.mjs" as Q
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
@@ -24,8 +25,10 @@ ShellRoot {
     // The type filter under the field: what Enter in the field searches for.
     readonly property var types: ["videos", "playlists", "channels"]
     property string type: "videos"
-    // The last search's rows, Saved's and History's, as youtube.mjs rows() makes them; the list draws the view's, with the cursor on one.
-    property var results: []
+    // The last search as youtube-find.mjs pages it, and the query and type it pages on; its rows, Saved's and History's are as youtube.mjs rows() makes them, and the list draws the view's, with the cursor on one.
+    property var found: F.page(null)
+    property var searched: null
+    readonly property var results: found.rows
     readonly property var savedRows: YT.rows({
         rows: store.saved
     })
@@ -75,8 +78,25 @@ ShellRoot {
         if (pane === "sidebar") {
             const names = look.places.map(p => p.view);
             view = names[Math.max(0, Math.min(names.length - 1, names.indexOf(view) + step))];
-        } else if (rows.length > 0)
+        } else if (rows.length > 0) {
             cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
+            pageOn();
+        }
+    }
+
+    // The cursor on the last 5 rows of a search asks for its next page, once while it loads; the rows on screen stay as they are, the new ones go below.
+    function pageOn() {
+        if (view !== "search" || failed !== null || !F.wants(found, cursor))
+            return;
+        const seq = searchSeq;
+        found = F.asking(found);
+        api(["search", searched.query, searched.type, String(found.next)], answer => {
+            if (seq !== app.searchSeq)
+                return;
+            const before = app.found.rows.length;
+            app.found = F.append(app.found, answer);
+            app.fetchThumbs(app.found.rows.slice(before));
+        });
     }
 
     // h and l on Search: the filter moves one type, and a query in the field is searched again under it.
@@ -161,12 +181,17 @@ ShellRoot {
             return;
         searchSeq += 1;
         const seq = searchSeq;
+        const asked = {
+            query: q,
+            type: type
+        };
         focusPane("list");
         api(["search", q, type, "0"], answer => {
             if (seq !== app.searchSeq)
                 return;
             app.failed = YT.failure(answer);
-            app.results = app.failed ? [] : YT.rows(answer);
+            app.searched = asked;
+            app.found = F.page(app.failed ? null : answer);
             app.cursor = 0;
             app.fetchThumbs(app.results);
         });
@@ -301,6 +326,11 @@ ShellRoot {
                 type: app.type,
                 rows: app.rows,
                 cursor: app.cursor,
+                paging: {
+                    next: app.found.next,
+                    more: app.found.more,
+                    loading: app.found.loading
+                },
                 searchSeq: app.searchSeq,
                 units: app.units,
                 queue: app.queue,
