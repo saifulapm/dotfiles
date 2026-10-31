@@ -47,7 +47,7 @@ function canned(length = 20) {
   return JSON.stringify({ _type: 'playlist', id: 'nujabes', title: 'nujabes', entries });
 }
 
-test('search prints 20 rows of id, title, channel, duration and thumb, asking yt-dlp for the videos filter, the page at the offset and the deno mise names', (t) => {
+test('search prints 20 rows of id, kind, title, channel, duration and thumb, asking yt-dlp for the videos filter, the page at the offset and the deno mise names', (t) => {
   const { dir, act, run } = rig(t);
   writeFileSync(join(dir, 'canned.json'), canned());
   act(`cat "${dir}/canned.json"`);
@@ -56,13 +56,14 @@ test('search prints 20 rows of id, title, channel, duration and thumb, asking yt
   assert.equal(r.stdout.trimEnd().split('\n').length, 1);
   const { rows } = JSON.parse(r.stdout);
   assert.equal(rows.length, 20);
-  for (const row of rows) assert.deepEqual(Object.keys(row), ['id', 'title', 'channel', 'duration', 'thumb']);
-  assert.deepEqual(rows[0], { id: 'vid00000000', title: 'Track 0 [Official Audio]', channel: 'Channel 0', duration: 100, thumb: 'vid00000000' });
+  for (const row of rows) assert.deepEqual(Object.keys(row), ['id', 'kind', 'title', 'channel', 'duration', 'thumb']);
+  assert.deepEqual(rows[0], { id: 'vid00000000', kind: 'video', title: 'Track 0 [Official Audio]', channel: 'Channel 0', duration: 100, thumb: 'vid00000000' });
   assert.equal(rows[1].channel, 'Uploader 1');
   assert.equal(rows[2].duration, null);
   const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
   const after = (flag) => argv[argv.indexOf(flag) + 1];
   assert.ok(argv.includes('--flat-playlist') && argv.includes('-J'), argv.join(' '));
+  assert.ok(!argv.includes('--write-pages'), argv.join(' '));
   assert.equal(after('--playlist-start'), '41');
   assert.equal(after('--playlist-end'), '70', 'ten past the page, for the channel cards the filter lets through');
   assert.equal(after('--js-runtimes'), `deno:${dir}/deno/deno`);
@@ -85,6 +86,77 @@ test('a channel card or a null entry among the videos is dropped, the page still
   assert.ok(a.rows.every((row) => /^vid[0-9]{8}$/.test(row.id)), a.rows.map((row) => row.id).join(' '));
   assert.equal(a.rows[19].id, 'vid00000022');
   assert.equal(a.next, 63);
+});
+
+// Search entries as yt-dlp 2026.10.26 gave them live for `nujabes`: the playlists and channels filters both list channel cards, and no flat entry carries a playlist's count.
+const nujabesCard = { _type: 'url', ie_key: 'YoutubeTab', id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', url: 'https://www.youtube.com/channel/UCO5XcuQe_fLJVI3sZ0LmGCA', title: 'Nujabes', channel: 'Nujabes', uploader_id: '@Nujabes19740207', thumbnails: [{ url: 'https://yt3.ggpht.com/ytc/AIdro_kQR6ZLejMlmjEV3Jr_avZ3QucWE6b34SciJ1rGU2zXYg=s88-c-k-c0x00ffffff-no-rj-mo', height: 88, width: 88 }], playlist_count: null };
+const topicCard = { _type: 'url', ie_key: 'YoutubeTab', id: 'UCxQQET-tQsC4cwzLow9ZsuQ', url: 'https://www.youtube.com/channel/UCxQQET-tQsC4cwzLow9ZsuQ', title: 'Nujabes - Topic', channel: 'Nujabes - Topic', uploader_id: null, thumbnails: [{ url: 'https://yt3.ggpht.com/ytc/AIdro_kQR6ZLejMlmjEV3Jr_avZ3QucWE6b34SciJ1rGU2zXYg=s88-c-k-c0x00ffffff-no-rj-mo', height: 88, width: 88 }], playlist_count: null };
+const listEntry = (id, title, channel, video) => ({ _type: 'url', ie_key: 'YoutubeTab', id, url: `https://www.youtube.com/playlist?list=${id}`, title, channel, uploader: channel, duration: null, playlist_count: null, thumbnails: [{ url: `https://i.ytimg.com/vi/${video}/hq720.jpg?sqp=-oaymwExCOgCEMoBSFryq4qpAyMIARUAAIhCGAHwAQH4Af4JgALQBYoCDAgAEAEYfyAqKB8wDw==`, height: 202, width: 360 }] });
+
+// A search result's lockup as YouTube's pages carry it, its count deep in a thumbnail badge.
+const lockup = (id, title, count) => ({
+  lockupViewModel: {
+    contentImage: { collectionThumbnailViewModel: { primaryThumbnail: { thumbnailViewModel: { overlays: [{ thumbnailOverlayBadgeViewModel: { thumbnailBadges: [{ thumbnailBadgeViewModel: { icon: { sources: [{ clientResource: { imageName: 'PLAYLISTS' } }] }, text: count } }] } }] } } } },
+    metadata: { lockupMetadataViewModel: { title: { content: title } } },
+    contentId: id,
+    contentType: 'LOCKUP_CONTENT_TYPE_PLAYLIST',
+  },
+});
+
+test('a playlists search prints playlist rows, each with the count the pages yt-dlp fetched name, dropping channel cards and a repeated id', (t) => {
+  const { dir, act, run } = rig(t);
+  const flat = { _type: 'playlist', id: 'nujabes', title: 'nujabes', playlist_count: null, entries: [
+    nujabesCard,
+    topicCard,
+    listEntry('PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', 'Modal Soul [Official Audio]', 'Nujabes', 'hQ5x8pHoIPA'),
+    listEntry('PLUzwRBBmKGAiXhMgP8TahswgiwwGcKUz1', 'Nujabes Mix', 'Lofi Room', 'LbeiNME75ZE'),
+    listEntry('PLUzwRBBmKGAiXhMgP8TahswgiwwGcKUz1', 'Nujabes Mix', 'Lofi Room', 'LbeiNME75ZE'),
+    listEntry('PLrVMWXVn39RROm27kBJfg1AUVPgHiXGYG', 'Samurai Champloo', 'Anime OST', '2wK27xW4OFI'),
+  ] };
+  writeFileSync(join(dir, 'flat.json'), JSON.stringify(flat));
+  // The results page is HTML holding ytInitialData; a continuation is JSON; a third page is cut short and names nothing.
+  const initial = { contents: { twoColumnSearchResultsRenderer: { primaryContents: { sectionListRenderer: { contents: [{ itemSectionRenderer: { contents: [lockup('PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', 'Modal Soul [Official Audio]', '14 videos')] } }] } } } } };
+  writeFileSync(join(dir, 'results.dump'), `<!DOCTYPE html><html><head><script nonce="x">var ytInitialData = ${JSON.stringify(initial)};</script><script nonce="x">var other = {};</script></head></html>`);
+  const more = { onResponseReceivedCommands: [{ appendContinuationItemsAction: { continuationItems: [{ itemSectionRenderer: { contents: [lockup('PLUzwRBBmKGAiXhMgP8TahswgiwwGcKUz1', 'Nujabes Mix', '1,234 videos')] } }] } }] };
+  writeFileSync(join(dir, 'page_1.dump'), JSON.stringify(more));
+  writeFileSync(join(dir, 'page_2.dump'), '{"onResponseReceivedCommands": [');
+  act(`cp "${dir}/results.dump" "query_nujabes_https_-_www.youtube.com_results.dump"\ncp "${dir}/page_1.dump" "query_nujabes_page_1_https_-_www.youtube.com_youtubei_v1_search.dump"\ncp "${dir}/page_2.dump" "query_nujabes_page_2_https_-_www.youtube.com_youtubei_v1_search.dump"\npwd >"${dir}/cwd"\ncat "${dir}/flat.json"`);
+  const r = run('search', 'nujabes', 'playlists', '0');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), {
+    rows: [
+      { id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', kind: 'playlist', title: 'Modal Soul [Official Audio]', channel: 'Nujabes', duration: null, thumb: 'hQ5x8pHoIPA', count: 14 },
+      { id: 'PLUzwRBBmKGAiXhMgP8TahswgiwwGcKUz1', kind: 'playlist', title: 'Nujabes Mix', channel: 'Lofi Room', duration: null, thumb: 'LbeiNME75ZE', count: 1234 },
+      { id: 'PLrVMWXVn39RROm27kBJfg1AUVPgHiXGYG', kind: 'playlist', title: 'Samurai Champloo', channel: 'Anime OST', duration: null, thumb: '2wK27xW4OFI', count: null },
+    ],
+    next: 6,
+  });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.ok(argv.includes('--write-pages'), argv.join(' '));
+  assert.ok(argv.includes('https://www.youtube.com/results?search_query=nujabes&sp=EgIQAw%3D%3D'), argv.join(' '));
+  // yt-dlp wrote its pages into a directory of the CLI's own, gone once the search answered.
+  const cwd = readFileSync(join(dir, 'cwd'), 'utf8').trim();
+  assert.notEqual(cwd, process.cwd());
+  assert.ok(!existsSync(cwd), cwd);
+});
+
+test('a channels search prints channel rows with the handle as channel, dropping a repeated id, and asks for no pages', (t) => {
+  const { dir, act, run } = rig(t);
+  const flat = { _type: 'playlist', id: 'nujabes', title: 'nujabes', playlist_count: null, entries: [nujabesCard, topicCard, nujabesCard] };
+  writeFileSync(join(dir, 'flat.json'), JSON.stringify(flat));
+  act(`cat "${dir}/flat.json"`);
+  const r = run('search', 'nujabes', 'channels', '20');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), {
+    rows: [
+      { id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', kind: 'channel', title: 'Nujabes', channel: '@Nujabes19740207', duration: null, thumb: '' },
+      { id: 'UCxQQET-tQsC4cwzLow9ZsuQ', kind: 'channel', title: 'Nujabes - Topic', channel: '', duration: null, thumb: '' },
+    ],
+    next: 22,
+  });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.ok(!argv.includes('--write-pages'), argv.join(' '));
+  assert.ok(argv.includes('https://www.youtube.com/results?search_query=nujabes&sp=EgIQAg%3D%3D'), argv.join(' '));
 });
 
 const denoLine = { error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime', raw: '' };

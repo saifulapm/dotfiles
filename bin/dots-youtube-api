@@ -18,6 +18,7 @@ PAGE = 20
 SPARE = 10
 CAP = 200 * 1024 * 1024
 ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+COUNT = re.compile(r"^(\d[\d,]*) videos?$")
 NETWORK = re.compile(r"name resolution|connection refused|connection reset|network is unreachable|timed out|urlopen error", re.I)
 
 # The running yt-dlp, which a SIGTERM or SIGHUP takes down with this process.
@@ -68,47 +69,135 @@ def stop(signum, _frame):
     sys.exit(128 + signum)
 
 
-def search(query, kind, offset):
+# Runs yt-dlp with the deno mise names, in cwd when given, and answers its JSON object (None when it failed or printed none) and its stderr.
+def ytdlp(args, cwd=None):
     global child
     if shutil.which("yt-dlp") is None:
         fail("yt-dlp is missing: run dots update", "runtime")
     runtime = deno()
     if runtime is None:
         fail("yt-dlp needs deno 2.3 or newer: run dots update", "runtime")
-    # The filter is already percent-encoded, so only the query is quoted.
-    url = "https://www.youtube.com/results?search_query=%s&sp=%s" % (urllib.parse.quote_plus(query), FILTERS[kind])
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGHUP, stop)
     # A group of its own, so stop() also reaches whatever yt-dlp starts.
     child = subprocess.Popen(
-        ["yt-dlp", "--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE + SPARE), "--js-runtimes", "deno:" + runtime, url],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, process_group=0, preexec_fn=die_with_parent,
+        ["yt-dlp", *args[:-1], "--js-runtimes", "deno:" + runtime, args[-1]],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, process_group=0, preexec_fn=die_with_parent,
     )
     stdout, stderr = child.communicate()
     try:
         data = json.loads(stdout)
-        entries = data["entries"]
-    except (ValueError, KeyError, TypeError):
+    except ValueError:
         data = None
-    if child.returncode != 0 or data is None:
-        raw = next((line.rstrip() for line in reversed(stderr.splitlines()) if line.startswith("ERROR:")), "")
-        if NETWORK.search(stderr):
-            fail("No network. Check Wi-Fi, then ↵ to try again.", "network", raw)
-        version = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True).stdout.strip()
-        fail("yt-dlp %s may be behind YouTube: run dots bump, then dots update" % version, "extraction", raw)
+    if child.returncode != 0 or not isinstance(data, dict):
+        data = None
+    return data, stderr
+
+
+# Fails with what yt-dlp's stderr says went wrong.
+def broke(stderr):
+    raw = next((line.rstrip() for line in reversed(stderr.splitlines()) if line.startswith("ERROR:")), "")
+    if NETWORK.search(stderr):
+        fail("No network. Check Wi-Fi, then ↵ to try again.", "network", raw)
+    version = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True).stdout.strip()
+    fail("yt-dlp %s may be behind YouTube: run dots bump, then dots update" % version, "extraction", raw)
+
+
+# The first i.ytimg.com video id among an entry's thumbnails.
+def thumb_of(e, fallback):
+    return next((m[1] for t in e.get("thumbnails") or [] if (m := re.search(r"/vi/([A-Za-z0-9_-]{11})/", t.get("url", "")))), fallback)
+
+
+# A video row; a video with no ytimg thumbnail falls back to its own id.
+def video_row(e, channel=None):
+    return {"id": e["id"], "kind": "video", "title": e.get("title"), "channel": e.get("channel") or e.get("uploader") or channel, "duration": e.get("duration"), "thumb": thumb_of(e, e["id"])}
+
+
+# The results page is HTML holding ytInitialData; the pages after it are JSON.
+def page_data(text):
+    try:
+        return json.loads(text)
+    except ValueError:
+        m = re.search(r"var ytInitialData\s*=\s*(\{.*?\});\s*</script>", text, re.S)
+        return json.loads(m[1]) if m else None
+
+
+def strings(o, found):
+    if isinstance(o, str):
+        found.append(o)
+    elif isinstance(o, dict):
+        for x in o.values():
+            strings(x, found)
+    elif isinstance(o, list):
+        for x in o:
+            strings(x, found)
+
+
+# Maps each lockup's contentId to the "14 videos" somewhere under it, or None.
+def lockups(o, counts):
+    if isinstance(o, dict):
+        v = o.get("lockupViewModel")
+        if isinstance(v, dict) and v.get("contentId"):
+            texts = []
+            strings(v, texts)
+            counts.setdefault(v["contentId"], next((int(m[1].replace(",", "")) for t in texts if (m := COUNT.match(t))), None))
+        for x in o.values():
+            lockups(x, counts)
+    elif isinstance(o, list):
+        for x in o:
+            lockups(x, counts)
+
+
+# No flat search entry carries a playlist's count (playlist_count is always null), so it comes from the pages yt-dlp wrote; a page that no longer parses names no count and never fails the search.
+def page_counts(folder):
+    counts = {}
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".dump"):
+            try:
+                with open(os.path.join(folder, name), encoding="utf-8", errors="replace") as f:
+                    lockups(page_data(f.read()), counts)
+            except (OSError, ValueError, RecursionError):
+                pass
+    return counts
+
+
+def search(query, kind, offset):
+    # The filter is already percent-encoded, so only the query is quoted.
+    url = "https://www.youtube.com/results?search_query=%s&sp=%s" % (urllib.parse.quote_plus(query), FILTERS[kind])
+    args = ["--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE + SPARE), url]
+    counts = {}
+    if kind == "playlists":
+        with tempfile.TemporaryDirectory() as folder:
+            data, stderr = ytdlp(["--write-pages", *args], cwd=folder)
+            counts = page_counts(folder)
+    else:
+        data, stderr = ytdlp(args)
+    if data is None or not isinstance(data.get("entries"), list):
+        broke(stderr)
     rows = []
+    kept = set()
     # next is where the following page starts, past the last entry this one kept.
     following = offset
-    for at, e in enumerate(entries):
+    for at, e in enumerate(data["entries"]):
         if len(rows) == PAGE:
             break
-        # A videos search keeps only videos: a channel card or a null entry is nothing to play.
-        if not isinstance(e, dict) or kind == "videos" and not (e.get("ie_key") in (None, "Youtube") and ID.match(str(e.get("id")))):
+        if not isinstance(e, dict) or e.get("id") in kept:
             continue
+        url = str(e.get("url"))
+        # Every filter lets channel cards through, and a channel card or a null entry is nothing to play.
+        if kind == "videos" and not (e.get("ie_key") in (None, "Youtube") and ID.match(str(e.get("id")))):
+            continue
+        if kind == "playlists" and "/playlist?list=" not in url or kind == "channels" and "/channel/" not in url:
+            continue
+        kept.add(e["id"])
         following = offset + at + 1
-        # A playlist row's thumbnail is one of its videos; a row with no ytimg thumbnail falls back to its own id.
-        thumb = next((m[1] for t in e.get("thumbnails") or [] if (m := re.search(r"/vi/([A-Za-z0-9_-]{11})/", t.get("url", "")))), e["id"])
-        rows.append({"id": e["id"], "title": e.get("title"), "channel": e.get("channel") or e.get("uploader"), "duration": e.get("duration"), "thumb": thumb})
+        if kind == "videos":
+            rows.append(video_row(e))
+        elif kind == "playlists":
+            # A playlist's thumbnail is one of its videos.
+            rows.append({"id": e["id"], "kind": "playlist", "title": e.get("title"), "channel": e.get("channel") or e.get("uploader"), "duration": None, "thumb": thumb_of(e, ""), "count": counts.get(e["id"])})
+        else:
+            rows.append({"id": e["id"], "kind": "channel", "title": e.get("title"), "channel": e.get("uploader_id") or "", "duration": None, "thumb": ""})
     out({"rows": rows, "next": following})
 
 
