@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev's dots-youtube-api: answers search, channel, playlist, resolve and thumbs from the canned JSON and thumbnails in dev/youtube, so a nested check never reaches YouTube, and logs each call to DOTS_DEV_DIR/youtube.log.
+# just dev's dots-youtube-api: answers search, channel, playlist, snapshot, resolve and thumbs from the canned JSON and thumbnails in dev/youtube, so a nested check never reaches YouTube, and logs each call to DOTS_DEV_DIR/youtube.log.
 set -euo pipefail
 {
 [ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-youtube: run it from a sourced just dev env" >&2; exit 1; }
@@ -14,6 +14,25 @@ fail_if_asked() {
     jq -c . "$fixtures/fail-$(tr -d '[:space:]' <"$fail").json"
     exit 1
   fi
+}
+
+# The playlist an id or URL names, as {title, count, rows}, or nothing for one the fixtures lack. PLfakeList5000's 5000 rows are built here rather than kept in the JSON; with DOTS_DEV_DIR/youtube-grow, every playlist has one more item than when it was saved.
+items() {
+  local data
+  if [ "$1" = PLfakeList5000 ]; then
+    data=$(jq -nc '{title: "Five thousand", count: 5000, rows: [range(1; 5001) | ("fakeBig" + ("000" + tostring)[-4:]) as $id | {id: $id, kind: "video", title: "Big \(.)", channel: "lofi archive", duration: 61, thumb: $id}]}')
+  else
+    data=$(jq -c --arg id "$1" '.[$id] // empty' "$fixtures/playlist-items.json")
+  fi
+  if [ -n "$data" ] && [ -f "$DOTS_DEV_DIR/youtube-grow" ]; then
+    data=$(jq -c '.rows += [{id: "fakeGrow001", kind: "video", title: "Grown", channel: "lofi archive", duration: 60, thumb: ""}] | .count += 1' <<<"$data")
+  fi
+  printf '%s' "$data"
+}
+
+no_playlist() {
+  jq -nc --arg id "$1" '{error: "The playlist does not exist.", kind: "extraction", raw: "ERROR: [youtube:tab] \($id): YouTube said: The playlist does not exist."}'
+  exit 1
 }
 
 case "${1:-}" in
@@ -44,10 +63,28 @@ playlist)
   fail_if_asked
   id=$2
   [[ $id =~ list=([A-Za-z0-9_-]+) ]] && id=${BASH_REMATCH[1]}
-  if ! jq -ce --arg id "$id" '.[$id] // empty' "$fixtures/playlist-items.json" | grep .; then
-    jq -nc --arg id "$id" '{error: "The playlist does not exist.", kind: "extraction", raw: "ERROR: [youtube:tab] \($id): YouTube said: The playlist does not exist."}'
-    exit 1
-  fi
+  data=$(items "$id")
+  [ -n "$data" ] || no_playlist "$id"
+  printf '%s\n' "$data"
+  ;;
+snapshot)
+  [ $# = 2 ] || { echo "dev-fake-youtube: usage: snapshot <id|url>" >&2; exit 2; }
+  fail_if_asked
+  id=$2
+  [[ $id =~ list=([A-Za-z0-9_-]+) ]] && id=${BASH_REMATCH[1]}
+  data=$(items "$id")
+  [ -n "$data" ] || no_playlist "$id"
+  # The playlist's channel is the one its search row names, as yt-dlp's playlist_channel would.
+  channel=$(jq -c --arg id "$id" '(.rows | map(select(.id == $id))[0].channel) // null' "$fixtures/playlists.json")
+  # yt-dlp takes 0.4 s or more per page of 100; the 5000-row list pages faster, so a check of its progress stays short.
+  pause=0.4
+  [ "$id" != PLfakeList5000 ] || pause=0.05
+  jq -c --argjson channel "$channel" '(.rows | length) as $n | range(1; ($n + 99) / 100 | floor + 1) as $page | {read: ([$page * 100, $n] | min), count, title, channel: $channel}' <<<"$data" |
+    while read -r line; do
+      sleep "$pause"
+      printf '%s\n' "$line"
+    done
+  jq -c --argjson channel "$channel" '{title, channel: $channel, count, rows}' <<<"$data"
   ;;
 resolve)
   [ $# = 2 ] || { echo "dev-fake-youtube: usage: resolve <url>" >&2; exit 2; }

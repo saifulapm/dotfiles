@@ -143,6 +143,46 @@ test('a private or unknown playlist fails as extraction and exits 1', (t) => {
   }
 });
 
+const lines = (r) => {
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout.trimEnd().split('\n').map((l) => JSON.parse(l));
+};
+
+test('snapshot prints how far it has read after each 100 rows, then every row in order with the title, channel and count', (t) => {
+  const { run } = rig(t);
+  const out = lines(run('snapshot', 'https://www.youtube.com/playlist?list=PLfakeList0002'));
+  assert.equal(out.length, 4);
+  assert.deepEqual(out.slice(0, 3), [100, 200, 300].map((read) => ({ read, count: 300, title: 'Lofi Archive', channel: 'lofi archive' })));
+  const last = out[3];
+  assert.deepEqual(Object.keys(last), ['title', 'channel', 'count', 'rows']);
+  assert.deepEqual([last.title, last.channel, last.count, last.rows.length], ['Lofi Archive', 'lofi archive', 300, 300]);
+  assert.deepEqual(last.rows.map((r) => r.id), Array.from({ length: 300 }, (_, i) => `fakeLof${String(i + 1).padStart(4, '0')}`));
+  assert.deepEqual(last.rows[0], { id: 'fakeLof0001', kind: 'video', title: 'Lofi 1', channel: 'lofi archive', duration: 61, thumb: 'fakeLof0001' });
+});
+
+test('with youtube-grow, playlist and snapshot both answer one more item', (t) => {
+  const { dir, run } = rig(t);
+  writeFileSync(join(dir, 'youtube-grow'), '');
+  const grown = { id: 'fakeGrow001', kind: 'video', title: 'Grown', channel: 'lofi archive', duration: 60, thumb: '' };
+  const p = json(run('playlist', 'PLfakeList0002'));
+  assert.deepEqual([p.count, p.rows.length, p.rows[300]], [301, 301, grown]);
+  const s = lines(run('snapshot', 'PLfakeList0002'));
+  assert.deepEqual(s.slice(0, -1).map((l) => [l.read, l.count]), [[100, 301], [200, 301], [300, 301], [301, 301]]);
+  assert.deepEqual([s.at(-1).count, s.at(-1).rows.length, s.at(-1).rows[300]], [301, 301, grown]);
+});
+
+test('PLfakeList0003 holds an unavailable video second, and snapshot fails as playlist does on an unknown list', (t) => {
+  const { run } = rig(t);
+  const p = json(run('playlist', 'PLfakeList0003'));
+  assert.deepEqual([p.title, p.count, p.rows.map((r) => r.id)], ['Mixed tape', 4, ['fakeVid0004', 'fakeGone001', 'fakeVid0005', 'fakeVid0006']]);
+  assert.deepEqual(p.rows[1], { id: 'fakeGone001', kind: 'video', title: '', channel: '', duration: null, thumb: '', unavailable: 'made private' });
+  assert.ok(!('unavailable' in p.rows[0]));
+  assert.deepEqual(lines(run('snapshot', 'PLfakeList0003')).at(-1).rows, p.rows);
+  const r = run('snapshot', 'PLnoSuchList');
+  assert.equal(r.status, 1);
+  assert.deepEqual(JSON.parse(r.stdout), { error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLnoSuchList: YouTube said: The playlist does not exist.' });
+});
+
 test('resolve places each URL shape', (t) => {
   const { run } = rig(t);
   const res = (u) => json(run('resolve', u));
@@ -168,7 +208,7 @@ test('resolve places each URL shape', (t) => {
   assert.deepEqual(res('https://www.youtube.com/feed/history'), { kind: 'none' });
 });
 
-test('with youtube-fail naming a kind, search, channel, playlist and resolve print that failure as the real CLI does and exits 1', (t) => {
+test('with youtube-fail naming a kind, search, channel, playlist, snapshot and resolve print that failure as the real CLI does and exits 1', (t) => {
   const { dir, run } = rig(t);
   const want = {
     runtime: 'yt-dlp needs deno 2.3 or newer: run dots update',
@@ -177,7 +217,7 @@ test('with youtube-fail naming a kind, search, channel, playlist and resolve pri
   };
   for (const [kind, error] of Object.entries(want)) {
     writeFileSync(join(dir, 'youtube-fail'), kind + '\n');
-    for (const verb of [['search', 'lofi', 'videos', '0'], ['channel', '@nujabes', '0'], ['playlist', 'PLfakeList0001'], ['resolve', 'https://youtu.be/fakeVid0007']]) {
+    for (const verb of [['search', 'lofi', 'videos', '0'], ['channel', '@nujabes', '0'], ['playlist', 'PLfakeList0001'], ['snapshot', 'PLfakeList0001'], ['resolve', 'https://youtu.be/fakeVid0007']]) {
       const r = run(...verb);
       assert.equal(r.status, 1, kind + ' ' + verb[0]);
       const a = JSON.parse(r.stdout);
