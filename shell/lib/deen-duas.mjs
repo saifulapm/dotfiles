@@ -41,10 +41,13 @@ export function parseList(answer) {
 
 export const heading = (count) => `${BOOK} · ${count} duas`;
 
+// Decomposed and without ZWNJ or ZWJ, so য় typed as one code point or as য plus nukta, and যিক্‌র typed with or without its ZWNJ, match alike.
+const folded = (s) => s.normalize('NFD').replace(/[\u200c\u200d]/g, '').toLowerCase();
+
 // Chapters whose Bangla, English or Arabic name holds the query, any case.
 export function filter(chapters, query) {
-  const q = oneLine(query).toLowerCase();
-  return chapters.filter((c) => [c.name, c.en, c.ar].some((s) => s.toLowerCase().includes(q)));
+  const q = folded(oneLine(query));
+  return chapters.filter((c) => [c.name, c.en, c.ar].some((s) => folded(s).includes(q)));
 }
 
 // The cursor moves by one and stops at the ends.

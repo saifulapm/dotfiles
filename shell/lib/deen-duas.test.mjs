@@ -95,6 +95,11 @@ test('chapters filter by Bangla, English or Arabic name, any case', () => {
   assert.deepEqual(numbers('বের'), [7, 10, 14, 30, 81]);
   assert.deepEqual(numbers('বের হও\u09dfার সম\u09dfের'), [10]);
   assert.deepEqual(numbers('Leaving'), [7, 10, 14]);
+  // য় typed as য plus nukta finds the book's one code point, and a name typed without its ZWNJ finds the one with it.
+  assert.deepEqual(numbers('বের হও\u09af\u09bcার সম\u09af\u09bcের'), [10]);
+  assert.deepEqual(numbers('বা\u09a1\u09bcি থেকে'), [10]);
+  assert.equal(U.filter(book.chapters, 'যিক্র').length, U.filter(book.chapters, 'যিক্\u200cর').length);
+  assert.ok(U.filter(book.chapters, 'যিক্র').length > 1);
   assert.deepEqual(names('LEAVING THE HOME'), ['Remembrance when leaving the home']);
   assert.deepEqual(names('SLEEPING'), ['Before sleeping']);
   assert.deepEqual(names('ذكار النوم'), ['Before sleeping']);
