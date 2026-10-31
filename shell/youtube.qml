@@ -421,10 +421,12 @@ ShellRoot {
         });
     }
 
-    // Space and r: a command with no Queue connected has nothing to reach.
+    // Space, r and a video's pause: a command with no Queue connected has nothing to reach. It waits behind any load still asking where, so Enter's pause never comes before the song m loaded and unpaused (CE6JY061).
     function queueCommand(line) {
-        if (link.status === "up")
-            writeQueue([line]);
+        withFiles([], () => {
+            if (app.link.status === "up")
+                app.writeQueue([line]);
+        });
     }
 
     function writeQueue(lines) {
