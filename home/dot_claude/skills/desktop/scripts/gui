@@ -6,9 +6,15 @@ no focus stealing. Works for GTK/Qt apps that expose AT-SPI; Electron and
 Chromium need --force-renderer-accessibility to appear.
 
   gui apps                      apps currently on the a11y bus
-  gui tree <app> [--all]        interactive widgets as one JSON object, each with a ref (--all = every node)
+  gui tree <app> [--all] [--depth N] [--root REF]   interactive widgets as one JSON object, each with a ref
+                                (--all = every node; --depth cuts N levels down, a cut node showing children_count;
+                                --root walks only that node's subtree)
   gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
+  gui check|uncheck <app> <text>   tick or clear a check box; one already so prints "already": true
+  gui wait <app> --text T | --gone T | --state <text> <state> [--timeout S]
+                                until a name or field holds T, none does, or the widget has the state;
+                                10 s by default, 60 at most, exit 1 at the timeout with the last state seen
   gui get <app> <text> [text|states|box]   one property, or all three (a password field's text is withheld)
   gui click <app> <text> [--any] [--then shot|windows|tree]       activate the first match semantically
   gui type <app> <text> <val> [--any] [--then shot|windows|tree]  set an entry's text
@@ -64,6 +70,9 @@ INLINE_NODES = 1000  # what gui tree prints before it spills
 INLINE_BYTES = 32768  # the printed object, newline included
 SPILL_KEEP_S = 3600  # a spill or snapshot older than this goes on the next gui call
 AMBIGUOUS_SHOWN = 10
+WAIT_S, WAIT_MAX_S, WAIT_EVERY_S = 10, 60, 0.1
+GONE_SEE_S = 2  # a --gone wait must see the thing first, or wait this long: a menu shows up to 0.7 s after its opener
+FIELDS = {"text", "entry"}  # roles whose text, not only their name, a --text wait reads
 REF = re.compile(r"^s([0-9a-f]{4}):([0-9]+)$")
 CALL_MS = 3000  # every AT-SPI call; a stopped app never answers, and libatspi would wait 25 s
 READ_FROM_S, READ_EVERY_S, READ_UNTIL_S = 0.3, 0.1, 2.0  # a write's effect lands a beat after its reply
@@ -166,8 +175,8 @@ def find_app(pattern):
     return hits[0]
 
 
-def walk(node, want=None, path=(), budget=None):
-    """Yield (path, node) for the subtree, path the child indexes from node down; cheapest-first and bounded."""
+def walk(node, want=None, path=(), budget=None, below=None):
+    """Yield (path, node) for the subtree, path the child indexes from node down; cheapest-first and bounded, and below levels deep at most."""
     if budget is None:
         budget = [MAX_NODES]
     if budget[0] <= 0:
@@ -177,8 +186,10 @@ def walk(node, want=None, path=(), budget=None):
         role = node.get_role_name()
         if want is None or role in want:
             yield path, node
+        if below == 0:
+            return
         for i in range(node.get_child_count()):
-            yield from walk(node.get_child_at_index(i), want, path + (i,), budget)
+            yield from walk(node.get_child_at_index(i), want, path + (i,), budget, None if below is None else below - 1)
     except Exception:
         return  # a widget can vanish mid-walk; that is not an error
 
@@ -209,10 +220,10 @@ def value(node):
 FLAGS = {"checked", "pressed", "selected", "focused", "expanded", "sensitive"}
 
 
-def walked(app):
-    """[(i, path, node, role, name)] for every node under app, i its place in the walk."""
+def walked(app, root=None, path=(), depth=None):
+    """[(i, path, node, role, name)] for every node under app, or root and under it, depth levels down at most; i its place in the walk, path from app."""
     rows = []
-    for path, node in walk(app):
+    for path, node in walk(root or app, path=path, below=depth):
         if node is not app:
             try:
                 rows.append((len(rows), path, node, node.get_role_name(), node.get_name() or ""))
@@ -323,11 +334,18 @@ def entry(i, depth, node):
     return out
 
 
-def tree(app, everything):
-    """The app's widgets as a dict, each with its ref; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file."""
-    rows = walked(app)
+def tree(app, everything, depth=None, root=None):
+    """The app's widgets as a dict, each with its ref; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file.
+
+    depth cuts the walk that many levels below the app or root: a node there whose children were left out shows them as children_count, kept whatever its role."""
+    top = len(root[1]) if root else 0
+    rows = walked(app, root and root[2], root[1] if root else (), depth)
     hexid = snapshot(app, rows)
-    nodes = [dict(entry(i, len(p), n), ref=ref(hexid, i)) for i, p, n, role, _ in rows if everything or role in INTERACTIVE]
+    nodes = []
+    for i, p, n, role, _ in rows:
+        count = n.get_child_count() if depth is not None and len(p) - top == depth else 0
+        if everything or role in INTERACTIVE or count > 0:
+            nodes.append(dict(entry(i, len(p), n), ref=ref(hexid, i), **({"children_count": count} if count > 0 else {})))
     head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
     whole = dict(head, nodes=nodes)
     # Every tree replaces the spill before it, whether it spills or not; snapshots stay their hour.
@@ -417,6 +435,7 @@ def write(node, role, editable, value):
     return delivery("unverified", matched=False)
 
 
+ACTS = ("click", "type", "check", "uncheck")  # the commands that act, each guarded and journalled
 TOGGLES = {"check box", "toggle button", "radio button", "check menu item", "radio menu item"}
 SHOWN = {"checked", "pressed", "expanded"}  # what a toggle's or an expander's click changes
 
@@ -453,6 +472,55 @@ def press(node, action, index):
 
 def matches(role, name, text):
     return text.lower() in f"{name} {role}".lower()
+
+
+def holding(app, text):
+    """(rows, the first row whose name, or a field's text, holds text), the row None when none does; a password field is never read."""
+    t = text.lower()
+    rows = walked(app)
+    for row in rows:
+        _, _, node, role, name = row
+        if t in name.lower():
+            return rows, row
+        if role in FIELDS:
+            try:
+                if t in read_text(node).lower():
+                    return rows, row
+            except Exception:
+                pass
+    return rows, None
+
+
+def wait(app, kind, args, timeout):
+    """Polls every 100 ms until the tree shows what kind asks, printing what it saw; exit 1 at the timeout with the last state."""
+    t0 = time.monotonic()
+    node = None
+    if kind == "--state":
+        r, _, node, role, name = target(app, args[0])
+    seen = False
+    while True:
+        if kind == "--state":
+            last = sorted(states(node))
+            if args[1] in last:
+                print(json.dumps({"ok": True, "ms": int((time.monotonic() - t0) * 1000), "widget": widget(r, role, name), "states": last}))
+                return
+        else:
+            rows, row = holding(app, args[0])
+            seen = seen or row is not None
+            last = {"present": row is not None}
+            # A --gone right after an opener would pass before the thing shows, so it first sees it or waits 2 s.
+            done = row is not None if kind == "--text" else row is None and (seen or time.monotonic() - t0 >= GONE_SEE_S)
+            if done:
+                out = {"ok": True, "ms": int((time.monotonic() - t0) * 1000)}
+                if row:
+                    i, _, _, role, name = row
+                    out["widget"] = widget(ref(snapshot(app, rows), i), role, name)
+                print(json.dumps(out))
+                return
+        if time.monotonic() - t0 >= timeout:
+            print(json.dumps({"ok": False, "timeout": timeout, "last": last}))
+            sys.exit(1)
+        time.sleep(WAIT_EVERY_S)
 
 
 def finish(out, then, app):
@@ -498,22 +566,49 @@ def main(argv):
 
     if len(argv) < 3:
         usage()
-    if cmd in ("click", "type"):
+    if cmd in ACTS:
         guard()
     Atspi.init()
-    if cmd == "tree" and argv[2] == "--pid":
-        if len(argv) < 4 or not argv[3].isdigit():
+    if cmd == "tree":
+        # gui tree <app> | --pid N, then --all, --depth N and --root REF in any order.
+        rest = argv[4:] if argv[2] == "--pid" else argv[3:]
+        everything, depth, root = False, None, None
+        while rest:
+            if rest[0] == "--all":
+                everything, rest = True, rest[1:]
+            elif rest[0] == "--depth" and len(rest) > 1 and rest[1].isdigit() and int(rest[1]) > 0:
+                depth, rest = int(rest[1]), rest[2:]
+            elif rest[0] == "--root" and len(rest) > 1 and REF.match(rest[1]):
+                root, rest = rest[1], rest[2:]
+            else:
+                usage()
+        if argv[2] == "--pid":
+            if len(argv) < 4 or not argv[3].isdigit():
+                usage()
+            pids = [app for _, app in apps() if app.get_process_id() == int(argv[3])]
+            if not pids:
+                nothing(f"no app with pid {argv[3]} on the a11y bus")
+            app = pids[0]
+        else:
+            app = find_app(argv[2])
+        print(json.dumps(tree(app, everything, depth, root and target(app, root))))
+        return
+    if cmd == "wait":
+        # gui wait <app> --text T | --gone T | --state TARGET STATE, then --timeout S.
+        rest, timeout = argv[3:], WAIT_S
+        if len(rest) >= 2 and rest[-2] == "--timeout":
+            try:
+                timeout = float(rest[-1])
+            except ValueError:
+                usage()
+            rest = rest[:-2]
+            if not 0 < timeout <= WAIT_MAX_S:
+                usage()
+        if not rest or (rest[0], len(rest)) not in (("--text", 2), ("--gone", 2), ("--state", 3)) or not rest[1]:
             usage()
-        pids = [app for _, app in apps() if app.get_process_id() == int(argv[3])]
-        if not pids:
-            nothing(f"no app with pid {argv[3]} on the a11y bus")
-        print(json.dumps(tree(pids[0], "--all" in argv)))
+        wait(find_app(argv[2]), rest[0], rest[1:], timeout)
         return
     app = find_app(argv[2])
-
-    if cmd == "tree":
-        print(json.dumps(tree(app, "--all" in argv)))
-        return
 
     if cmd == "text":
         seen = set()
@@ -576,6 +671,30 @@ def main(argv):
         guard()
         finish({**press(node, action, index), "action": names[index], "widget": w}, then, app)
 
+    if cmd in ("check", "uncheck"):
+        r, path, node, role, name = target(app, needle)
+        w = widget(r, role, name)
+        want = cmd == "check"
+        # Already as asked: nothing to press, and pressing would undo it.
+        if ("checked" in states(node)) == want:
+            finish({**delivery("verified"), "already": True, "widget": w}, None, app)
+        try:
+            action = node.get_action()
+            names = [Atspi.Action.get_action_name(action, k) for k in range(Atspi.Action.get_n_actions(action))]
+        except Exception:
+            names = []
+        if not names:
+            nothing(f"{role} {name!r} offers no action (a GTK4 check box offers none)")
+        index = names.index("click") if "click" in names else 0
+        if not anywhere:
+            confine(app, path)
+        guard()
+        out = press(node, action, index)
+        # The change press saw must be the one asked for.
+        if out["delivery"] == "verified" and ("checked" in states(node)) != want:
+            out = delivery("unverified")
+        finish({**out, "action": names[index], "widget": w}, None, app)
+
     if cmd == "type":
         if len(argv) < 5:
             usage()
@@ -610,5 +729,5 @@ if __name__ == "__main__":
         raise
     finally:
         # click and type are actions, and each leaves one journal line, refusals included.
-        if sys.argv[1:2] in (["click"], ["type"]):
+        if sys.argv[1:2] in ([a] for a in ACTS):
             load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:], delivery=delivered)

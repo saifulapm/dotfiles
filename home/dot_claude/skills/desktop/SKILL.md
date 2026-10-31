@@ -97,6 +97,9 @@ gui tree <app>                # JSON: interactive widgets, boxes, checked/focuse
 gui click <app> 'Save'        # activates it, then reads it back for "delivery"
 gui type <app> 'Search' 'foo' # sets an entry's text, the same way
 gui get <app> 'Search' text   # one of text, states or box; all three without it
+gui check <app> 'Wrap'        # ticks a check box once; already ticked says "already": true (uncheck clears)
+gui tree <app> --depth 3      # three levels down; a cut node shows children_count, --root <ref> opens it
+gui wait <app> --gone 'Open'  # until no widget is named so; also --text T, --state <ref> <state>
 gui text <app>                # every readable string
 ```
 
@@ -111,6 +114,11 @@ editable, or is read-only, with exit 3, and the typed text never appears in
 the output or the journal, only `"matched"`; `get` withholds a password
 field's text. A GTK4 check box offers no action at all, so `click` exits 4
 on it: use pixels.
+
+Wait on the tree, never with `sleep`: `wait` polls every 100 ms for 10 s
+(`--timeout S`, 60 at most) and exits 1 with the last state it saw.
+`--gone` first sees the thing, or waits 2 s, so it is safe right after the
+click that opens it: a menu shows up to 0.7 s after its opener.
 
 Each `tree` node has a `"ref"` such as `s3fa1:42`; pass it where a text
 goes (`gui click <app> s3fa1:42`) to reach a widget with no name, or one of
