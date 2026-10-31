@@ -52,6 +52,12 @@ if ((${#missing[@]})); then
   root dnf -y install "${missing[@]}" || die "dnf could not install ${missing[*]}"
 fi
 
+# mpv recommends the yt-dlp rpm, so the install batch above can pull it back; the pinned binary in ~/.local/bin is the one that stays.
+if rpm -q --quiet yt-dlp; then
+  log "removing the yt-dlp rpm"
+  root dnf -y -q remove yt-dlp yt-dlp+default || die "could not remove the yt-dlp rpm"
+fi
+
 # --allowerasing replaces the -free libraries mpv and wf-recorder pulled in, as dnf swap would, and works whether or not they are there.
 for entry in "${from_fusion[@]}"; do
   read -r name fusion <<<"$entry"

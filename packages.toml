@@ -462,6 +462,11 @@ arch = "all"
 why = "plays video"
 
 [[package]]
+name = "mpv-mpris"
+arch = "all"
+why = "the island and media keys drive the YouTube App's Queue through MPRIS"
+
+[[package]]
 name = "imv"
 arch = "all"
 why = "shows images"
@@ -475,11 +480,6 @@ why = "reads PDFs"
 name = "zathura-pdf-mupdf"
 arch = "all"
 why = "zathura's PDF backend"
-
-[[package]]
-name = "yt-dlp"
-arch = "all"
-why = "downloads video for mpv"
 
 [[package]]
 name = "pass-otp"

@@ -9,22 +9,24 @@ import { join } from 'node:path';
 const repo = new URL('../../', import.meta.url).pathname;
 const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_before_00-packages.sh.tmpl'), 'utf8');
 
-// remi-release answers with $REMI; everything else is installed.
+// remi-release answers with $REMI and yt-dlp with $YTDLP; mpv-mpris is the one package missing, so the install batch runs; everything else is installed.
 const RPM = `#!/bin/sh
 [ "$1" = -E ] && { echo 44; exit 0; }
 for a; do last=$a; done
 [ "$last" = remi-release ] && exit "$REMI"
+[ "$last" = yt-dlp ] && exit "$YTDLP"
+[ "$last" = mpv-mpris ] && exit 1
 exit 0
 `;
 
-function apply({ remi }) {
+function apply({ remi = false, ytdlp = false }) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-packages-')));
   mkdirSync(join(home, 'stubs'));
   writeFileSync(join(home, 'stubs/rpm'), RPM, { mode: 0o755 });
   writeFileSync(join(home, 'stubs/dnf'), '#!/bin/sh\necho "$*" >> "$HOME/dnf.log"\n', { mode: 0o755 });
   writeFileSync(join(home, 'stubs/sudo'), '#!/bin/sh\n[ "$1" = -n ] && shift\nexec "$@"\n', { mode: 0o755 });
   const env = {
-    PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home, REMI: remi ? '0' : '1',
+    PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home, REMI: remi ? '0' : '1', YTDLP: ytdlp ? '0' : '1',
     XDG_CONFIG_HOME: join(home, '.config'), XDG_DATA_HOME: join(home, '.local/share'), XDG_CACHE_HOME: join(home, '.cache'),
   };
   const rendered = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env });
@@ -44,4 +46,20 @@ test('a machine without Remi removes nothing', () => {
   const { r, dnf } = apply({ remi: false });
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(dnf.filter((l) => /\bremove\b/.test(l)), []);
+});
+
+// mpv recommends the yt-dlp rpm, so the install batch can pull it back; the pinned binary is the one that stays.
+test('a machine with the yt-dlp rpm loses it after the install batch', () => {
+  const { r, dnf } = apply({ ytdlp: true });
+  assert.equal(r.status, 0, r.stderr);
+  const remove = dnf.findIndex((l) => /\bremove\b/.test(l));
+  assert.equal(dnf[remove], '-y -q remove yt-dlp yt-dlp+default');
+  assert.equal(dnf.filter((l) => /\bremove\b/.test(l)).length, 1);
+  assert.ok(dnf.slice(0, remove).some((l) => /^-y install /.test(l)), dnf.join('\n'));
+});
+
+test('a machine without the yt-dlp rpm removes no yt-dlp', () => {
+  const { r, dnf } = apply({ ytdlp: false });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(dnf.filter((l) => /yt-dlp/.test(l)), []);
 });

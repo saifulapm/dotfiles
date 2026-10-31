@@ -13,7 +13,7 @@ const byName = new Map(entries.map((e) => [e.name, e]));
 const everyArch = [
   'chromium', 'tailscale', 'pipewire', 'wireplumber', 'brightnessctl', 'wf-recorder', 'grim', 'slurp', 'wlrctl',
   'ydotool', 'tesseract', 'tesseract-langpack-eng', 'tesseract-langpack-ben', 'zbar', 'python3-gobject', 'just',
-  'mpv', 'imv', 'zathura', 'zathura-pdf-mupdf', 'yt-dlp', 'pass-otp', 'ffmpeg', 'ruby', 'rubypick', 'golang',
+  'mpv', 'mpv-mpris', 'imv', 'zathura', 'zathura-pdf-mupdf', 'pass-otp', 'ffmpeg', 'ruby', 'rubypick', 'golang',
   'gtk4', 'gtk4-devel-tools', 'wlr-protocols-devel', 'wayland-devel', 'libadwaita', 'lynx', 'php-cli', 'php-fpm', 'php-mbstring', 'php-xml', 'php-pdo', 'php-intl', 'php-process', 'php-mysqlnd', 'php-pgsql', 'php-gd', 'php-bcmath', 'php-pecl-redis6', 'composer', 'caddy', 'podman',
 ];
 const macOnly = ['arm-none-eabi-gcc-cs', 'libva-devel', 'binutils', 'kernel-headers'];
@@ -92,4 +92,9 @@ test('wayvnc and everything wlvncc builds against are declared for every arch', 
     assert.match(byName.get(name).why, /\w/, `${name} why`);
   }
   assert.equal(byName.get('ffmpeg-devel').rpmfusion, 'free');
+});
+
+// yt-dlp is a versions.toml pin of the release binary now; the rpm is removed, not declared.
+test('yt-dlp is not a package', () => {
+  assert.equal(byName.has('yt-dlp'), false);
 });
