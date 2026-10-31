@@ -539,6 +539,7 @@ Rectangle {
                             function askedLook() {
                                 return confirmBox.visible ? {
                                     border: String(confirmBox.border.color),
+                                    cut: confirmText.truncated,
                                     mark: confirmMark.visible ? confirmMark.text : ""
                                 } : null;
                             }
@@ -677,9 +678,8 @@ Rectangle {
                                         width: confirmColumn.width - (confirmMark.visible ? confirmMark.implicitWidth + 6 : 0)
                                         textFormat: Text.PlainText
                                         text: board.yt.playlist ? look.confirm.question(board.yt.playlist.name, board.yt.playlist.count) : ""
-                                        wrapMode: Text.Wrap
-                                        maximumLineCount: 3
-                                        elide: Text.ElideRight
+                                        // The name is cut already, so the question wraps, anywhere a long word needs, and is never elided before its count.
+                                        wrapMode: Text.WrapAtWordBoundaryOrAnywhere
                                         color: (plain ? look.tint.errInk : c.ink) ?? "black"
                                         font.family: board.bodyFont
                                         font.pixelSize: bracket ? 12 : 11
