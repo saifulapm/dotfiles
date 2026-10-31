@@ -50,14 +50,14 @@ Rectangle {
                 fix: fixText.text,
                 retry: retryKey.text + " " + retryWord.text,
                 raw: rawBox.visible ? rawText.text : "",
-                rawFont: rawText.font.family,
+                rawFont: rawText.fontInfo.family,
                 rawSize: rawText.font.pixelSize,
                 rawBelow: rawBox.y > fixText.y
             } : null,
             empty: emptyBlock.visible ? [emptyHead.text, [emptyKey.text, emptyRest.text].filter(t => t).join(" ")].filter(t => t) : [],
             look: {
                 title: [labelText.text, viewName.text, fromText.text],
-                viewFont: viewName.font.family,
+                viewFont: viewName.fontInfo.family,
                 viewBold: viewName.font.weight >= Font.Bold,
                 pills: [labelPill.color.a > 0, fromPill.color.a > 0],
                 frameRadius: board.radius,
