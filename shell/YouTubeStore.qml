@@ -26,13 +26,38 @@ Scope {
     function save(video) {
         if (!ready || broken)
             return;
-        const next = P.add(playlists, "saved", {
+        write(P.add(playlists, "saved", {
             id: video.id,
             title: video.title,
             channel: video.channel,
             duration: video.secs,
             thumb: video.thumb
-        }, Date.now());
+        }, Date.now()));
+    }
+
+    // A new Playlist's id, or "" when the name is blank or the store cannot be written.
+    function create(name) {
+        if (!ready || broken)
+            return "";
+        const id = "pl" + Date.now().toString(36) + Math.floor(Math.random() * 1679616).toString(36);
+        const next = P.create(playlists, id, name, Date.now());
+        const made = next !== playlists;
+        write(next);
+        return made ? id : "";
+    }
+
+    function rename(id, name) {
+        if (ready && !broken)
+            write(P.rename(playlists, id, name, Date.now()));
+    }
+
+    function remove(id) {
+        if (ready && !broken)
+            write(P.remove(playlists, id, Date.now()));
+    }
+
+    // Only a change is written, so a key that changed nothing leaves the file alone.
+    function write(next) {
         if (next === playlists)
             return;
         playlists = next;

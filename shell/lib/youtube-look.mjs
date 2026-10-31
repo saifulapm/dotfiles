@@ -1,6 +1,6 @@
 // How the YouTube App reads under a token set, as the three themes' YouTube boards draw it: the title strip, the sidebar, the field and chips, the legend, the empty views and the error block.
 import { listLook } from './voice.mjs';
-import { EMPTY } from './youtube.mjs';
+import { EMPTY, count } from './youtube.mjs';
 
 // The boards' tints, which no token carries: Paper's chosen place, row rule and light ink on a lit row, Artboard's accent tint, field, tiles, thumbnail and error block, Blueprint's warning amber; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
 const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', errFill: '#FFF1E8', errInk: '#B4380B', errText: '#2B2F36', warn: '#FFB547' };
@@ -10,6 +10,8 @@ const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio']
 const BRACKET_DOWNLOAD = { key: '[D/⇧D]', word: 'DOWNLOAD AUDIO / VIDEO' };
 // A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
 const PLAYLIST_KEYS = [['↵', 'play as video'], ['m', 'play in queue'], ['S', 'shuffle'], ['a', 'add to queue'], ['x', 'remove'], ['⇧J/⇧K', 'move'], ['d/D', 'download missing'], ['r', 'repeat'], ['esc', 'back']];
+// With the sidebar focused the keys make, rename, delete and open a Playlist.
+const SIDEBAR_KEYS = [['n', 'new'], ['e', 'rename'], ['x', 'delete'], ['↵', 'open'], ['tab', 'list']];
 // Blueprint marks each shifted key.
 const BRACKET_SHIFTED = { '[S]': '[⇧S]', '[D/D]': '[D/⇧D]' };
 const EMPTY_KEYS = [['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
@@ -40,6 +42,7 @@ export function youtubeLook(tokens) {
     playlists: 'PLAYLISTS',
     noPlaylists: EMPTY.playlists,
     placeholder: 'Search YouTube',
+    namePlaceholder: 'Playlist name',
     hint: bracket ? '[/]' : '/',
     typeLabel: plain ? '' : 'TYPE',
     chips: ['Videos', 'Playlists', 'Channels'].map((w) => (bracket ? w.toUpperCase() : w)),
@@ -47,7 +50,8 @@ export function youtubeLook(tokens) {
     // The now-playing line's right side, as the Queue's loop-playlist reads.
     repeat: (on) => (bracket ? (on ? 'REPEAT ON' : 'REPEAT OFF') : on ? 'repeat on' : 'repeat off'),
     // A failed search's list is its error block, so only try again and the moves away act on it.
-    legend(view, failed) {
+    legend(view, failed, focus) {
+      if (focus === 'sidebar') return l.keys(SIDEBAR_KEYS);
       if (view === 'playlist') {
         const keys = l.keys(PLAYLIST_KEYS);
         return bracket ? keys.map((k) => Object.assign({}, k, { key: BRACKET_SHIFTED[k.key] || k.key })) : keys;
@@ -68,6 +72,11 @@ export function youtubeLook(tokens) {
       word: 'try again',
       // Paper's board heads a stale yt-dlp's block YOUTUBE CHANGED; the other kinds' boards draw no such line.
       kicker: (f) => (voice === 'caps' && f.kind === 'extraction' && f.error.startsWith('yt-dlp ') ? 'YOUTUBE CHANGED' : ''),
+    },
+    // x on a Playlist asks under its row; Paper's and Artboard's keys keep their case, as their boards draw them.
+    confirm: {
+      question: (name, n) => `Delete ${name} and its ${count(n)}?`,
+      keys: bracket ? l.keys([['y', 'delete'], ['esc', 'keep']]) : [{ key: 'y', word: 'delete' }, { key: 'esc', word: 'keep' }],
     },
     fieldRadius: plain ? 14 : 0,
     rowRadius: plain ? 10 : 0,

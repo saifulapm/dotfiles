@@ -86,3 +86,19 @@ test("a Playlist's legend names its whole-playlist keys, and its empty view name
   assert.deepEqual(legend(look('blueprint'), 'playlist'), ['[↵] PLAY AS VIDEO', '[M] PLAY IN QUEUE', '[⇧S] SHUFFLE', '[A] ADD TO QUEUE', '[X] REMOVE', '[⇧J/⇧K] MOVE', '[D/⇧D] DOWNLOAD MISSING', '[R] REPEAT', '[ESC] BACK']);
   for (const name of ['paper', 'artboard', 'blueprint']) assert.deepEqual(look(name).empty('playlist'), { head: '', key: 'p', rest: 'adds a video here' }, name);
 });
+
+// The delete board: with the sidebar focused the legend names its keys, and x asks under the row before y deletes.
+test('the sidebar legend names n, e, x, open and list, and the delete question counts the videos', () => {
+  const sidebar = (l) => l.legend('playlist', false, 'sidebar').map((k) => `${k.key} ${k.word}`);
+  assert.deepEqual(sidebar(look('paper')), ['N NEW', 'E RENAME', 'X DELETE', '↵ OPEN', 'TAB LIST']);
+  assert.deepEqual(sidebar(look('artboard')), ['n new', 'e rename', 'x delete', '↵ open', 'tab list']);
+  assert.deepEqual(sidebar(look('blueprint')), ['[N] NEW', '[E] RENAME', '[X] DELETE', '[↵] OPEN', '[TAB] LIST']);
+  assert.deepEqual(legend(look('paper'), 'search'), legend(look('paper'), 'search', false, 'list'));
+  const a = look('artboard');
+  assert.equal(a.confirm.question('Gym', 25), 'Delete Gym and its 25 videos?');
+  assert.equal(a.confirm.question('Deep focus', 0), 'Delete Deep focus and its 0 videos?');
+  assert.equal(a.confirm.question('One', 1), 'Delete One and its 1 video?');
+  assert.deepEqual(a.confirm.keys.map((k) => `${k.key} ${k.word}`), ['y delete', 'esc keep']);
+  assert.deepEqual(look('blueprint').confirm.keys.map((k) => `${k.key} ${k.word}`), ['[Y] DELETE', '[ESC] KEEP']);
+  assert.deepEqual(look('paper').confirm.keys.map((k) => `${k.key} ${k.word}`), ['y delete', 'esc keep']);
+});

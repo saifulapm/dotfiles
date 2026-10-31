@@ -31,7 +31,7 @@ ShellRoot {
     readonly property string sideKey: view === "playlist" ? "pl:" + playlistId : view
     // Which pane the keys move in while the field is not focused: sidebar or list.
     property string pane: "list"
-    readonly property string focusAt: board.fieldFocused ? "field" : pane
+    readonly property string focusAt: board.fieldFocused ? "field" : board.nameFocused ? "name" : pane
     readonly property string query: board.queryText
     // The type filter under the field: what Enter in the field searches for.
     readonly property var types: ["videos", "playlists", "channels"]
@@ -116,6 +116,41 @@ ShellRoot {
             app.setList(F.append(now, answer));
             app.fetchThumbs(app.results.slice(now.rows.length));
         });
+    }
+
+    // n or e in the sidebar: "new" while a new Playlist is named, the Playlist's id while it is renamed, else "".
+    property string naming: ""
+    // x on a Playlist in the sidebar asks first; y deletes it, Esc keeps it.
+    property bool confirming: false
+
+    function startName(what) {
+        naming = what;
+        board.focusName(what === "new" || !playlist ? "" : playlist.name);
+    }
+
+    // A new Playlist opens beside the sidebar at once, so its empty view says how to fill it.
+    function commitName(text) {
+        if (naming === "new") {
+            const id = store.create(text);
+            if (id !== "")
+                show("pl:" + id);
+        } else if (naming !== "")
+            store.rename(naming, text);
+        naming = "";
+        focusPane("sidebar");
+    }
+
+    function cancelName() {
+        naming = "";
+        focusPane("sidebar");
+    }
+
+    // The sidebar moves up to the entry above the deleted Playlist.
+    function deleteNow() {
+        const id = playlistId;
+        confirming = false;
+        show(sideKeys[sideKeys.indexOf(sideKey) - 1]);
+        store.remove(id);
     }
 
     // A sidebar key: a view's name, or pl:<id> for a Playlist.
@@ -433,6 +468,8 @@ ShellRoot {
             return JSON.stringify(Object.assign({
                 view: app.view,
                 playlistId: app.playlistId,
+                naming: app.naming,
+                confirming: app.confirming,
                 playlists: store.lists,
                 focus: app.focusAt,
                 query: app.query,

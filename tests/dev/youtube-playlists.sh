@@ -54,8 +54,6 @@ check "j from History opens Focus, its name in the title strip ($(yt_state | jq 
   yt_is '.view == "playlist" and .playlistId == "pl1" and .look.title[1] == "Focus"'
 check "its head reads Focus · 3 videos · 16 min ($(yt_state | jq -c .look.results))" yt_is '.look.results == ["Focus", "3 videos · 16 min"]'
 check "its rows are numbered in its own order ($(yt_state | jq -c '[.drawn[] | [.number, .title]]'))" focus_drawn
-check "its legend names the whole-playlist keys ($(yt_state | jq -c '.look.legend[0:3]'))" \
-  yt_is '.look.legend[0:3] == ["↵ PLAY AS VIDEO", "M PLAY IN QUEUE", "S SHUFFLE"]'
 
 wtype j
 until_ok 1000 yt_is '.playlistId == "pl2"'
@@ -70,9 +68,78 @@ until_ok 1000 yt_is '.playlistId == "pl1"'
 wtype -k Return
 until_ok 1000 yt_is '.focus == "list"'
 check "Enter on Focus in the sidebar moves to its list" yt_is '.focus == "list" and .view == "playlist" and .cursor == 0'
+check "where the legend names the whole-playlist keys ($(yt_state | jq -c '.look.legend[0:3]'))" \
+  yt_is '.look.legend[0:3] == ["↵ PLAY AS VIDEO", "M PLAY IN QUEUE", "S SHUFFLE"]'
 wtype -k Escape
 until_ok 1000 yt_is '.view == "search"'
 check "Esc in a Playlist goes back to Search" yt_is '.view == "search"'
+
+# n names a new Playlist, here a second Focus; e renames it; x asks under its row, Esc keeps it and y deletes it.
+wtype -k Tab
+until_ok 1000 yt_is '.focus == "sidebar"'
+check "with the sidebar focused the legend names n, e, x, open and list ($(yt_state | jq -c .look.legend))" \
+  yt_is '.look.legend == ["N NEW", "E RENAME", "X DELETE", "↵ OPEN", "TAB LIST"]'
+wtype n
+until_ok 1000 yt_is '.focus == "name" and .naming == "new" and .nameField == ""'
+wtype Focus
+until_ok 1000 yt_is '.nameField == "Focus"'
+wtype -k Return
+until_ok 2000 yt_is '.look.sidebar[-1] == "Focus 0"'
+made=$(yt_state | jq -r .playlistId)
+check "n, Focus, Enter lists a second Focus 0 under PLAYLISTS, beside the first ($(yt_state | jq -c '.look.sidebar[4:]'))" \
+  yt_is '.look.sidebar[4] == "Focus 3" and .look.sidebar[-1] == "Focus 0" and .focus == "sidebar"'
+check "and opens it, reading p adds a video here ($(yt_state | jq -c '[.view, .playlistId, .empty]'))" \
+  yt_is --arg id "$made" '.view == "playlist" and .playlistId == $id and .empty == ["p adds a video here"] and .look.title[1] == "Focus"'
+wtype e
+until_ok 1000 yt_is --arg id "$made" '.focus == "name" and .naming == $id and .nameField == "Focus"'
+wtype -M ctrl a -m ctrl
+wtype 'Deep focus'
+wtype -k Return
+until_ok 2000 yt_is '.look.sidebar[-1] == "Deep focus 0"'
+check "e on it, Deep focus, Enter renames it ($(yt_state | jq -c '[.look.sidebar[-1], .look.title[1]]'))" \
+  yt_is '.look.sidebar[-1] == "Deep focus 0" and .look.title[1] == "Deep focus" and .focus == "sidebar"'
+wtype x
+until_ok 1000 yt_is '.confirming'
+check "x asks Delete Deep focus and its 0 videos? under its row, the list beside dimmed ($(yt_state | jq -c '[.confirm, .dimmed]'))" \
+  yt_is '.confirm == ["Delete Deep focus and its 0 videos?", "y delete", "esc keep"] and .dimmed'
+wtype j
+sleep 0.3
+check "while it asks, j moves nothing" yt_is --arg id "$made" '.playlistId == $id and .confirming'
+wtype -k Escape
+until_ok 1000 yt_is '.confirming == false'
+check "Esc keeps it ($(yt_state | jq -c '[.confirm, .dimmed, .look.sidebar[-1]]'))" \
+  yt_is --arg id "$made" '.confirm == null and (.dimmed | not) and .look.sidebar[-1] == "Deep focus 0" and .playlistId == $id'
+wtype x
+until_ok 1000 yt_is '.confirming'
+wtype y
+until_ok 2000 yt_is '.look.sidebar[-1] != "Deep focus 0"'
+check "x then y removes it, and the sidebar moves to the Playlist above ($(yt_state | jq -c '[.look.sidebar[-1], .playlistId]'))" \
+  yt_is '(.look.sidebar | map(select(startswith("Deep focus"))) | length) == 0 and .playlistId == "pl3"'
+gone_in_store() { jq -e --arg id "$made" '.playlists[$id].deleted == true' "$store" >/dev/null 2>&1; }
+until_ok 2000 gone_in_store
+check "and the store keeps it as a tombstone" gone_in_store
+
+# A blank name makes nothing, and Esc leaves the field making nothing.
+wtype n
+until_ok 1000 yt_is '.focus == "name"'
+wtype -k Return
+until_ok 1000 yt_is '.focus == "sidebar"'
+wtype n
+until_ok 1000 yt_is '.focus == "name"'
+wtype Unsaved
+wtype -k Escape
+until_ok 1000 yt_is '.focus == "sidebar" and .naming == "" and .nameField == null'
+check "a blank name and an Escaped one make no Playlist ($(yt_state | jq -c '.playlists | length'))" yt_is '(.playlists | length) == 3'
+
+# Saved is never renamed or deleted.
+wtype k k k k
+until_ok 1000 yt_is '.view == "saved"'
+wtype e
+wtype x
+sleep 0.3
+check "on Saved, e and x do nothing ($(yt_state | jq -c '{focus, naming, confirming}'))" yt_is '.focus == "sidebar" and .naming == "" and .confirming == false and .view == "saved"'
+wtype -k Escape
+until_ok 1000 yt_is '.view == "search"'
 wtype -k Escape
 until_ok 3000 yt_gone
 

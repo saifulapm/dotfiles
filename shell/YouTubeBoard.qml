@@ -18,6 +18,7 @@ Rectangle {
     readonly property string bodyFont: (bracket ? yt.fonts.mono : yt.fonts.ui) ?? ""
     readonly property color ruleColor: (caps ? c.ink : c.line) ?? "gray"
     readonly property bool fieldFocused: field.activeFocus
+    readonly property bool nameFocused: nameInput.activeFocus
     readonly property string queryText: field.text
     // Search draws no empty text but an opened channel's once it has answered with no uploads.
     readonly property var emptyText: yt.view !== "search" ? yt.look.empty(yt.view) : yt.opened && yt.opened.kind === "channel" && !yt.opened.list.loading && yt.failed === null ? yt.look.empty("channel") : null
@@ -32,6 +33,11 @@ Rectangle {
         keyTarget.forceActiveFocus();
     }
 
+    function focusName(text) {
+        nameInput.text = text;
+        nameInput.forceActiveFocus();
+    }
+
     function state() {
         const sidebar = [];
         if (libraryLabel.visible)
@@ -43,6 +49,9 @@ Rectangle {
             sidebar.push(listList.itemAt(i).drawn());
         if (noneLine.visible)
             sidebar.push([noneKey.text, noneRest.text].filter(t => t).join(" "));
+        let asked = null;
+        for (let i = 0; i < listList.count; i++)
+            asked = asked || listList.itemAt(i).asked();
         const drawn = [];
         for (let i = 0; i < rowList.count; i++) {
             const row = rowList.itemAtIndex(i);
@@ -50,6 +59,9 @@ Rectangle {
                 drawn.push(row.drawn());
         }
         return {
+            nameField: nameBox.visible ? nameInput.text : null,
+            confirm: asked,
+            dimmed: listColumn.opacity < 1,
             drawn: rowList.visible ? drawn : [],
             // The list's own cursor and the rows at its top and bottom edges, so a check sees that a page landing below kept the cursor in view.
             listed: {
@@ -107,6 +119,15 @@ Rectangle {
         Keys.onPressed: event => {
             const k = event.key;
             const t = event.text;
+            // While x asks, only y and Esc answer it.
+            if (board.yt.confirming) {
+                if (t === "y")
+                    board.yt.deleteNow();
+                else if (k === Qt.Key_Escape)
+                    board.yt.confirming = false;
+                event.accepted = true;
+                return;
+            }
             if (t === "/")
                 board.yt.focusField();
             else if (k === Qt.Key_Tab || k === Qt.Key_Backtab)
@@ -133,6 +154,12 @@ Rectangle {
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
             else if (t === "a" && board.yt.pane === "list")
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "add");
+            else if (t === "n" && board.yt.pane === "sidebar")
+                board.yt.startName("new");
+            else if (t === "e" && board.yt.pane === "sidebar" && board.yt.playlist)
+                board.yt.startName(board.yt.playlistId);
+            else if (t === "x" && board.yt.pane === "sidebar" && board.yt.playlist)
+                board.yt.confirming = true;
             else if (k === Qt.Key_Space)
                 board.yt.queueCommand(Q.pauseLine(board.yt.queue));
             else if (t === "r")
@@ -288,11 +315,50 @@ Rectangle {
                         delegate: sideRow
                     }
 
+                    // n and e name a Playlist here: Enter keeps a name with something in it, Esc leaves things as they were.
+                    Rectangle {
+                        id: nameBox
+                        visible: board.yt.naming !== ""
+                        Layout.fillWidth: true
+                        Layout.topMargin: 4
+                        implicitHeight: plain ? 36 : 32
+                        radius: plain ? 10 : 0
+                        color: plain ? look.tint.field : "transparent"
+                        border.width: plain ? 1.5 : 1
+                        border.color: (caps ? c.ink : c.accent) ?? "black"
+
+                        TextInput {
+                            id: nameInput
+                            anchors.fill: parent
+                            anchors.leftMargin: 10
+                            anchors.rightMargin: 10
+                            verticalAlignment: TextInput.AlignVCenter
+                            clip: true
+                            color: c.ink ?? "black"
+                            selectionColor: c.accent ?? "red"
+                            selectedTextColor: c.surface ?? "white"
+                            font.family: board.bodyFont
+                            font.pixelSize: 13
+                            Keys.onEscapePressed: board.yt.cancelName()
+                            onAccepted: board.yt.commitName(text)
+
+                            Text {
+                                anchors.fill: parent
+                                verticalAlignment: Text.AlignVCenter
+                                visible: nameInput.text === ""
+                                textFormat: Text.PlainText
+                                text: look.namePlaceholder
+                                color: c.muted ?? "gray"
+                                font: nameInput.font
+                            }
+                        }
+                    }
+
                     // A view or a Playlist in the sidebar: its icon, its name on one line, and its count.
                     Component {
                         id: sideRow
 
-                        Rectangle {
+                        ColumnLayout {
                             id: place
                             required property var modelData
                             readonly property bool chosen: board.yt.sideKey === modelData.key
@@ -302,6 +368,17 @@ Rectangle {
                                 return [placeName.text, placeCount.text].filter(t => t).join(" ");
                             }
 
+                            // The question x asks under the row, or null while none is asked.
+                            function asked() {
+                                return confirmBox.visible ? [confirmText.text].concat(Array.from({
+                                    length: confirmKeys.count
+                                }, (_, i) => confirmKeys.itemAt(i).text)) : null;
+                            }
+
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                        Rectangle {
                             Layout.fillWidth: true
                             implicitHeight: plain ? 38 : 34
                             radius: plain ? 10 : 0
@@ -369,6 +446,86 @@ Rectangle {
                                 }
                             }
                         }
+
+                        // x asks under the row: Paper's box ruled in its accent, Artboard's orange card, Blueprint's amber box with its mark.
+                        Rectangle {
+                            id: confirmBox
+                            visible: place.chosen && board.yt.confirming
+                            Layout.fillWidth: true
+                            Layout.topMargin: 4
+                            Layout.bottomMargin: 6
+                            implicitHeight: confirmColumn.implicitHeight + 18
+                            radius: plain ? 10 : 0
+                            color: (plain ? look.tint.errFill : caps ? c.surface : "transparent") ?? "transparent"
+                            border.width: plain ? 0 : 1
+                            border.color: (bracket ? look.tint.warn : c.accent) ?? "red"
+
+                            Column {
+                                id: confirmColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: 9
+                                spacing: 8
+
+                                Text {
+                                    id: confirmText
+                                    width: parent.width
+                                    textFormat: Text.PlainText
+                                    text: board.yt.playlist ? look.confirm.question(board.yt.playlist.name, board.yt.playlist.count) : ""
+                                    wrapMode: Text.Wrap
+                                    maximumLineCount: 3
+                                    elide: Text.ElideRight
+                                    color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: bracket ? 12 : 11
+                                    font.weight: plain ? Font.Bold : Font.Normal
+                                }
+                                Row {
+                                    spacing: plain ? 6 : 14
+
+                                    Repeater {
+                                        id: confirmKeys
+                                        model: look.confirm.keys
+
+                                        Rectangle {
+                                            required property var modelData
+                                            required property int index
+                                            readonly property string text: modelData.key + " " + modelData.word
+                                            implicitWidth: confirmRow.implicitWidth + (plain ? 14 : 0)
+                                            implicitHeight: confirmRow.implicitHeight + (plain ? 6 : 0)
+                                            radius: 6
+                                            color: plain ? c.surface ?? "white" : "transparent"
+
+                                            Row {
+                                                id: confirmRow
+                                                anchors.centerIn: parent
+                                                spacing: 5
+
+                                                Text {
+                                                    textFormat: Text.PlainText
+                                                    text: modelData.key
+                                                    color: (plain ? look.tint.errInk : bracket || index === 0 ? c.accent : c.ink) ?? "black"
+                                                    font.family: board.bodyFont
+                                                    font.pixelSize: 11
+                                                    font.weight: Font.Bold
+                                                    font.letterSpacing: bracket ? 1.54 : 0
+                                                }
+                                                Text {
+                                                    textFormat: Text.PlainText
+                                                    text: modelData.word
+                                                    color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                                    font.family: board.bodyFont
+                                                    font.pixelSize: 11
+                                                    font.letterSpacing: bracket ? 1.54 : 0
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        }
                     }
 
                     // n makes one, while there is none: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
@@ -432,7 +589,10 @@ Rectangle {
                 }
 
                 ColumnLayout {
+                    id: listColumn
                     anchors.fill: parent
+                    // The list beside a delete question dims until it is answered.
+                    opacity: board.yt.confirming ? (plain ? 0.45 : 0.4) : 1
                     anchors.leftMargin: bracket ? 8 : 18
                     anchors.rightMargin: bracket ? 8 : 18
                     anchors.topMargin: bracket ? 8 : 0
@@ -1053,7 +1213,7 @@ Rectangle {
 
             Repeater {
                 id: legendList
-                model: look.legend(board.yt.view, board.failing)
+                model: look.legend(board.yt.view, board.failing, board.yt.focusAt)
 
                 Rectangle {
                     required property var modelData
