@@ -5,8 +5,13 @@ const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 // An item holds what a row draws, so no view needs the network to draw it.
 const FIELDS = ['id', 'title', 'channel', 'duration', 'thumb'];
 
-// A missing deleted is false: the file written before Playlists could be made has none.
-const live = (list) => Object.values(list.items).filter((it) => !it.deleted).sort((a, b) => a.pos - b.pos);
+const num = (v) => (typeof v === 'number' ? v : 0);
+
+// A missing deleted is false: the file written before Playlists could be made has none. Two machines can each add a video at one position, so the id settles their order alike on both.
+const live = (list) =>
+  Object.values(list.items)
+    .filter((it) => !it.deleted)
+    .sort((a, b) => num(a.pos) - num(b.pos) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 const saved = () => ({ id: 'saved', name: 'Saved', updatedAt: 0, items: {} });
 
@@ -25,6 +30,9 @@ export function parse(text) {
   return s.playlists.saved ? s : Object.assign({}, s, { playlists: Object.assign({}, s.playlists, { saved: saved() }) });
 }
 
+// dots-sync-merge reads every unit's store by this name.
+export const parseStore = parse;
+
 export const serialize = (store) => JSON.stringify(store, null, 1) + '\n';
 
 const put = (store, id, list) => Object.assign({}, store, { playlists: Object.assign({}, store.playlists, { [id]: list }) });
@@ -40,7 +48,7 @@ export function rename(store, id, name, now) {
   const list = store.playlists[id];
   const n = String(name).trim();
   if (n === '' || id === 'saved' || !list || list.deleted) return store;
-  return put(store, id, Object.assign({}, list, { name: n, updatedAt: now }));
+  return put(store, id, Object.assign({}, list, { name: n, nameAt: now, updatedAt: now }));
 }
 
 // A removed Playlist stays as a tombstone so a later sync can tell it was deleted, not never made.
@@ -122,3 +130,39 @@ export function playlists(store) {
       return { id: l.id, name: l.name, count: its.length, secs: its.reduce((sum, it) => sum + (typeof it.duration === 'number' ? it.duration : 0), 0) };
     });
 }
+
+// The newer of two copies of one record; at the same stamp the larger text wins, so both machines pick alike.
+function later(a, b, stamp) {
+  const d = stamp(a) - stamp(b);
+  if (d) return d > 0 ? a : b;
+  return JSON.stringify(a) >= JSON.stringify(b) ? a : b;
+}
+
+// a's keys first, then b's new ones, so merging a store with itself writes the same bytes.
+function mergeById(a, b, fn) {
+  const out = {};
+  for (const k of Object.keys(a)) out[k] = k in b ? fn(a[k], b[k]) : a[k];
+  for (const k of Object.keys(b)) if (!(k in a)) out[k] = b[k];
+  return out;
+}
+
+const nameAt = (l) => num(l.nameAt !== undefined ? l.nameAt : l.createdAt);
+
+// An item is taken whole from its newer copy, a removal included; a name from the copy that set it last. A Playlist deleted anywhere stays deleted, as nothing makes it again under its id; Saved is never renamed or deleted.
+function mergeList(a, b) {
+  const items = mergeById(a.items, b.items, (x, y) => later(x, y, (it) => num(it.updatedAt)));
+  const out = Object.assign({}, a, { updatedAt: Math.max(num(a.updatedAt), num(b.updatedAt)), items });
+  if (a.id === 'saved') {
+    if (out.name !== 'Saved') out.name = 'Saved';
+    if (out.deleted) delete out.deleted;
+    return out;
+  }
+  const named = later(a, b, nameAt);
+  out.name = named.name;
+  if (a.nameAt !== undefined || b.nameAt !== undefined) out.nameAt = nameAt(named);
+  if (a.deleted || b.deleted) out.deleted = true;
+  return out;
+}
+
+// The sync merge: per Playlist and per item by id, so a video added on one machine and another removed on a second both survive.
+export const mergeStores = (a, b) => Object.assign({}, a, { playlists: mergeById(a.playlists, b.playlists, mergeList) });

@@ -202,3 +202,92 @@ test('a store written by the old code parses and its Saved items list', () => {
   assert.equal(P.holds(s, 'saved', 'a'), true);
   assert.deepEqual(ids(P.move(s, 'saved', 'a', 1, 9), 'saved'), ['b', 'a']);
 });
+
+// Two machines that last synced on base each edit, then each merges the other's file: both must end the same.
+const both = (a, b) => {
+  const ab = P.mergeStores(a, b);
+  const ba = P.mergeStores(b, a);
+  assert.deepEqual(P.playlists(ab), P.playlists(ba));
+  for (const id of Object.keys(ab.playlists)) assert.deepEqual(ids(ab, id), ids(ba, id));
+  return ab;
+};
+const focus = () => {
+  let s = P.create(P.emptyStore(), 'focus', 'Focus', 100);
+  s = P.addMany(s, 'focus', ['v1', 'v2', 'v3', 'v4'].map((id) => video(id)), 100);
+  return P.create(s, 'gym', 'Gym', 101);
+};
+
+test('a video added on one machine and another removed on a second both survive the merge', () => {
+  const base = focus();
+  const a = P.add(base, 'focus', video('x'), 1000);
+  const b = P.removeItem(base, 'focus', 'v2', 1001);
+  const m = both(a, b);
+  assert.deepEqual(ids(m, 'focus'), ['v1', 'v3', 'v4', 'x']);
+  // A second round, each merging the result, changes nothing.
+  assert.deepEqual(P.mergeStores(m, a), m);
+  assert.deepEqual(P.mergeStores(m, b), m);
+});
+
+test('a move merges by last write: the later of two moves of one video wins on both', () => {
+  const base = focus();
+  const a = P.move(base, 'focus', 'v3', -1, 1000);
+  const b = P.move(base, 'focus', 'v3', 1, 1001);
+  assert.deepEqual(ids(a, 'focus'), ['v1', 'v3', 'v2', 'v4']);
+  assert.deepEqual(ids(both(a, b), 'focus'), ['v1', 'v2', 'v4', 'v3']);
+});
+
+test('a name merges by last write, even when the other machine changed the Playlist later', () => {
+  const base = focus();
+  const b = P.add(P.rename(base, 'focus', 'Work', 1000), 'focus', video('y'), 3000);
+  const a = P.rename(base, 'focus', 'Deep focus', 2000);
+  const m = both(a, b);
+  assert.deepEqual(P.playlists(m).map((l) => l.name), ['Deep focus', 'Gym']);
+  assert.deepEqual(ids(m, 'focus'), ['v1', 'v2', 'v3', 'v4', 'y']);
+});
+
+test('a Playlist deleted on one machine stays gone though the other added to it or renamed it later', () => {
+  const base = focus();
+  const a = P.remove(base, 'gym', 1000);
+  const b = P.rename(P.add(base, 'gym', video('z'), 2000), 'gym', 'Lifting', 2001);
+  assert.deepEqual(P.playlists(both(a, b)).map((l) => l.name), ['Focus']);
+});
+
+test('the same video added on two machines in one round is one item, and items at one position list alike on both', () => {
+  const base = focus();
+  const a = P.add(P.add(base, 'focus', video('x'), 1000), 'focus', video('p'), 1002);
+  const b = P.add(P.add(base, 'focus', video('q'), 1001), 'focus', video('x'), 1003);
+  const m = both(a, b);
+  assert.deepEqual(ids(m, 'focus').filter((id) => id === 'x'), ['x']);
+  assert.equal(ids(m, 'focus').length, 7);
+});
+
+test('a video removed on one machine and added again later on another comes back', () => {
+  const base = focus();
+  const a = P.removeItem(base, 'focus', 'v1', 1000);
+  const b = P.add(P.removeItem(base, 'focus', 'v1', 900), 'focus', video('v1'), 2000);
+  assert.deepEqual(ids(both(a, b), 'focus'), ['v2', 'v3', 'v4', 'v1']);
+});
+
+test('Saved is never deleted or renamed by a merge', () => {
+  const forged = JSON.parse(JSON.stringify(focus()));
+  Object.assign(forged.playlists.saved, { name: 'Mine', nameAt: 9e12, deleted: true, updatedAt: 9e12 });
+  for (const m of [P.mergeStores(focus(), forged), P.mergeStores(forged, focus())]) {
+    assert.equal(m.playlists.saved.name, 'Saved');
+    assert.notEqual(m.playlists.saved.deleted, true);
+  }
+});
+
+test('merging a store with itself leaves its file byte for byte unchanged', () => {
+  let s = P.removeItem(P.remove(focus(), 'gym', 200), 'focus', 'v2', 201);
+  s = P.rename(P.add(s, 'saved', video('s1'), 202), 'focus', 'Deep focus', 203);
+  const text = P.serialize(s);
+  assert.equal(P.serialize(P.mergeStores(P.parseStore(text), P.parseStore(text))), text);
+});
+
+test('a store written by the old code merges with a new one without losing an item', () => {
+  const old = P.parse('{"version":1,"playlists":{"saved":{"id":"saved","name":"Saved","updatedAt":5,"items":{"a":{"id":"a","title":"T","channel":"C","duration":9,"thumb":"a","pos":1,"updatedAt":5},"b":{"id":"b","title":"U","channel":"C","duration":9,"thumb":"b","updatedAt":5}}}}}');
+  const m = both(old, focus());
+  assert.deepEqual(ids(m, 'saved'), ['b', 'a']);
+  assert.deepEqual(P.playlists(m).map((l) => l.name), ['Focus', 'Gym']);
+  assert.equal(P.serialize(P.mergeStores(old, old)), P.serialize(old));
+});
