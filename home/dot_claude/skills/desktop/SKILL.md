@@ -94,18 +94,23 @@ tmux kill-session -t agent-x                  # always
 ```sh
 gui apps                      # apps on the a11y bus
 gui tree <app>                # JSON: interactive widgets, boxes, checked/focused/... states
-gui click <app> 'Save'        # activates it, {"ok": true}; exit 1 when the widget refused it
-gui type <app> 'Search' 'foo' # sets an entry's text, then reads it back for "delivery"
+gui click <app> 'Save'        # activates it, then reads it back for "delivery"
+gui type <app> 'Search' 'foo' # sets an entry's text, the same way
+gui get <app> 'Search' text   # one of text, states or box; all three without it
 gui text <app>                # every readable string
 ```
 
-`type` reads the field after it writes, from 300 ms to 2 s: `"delivery":
-"verified"` read back; `"not_delivered"` the field kept its old text, exit
-1, the only answer with `"retry_safe": true`; `"unverified"` anything else.
-An unverified write may still land (an app that stopped applies it when it
-resumes), so never send it again: look with `gui tree` or a shot. A field
-that is not editable, or is read-only, is refused with exit 3, and the typed
-text never appears in the output or the journal, only `"matched"`.
+`click` and `type` read the widget after they act, from 300 ms to 2 s:
+`"delivery": "verified"` the field reads the text, or a check box, toggle or
+expander changed state; `"not_delivered"` nothing changed or the widget
+refused, exit 1, the only answer with `"retry_safe": true`; `"unverified"`
+anything else, a plain button's click among them. An unverified action may
+still land (an app that stopped applies it when it resumes), so never send
+it again: look with `gui tree` or a shot. `type` refuses a field that is not
+editable, or is read-only, with exit 3, and the typed text never appears in
+the output or the journal, only `"matched"`; `get` withholds a password
+field's text. A GTK4 check box offers no action at all, so `click` exits 4
+on it: use pixels.
 
 `tree` prints at most 1000 nodes and 32 KB; a longer tree is written whole
 to the file its `"spill"` names, with the same `i` for each node. Read the

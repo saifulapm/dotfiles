@@ -9,6 +9,7 @@ Chromium need --force-renderer-accessibility to appear.
   gui tree <app> [--all]        interactive widgets as one JSON object (--all = every node)
   gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
+  gui get <app> <text> [text|states|box]   one property, or all three (a password field's text is withheld)
   gui click <app> <text> [--any] [--then shot|windows|tree]       activate the first match semantically
   gui type <app> <text> <val> [--any] [--then shot|windows|tree]  set an entry's text
   gui text <app>                all readable text in the app
@@ -82,14 +83,12 @@ def nothing(msg):
     sys.exit(4)
 
 
-def toplevel(node):
-    """The window holding node: the ancestor whose parent is the application."""
+def toplevel(app, path):
+    """The window holding the node at path: the app's child it was walked down from, since GTK's parents disagree with its child lists."""
     try:
-        while node.get_parent() and node.get_parent().get_role_name() != "application":
-            node = node.get_parent()
+        return app.get_child_at_index(path[0])
     except Exception:
-        pass
-    return node
+        return None
 
 
 def unlocked():
@@ -122,20 +121,21 @@ def guard():
     no_prompt()
 
 
-def confine(app, node):
-    """Returns only when node sits in an agent window, noting the action there; else refuses with exit 3."""
+def confine(app, path):
+    """Returns only when the node at path sits in an agent window, noting the action there; else refuses with exit 3."""
     global seen
     desk = load_desk()
-    pid, title = app.get_process_id(), toplevel(node).get_name() or ""
+    window = toplevel(app, path)
+    pid, title = app.get_process_id(), (window.get_name() if window else "") or ""
     hits = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
     seen = {k: hits[0][k] for k in ("id", "app_id", "title")} if hits else {"pid": pid, "title": title}
-    for w in hits:
-        if w["agent"]:
-            seen = {k: w[k] for k in ("id", "app_id", "title")}
-            desk.note("act", str(w["id"]))
-            return
-    print(json.dumps({"refused": "not an agent window", "window": seen}))
-    sys.exit(3)
+    agents = [w for w in hits if w["agent"]]
+    # Two windows of one app with one title are one to AT-SPI, so either could be the agent's.
+    if len(agents) < len(hits):
+        print(json.dumps({"refused": "not an agent window" if not agents else "windows share a title", "window": seen}))
+        sys.exit(3)
+    seen = {k: agents[0][k] for k in ("id", "app_id", "title")}
+    desk.note("act", str(agents[0]["id"]))
 
 
 def apps():
@@ -159,8 +159,8 @@ def find_app(pattern):
     return hits[0]
 
 
-def walk(node, want=None, depth=0, budget=None):
-    """Yield (depth, node) for the subtree, cheapest-first and bounded."""
+def walk(node, want=None, path=(), budget=None):
+    """Yield (path, node) for the subtree, path the child indexes from node down; cheapest-first and bounded."""
     if budget is None:
         budget = [MAX_NODES]
     if budget[0] <= 0:
@@ -169,9 +169,9 @@ def walk(node, want=None, depth=0, budget=None):
     try:
         role = node.get_role_name()
         if want is None or role in want:
-            yield depth, node
+            yield path, node
         for i in range(node.get_child_count()):
-            yield from walk(node.get_child_at_index(i), want, depth + 1, budget)
+            yield from walk(node.get_child_at_index(i), want, path + (i,), budget)
     except Exception:
         return  # a widget can vanish mid-walk; that is not an error
 
@@ -203,13 +203,13 @@ FLAGS = {"checked", "pressed", "selected", "focused", "expanded", "sensitive"}
 
 
 def numbered(app, want=None):
-    """Yield (i, depth, node) for every node under app; i counts the whole walk, whatever want keeps."""
+    """Yield (i, path, node) for every node under app; i counts the whole walk, whatever want keeps."""
     i = 0
-    for depth, node in walk(app):
+    for path, node in walk(app):
         if node is app:
             continue
         if want is None or node.get_role_name() in want:
-            yield i, depth, node
+            yield i, path, node
         i += 1
 
 
@@ -246,7 +246,7 @@ def entry(i, depth, node):
 
 def tree(app, everything):
     """The app's widgets as a dict; past 1000 nodes or 32 KB the dict is cut and the whole tree is in the "spill" file."""
-    nodes = [entry(i, d, n) for i, d, n in numbered(app, None if everything else INTERACTIVE)]
+    nodes = [entry(i, len(p), n) for i, p, n in numbered(app, None if everything else INTERACTIVE)]
     head = {"app": app.get_name() or "", "pid": app.get_process_id(), "count": len(nodes)}
     whole = dict(head, nodes=nodes)
     # Every tree replaces the spill before it, whether it spills or not.
@@ -336,6 +336,40 @@ def write(node, editable, value):
     return delivery("unverified", matched=False)
 
 
+TOGGLES = {"check box", "toggle button", "radio button", "check menu item", "radio menu item"}
+SHOWN = {"checked", "pressed", "expanded"}  # what a toggle's or an expander's click changes
+
+
+def shown(node):
+    """The node's checked, pressed and expanded states; raises when the app does not answer."""
+    return {s.value_nick for s in node.get_state_set().get_states()} & SHOWN
+
+
+def press(node, action, index):
+    """Runs the action, then judges a toggle or expander by its state; a plain click stays unverified."""
+    st = states(node)
+    toggle = node.get_role_name() in TOGGLES or bool(st & (SHOWN | {"checkable", "expandable"}))
+    before = st & SHOWN
+    try:
+        if not Atspi.Action.do_action(action, index):
+            return delivery("not_delivered", "action_refused")
+    except Exception as e:
+        return delivery("unverified", "timeout") if timed_out(e) else delivery("not_delivered", "action_refused")
+    if not toggle:
+        return delivery("unverified")
+    t0 = time.monotonic()
+    time.sleep(READ_FROM_S)
+    while True:
+        try:
+            if shown(node) != before:
+                return delivery("verified")
+        except Exception as e:
+            return delivery("unverified", "timeout" if timed_out(e) else None)
+        if time.monotonic() - t0 >= READ_UNTIL_S:
+            return delivery("not_delivered", "state_unchanged")
+        time.sleep(READ_EVERY_S)
+
+
 def matches(node, text):
     haystack = (node.get_name() or "") + " " + (node.get_role_name() or "")
     return text.lower() in haystack.lower()
@@ -413,17 +447,42 @@ def main(argv):
     if len(argv) < 4:
         usage()
     needle = argv[3]
-    hits = [(i, n) for i, _, n in numbered(app) if matches(n, needle)]
+    hits = [(i, p, n) for i, p, n in numbered(app) if matches(n, needle)]
 
     if cmd == "find":
         if not hits:
             nothing(f"nothing matching {needle!r}")
-        for _, node in hits[:20]:
+        for _, _, node in hits[:20]:
             print(describe(node))
         return
 
+    if cmd == "get":
+        what = argv[4:] or ["text", "states", "box"]
+        if len(what) > 1 and len(argv) > 4 or what[0] not in ("text", "states", "box"):
+            usage()
+        if not hits:
+            nothing(f"nothing matching {needle!r}")
+        i, _, node = hits[0]
+        out = {"widget": widget(i, node)}
+        if "text" in what:
+            # A password field's text never leaves it, whatever asks.
+            if node.get_role_name() == "password text":
+                out.update(text=None, withheld=True)
+            else:
+                try:
+                    out["text"] = read_text(node)
+                except Exception:
+                    out["text"] = None
+        if "states" in what:
+            out["states"] = sorted(states(node))
+        if "box" in what:
+            box = coords(node)
+            out["box"] = list(box) if box else None
+        print(json.dumps(out))
+        return
+
     if cmd == "click":
-        for i, node in hits:
+        for i, path, node in hits:
             try:
                 action = node.get_action()
                 names = [
@@ -436,21 +495,18 @@ def main(argv):
                 continue
             # "click" where offered, else the first action the widget has.
             index = names.index("click") if "click" in names else 0
+            w = widget(i, node)
             if not anywhere:
-                confine(app, node)
+                confine(app, path)
             guard()
-            try:
-                ok = bool(Atspi.Action.do_action(action, index))
-            except Exception:
-                ok = False
-            finish({"ok": ok, "action": names[index], "widget": widget(i, node)}, then, app)
+            finish({**press(node, action, index), "action": names[index], "widget": w}, then, app)
         nothing(f"nothing clickable matching {needle!r}")
 
     if cmd == "type":
         if len(argv) < 5:
             usage()
         value = argv[4]
-        for i, node in hits:
+        for i, path, node in hits:
             try:
                 editable = node.get_editable_text()
             except Exception:
@@ -460,7 +516,7 @@ def main(argv):
             # Read before the write: an app that stops on it answers nothing after.
             w = widget(i, node)
             if not anywhere:
-                confine(app, node)
+                confine(app, path)
             guard()
             # Editable set and read-only clear, whatever interfaces the widget has.
             st = states(node)

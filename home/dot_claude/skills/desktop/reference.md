@@ -15,6 +15,7 @@ call, `gui click|type`) refuses with exit 3 and prints
 | `jev not granted` | `screen find` or `screen check` ran without `--jev` | pass `--jev` only if the brief says "JEV allowed"; else use `gui` or OCR |
 | `overview open` | `screen find` or `check` without `--any` while niri's overview shows every workspace | retry once it is closed; the overview may be Saiful's, so if the agent did not open it, hand back |
 | `not an agent window` | the focused window (keys) or the window under the point (clicks) is not one `screen launch` opened; for `screen find` and `check`, any window on the focused output's active workspace that is not | `screen launch` the app, or `--any` if the brief grants it |
+| `windows share a title` | `gui click` or `type` in an app with two windows of one title, only one of them an agent window: AT-SPI cannot tell them apart | close the other window or rename yours; hand back if the other is Saiful's |
 | `not editable` | `gui type` on a field without the editable state, or with read-only | find the right field in `gui tree`; never type into it another way |
 | `no window` | no window under the point, or none focused | re-read `niri msg -j windows`, re-shoot |
 | `no answer` | `mouse` got no answer from niri's pick-window in 500 ms | retry once, then hand back |
