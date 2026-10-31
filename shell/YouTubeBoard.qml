@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "lib/youtube-queue.mjs" as Q
 
 // The YouTube window as each theme's board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
 Rectangle {
@@ -111,6 +112,10 @@ Rectangle {
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
             else if (t === "a" && board.yt.pane === "list")
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "add");
+            else if (k === Qt.Key_Space)
+                board.yt.queueCommand(Q.pauseLine(board.yt.queue));
+            else if (t === "r")
+                board.yt.queueCommand(Q.repeatLine(board.yt.queue));
             else
                 return;
             event.accepted = true;
@@ -956,7 +961,7 @@ Rectangle {
             Text {
                 id: repeatText
                 textFormat: Text.PlainText
-                text: look.repeat
+                text: look.repeat(board.yt.queue.loop)
                 color: c.muted ?? "gray"
                 font.family: board.bodyFont
                 font.pixelSize: plain ? 12 : 11

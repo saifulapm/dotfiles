@@ -12,21 +12,21 @@ test("Paper's title strip is a small caps label over a serif view name, and its 
   const p = look('paper');
   assert.deepEqual([p.title.label, p.title.from, p.viewFont, p.viewSize], ['YOUTUBE', 'from the launcher', 'Instrument Serif', 18]);
   assert.deepEqual(legend(p, 'search'), ['J/K MOVE', '↵ PLAY VIDEO', 'M PLAY AUDIO', 'A ADD TO QUEUE', 'S SAVE', 'P ADD TO PLAYLIST', 'D/D DOWNLOAD AUDIO/VIDEO', '/ SEARCH', 'TAB SIDEBAR', 'ESC BACK']);
-  assert.deepEqual([p.fieldRadius, p.ruleDashed, p.library, p.typeLabel, p.chips[0], p.results, p.repeat], [0, false, '', 'TYPE', 'Videos', 'RESULTS', 'repeat off']);
+  assert.deepEqual([p.fieldRadius, p.ruleDashed, p.library, p.typeLabel, p.chips[0], p.results, p.repeat(false), p.repeat(true)], [0, false, '', 'TYPE', 'Videos', 'RESULTS', 'repeat off', 'repeat on']);
 });
 
 test("Artboard's title strip pills YouTube beside a bold view name, and its field and rows are rounded", () => {
   const a = look('artboard');
   assert.deepEqual([a.title.label, a.title.from, a.viewFont, a.viewSize], ['YouTube', 'from the launcher', 'Maple Mono', 14]);
   assert.deepEqual(legend(a, 'search'), ['j/k move', '↵ play video', 'm play audio', 'a add to queue', 's save', 'p add to playlist', 'd/D download audio/video', '/ search', 'tab sidebar', 'esc back']);
-  assert.deepEqual([a.fieldRadius, a.rowRadius, a.ruleDashed, a.typeLabel, a.chips[0], a.results, a.repeat], [14, 10, false, '', 'Videos', 'Results', 'repeat off']);
+  assert.deepEqual([a.fieldRadius, a.rowRadius, a.ruleDashed, a.typeLabel, a.chips[0], a.results, a.repeat(false), a.repeat(true)], [14, 10, false, '', 'Videos', 'Results', 'repeat off', 'repeat on']);
 });
 
 test("Blueprint writes its keys bracketed in upper case, its chips in caps, and dashes its rules", () => {
   const b = look('blueprint');
   assert.deepEqual([b.title.label, b.title.from, b.viewFont, b.viewSize], ['YOUTUBE', 'FROM THE LAUNCHER', 'Maple Mono', 12]);
   assert.deepEqual(legend(b, 'search'), ['[J/K] MOVE', '[↵] PLAY VIDEO', '[M] PLAY AUDIO', '[A] ADD TO QUEUE', '[S] SAVE', '[P] ADD TO PLAYLIST', '[D/⇧D] DOWNLOAD AUDIO / VIDEO', '[/] SEARCH', '[TAB] SIDEBAR', '[ESC] BACK']);
-  assert.deepEqual([b.fieldRadius, b.ruleDashed, b.library, b.hint, b.chips, b.results, b.repeat], [0, true, 'LIBRARY', '[/]', ['VIDEOS', 'PLAYLISTS', 'CHANNELS'], 'RESULTS', 'REPEAT OFF']);
+  assert.deepEqual([b.fieldRadius, b.ruleDashed, b.library, b.hint, b.chips, b.results, b.repeat(false), b.repeat(true)], [0, true, 'LIBRARY', '[/]', ['VIDEOS', 'PLAYLISTS', 'CHANNELS'], 'RESULTS', 'REPEAT OFF', 'REPEAT ON']);
 });
 
 test('an empty view names the key that fills it, and its legend keeps search, sidebar and back', () => {

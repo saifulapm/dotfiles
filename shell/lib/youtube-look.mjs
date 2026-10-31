@@ -40,7 +40,8 @@ export function youtubeLook(tokens) {
     typeLabel: plain ? '' : 'TYPE',
     chips: ['Videos', 'Playlists', 'Channels'].map((w) => (bracket ? w.toUpperCase() : w)),
     results: plain ? 'Results' : 'RESULTS',
-    repeat: bracket ? 'REPEAT OFF' : 'repeat off',
+    // The now-playing line's right side, as the Queue's loop-playlist reads.
+    repeat: (on) => (bracket ? (on ? 'REPEAT ON' : 'REPEAT OFF') : on ? 'repeat on' : 'repeat off'),
     // A failed search's list is its error block, so only try again and the moves away act on it.
     legend(view, failed) {
       const keys = l.keys(view !== 'search' ? EMPTY_KEYS : failed ? FAILED_KEYS : SEARCH_KEYS);

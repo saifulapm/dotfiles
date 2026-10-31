@@ -51,7 +51,7 @@ check "and no video window opened ($(mpv_windows))" test "$(mpv_windows)" = 0
 check "state() reports the Queue beside the line ($(yt_state | jq -c '.queue | {pos, count, paused, title, channel, secs}'))" \
   yt_is '.queue.pos == 0 and .queue.count == 1 and .queue.paused == false and .queue.title == "Aruarian Dance" and .queue.channel == "Nujabes - Topic" and .queue.secs == 267'
 
-wtype j a j a
+wtype jaja
 ends_two() { line_is ' · \+2$'; }
 until_ok 5000 ends_two
 check "a on two more rows ends the line +2 ($(line))" ends_two
@@ -73,7 +73,7 @@ check "and the line reads it ($(line))" line_is '^▶ Luv\(sic\) Part 3 — Nuja
 
 systemctl --user stop youtube-audio
 until_ok 3000 line_is '^$'
-wtype k k k k k
+wtype kkkkk
 until_ok 1000 yt_is '.cursor == 0'
 before=$(queue_starts)
 wtype "$(printf 'aj%.0s' {1..20})"

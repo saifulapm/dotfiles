@@ -119,6 +119,12 @@ ShellRoot {
         });
     }
 
+    // Space and r: a command with no Queue connected has nothing to reach.
+    function queueCommand(line) {
+        if (link.status === "up")
+            writeQueue([line]);
+    }
+
     function writeQueue(lines) {
         if (lines.length === 0)
             return;
