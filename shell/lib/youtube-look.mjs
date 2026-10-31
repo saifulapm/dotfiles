@@ -2,8 +2,8 @@
 import { listLook } from './voice.mjs';
 import { EMPTY } from './youtube.mjs';
 
-// The boards' tints, which no token carries: Paper's chosen place and row rule, Artboard's accent tint, field, tiles and thumbnail; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
-const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1' };
+// The boards' tints, which no token carries: Paper's chosen place, row rule and light ink on a lit row, Artboard's accent tint, field, tiles and thumbnail; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
+const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1' };
 
 const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['s', 'save'], ['p', 'add to playlist'], ['d/D', 'download audio/video'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // Blueprint marks the shifted key and spaces the slash in its download pair.

@@ -5,6 +5,7 @@ import QtQuick
 import "services" as Services
 import "lib/status.mjs" as Status
 import "lib/youtube-look.mjs" as Y
+import "lib/youtube.mjs" as YT
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
 ShellRoot {
@@ -22,6 +23,10 @@ ShellRoot {
     // The rows the list draws, as youtube.mjs rows() makes them, and the one under the cursor.
     property var rows: []
     property int cursor: 0
+    // Each search's number: an answer from any search but the last is dropped.
+    property int searchSeq: 0
+    // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them.
+    property var thumbs: ({})
     property int savedCount: 0
     property int historyCount: 0
     // What the Queue plays, as the now-playing line writes it; empty while it is stopped.
@@ -55,6 +60,50 @@ ShellRoot {
             cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
     }
 
+    // Runs `<backend> <args>` off the render loop and hands done its one JSON answer, or null when it failed.
+    function api(args, done) {
+        const call = caller.createObject(app, {
+            command: [backend].concat(args)
+        });
+        call.done = done;
+        call.running = true;
+    }
+
+    // Enter in the field: the list takes focus at once, and the rows come when the CLI answers.
+    function search() {
+        const q = query.trim();
+        if (q === "")
+            return;
+        searchSeq += 1;
+        const seq = searchSeq;
+        focusPane("list");
+        api(["search", q, "videos", "0"], answer => {
+            if (seq !== app.searchSeq)
+                return;
+            app.rows = YT.rows(answer);
+            app.cursor = 0;
+            app.fetchThumbs(app.rows);
+        });
+    }
+
+    // One thumbs call for a list's ids; a thumb it does not name keeps its row's placeholder.
+    function fetchThumbs(list) {
+        const ids = list.map(r => r.thumb).filter((t, i, all) => t && all.indexOf(t) === i);
+        if (ids.length === 0)
+            return;
+        api(["thumbs"].concat(ids), answer => {
+            const files = answer && answer.files;
+            if (files && typeof files === "object")
+                app.thumbs = Object.assign({}, app.thumbs, files);
+        });
+    }
+
+    // The file a thumb id draws from, or "" for its placeholder.
+    function thumbSource(id) {
+        const f = thumbs[id];
+        return typeof f === "string" && f.startsWith("/") ? "file://" + f : "";
+    }
+
     // Saved and History go back to Search; Search has nothing behind it, so Esc there closes the App.
     function back() {
         if (view !== "search")
@@ -65,6 +114,23 @@ ShellRoot {
 
     Services.Theme {
         id: theme
+    }
+
+    Component {
+        id: caller
+
+        Process {
+            property var done: null
+            stdout: StdioCollector {
+                id: answerOut
+            }
+            onExited: {
+                const answer = YT.answer(answerOut.text);
+                if (done)
+                    done(answer);
+                destroy();
+            }
+        }
     }
 
     Process {
@@ -110,6 +176,7 @@ ShellRoot {
                 query: app.query,
                 rows: app.rows,
                 cursor: app.cursor,
+                searchSeq: app.searchSeq,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice

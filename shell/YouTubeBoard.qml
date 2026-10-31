@@ -34,7 +34,14 @@ Rectangle {
         for (let i = 0; i < placeList.count; i++)
             sidebar.push(placeList.itemAt(i).drawn());
         sidebar.push(playlistsLabel.text, [noneKey.text, noneRest.text].filter(t => t).join(" "));
+        const drawn = [];
+        for (let i = 0; i < rowList.count; i++) {
+            const row = rowList.itemAtIndex(i);
+            if (row)
+                drawn.push(row.drawn());
+        }
         return {
+            drawn: rowList.visible ? drawn : [],
             empty: emptyBlock.visible ? [emptyHead.text, [emptyKey.text, emptyRest.text].filter(t => t).join(" ")].filter(t => t) : [],
             look: {
                 title: [labelText.text, viewName.text, fromText.text],
@@ -392,8 +399,9 @@ Rectangle {
                             selectedTextColor: c.surface ?? "white"
                             font.family: board.bodyFont
                             font.pixelSize: caps ? 15 : 14
-                            // Esc leaves the field for the list; Enter is where a search will start.
+                            // Esc leaves the field for the list; Enter searches.
                             Keys.onEscapePressed: board.yt.focusPane("list")
+                            onAccepted: board.yt.search()
 
                             Text {
                                 id: placeholderText
@@ -545,6 +553,8 @@ Rectangle {
                         Layout.fillHeight: true
                         clip: true
                         interactive: false
+                        // A page's 20 rows stay made below the fold, so j shows a row whose thumbnail has already decoded.
+                        cacheBuffer: 20 * 55
                         model: board.yt.rows
                         currentIndex: board.yt.cursor
 
@@ -553,30 +563,61 @@ Rectangle {
                             required property var modelData
                             required property int index
                             readonly property bool lit: index === board.yt.cursor && board.yt.focusAt === "list"
+                            // The channel and duration on the lit row: Paper's light ink, Blueprint's dark surface, Artboard's grey as on any row.
+                            readonly property color litMuted: (caps ? look.tint.onInk : plain ? c.muted : c.surface) ?? "gray"
+
+                            function drawn() {
+                                return {
+                                    id: rowItem.modelData.id,
+                                    title: titleText.text,
+                                    titleLines: titleText.lineCount,
+                                    titleElided: titleText.truncated,
+                                    channel: channelText.text,
+                                    channelElided: channelText.truncated,
+                                    duration: durationText.text,
+                                    thumb: picture.drawn()
+                                };
+                            }
                             width: ListView.view.width
-                            height: plain ? 54 : 52
+                            height: plain ? 54 : bracket ? 55 : 52
                             radius: look.rowRadius
                             color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+                            // Artboard outlines the lit row in its accent.
+                            border.width: lit && plain ? 1.5 : 0
+                            border.color: c.accent ?? "blue"
 
+                            // Paper marks the lit row with a 3 px accent bar at its left.
+                            Rectangle {
+                                visible: rowItem.lit && caps
+                                width: 3
+                                height: parent.height
+                                color: c.accent ?? "red"
+                            }
+
+                            // The boards' columns: the thumbnail, the title over the channel, the download mark's slot, the duration, and Paper's 16 px end.
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 12
                                 spacing: 14
 
-                                Rectangle {
+                                YouTubeThumb {
+                                    id: picture
                                     implicitWidth: caps ? 72 : 80
                                     implicitHeight: caps ? 40 : 45
+                                    source: board.yt.thumbSource(rowItem.modelData.thumb)
+                                    kind: caps ? "hatched" : plain ? "tile" : "crossed"
                                     radius: plain ? 8 : 0
-                                    color: plain ? look.tint.thumb : "transparent"
-                                    border.width: plain ? 0 : 1
-                                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+                                    fill: (caps ? c.surface : plain ? look.tint.thumb : "transparent") ?? "transparent"
+                                    stroke: (caps ? look.tint.rule : bracket && rowItem.lit ? c.surface : c.line) ?? "gray"
+                                    edge: (caps ? c.muted : bracket && rowItem.lit ? c.surface : c.line) ?? "gray"
                                 }
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: 3
+                                    spacing: caps ? 3 : 4
 
                                     Text {
+                                        id: titleText
                                         Layout.fillWidth: true
                                         textFormat: Text.PlainText
                                         text: rowItem.modelData.title
@@ -585,30 +626,42 @@ Rectangle {
                                         color: (rowItem.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
                                         font.family: board.bodyFont
                                         font.pixelSize: plain ? 14 : 13
-                                        font.weight: Font.Medium
+                                        font.weight: plain && !rowItem.lit ? Font.Normal : bracket && rowItem.lit ? Font.Bold : Font.Medium
                                     }
                                     Text {
+                                        id: channelText
                                         Layout.fillWidth: true
                                         textFormat: Text.PlainText
                                         text: rowItem.modelData.channel
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: (rowItem.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                        color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
                                         font.family: board.bodyFont
                                         font.pixelSize: 11
+                                        font.letterSpacing: bracket ? 0.66 : 0
                                     }
                                 }
+                                Item {
+                                    visible: !caps
+                                    implicitWidth: plain ? 22 : 16
+                                }
                                 Text {
-                                    Layout.preferredWidth: 64
+                                    id: durationText
+                                    Layout.preferredWidth: bracket ? 76 : 64
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
                                     text: rowItem.modelData.duration
-                                    color: (rowItem.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                    color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 12
+                                    font.letterSpacing: bracket ? 0.72 : 0
                                     font.features: {
                                         "tnum": 1
                                     }
+                                }
+                                Item {
+                                    visible: caps
+                                    implicitWidth: 16
                                 }
                             }
                         }
