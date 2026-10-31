@@ -37,7 +37,8 @@ chmod +x "$slow"
 
 "$repo/bin/dots" theme paper >/dev/null
 until_ok 3000 status_theme paper
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv XDG_DATA_HOME=$work XDG_STATE_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+# The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 check "the App opens on Search ($(yt_state | jq -c '{view, focus}'))" yt_is '.view == "search" and .focus == "list"'
@@ -63,7 +64,7 @@ check "within 3 s every row but fakeVid0008 shows its thumbnail ($(yt_state | jq
 check "each thumbnail is its row's file ($(yt_state | jq -c '[.drawn[] | select(.thumb.shown) | .thumb.file][0:2]'))" \
   yt_is 'all(.drawn[] | select(.thumb.shown); .thumb.file == .id + ".jpg")'
 check "fakeVid0008 has no file and keeps Paper's hatched placeholder ($(yt_state | jq -c '.drawn[7] | {id, thumb}'))" \
-  yt_is '.drawn[7] | .id == "fakeVid0008" and .thumb.shown == false and .thumb.placeholder == "hatched"'
+  yt_is '.look.viewFont == "Instrument Serif" and (.drawn[7] | .id == "fakeVid0008" and .thumb.shown == false and .thumb.placeholder == "hatched")'
 check "each shown thumbnail decodes at no more than twice its drawn 72x40 ($(yt_state | jq -c '.drawn[0].thumb | {width, height, decodedWidth, decodedHeight}'))" \
   yt_is '[.drawn[] | select(.thumb.shown) | .thumb] | length == 19 and all(.width == 72 and .height == 40 and .decodedWidth > 0 and .decodedHeight > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height)'
 page_ids=$(jq -r '[.rows[].thumb] | join(" ")' "$repo/dev/youtube/search.json")
