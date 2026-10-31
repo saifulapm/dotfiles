@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
-# The YouTube nested checks' mpv: logs the command line it is given to DOTS_DEV_DIR/youtube-mpv.log, then opens dev/fake-mpv.qml's window titled with the URL, which ends when that window closes, as mpv does.
+# The YouTube nested checks' mpv: logs the command line it is given to DOTS_DEV_DIR/youtube-mpv.log, then runs the real mpv silent with dev/youtube/fake-ytdl.lua in yt-dlp's place, so a check meets mpv's own window, JSON IPC and MPRIS with no network.
 printf '%s\n' "$*" >>"$DOTS_DEV_DIR/youtube-mpv.log"
-FAKE_MPV_TITLE=${*: -1} exec env -u QS_CONFIG_PATH qs -p "$(dirname "$(realpath "$0")")/../fake-mpv.qml"
+dir=$(dirname "$(realpath "$0")")
+# After the caller's options, as mpv's last option wins and the caller names its own --script-opts.
+exec mpv "$@" --ytdl=no --ao=null "--script=$dir/fake-ytdl.lua" "--script-opts-append=fake_ytdl-dir=$dir"

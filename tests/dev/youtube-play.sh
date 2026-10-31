@@ -44,7 +44,7 @@ until_ok 5000 units_are 1
 until_ok 5000 mpv_count 1
 check "Enter started one youtube-video-<n> unit ($(yt_state | jq -c .units))" yt_is '.units | length == 1 and all(test("^youtube-video-[0-9]+$"))'
 check "its unit is active" all_active
-check "its fake mpv window, app id mpv, opened ($(mpv_windows))" mpv_count 1
+check "its mpv window, app id mpv, opened ($(mpv_windows))" mpv_count 1
 check "mpv was handed the row's watch URL ($(tail -1 "$mpv_log" 2>/dev/null))" grep -qF 'https://www.youtube.com/watch?v=fakeVid0002' "$mpv_log"
 check "and the at most 1080p format" grep -qF -- '--ytdl-format=bv*[height<=1080]+ba/b[height<=1080]' "$mpv_log"
 first=$(units)
