@@ -1,4 +1,6 @@
 #!/bin/bash
+# The data is built from the deen-data pin, which runs just before this; its version and the gh key below re-run this when either changes.
+# deen-data: {{ range (include (joinPath .chezmoi.workingTree "versions.toml") | fromToml).pin }}{{ if eq .name "deen-data" }}{{ .version }}{{ end }}{{ end }}, gh: {{ if stat (joinPath (env "GH_CONFIG_DIR" | default (joinPath .chezmoi.homeDir ".config/gh")) "hosts.yml") }}logged in{{ else }}not logged in{{ end }}
 {{ template "lib.sh" . }}
 {{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "deen") }}
 {{ template "cargo.sh" . }}
@@ -6,13 +8,14 @@ tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 src=$pin_tmp/deen-$pin_version
 pin_cargo "$src" deen
-# The Quran text, its word meanings and Hisn al-Muslim come at the first apply that lacks them; only the hadith corpus waits for Deen's first open.
+# The Quran text, its word meanings and Hisn al-Muslim are built from the deen-data tree, again whenever deen or that tree moves; only the hadith corpus waits for Deen's first open.
 data=$HOME/.local/share/deen
-mkdir -p "$data"
-for pair in quran:fetch-data words:fetch-words duas:fetch-duas; do
-  file=$data/${pair%%:*}.json
-  [ -s "$file" ] && continue
-  "$src/scripts/${pair#*:}" >"$file.tmp" || { rm -f "$file.tmp"; die "pin deen: scripts/${pair#*:} failed"; }
-  mv -f "$file.tmp" "$file"
-done
+sources=$HOME/.local/share/deen-data
+if [[ -f $sources/.commit ]]; then
+  built="$pin_version $(cat "$sources/.commit")"
+  if [[ $(cat "$data/built-from" 2>/dev/null) != "$built" ]]; then
+    "$src/scripts/build-data" "$sources" "$data" || die "pin deen: scripts/build-data failed"
+    echo "$built" >"$data/built-from"
+  fi
+fi
 pin_done

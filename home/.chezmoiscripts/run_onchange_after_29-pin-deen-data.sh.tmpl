@@ -1,0 +1,37 @@
+#!/bin/bash
+# gh: {{ if stat (joinPath (env "GH_CONFIG_DIR" | default (joinPath .chezmoi.homeDir ".config/gh")) "hosts.yml") }}logged in{{ else }}not logged in{{ end }}
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "deen-data") }}
+# deen's sources are private, so the download waits for the gh login; the key above re-runs this once there is one, and the deen pin builds its data from the tree this leaves.
+dest=$HOME/.local/share/deen-data
+if [[ ! -f ${GH_CONFIG_DIR:-$HOME/.config/gh}/hosts.yml ]]; then
+  echo "deen-data: not logged in to GitHub (gh auth login), Bangla data skipped"
+  exit 0
+fi
+[[ $(cat "$dest/.commit" 2>/dev/null) != "$pin_version" ]] || exit 0
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+tree=$(dirname "$(find "$pin_tmp" -mindepth 2 -maxdepth 2 -name manifest.toml)")
+[[ -f $tree/manifest.toml ]] || die "pin deen-data: the tarball has no manifest.toml"
+# Every file has to be the one its manifest names; the first that is not stops the apply before anything is replaced.
+python3 -I - "$tree" <<'PY' || exit 1
+import hashlib, sys, tomllib
+tree = sys.argv[1]
+for f in tomllib.load(open(f"{tree}/manifest.toml", "rb"))["file"]:
+    try:
+        ok = hashlib.sha256(open(f"{tree}/{f['path']}", "rb").read()).hexdigest() == f["sha256"]
+    except FileNotFoundError:
+        ok = False
+    if not ok:
+        print(f"dots: deen-data: {f['path']} does not match manifest.toml", file=sys.stderr)
+        sys.exit(1)
+PY
+echo "$pin_version" >"$tree/.commit"
+# The new tree goes in by renames beside the old one, so a cut apply leaves a whole tree or none, never a mix.
+mkdir -p "${dest%/*}"
+rm -rf "$dest.new" "$dest.old"
+mv "$tree" "$dest.new"
+[[ ! -d $dest ]] || mv "$dest" "$dest.old"
+mv "$dest.new" "$dest"
+rm -rf "$dest.old"
+pin_done
