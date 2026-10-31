@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call prints one compact JSON object; a failed search prints {error, kind, raw} and exits 1.
+# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; channel <UC-id|@handle> <offset> prints 20 of a channel's uploads; playlist <id|url> prints every item of a playlist; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call prints one compact JSON object; a failed read prints {error, kind, raw} and exits 1.
 import ctypes
 import json
 import os
@@ -26,7 +26,7 @@ child = None
 
 
 def usage():
-    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | thumbs <id>...", file=sys.stderr)
+    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | channel <UC-id|@handle> <offset> | playlist <id|url> | thumbs <id>...", file=sys.stderr)
     sys.exit(2)
 
 
@@ -94,9 +94,11 @@ def ytdlp(args, cwd=None):
     return data, stderr
 
 
-# Fails with what yt-dlp's stderr says went wrong.
+# Fails with what yt-dlp's stderr says went wrong; when YouTube gave its own reason (a missing playlist), its sentence is the error.
 def broke(stderr):
     raw = next((line.rstrip() for line in reversed(stderr.splitlines()) if line.startswith("ERROR:")), "")
+    if "YouTube said: " in raw:
+        fail(raw.split("YouTube said: ", 1)[1], "extraction", raw)
     if NETWORK.search(stderr):
         fail("No network. Check Wi-Fi, then ↵ to try again.", "network", raw)
     version = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True).stdout.strip()
@@ -201,6 +203,38 @@ def search(query, kind, offset):
     out({"rows": rows, "next": following})
 
 
+# A channel's uploads, newest first as YouTube lists them; no entry carries a timestamp to sort by, nor a channel, so each takes the top level's.
+def channel(who, offset):
+    url = "https://www.youtube.com/%s/videos" % (who if who.startswith("@") else "channel/" + who)
+    data, stderr = ytdlp(["--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE), url])
+    if data is None and "does not have a videos tab" in stderr:
+        # A Topic channel or a tiny one has no uploads tab: nothing to list, not a failure.
+        out({"title": None, "rows": [], "next": offset})
+        return
+    if data is None or not isinstance(data.get("entries"), list):
+        broke(stderr)
+    entries = data["entries"]
+    rows = [video_row(e, data.get("channel")) for e in entries if isinstance(e, dict) and ID.match(str(e.get("id")))]
+    out({"title": data.get("channel"), "rows": rows, "next": offset + len(entries)})
+
+
+# Every item of a playlist; YouTube's playlist_count can be missing, and the rows count then.
+def playlist(list_id):
+    data, stderr = ytdlp(["--flat-playlist", "-J", "https://www.youtube.com/playlist?list=" + list_id])
+    if data is None or not isinstance(data.get("entries"), list):
+        broke(stderr)
+    rows = [video_row(e) for e in data["entries"] if isinstance(e, dict) and ID.match(str(e.get("id")))]
+    count = data.get("playlist_count")
+    out({"title": data.get("title"), "count": count if isinstance(count, int) else len(rows), "rows": rows})
+
+
+# A playlist argument is its id, or a URL whose list= names it.
+def list_id(arg):
+    if "?" in arg:
+        arg = (urllib.parse.parse_qs(urllib.parse.urlsplit(arg).query).get("list") or [""])[0]
+    return arg if re.fullmatch(r"[A-Za-z0-9_-]+", arg) else None
+
+
 def thumbs(ids):
     cache = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
     folder = os.path.abspath(os.path.join(cache, "dots", "youtube", "thumbs"))
@@ -236,6 +270,10 @@ def thumbs(ids):
 def main(args):
     if len(args) == 4 and args[0] == "search" and args[2] in FILTERS and re.fullmatch(r"[0-9]+", args[3]):
         search(args[1], args[2], int(args[3]))
+    elif len(args) == 3 and args[0] == "channel" and re.fullmatch(r"UC[A-Za-z0-9_-]{22}|@[\w.-]+", args[1]) and re.fullmatch(r"[0-9]+", args[2]):
+        channel(args[1], int(args[2]))
+    elif len(args) == 2 and args[0] == "playlist" and list_id(args[1]):
+        playlist(list_id(args[1]))
     elif len(args) >= 2 and args[0] == "thumbs":
         thumbs(args[1:])
     else:

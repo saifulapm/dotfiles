@@ -159,6 +159,105 @@ test('a channels search prints channel rows with the handle as channel, dropping
   assert.ok(argv.includes('https://www.youtube.com/results?search_query=nujabes&sp=EgIQAg%3D%3D'), argv.join(' '));
 });
 
+// A flat video entry as a channel's uploads or a playlist list it: an uploads entry has no channel of its own.
+const upload = (id, title, duration, channel) => ({ _type: 'url', ie_key: 'Youtube', id, url: `https://www.youtube.com/watch?v=${id}`, title, duration, view_count: 22000, timestamp: null, channel_url: null, uploader_url: null, ...(channel && { channel, uploader: channel, channel_id: 'UCO5XcuQe_fLJVI3sZ0LmGCA' }), thumbnails: [{ url: `https://i.ytimg.com/vi/${id}/hq720.jpg?sqp=-oaymwE2COgCEMoBSFXyq4qpAygIARUAAIhCGAFwAcABBvABAfgB_gmAAtAFigIMCAAQARgiIEMofzAP`, height: 202, width: 360 }] });
+
+// Newest first, as YouTube lists them, which is not the order of their ids.
+const uploads = {
+  id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', channel: 'Nujabes', channel_id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', title: 'Nujabes - Videos', uploader_id: '@Nujabes19740207', playlist_count: null, _type: 'playlist',
+  entries: [
+    upload('5OH5rpgq1-8', "Nujabes - Child's Attraction (Cosmic Arts Praise Reprise) [Instrumental]", 509),
+    upload('pCWB01_pTck', "Nujabes - Child's Attraction (Cosmic Arts Vocal Praise Reprise) [Official Audio]", 509),
+    upload('1WA1S7JV0YA', "Nujabes - Child's Attraction (Sacred Rhythm Dance Mix) [Official Audio]", 848),
+  ],
+};
+const uploadRows = [
+  { id: '5OH5rpgq1-8', kind: 'video', title: "Nujabes - Child's Attraction (Cosmic Arts Praise Reprise) [Instrumental]", channel: 'Nujabes', duration: 509, thumb: '5OH5rpgq1-8' },
+  { id: 'pCWB01_pTck', kind: 'video', title: "Nujabes - Child's Attraction (Cosmic Arts Vocal Praise Reprise) [Official Audio]", channel: 'Nujabes', duration: 509, thumb: 'pCWB01_pTck' },
+  { id: '1WA1S7JV0YA', kind: 'video', title: "Nujabes - Child's Attraction (Sacred Rhythm Dance Mix) [Official Audio]", channel: 'Nujabes', duration: 848, thumb: '1WA1S7JV0YA' },
+];
+
+test('channel <UC id> prints 20 uploads from the offset in YouTube order, each with the channel the top level names', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'uploads.json'), JSON.stringify(uploads));
+  act(`cat "${dir}/uploads.json"`);
+  const r = run('channel', 'UCO5XcuQe_fLJVI3sZ0LmGCA', '20');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: 'Nujabes', rows: uploadRows, next: 23 });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  const after = (flag) => argv[argv.indexOf(flag) + 1];
+  assert.ok(argv.includes('--flat-playlist') && argv.includes('-J'), argv.join(' '));
+  assert.equal(after('--playlist-start'), '21');
+  assert.equal(after('--playlist-end'), '40');
+  assert.equal(argv.at(-1), 'https://www.youtube.com/channel/UCO5XcuQe_fLJVI3sZ0LmGCA/videos');
+});
+
+test('channel @handle asks for the handle\'s videos tab from the first upload', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'uploads.json'), JSON.stringify(uploads));
+  act(`cat "${dir}/uploads.json"`);
+  const r = run('channel', '@Nujabes19740207', '0');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: 'Nujabes', rows: uploadRows, next: 3 });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.equal(argv[argv.indexOf('--playlist-start') + 1], '1');
+  assert.equal(argv[argv.indexOf('--playlist-end') + 1], '20');
+  assert.equal(argv.at(-1), 'https://www.youtube.com/@Nujabes19740207/videos');
+});
+
+// A Topic channel or a tiny one has no videos tab; that is a channel with nothing to list, not a failure.
+test('a channel with no videos tab answers no rows and exits 0', (t) => {
+  const { act, run } = rig(t);
+  act(`echo "WARNING: [youtube:tab] some formats may be missing" >&2\necho "ERROR: [youtube:tab] UCxQQET-tQsC4cwzLow9ZsuQ: This channel does not have a videos tab" >&2\nexit 1`);
+  const r = run('channel', 'UCxQQET-tQsC4cwzLow9ZsuQ', '40');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: null, rows: [], next: 40 });
+});
+
+const playlist = (count) => ({
+  id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', title: 'Modal Soul [Official Audio]', playlist_count: count, channel: 'Nujabes', channel_id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', uploader: 'Nujabes', _type: 'playlist',
+  entries: [
+    upload('hQ5x8pHoIPA', 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', 176, 'Nujabes'),
+    upload('LbeiNME75ZE', 'Nujabes - ordinary joe (feat.Terry Callier) [Official Audio]', 309, 'Nujabes feat. Terry Callier'),
+  ],
+});
+const playlistRows = [
+  { id: 'hQ5x8pHoIPA', kind: 'video', title: 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', channel: 'Nujabes', duration: 176, thumb: 'hQ5x8pHoIPA' },
+  { id: 'LbeiNME75ZE', kind: 'video', title: 'Nujabes - ordinary joe (feat.Terry Callier) [Official Audio]', channel: 'Nujabes feat. Terry Callier', duration: 309, thumb: 'LbeiNME75ZE' },
+];
+
+test('playlist <id> lists every item with the playlist\'s title and the count YouTube gives', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'playlist.json'), JSON.stringify(playlist(14)));
+  act(`cat "${dir}/playlist.json"`);
+  const r = run('playlist', 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: 'Modal Soul [Official Audio]', count: 14, rows: playlistRows });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.ok(argv.includes('--flat-playlist') && argv.includes('-J'), argv.join(' '));
+  assert.ok(!argv.includes('--playlist-end') && !argv.includes('--playlist-start'), argv.join(' '));
+  assert.equal(argv.at(-1), 'https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+});
+
+test('playlist <url> reads the list the URL names, counting its rows when YouTube gives no count', (t) => {
+  const { dir, act, run } = rig(t);
+  writeFileSync(join(dir, 'playlist.json'), JSON.stringify(playlist(null)));
+  act(`cat "${dir}/playlist.json"`);
+  const r = run('playlist', 'https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { title: 'Modal Soul [Official Audio]', count: 2, rows: playlistRows });
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.equal(argv.at(-1), 'https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+});
+
+test('a failure YouTube explains prints YouTube\'s sentence as the error, with its ERROR line as raw', (t) => {
+  const { act, run } = rig(t);
+  act(`echo "WARNING: [youtube:tab] Incomplete data received" >&2\necho "ERROR: [youtube:tab] PLmissingmissingmissing: YouTube said: The playlist does not exist." >&2\nexit 1`);
+  const r = run('playlist', 'PLmissingmissingmissing');
+  assert.equal(r.status, 1);
+  assert.deepEqual(JSON.parse(r.stdout), { error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLmissingmissingmissing: YouTube said: The playlist does not exist.' });
+});
+
 const denoLine = { error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime', raw: '' };
 
 test('with mise naming no deno, search fails as runtime before yt-dlp searches', (t) => {
