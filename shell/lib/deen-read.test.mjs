@@ -45,10 +45,10 @@ test('the bar reads the word\'s place and root, leaving out a root it has none o
 });
 
 const surahs = [
-  { n: 1, ar: 'سُورَةُ ٱلْفَاتِحَةِ', en: 'Al-Faatiha', tr: 'The Opening' },
+  { n: 1, ar: 'سُورَةُ ٱلْفَاتِحَةِ', en: 'Al-Faatiha', tr: 'The Opening', bn: 'সূরা আল-ফা-তিহাহ' },
   { n: 3, ar: 'سُورَةُ آلِ عِمۡرَانَ', en: 'Aal-i-Imraan', tr: 'The Family of Imraan' },
   { n: 13, ar: 'سُورَةُ الرَّعۡدِ', en: 'Ar-Ra\'d', tr: 'The Thunder' },
-  { n: 36, ar: 'سُورَةُ يسٓ', en: 'Yaseen', tr: 'Yaseen' },
+  { n: 36, ar: 'سُورَةُ يسٓ', en: 'Yaseen', tr: 'Yaseen', bn: 'সূরা ইয\u09bcা সী-ন' },
   { n: 94, ar: 'سُورَةُ الشَّرۡحِ', en: 'Ash-Sharh', tr: 'The Consolation', bn: 'সূরা আশ-শারহ' },
   { n: 103, ar: 'سُورَةُ العَصۡرِ', en: 'Al-Asr', tr: 'The Declining Day, Epoch' },
 ];
@@ -70,6 +70,13 @@ test('the picker finds a surah by its English name, its meaning or its Arabic na
 
 test('the picker finds a surah by its Bangla name', () => {
   assert.deepEqual(R.surahsMatching(surahs, 'শারহ').map((s) => s.n), [94]);
+});
+
+test('the picker matches a Bangla name past its hyphens and spaces, and either way য় is typed', () => {
+  assert.deepEqual(R.surahsMatching(surahs, 'ফাতিহা').map((s) => s.n), [1]);
+  assert.deepEqual(R.surahsMatching(surahs, 'ইয\u09bcাসীন').map((s) => s.n), [36]);
+  assert.deepEqual(R.surahsMatching(surahs, 'ই\u09dfাসীন').map((s) => s.n), [36]);
+  assert.deepEqual(R.surahsMatching(surahs, 'ash sharh').map((s) => s.n), [94]);
 });
 
 test('an answer is a surah to read only when it carries ayat and their words', () => {

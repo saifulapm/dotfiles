@@ -45,6 +45,8 @@ test('a tab without its Bangla data says how to get it', () => {
 test('deen has no Bangla data when it cannot read the Quran text or the duas', () => {
   assert.equal(D.noData({ error: 'cannot read the Quran text at /home/s/.local/share/deen/quran.json: No such file or directory (os error 2)' }), true);
   assert.equal(D.noData({ error: 'cannot read the duas at /home/s/.local/share/deen/duas.json: No such file or directory (os error 2)' }), true);
+  // Data built before this deen: it lacks fields deen now needs, and the next dots update rebuilds it.
+  assert.equal(D.noData({ error: '/home/s/.local/share/deen/quran.json is not valid deen data' }), true);
 });
 
 test('a surah whose words carry no Bangla meaning is no Bangla data, but one with some is', () => {

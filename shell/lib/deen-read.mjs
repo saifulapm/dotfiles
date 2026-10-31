@@ -32,9 +32,9 @@ export function wordLine(voice, word, a) {
 
 export const hearHint = (voice) => (voice === 'bracket' ? '[↵] HEAR THIS WORD' : '↵ hear this word');
 
-// Harakat and Quranic marks, so a name typed bare finds the voweled one.
-const MARKS = /[ً-ٰٟۖ-ۭ]/g;
-const bare = (s) => String(s || '').replace(MARKS, '').toLowerCase();
+// Harakat and Quranic marks, so a name typed bare finds the voweled one; spaces and hyphens, so ফাতিহা finds আল-ফা-তিহাহ; and য় typed as one code point is the table's য plus nukta.
+const MARKS = /[ً-ٰٟۖ-ۭ\s-]/g;
+const bare = (s) => String(s || '').replace(MARKS, '').replace(/\u09df/g, '\u09af\u09bc').toLowerCase();
 
 export function surahsMatching(surahs, query) {
   const q = bare(query).trim();
