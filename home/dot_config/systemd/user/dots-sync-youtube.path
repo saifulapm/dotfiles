@@ -1,0 +1,7 @@
+[Unit]
+Description=dots sync when the YouTube Playlists store changes
+
+[Path]
+# The App writes the store with a close, and dots sync renames its merge over it; both fire this. Dot-files are ignored.
+PathChanged=%h/.local/share/dots/youtube
+MakeDirectory=yes

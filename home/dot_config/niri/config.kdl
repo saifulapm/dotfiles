@@ -13,6 +13,7 @@ spawn-at-startup "systemctl" "--user" "start" "niriusd.service"
 spawn-at-startup "systemctl" "--user" "start" "dots-sync.timer"
 spawn-at-startup "systemctl" "--user" "start" "dots-sync-notes.path"
 spawn-at-startup "systemctl" "--user" "start" "dots-sync-goals.path"
+spawn-at-startup "systemctl" "--user" "start" "dots-sync-youtube.path"
 spawn-at-startup "systemctl" "--user" "start" "mail-sync.timer"
 
 input {

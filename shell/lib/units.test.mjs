@@ -47,8 +47,8 @@ test('the sync timer runs dots sync 3 min after boot and then every 15 min', () 
   assert.deepEqual(props(service, 'ExecStart'), [syncCmd('')]);
 });
 
-test('a change to the notes or goals store runs dots sync --only for that unit', () => {
-  for (const unit of ['notes', 'goals']) {
+test('a change to the notes, goals or youtube store runs dots sync --only for that unit', () => {
+  for (const unit of ['notes', 'goals', 'youtube']) {
     const path = userUnit(`dots-sync-${unit}.path`);
     assert.deepEqual(props(path, 'PathChanged'), [`%h/.local/share/dots/${unit}`]);
     assert.deepEqual(props(path, 'MakeDirectory'), ['yes']);
@@ -56,9 +56,9 @@ test('a change to the notes or goals store runs dots sync --only for that unit',
   }
 });
 
-test('niri starts the sync timer and both path units at login', () => {
+test('niri starts the sync timer and every path unit at login', () => {
   const niri = readFileSync(root + 'home/dot_config/niri/config.kdl', 'utf8');
-  for (const u of ['dots-sync.timer', 'dots-sync-notes.path', 'dots-sync-goals.path']) {
+  for (const u of ['dots-sync.timer', 'dots-sync-notes.path', 'dots-sync-goals.path', 'dots-sync-youtube.path']) {
     assert.match(niri, new RegExp(`^spawn-at-startup "systemctl" "--user" "start" "${u.replace('.', '\\.')}"$`, 'm'));
   }
 });
