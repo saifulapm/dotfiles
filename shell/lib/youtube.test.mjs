@@ -55,3 +55,27 @@ test('each empty view names the key that fills it', () => {
   assert.deepEqual(Y.EMPTY.saved, { head: 'Nothing saved yet', key: 's', rest: 'saves a video' });
   assert.equal(Y.EMPTY.playlists, 'n makes one');
 });
+
+// The CLI's error is the exact line the list shows, so it is read as given, made one line.
+test('a failed answer is its error, kind and raw line', () => {
+  assert.deepEqual(Y.failure({ error: 'yt-dlp 2026.10.26 may be behind YouTube: run dots bump, then dots update', kind: 'extraction', raw: "ERROR: [youtube] Sign in to confirm you're not a bot" }), {
+    error: 'yt-dlp 2026.10.26 may be behind YouTube: run dots bump, then dots update',
+    kind: 'extraction',
+    raw: "ERROR: [youtube] Sign in to confirm you're not a bot",
+  });
+  assert.deepEqual(Y.failure({ error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime' }), { error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime', raw: '' });
+  assert.deepEqual(Y.failure({ error: 'No network.\nCheck Wi-Fi', kind: 'network', raw: 'ERROR:\u001b x' }), { error: 'No network. Check Wi-Fi', kind: 'network', raw: 'ERROR: x' });
+});
+
+test('an answer with rows and no error is no failure', () => {
+  assert.equal(Y.failure({ rows: [], next: 0 }), null);
+  assert.equal(Y.failure({ rows: [], error: '' }), null);
+});
+
+// A CLI that crashed printed no JSON, and the list still says so rather than draw empty.
+test('no answer at all is a failure that names the CLI', () => {
+  const none = { error: 'dots-youtube-api gave no answer', kind: '', raw: '' };
+  assert.deepEqual(Y.failure(null), none);
+  assert.deepEqual(Y.failure('Traceback'), none);
+  assert.deepEqual(Y.failure([1]), none);
+});

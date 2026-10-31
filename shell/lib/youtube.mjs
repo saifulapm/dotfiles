@@ -34,6 +34,14 @@ export function rows(answer) {
   return out;
 }
 
+// A failed call's error is the line the list shows, raw is yt-dlp's own ERROR line or empty; an answer with no JSON at all fails too, so the list never draws empty for it.
+export function failure(answer) {
+  if (!answer || typeof answer !== 'object' || Array.isArray(answer)) return { error: 'dots-youtube-api gave no answer', kind: '', raw: '' };
+  if (typeof answer.error !== 'string' || answer.error === '') return null;
+  const text = (v) => (typeof v === 'string' ? oneLine(v) : '');
+  return { error: oneLine(answer.error), kind: text(answer.kind), raw: text(answer.raw) };
+}
+
 // Each empty view names the key that fills it, as the first-open boards write it.
 export const EMPTY = {
   saved: { head: 'Nothing saved yet', key: 's', rest: 'saves a video' },

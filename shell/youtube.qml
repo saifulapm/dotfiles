@@ -27,6 +27,8 @@ ShellRoot {
     property int searchSeq: 0
     // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them.
     property var thumbs: ({})
+    // The last search's failure as youtube.mjs failure() reads it, {error, kind, raw}, or null.
+    property var failed: null
     // The youtube-video-<n> units this App started, in order.
     property var units: []
     property int savedCount: 0
@@ -97,7 +99,8 @@ ShellRoot {
         api(["search", q, "videos", "0"], answer => {
             if (seq !== app.searchSeq)
                 return;
-            app.rows = YT.rows(answer);
+            app.failed = YT.failure(answer);
+            app.rows = app.failed ? [] : YT.rows(answer);
             app.cursor = 0;
             app.fetchThumbs(app.rows);
         });
@@ -195,6 +198,7 @@ ShellRoot {
                 cursor: app.cursor,
                 searchSeq: app.searchSeq,
                 units: app.units,
+                error: app.failed,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice

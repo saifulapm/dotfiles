@@ -18,6 +18,8 @@ Rectangle {
     readonly property bool fieldFocused: field.activeFocus
     readonly property string queryText: field.text
     readonly property var emptyText: yt.look.empty(yt.view)
+    // A failed search's list is its error block.
+    readonly property bool failing: yt.view === "search" && yt.failed !== null
 
     function focusField() {
         field.forceActiveFocus();
@@ -42,6 +44,16 @@ Rectangle {
         }
         return {
             drawn: rowList.visible ? drawn : [],
+            failed: failPane.visible ? {
+                kicker: kickerText.text,
+                head: failHead.text,
+                fix: fixText.text,
+                retry: retryKey.text + " " + retryWord.text,
+                raw: rawBox.visible ? rawText.text : "",
+                rawFont: rawText.font.family,
+                rawSize: rawText.font.pixelSize,
+                rawBelow: rawBox.y > fixText.y
+            } : null,
             empty: emptyBlock.visible ? [emptyHead.text, [emptyKey.text, emptyRest.text].filter(t => t).join(" ")].filter(t => t) : [],
             look: {
                 title: [labelText.text, viewName.text, fromText.text],
@@ -89,6 +101,8 @@ Rectangle {
                 board.yt.move(-1);
             else if (k === Qt.Key_Escape)
                 board.yt.back();
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
+                board.yt.search();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
                 board.yt.play(board.yt.rows[board.yt.cursor]);
             else
@@ -501,9 +515,9 @@ Rectangle {
                         }
                     }
 
-                    // The list's head: RESULTS and their count on Search, the view's name elsewhere; Paper's empty views draw none.
+                    // The list's head: RESULTS and their count on Search, the view's name elsewhere; Paper's empty views draw none, and only Blueprint heads a failed search, with no count.
                     RowLayout {
-                        visible: board.yt.view === "search" || !caps
+                        visible: (board.yt.view === "search" || !caps) && (!board.failing || bracket)
                         Layout.fillWidth: true
                         Layout.topMargin: plain ? 8 : 10
                         Layout.preferredHeight: 26
@@ -533,7 +547,7 @@ Rectangle {
                         Text {
                             id: resultsCount
                             textFormat: Text.PlainText
-                            text: plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : String(board.yt.rows.length)
+                            text: board.failing ? "—" : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : String(board.yt.rows.length)
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: caps ? 10 : 11
@@ -541,7 +555,7 @@ Rectangle {
                         }
                     }
                     Rule {
-                        visible: !plain && (board.yt.view === "search" || !caps)
+                        visible: !plain && (board.yt.view === "search" || !caps) && (!board.failing || bracket)
                         Layout.fillWidth: true
                         dashed: look.ruleDashed
                         color: (caps ? look.tint.rule : c.line) ?? "gray"
@@ -550,7 +564,7 @@ Rectangle {
                     // The rows the list draws; a later search fills them.
                     ListView {
                         id: rowList
-                        visible: !emptyBlock.visible
+                        visible: !emptyBlock.visible && !board.failing
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         clip: true
@@ -664,6 +678,184 @@ Rectangle {
                                 Item {
                                     visible: caps
                                     implicitWidth: 16
+                                }
+                            }
+                        }
+                    }
+
+                    // A failed search, as the error boards draw it: Paper's ruled box under its kicker, Artboard's orange card, Blueprint's amber box; each holds the headline, the CLI's fix line, try again, and yt-dlp's raw line in small mono.
+                    Item {
+                        id: failPane
+                        visible: board.failing
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.topMargin: caps ? 22 : plain ? 14 : 4
+                            anchors.leftMargin: bracket ? 4 : 0
+                            anchors.rightMargin: bracket ? 4 : 0
+                            implicitHeight: failColumn.implicitHeight + (caps ? 46 : 44)
+                            radius: plain ? 14 : 0
+                            color: plain ? look.tint.errFill : "transparent"
+                            // Artboard outlines the block in its accent while the list has focus, as it outlines a lit row.
+                            border.width: plain ? (board.yt.focusAt === "list" ? 1.5 : 0) : 1
+                            border.color: (plain ? c.accent : caps ? c.ink : look.tint.warn) ?? "gray"
+
+                            ColumnLayout {
+                                id: failColumn
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.margins: 24
+                                anchors.topMargin: 22
+                                spacing: bracket ? 14 : 12
+
+                                Row {
+                                    spacing: 12
+
+                                    Rectangle {
+                                        implicitWidth: plain ? 22 : 18
+                                        implicitHeight: plain ? 22 : 18
+                                        radius: plain ? 11 : 0
+                                        color: (plain ? look.tint.errInk : caps ? c.ink : look.tint.warn) ?? "red"
+
+                                        Text {
+                                            anchors.centerIn: parent
+                                            textFormat: Text.PlainText
+                                            text: "!"
+                                            color: c.surface ?? "white"
+                                            font.family: board.bodyFont
+                                            font.pixelSize: plain ? 13 : caps ? 11 : 10
+                                            font.weight: Font.Bold
+                                        }
+                                    }
+                                    Text {
+                                        id: kickerText
+                                        visible: caps
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        textFormat: Text.PlainText
+                                        text: board.yt.failed ? look.failed.kicker(board.yt.failed.kind) : ""
+                                        color: c.muted ?? "gray"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: 10
+                                        font.letterSpacing: 1.4
+                                    }
+                                    Text {
+                                        visible: !caps
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        textFormat: Text.PlainText
+                                        text: failHead.text
+                                        color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: plain ? 18 : 16
+                                        font.weight: Font.Bold
+                                    }
+                                }
+                                // Paper sets the headline on its own line in its serif; the others draw it beside the mark above.
+                                Text {
+                                    id: failHead
+                                    visible: caps
+                                    textFormat: Text.PlainText
+                                    text: look.failed.head
+                                    color: c.ink ?? "black"
+                                    font.family: look.viewFont ?? ""
+                                    font.pixelSize: 25
+                                }
+                                Text {
+                                    id: fixText
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: board.yt.failed ? board.yt.failed.error : ""
+                                    wrapMode: Text.Wrap
+                                    color: (plain ? look.tint.errText : c.ink) ?? "black"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: plain ? 14 : 13
+                                }
+                                Item {
+                                    implicitWidth: retryBox.width + (caps ? 3 : 0)
+                                    implicitHeight: retryBox.height + (caps ? 3 : 0)
+
+                                    // Paper's button casts a hard 3 px accent shadow.
+                                    Rectangle {
+                                        visible: caps
+                                        x: 3
+                                        y: 3
+                                        width: retryBox.width
+                                        height: retryBox.height
+                                        color: c.accent ?? "red"
+                                    }
+                                    Rectangle {
+                                        id: retryBox
+                                        width: retryRow.implicitWidth + (caps ? 28 : plain ? 18 : 0)
+                                        height: retryRow.implicitHeight + (caps ? 16 : plain ? 6 : 0)
+                                        radius: plain ? 6 : 0
+                                        color: (caps ? c.ink : plain ? c.surface : "transparent") ?? "transparent"
+
+                                        Row {
+                                            id: retryRow
+                                            anchors.centerIn: parent
+                                            spacing: bracket ? 8 : 4
+
+                                            Text {
+                                                id: retryKey
+                                                textFormat: Text.PlainText
+                                                text: look.failed.key
+                                                color: (caps ? c.surface : bracket ? c.accent : c.ink) ?? "black"
+                                                font.family: board.bodyFont
+                                                font.pixelSize: plain ? 12 : 13
+                                                font.weight: Font.Bold
+                                            }
+                                            Text {
+                                                id: retryWord
+                                                textFormat: Text.PlainText
+                                                text: look.failed.word
+                                                color: (caps ? c.surface : c.ink) ?? "black"
+                                                font.family: board.bodyFont
+                                                font.pixelSize: plain ? 12 : 13
+                                            }
+                                        }
+                                    }
+                                }
+                                // yt-dlp's own line: Paper's tinted strip with an accent edge, the others under a rule.
+                                Rectangle {
+                                    id: rawBox
+                                    visible: rawText.text !== ""
+                                    Layout.fillWidth: true
+                                    Layout.topMargin: 4
+                                    implicitHeight: rawText.implicitHeight + (caps ? 20 : 12)
+                                    color: caps ? look.tint.chosen : "transparent"
+
+                                    Rectangle {
+                                        visible: caps
+                                        width: 2
+                                        height: parent.height
+                                        color: c.accent ?? "red"
+                                    }
+                                    Rule {
+                                        visible: !caps
+                                        width: parent.width
+                                        dashed: bracket
+                                        color: plain ? Qt.rgba(180 / 255, 56 / 255, 11 / 255, 0.22) : c.line ?? "gray"
+                                    }
+                                    Text {
+                                        id: rawText
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: caps ? 12 : 0
+                                        anchors.rightMargin: caps ? 12 : 0
+                                        anchors.bottomMargin: caps ? 10 : 0
+                                        textFormat: Text.PlainText
+                                        text: board.yt.failed ? board.yt.failed.raw : ""
+                                        wrapMode: Text.WrapAnywhere
+                                        color: c.muted ?? "gray"
+                                        font.family: board.yt.fonts.mono ?? ""
+                                        font.pixelSize: 11
+                                        font.letterSpacing: bracket ? 0.44 : 0
+                                    }
                                 }
                             }
                         }
@@ -783,7 +975,7 @@ Rectangle {
 
             Repeater {
                 id: legendList
-                model: look.legend(board.yt.view)
+                model: look.legend(board.yt.view, board.failing)
 
                 Rectangle {
                     required property var modelData

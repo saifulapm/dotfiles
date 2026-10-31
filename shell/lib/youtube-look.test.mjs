@@ -55,3 +55,17 @@ test('before the theme loads the window draws with the unthemed look', () => {
   assert.equal(u.title.label, 'YOUTUBE');
   assert.equal(u.legend('search').length, 10);
 });
+
+// The error boards: the block's headline and retry, Paper's YOUTUBE CHANGED over a stale yt-dlp, and a legend led by try again.
+test('a failed search draws the error block and a legend led by try again, as each error board does', () => {
+  const failed = (l, view) => l.legend(view, true).map((k) => `${k.key} ${k.word}`);
+  const p = look('paper');
+  const a = look('artboard');
+  const b = look('blueprint');
+  assert.deepEqual(failed(p, 'search'), ['↵ TRY AGAIN', '/ SEARCH', 'TAB SIDEBAR', 'ESC BACK']);
+  assert.deepEqual(failed(a, 'search'), ['↵ try again', '/ search', 'tab sidebar', 'esc back']);
+  assert.deepEqual(failed(b, 'search'), ['[↵] TRY AGAIN', '[/] SEARCH', '[TAB] SIDEBAR', '[ESC] BACK']);
+  for (const l of [p, a, b]) assert.equal(l.failed.head, "YouTube didn't give results");
+  assert.deepEqual([p.failed.key, p.failed.word, a.failed.key, b.failed.key, b.failed.word], ['↵', 'try again', '↵', '[↵]', 'try again']);
+  assert.deepEqual([p.failed.kicker('extraction'), p.failed.kicker('network'), a.failed.kicker('extraction'), b.failed.kicker('extraction')], ['YOUTUBE CHANGED', '', '', '']);
+});
