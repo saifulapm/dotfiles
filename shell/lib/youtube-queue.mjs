@@ -97,7 +97,8 @@ function load(state, rows, how, shuffled) {
     lines.push(line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]));
     lines.push(line(['loadfile', watch(row.id), replace && i === 0 ? 'replace' : 'append-play', -1, { 'force-media-title': row.title }]));
   });
-  if (how === 'play') lines.push(shuffledLine(shuffled));
+  // Whatever replaces the Queue says whether it is shuffled; an append leaves the flag alone.
+  if (replace) lines.push(shuffledLine(shuffled));
   return replace ? lines.concat([setPauseLine(false)]) : lines;
 }
 

@@ -227,6 +227,8 @@ test('a playlist added to a stopped Queue starts afresh once, and counts as one 
   const first = Q.listLines(s, [row(1), row(2)], 'add');
   assert.deepEqual(loads(first).map((c) => c[2]), ['replace', 'append-play']);
   assert.deepEqual(cmds(first).at(-1), ['set_property', 'pause', false]);
+  // A Queue started afresh holds only these rows in order, so a shuffled flag an earlier S left is cleared.
+  assert.deepEqual(cmds(first).filter((c) => c[1] === SHUF), [['set_property', SHUF, false]]);
   s = Q.asked(s);
   assert.equal(s.asked, 1);
   assert.deepEqual(loads(Q.listLines(s, [row(3)], 'add')).map((c) => c[2]), ['append-play']);
