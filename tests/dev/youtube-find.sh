@@ -21,13 +21,15 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 logged() { grep -qxF -- "$1" "$calls" 2>/dev/null; }
 times_logged() { grep -cxF -- "$1" "$calls" 2>/dev/null; }
 calls_text() { tail -n 4 "$calls" 2>/dev/null | cut -c1-60 | tr '\n' '|'; }
+logged_times() { [ "$(times_logged "$1")" = "$2" ]; }
 searches() { cat "$calls" 2>/dev/null | grep -c "^search ${1:-}"; }
 
-# The second page of a videos search answers 1 s late, as a slow network would, so keys pressed while it loads are seen; every other call is the fake's.
+# The second page of a videos search answers 1 s late, and a playlists search 0.5 s late while $work/slow-playlists is there, as a slow network would, so keys pressed while they load are seen; every other call is the fake's.
 slow=$work/slow-youtube
 cat >"$slow" <<EOF
 #!/usr/bin/env bash
 [ "\$*" = "search nujabes videos 20" ] && sleep 1
+[ "\$*" = "search nujabes playlists 0" ] && [ -f "$work/slow-playlists" ] && sleep 0.5
 exec "$repo/bin/dev-fake-youtube" "\$@"
 EOF
 chmod +x "$slow"
@@ -109,6 +111,24 @@ until_ok 1000 yt_is '.cursor == 43'
 sleep 0.3
 check "the last row asks for no page past the end ($(calls_text))" test "$(searches 'nujabes videos')" = 3
 
+# A page asked for while a new search runs belongs to the old list, so it never lands under the new one's rows.
+wtype l
+until_ok 3000 yt_is '.type == "playlists" and (.rows | length) == 3'
+wtype h
+until_ok 3000 yt_is '.type == "videos" and (.rows | length) == 20'
+press_j 14
+until_ok 1000 yt_is '.cursor == 14'
+touch "$work/slow-playlists"
+wtype l
+wtype j
+until_ok 1000 logged_times 'search nujabes videos 20' 2
+sleep 2
+check "a page asked for during the playlists search does not land under its rows ($(yt_state | jq -c '{n: (.rows | length), kinds: ([.rows[].kind] | unique)}'))" \
+  yt_is '(.rows | length) == 3 and ([.rows[].kind] | unique) == ["playlist"]'
+rm "$work/slow-playlists"
+wtype h
+until_ok 3000 yt_is '.type == "videos" and (.rows | length) == 20'
+
 # A channel row opens its uploads, newest first, with the keys a search row has.
 wtype l
 until_ok 3000 yt_is '.type == "playlists" and (.rows | length) == 3'
@@ -172,7 +192,7 @@ until_ok 3000 yt_is '.error != null'
 check "a playlist that does not exist shows YouTube's own line in the list ($(yt_state | jq -c '.failed | {fix, raw}'))" \
   yt_is '.error.error == "The playlist does not exist." and .failed.fix == "The playlist does not exist." and (.failed.raw | test("YouTube said"))'
 wtype -k Return
-until_ok 3000 test "$(times_logged 'playlist PLfakePrivate1')" = 2
+until_ok 3000 logged_times 'playlist PLfakePrivate1' 2
 check "Enter on the failure asks for the playlist again ($(calls_text))" test "$(times_logged 'playlist PLfakePrivate1')" = 2
 wtype -k Escape
 until_ok 1000 yt_is '.opened == null and .error == null'

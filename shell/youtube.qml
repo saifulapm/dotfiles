@@ -95,12 +95,14 @@ ShellRoot {
         if (view !== "search" || failed !== null || !F.wants(list, cursor))
             return;
         const seq = searchSeq;
-        setList(F.asking(list));
+        const asked = F.asking(list);
+        setList(asked);
         const args = opened ? ["channel", opened.id, String(list.next)] : ["search", searched.query, searched.type, String(list.next)];
+        // A search started before this page shares its number, so the page lands only on the very list it was asked for.
         api(args, answer => {
-            if (seq !== app.searchSeq)
-                return;
             const now = app.opened ? app.opened.list : app.found;
+            if (seq !== app.searchSeq || now !== asked)
+                return;
             app.setList(F.append(now, answer));
             app.fetchThumbs(app.results.slice(now.rows.length));
         });
