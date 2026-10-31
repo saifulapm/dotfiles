@@ -176,3 +176,16 @@ test('no tests/dev script runs a bare wait', () => {
   }
   assert.deepEqual(found, [], 'wait "$pid"');
 });
+
+// until_ok runs its command again on each try, but a "$(...)" in its arguments is read once, before the first, so the wait passes or times out on a stale value (m69); wrap the read in a function.
+test('no tests/dev script waits on a value read once with until_ok test "$(...)"', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    readFileSync(dir + f, 'utf8')
+      .split('\n')
+      .forEach((line, i) => {
+        if (/\buntil_ok\s+\d+\s+(test|\[)\s+[^;&|]*\$\(/.test(line)) found.push(`${f}:${i + 1}`);
+      });
+  }
+  assert.deepEqual(found, [], 'until_ok <ms> <function that reads afresh>');
+});

@@ -17,10 +17,11 @@ listed() { clip list 2>/dev/null | cut -f2- | grep -qxF "$1"; }
 focused() { niri msg -j windows | jq -e --arg a "$1" 'any(.[]; .is_focused and .app_id == $a)' >/dev/null; }
 # niri reports no place for a tiled window, so the focused one floats at 200,200 and its contents start there plus the border.
 origin() { niri msg -j windows | jq -r 'first(.[] | select(.is_focused)).layout | select(.tile_pos_in_workspace_view == [200, 200]) | "\(200 + .window_offset_in_tile[0] | floor) \(200 + .window_offset_in_tile[1] | floor) \(.window_size[0]) \(.window_size[1])"'; }
+placed() { test -n "$(origin)"; }
 float() {
   niri msg action toggle-window-floating
   niri msg action move-floating-window -x 200 -y 200
-  until_ok 3000 test -n "$(origin)"
+  until_ok 3000 placed
   # The move animates, so the grab waits for it to land.
   sleep 0.5
   read -r x y w h <<<"$(origin)"

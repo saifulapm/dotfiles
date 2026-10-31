@@ -10,6 +10,7 @@ island_says() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e --arg t
 types() { wl-paste --list-types 2>/dev/null; }
 only_text() { types | grep -q . && ! types | grep -vqE '^(text/plain(;charset=utf-8)?|TEXT|STRING|UTF8_STRING)$'; }
 lists_png() { types | grep -qx image/png; }
+clipboard_is() { test "$(wl-paste 2>/dev/null)" = "$1"; }
 key() { wtype "$@"; sleep 0.1; }
 attachments="$DOTS_DEV_DIR/data/dots/notes/attachments"
 work=$(mktemp -d)
@@ -43,7 +44,7 @@ check "after Y the clipboard lists image/png" lists_png
 check "and holds the attached image" test "$(wl-paste --type image/png | sha256sum | cut -d' ' -f1)" = "$want"
 
 key -M ctrl y -m ctrl
-until_ok 2000 test "$(wl-paste 2>/dev/null)" = '- the island grows down'
+until_ok 2000 clipboard_is '- the island grows down'
 check "Ctrl+Y copies the section as a Markdown list" test "$(wl-paste)" = '- the island grows down'
 
 head -c $((26 * 1024 * 1024)) /dev/zero >"$work/big.png"

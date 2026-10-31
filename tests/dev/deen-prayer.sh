@@ -21,6 +21,7 @@ no_deen_process() { [ -z "$(deen_pids)" ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 asked() { grep -cxF -- "prayer $1" "$DOTS_DEV_DIR/deen.log" 2>/dev/null || true; }
+asked_times() { test "$(asked "$1")" = "$2"; }
 any_asked() { grep -c '^prayer' "$DOTS_DEV_DIR/deen.log" 2>/dev/null || true; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
@@ -90,7 +91,7 @@ until_ok 3000 prayer_is '.failed != ""'
 check "an answer of error draws that the times need the network, with r to retry ($(prayer '[.failed, .retry]'))" \
   prayer_is '.failed == "Prayer times need the network once a month" and .retry == "R TO RETRY" and .rows == []'
 wtype r
-until_ok 3000 test "$(asked '--date 2026-10-25 --refresh')" = 1
+until_ok 3000 asked_times '--date 2026-10-25 --refresh' 1
 check "r on the failed day asks again with --refresh" test "$(asked '--date 2026-10-25 --refresh')" = 1
 wtype -k t
 until_ok 3000 prayer_is '.failed == "" and (.rows | length) == 5'

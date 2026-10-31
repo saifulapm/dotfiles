@@ -6,6 +6,7 @@ source "$(dirname "$0")/lib.sh"
 scripts=$repo/home/dot_claude/skills/desktop/scripts
 gui=$scripts/gui
 window_count() { niri msg -j windows | jq "[.[] | select(.app_id == \"org.dots.Click\")] | length"; }
+windows_are() { test "$(window_count)" = "$1"; }
 cleanup() {
   local id
   for id in $(niri msg -j windows | jq -r '.[] | select(.app_id == "org.dots.Click" or .title == "box3") | .id'); do
@@ -90,7 +91,7 @@ check "the secret is in no output" bash -c "! grep -q hunter2 <<<'$out'"
 out=$("$gui" get click Plain box)
 check "gui get box prints the box alone, with its reason when null: $out" jq -e '(keys - ["widget", "box_reason"]) == ["box"]' <<<"$out"
 
-until_ok 10000 test "$(window_count)" = 3
+until_ok 10000 windows_are 3
 until_ok 5000 bash -c "'$gui' find click Three >/dev/null 2>&1"
 out=$("$gui" click click Two)
 rc=$?

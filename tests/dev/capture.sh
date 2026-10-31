@@ -8,13 +8,14 @@ notes_is() { notes_state | jq -e "$1" >/dev/null; }
 island_says() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e --arg t "$1" '.mode == "toast" and .text == $t' >/dev/null; }
 island_rests() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e '.mode == "rest"' >/dev/null; }
 store_has() { jq -e "$1" "$store" >/dev/null 2>&1; }
+primary_is() { test "$(wl-paste --primary)" = "$1"; }
 capture() { timeout 0.5 qs ipc call notes capture >/dev/null 2>&1; }
 store="$DOTS_DEV_DIR/data/dots/notes/dev.json"
 
 until_ok 5000 notes_is '.count == 0'
 wl-copy 'clip before'
 wl-copy --primary 'hello capture'
-until_ok 2000 test "$(wl-paste --primary)" = 'hello capture'
+until_ok 2000 primary_is 'hello capture'
 before=$(wl-paste)
 
 capture
