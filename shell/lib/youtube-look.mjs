@@ -91,7 +91,8 @@ export function youtubeLook(tokens) {
     },
     // x on a Playlist asks under its row; Paper's and Artboard's keys keep their case, as their boards draw them.
     confirm: {
-      question: (name, n) => `Delete ${name} and its ${count(n)}?`,
+      // A name past 40 characters is cut, so the question still ends with what it deletes.
+      question: (name, n) => `Delete ${name.length > 40 ? name.slice(0, 39) + '…' : name} and its ${count(n)}?`,
       keys: bracket ? l.keys([['y', 'delete'], ['esc', 'keep']]) : [{ key: 'y', word: 'delete' }, { key: 'esc', word: 'keep' }],
     },
     fieldRadius: plain ? 14 : 0,

@@ -104,8 +104,11 @@ Rectangle {
         if (noneLine.visible)
             sidebar.push([noneKey.text, noneRest.text].filter(t => t).join(" "));
         let asked = null;
-        for (let i = 0; i < listList.count; i++)
+        let askedLook = null;
+        for (let i = 0; i < listList.count; i++) {
             asked = asked || listList.itemAt(i).asked();
+            askedLook = askedLook || listList.itemAt(i).askedLook();
+        }
         const drawn = [];
         for (let i = 0; i < rowList.count; i++) {
             const row = rowList.itemAtIndex(i);
@@ -121,6 +124,7 @@ Rectangle {
             },
             nameField: nameBox.visible ? nameInput.text : null,
             confirm: asked,
+            confirmLook: askedLook,
             dimmed: listColumn.opacity < 1,
             toast: toastBox.visible ? toastText.text : "",
             picker: picker.visible ? {
@@ -531,6 +535,14 @@ Rectangle {
                                 }, (_, i) => confirmKeys.itemAt(i).text)) : null;
                             }
 
+                            // The question's frame and Blueprint's warning mark, as drawn.
+                            function askedLook() {
+                                return confirmBox.visible ? {
+                                    border: String(confirmBox.border.color),
+                                    mark: confirmMark.visible ? confirmMark.text : ""
+                                } : null;
+                            }
+
                             Layout.fillWidth: true
                             spacing: 0
 
@@ -646,18 +658,33 @@ Rectangle {
                                 anchors.margins: 9
                                 spacing: 8
 
-                                Text {
-                                    id: confirmText
-                                    width: parent.width
-                                    textFormat: Text.PlainText
-                                    text: board.yt.playlist ? look.confirm.question(board.yt.playlist.name, board.yt.playlist.count) : ""
-                                    wrapMode: Text.Wrap
-                                    maximumLineCount: 3
-                                    elide: Text.ElideRight
-                                    color: (plain ? look.tint.errInk : c.ink) ?? "black"
-                                    font.family: board.bodyFont
-                                    font.pixelSize: bracket ? 12 : 11
-                                    font.weight: plain ? Font.Bold : Font.Normal
+                                Row {
+                                    spacing: 6
+
+                                    // Blueprint warns with an amber ! before the question.
+                                    Text {
+                                        id: confirmMark
+                                        visible: bracket
+                                        textFormat: Text.PlainText
+                                        text: "!"
+                                        color: look.tint.warn ?? "orange"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                    }
+                                    Text {
+                                        id: confirmText
+                                        width: confirmColumn.width - (confirmMark.visible ? confirmMark.implicitWidth + 6 : 0)
+                                        textFormat: Text.PlainText
+                                        text: board.yt.playlist ? look.confirm.question(board.yt.playlist.name, board.yt.playlist.count) : ""
+                                        wrapMode: Text.Wrap
+                                        maximumLineCount: 3
+                                        elide: Text.ElideRight
+                                        color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: bracket ? 12 : 11
+                                        font.weight: plain ? Font.Bold : Font.Normal
+                                    }
                                 }
                                 Row {
                                     spacing: plain ? 6 : 14

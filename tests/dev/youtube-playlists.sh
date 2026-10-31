@@ -102,6 +102,14 @@ wtype x
 until_ok 1000 yt_is '.confirming'
 check "x asks Delete Deep focus and its 0 videos? under its row, the list beside dimmed ($(yt_state | jq -c '[.confirm, .dimmed]'))" \
   yt_is '.confirm == ["Delete Deep focus and its 0 videos?", "y delete", "esc keep"] and .dimmed'
+check "Paper frames the question in its red accent ($(yt_state | jq -c .confirmLook))" yt_is '.confirmLook == {"border": "#c8381e", "mark": ""}'
+"$repo/bin/dots" theme blueprint >/dev/null
+until_ok 3000 status_theme blueprint
+blueprint_frame() { yt_is '.confirmLook == {"border": "#ffb547", "mark": "!"}'; }
+until_ok 3000 blueprint_frame
+check "Blueprint frames it in amber with its ! mark ($(yt_state | jq -c .confirmLook))" blueprint_frame
+"$repo/bin/dots" theme paper >/dev/null
+until_ok 3000 status_theme paper
 wtype j
 sleep 0.3
 check "while it asks, j moves nothing" yt_is --arg id "$made" '.playlistId == $id and .confirming'

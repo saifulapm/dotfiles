@@ -131,3 +131,10 @@ test('an opened playlist names s save as a playlist, and a snapshot toasts its c
 test('an unavailable item reads Video unavailable and its reason', () => {
   for (const name of ['paper', 'artboard', 'blueprint']) assert.equal(look(name).unavailable('made private'), 'Video unavailable · made private', name);
 });
+
+// A long name, a hostile playlist's title say, is cut so the question still ends with what it deletes.
+test('the delete question cuts a long name and keeps its count', () => {
+  const q = look('blueprint').confirm.question('H'.repeat(316), 14);
+  assert.equal(q, `Delete ${'H'.repeat(39)}… and its 14 videos?`);
+  assert.equal(look('blueprint').confirm.question('H'.repeat(40), 1), `Delete ${'H'.repeat(40)} and its 1 video?`);
+});
