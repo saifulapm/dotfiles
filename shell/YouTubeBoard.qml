@@ -107,6 +107,10 @@ Rectangle {
                 board.yt.play(board.yt.rows[board.yt.cursor]);
             else if (t === "s" && board.yt.pane === "list")
                 board.yt.save(board.yt.rows[board.yt.cursor]);
+            else if (t === "m" && board.yt.pane === "list")
+                board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
+            else if (t === "a" && board.yt.pane === "list")
+                board.yt.queueItem(board.yt.rows[board.yt.cursor], "add");
             else
                 return;
             event.accepted = true;

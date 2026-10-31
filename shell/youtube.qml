@@ -6,6 +6,7 @@ import "services" as Services
 import "lib/status.mjs" as Status
 import "lib/youtube-look.mjs" as Y
 import "lib/youtube.mjs" as YT
+import "lib/youtube-queue.mjs" as Q
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
 ShellRoot {
@@ -37,8 +38,11 @@ ShellRoot {
     property var units: []
     readonly property int savedCount: savedRows.length
     property int historyCount: 0
+    // The Queue as mpv reports it over youtube-audio's socket, and the buffer that holds what m and a send while the unit starts.
+    property var queue: Q.initial()
+    property var link: Q.link()
     // What the Queue plays, as the now-playing line writes it; empty while it is stopped.
-    property string nowPlaying: ""
+    readonly property string nowPlaying: Q.nowLine(queue)
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -93,6 +97,38 @@ ShellRoot {
             if (answer && typeof answer.unit === "string")
                 app.units = app.units.concat([answer.unit]);
         });
+    }
+
+    // m plays a row in the Queue in place of what it holds, a appends it; the first ask with no Queue connected starts youtube-audio, and what follows waits for its socket.
+    function queueItem(row, how) {
+        if (!row)
+            return;
+        const lines = Q.itemLines(queue, row, how);
+        queue = Q.asked(queue);
+        const r = Q.send(link, lines);
+        link = r.link;
+        writeQueue(r.write);
+        if (!r.start)
+            return;
+        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "audio"], answer => {
+            if (answer && typeof answer.socket === "string")
+                queueSocket.connected = true;
+            // A failed start, or a socket that refused the connect, drops what waited, so the next m or a starts the unit again.
+            if (!queueSocket.connected)
+                app.dropQueue();
+        });
+    }
+
+    function writeQueue(lines) {
+        if (lines.length === 0)
+            return;
+        queueSocket.write(lines.join("\n") + "\n");
+        queueSocket.flush();
+    }
+
+    function dropQueue() {
+        link = Q.lost();
+        queue = Q.initial();
     }
 
     // Enter in the field: the list takes focus at once, and the rows come when the CLI answers.
@@ -152,6 +188,24 @@ ShellRoot {
 
     Services.Theme {
         id: theme
+    }
+
+    // Connects as the App opens, so a reopened App reads the running Queue; with no socket the connect fails and the line stays empty until m or a starts one.
+    Socket {
+        id: queueSocket
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/dots/youtube-audio.sock"
+        connected: true
+        onConnectedChanged: {
+            if (connected) {
+                const r = Q.connected(app.link);
+                app.link = r.link;
+                app.writeQueue(Q.connectLines().concat(r.write));
+            } else
+                app.dropQueue();
+        }
+        parser: SplitParser {
+            onRead: text => app.queue = Q.reduce(app.queue, text)
+        }
     }
 
     YouTubeStore {
@@ -220,6 +274,7 @@ ShellRoot {
                 cursor: app.cursor,
                 searchSeq: app.searchSeq,
                 units: app.units,
+                queue: app.queue,
                 error: app.failed,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
