@@ -121,7 +121,7 @@ test('an audio enqueue downloads bestaudio with tags and cover into the music fo
   assert.deepEqual(argvOf(ctx, 'aaaaaaaaaa1'), [
     '-f', 'bestaudio', '-x', '--embed-thumbnail', '--embed-metadata', '--convert-thumbnails', 'jpg',
     '--no-playlist', '--newline', '--progress', '--progress-template', TEMPLATE,
-    '-o', '%(title).150B [%(id)s].%(ext)s', '-P', `home:${music}`, '-P', `temp:${join(ctx.root, 'cache', 'dots', 'youtube-get', 'aaaaaaaaaa1')}`,
+    '-o', '%(title).70B [%(id)s].%(ext)s', '-P', `home:${music}`, '-P', `temp:${join(ctx.root, 'cache', 'dots', 'youtube-get', 'aaaaaaaaaa1')}`,
     '--print', 'after_move:file %(filepath)s', '--js-runtimes', `deno:${join(ctx.root, 'deno', 'deno')}`,
     'https://www.youtube.com/watch?v=aaaaaaaaaa1',
   ]);
@@ -244,7 +244,7 @@ test('odd titles reach yt-dlp only through the -o template, and a file printed o
   const music = join(ctx.root, 'Music', 'YouTube');
   for (const id of ['eeeeeeeeee1', 'eeeeeeeeee2', 'eeeeeeeeee3']) {
     const argv = argvOf(ctx, id);
-    assert.equal(argv[argv.indexOf('-o') + 1], '%(title).150B [%(id)s].%(ext)s');
+    assert.equal(argv[argv.indexOf('-o') + 1], '%(title).70B [%(id)s].%(ext)s');
     assert.deepEqual(argv.filter((a) => a.startsWith('home:') || a.startsWith('temp:')), [`home:${music}`, `temp:${join(ctx.root, 'cache', 'dots', 'youtube-get', id)}`]);
     assert.ok(!argv.some((a) => a.includes('-rf') || a.includes('../../x') || a.includes(long)), argv.join(' '));
   }

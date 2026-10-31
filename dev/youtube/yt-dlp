@@ -66,11 +66,10 @@ ext = "opus" if audio else "webm"
 
 def field(m):
     value = {"title": title, "id": video, "ext": ext}[m[1]]
-    # yt-dlp's own sanitising turns / into a look-alike slash, and .<n>B cuts to n bytes.
-    value = value.replace("/", "⧸")
+    # As yt-dlp does: .<n>B cuts to n bytes first, then its sanitising turns / into a 3-byte look-alike slash.
     if m[2]:
         value = value.encode()[: int(m[2])].decode(errors="ignore")
-    return value
+    return value.replace("/", "⧸")
 
 
 filename = re.sub(r"%\((\w+)\)(?:\.(\d+)B|s)", field, name)

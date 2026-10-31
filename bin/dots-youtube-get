@@ -21,8 +21,8 @@ FORMATS = {
 TEMPLATE = 'download:{"pct":"%(progress._percent_str)s","s":"%(progress.status)s"}'
 # The after_move line's prefix: a progress line starts with {, this one never does.
 SAVED = "file "
-# .150B cuts a title to 150 bytes, so a long one stays under the filesystem's 255-byte name limit.
-NAME = "%(title).150B [%(id)s].%(ext)s"
+# yt-dlp cuts the title to 70 bytes and then turns each of / | : ? " * < > \ into a 3-byte look-alike, so even a title of nothing else stays under the filesystem's 255-byte name limit with the id, the extension and the .f<format>.part a merge adds.
+NAME = "%(title).70B [%(id)s].%(ext)s"
 PASS = ["WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_MUSIC_DIR", "XDG_VIDEOS_DIR", "HOME", "DOTS_DEV_DIR"]
 # dots-call beside this script: the shell starts it by path, and the nested session's PATH holds no bin/.
 DOTS_CALL = os.path.join(os.path.dirname(os.path.realpath(__file__)), "dots-call")
@@ -117,12 +117,8 @@ def active():
 
 
 # Called under the lock, so no second enqueue sees the queue running before its unit is up; systemd refuses the name while the last worker still exits, so it tries again for 3 s.
-def start_unit(ytdlp):
+def start_unit(ytdlp, deno):
     command = ["systemd-run", "--user", "--collect", "--quiet", "--unit", unit_name(), "--setenv=DOTS_YOUTUBE_YTDLP=" + ytdlp]
-    try:
-        deno = subprocess.run(["mise", "which", "deno"], capture_output=True, text=True, timeout=10).stdout.strip()
-    except (OSError, subprocess.SubprocessError):
-        deno = ""
     if deno:
         command.append("--setenv=DOTS_YOUTUBE_DENO=" + deno)
     command += ["--setenv=" + name for name in PASS if name in os.environ]
@@ -140,6 +136,11 @@ def enqueue(kind, playlist):
     if not ytdlp:
         out({"error": "yt-dlp is missing: run dots update"})
         return 1
+    # Found before the lock, as mise can stall for seconds on a cold cache and every where waits on the lock.
+    try:
+        deno = subprocess.run(["mise", "which", "deno"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        deno = ""
     rows = []
     for line in sys.stdin:
         try:
@@ -168,7 +169,7 @@ def enqueue(kind, playlist):
         if (accepted and not queue["running"]) or crashed:
             queue["running"] = True
             save(queue_path(), queue)
-            if not start_unit(ytdlp):
+            if not start_unit(ytdlp, deno):
                 queue["running"] = False
                 save(queue_path(), queue)
                 out({"error": "the download did not start: systemd-run refused %s for 3 s" % unit_name()})
