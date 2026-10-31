@@ -136,7 +136,9 @@ to the file its `"spill"` names, with the same `i` and `ref` for each node.
 Read the file with `jq`, not whole.
 
 An app missing from `gui apps`, or whose `tree` is empty (Qt Quick apps),
-exposes nothing: use pixels. Chromium and Electron need
+exposes nothing: use pixels. The shell itself is kept off the a11y bus: on
+it, Quickshell showed 10 nodes with no names, launcher or control panel
+open, at 181 MiB idle, so drive its surfaces through `dots-call` instead. Chromium and Electron need
 `--force-renderer-accessibility` to appear.
 
 ## 3. Pixels: grim, window shots, OCR

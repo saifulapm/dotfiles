@@ -1028,10 +1028,18 @@ test('desk jev choice prints none as a choice', () => {
   assert.deepEqual(JSON.parse(r.stdout), { choice: 'none', confidence: 0.95, present: 0.05, destructive: 0 });
 });
 
-// The probe found niri places only floating windows (rulings 3D39GSN2, VTHGV2MR), and no combo is blocked because niri runs no bind from a virtual keyboard (W22CGMKB).
+// The probe found niri places only floating windows, and no combo is blocked because niri runs no bind from a virtual keyboard.
 test('SKILL.md says niri places only floating windows, and why screen key blocks no combo', () => {
   assert.match(doc, /floating window \(`layout\.tile_pos_in_workspace_view`/);
   assert.match(doc, /no position for a tiled/);
   assert.doesNotMatch(doc, /niri gives a window's size but not its position/);
   assert.match(doc, /No combo is blocked: niri runs no bind from the virtual keyboard/);
+});
+
+// The probe found Quickshell's tree nameless and its idle RSS over 150 MiB on the a11y bus, so the shell stays off it.
+test('the shell unit stays off the a11y bus, and SKILL.md says why', () => {
+  const unit = text(join(repo, 'home/dot_config/systemd/user/dots-shell.service'));
+  assert.doesNotMatch(unit, /QT_ACCESSIBILITY/);
+  assert.match(doc, /The shell itself is kept off the a11y bus/);
+  assert.match(doc, /no names/);
 });
