@@ -70,7 +70,8 @@ function place(step, tmp) {
 function recent(unit, store) {
   const limit = Date.now() + 24 * 3600000;
   let dropped = 0;
-  const ok = (x) => x.updatedAt <= limit || (dropped++, false);
+  // A record with no stamp merges as stamped long ago.
+  const ok = (x) => !(x.updatedAt > limit) || (dropped++, false);
   if (unit === 'notes') return { store: Object.assign({}, store, { notes: store.notes.filter(ok) }), dropped };
   if (unit === 'youtube') {
     const kept = eachPlaylist(store, (l) => (newest(l) <= limit ? keep(l, ok) : (dropped++, null)));
@@ -86,7 +87,7 @@ function restamp(unit, store) {
   const limit = now + 24 * 3600000;
   let fixed = 0;
   const fix = (x) => {
-    if (x.updatedAt <= limit) return x;
+    if (!(x.updatedAt > limit)) return x;
     fixed++;
     if (!x.stamps) return Object.assign({}, x, { updatedAt: now });
     const stamps = Object.fromEntries(Object.entries(x.stamps).map(([f, t]) => [f, t > limit ? now : t]));
@@ -114,8 +115,15 @@ function merge(unit, path, files) {
       continue;
     }
     const { store: kept, dropped } = recent(unit, store);
-    others.push(kept);
     if (dropped) skipped.push(`${unit}: left out ${dropped} record${dropped === 1 ? '' : 's'} from ${basename(f)}, stamped more than a day ahead`);
+    if (unit !== 'youtube') {
+      others.push(kept);
+      continue;
+    }
+    const { store: videos, odd } = videosOnly(kept);
+    others.push(videos);
+    const what = odd === 1 ? 'record from ' + basename(f) + ', which is not a video' : 'records from ' + basename(f) + ', which are not videos';
+    if (odd) skipped.push(`${unit}: left out ${odd} ${what}`);
   }
   for (let i = 0; i < 3; i++) {
     if (!round(unit, path, others)) continue;
@@ -142,6 +150,16 @@ function eachPlaylist(store, fn) {
 const keep = (l, ok) => Object.assign({}, l, { items: Object.fromEntries(Object.entries(l.items).filter(([, it]) => ok(it))) });
 
 const mapItems = (l, fn) => Object.assign({}, l, { items: Object.fromEntries(Object.entries(l.items).map(([k, it]) => [k, fn(it)])) });
+
+const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+
+// The App draws only items whose id is a video id, so a pulled item with any other id, or filed under another, would be counted in its Playlist and never drawn.
+function videosOnly(store) {
+  let odd = 0;
+  const ok = ([k, it]) => (k === it.id && VIDEO_ID.test(k)) || (odd++, false);
+  const kept = eachPlaylist(store, (l) => Object.assign({}, l, { items: Object.fromEntries(Object.entries(l.items).filter(ok)) }));
+  return { store: kept, odd };
+}
 
 // A Playlist counts once however many of its stamps ran ahead.
 function fixList(l, limit, now, count) {
