@@ -121,3 +121,18 @@ test('anything but a video id is no video', (t) => {
   assert.equal(run('video').status, 2);
   assert.equal(run('audio', 'fakeVid0001').status, 2, 'the Queue takes its items over the socket');
 });
+
+test('several ids start one unit whose mpv gets their watch URLs in order', (t) => {
+  const { run, argv } = rig(t);
+  const r = run('video', 'fakeVid0001', 'fakeVid0002', 'fakeVid0003');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { unit: 'youtube-video-1' });
+  assert.deepEqual(argv('youtube-video-1').slice(-3), ['fakeVid0001', 'fakeVid0002', 'fakeVid0003'].map((id) => `https://www.youtube.com/watch?v=${id}`));
+});
+
+test('a bad id among several is a usage error and starts nothing', (t) => {
+  const { run, ran } = rig(t);
+  assert.equal(run('video', 'fakeVid0001', '--input-ipc-server=/tmp/x', 'fakeVid0003').status, 2);
+  assert.equal(run('video', 'fakeVid0001', 'short').status, 2);
+  assert.equal(ran('youtube-video-1'), false);
+});

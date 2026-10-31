@@ -15,7 +15,7 @@ const playing = (over) =>
 
 test('a fresh Queue reads idle with nothing in it', () => {
   const s = Q.initial();
-  for (const [k, v] of Object.entries({ pos: -1, count: 0, paused: false, time: null, loop: false, idle: true, path: '', title: '', channel: '', secs: null })) assert.equal(s[k], v, k);
+  for (const [k, v] of Object.entries({ pos: -1, count: 0, paused: false, time: null, loop: false, idle: true, path: '', title: '', channel: '', secs: null, shuffled: false })) assert.equal(s[k], v, k);
 });
 
 test('the line reads the playing title, channel and both clocks, with no +N on the last item', () => {
@@ -42,7 +42,7 @@ test('no Queue, and a Queue whose playlist ended, read an empty line', () => {
 test('the lines sent on connect observe the Queue and ask for the items mpv keeps', () => {
   const sent = Q.connectLines().map((l) => JSON.parse(l));
   const observed = sent.filter((c) => c.command[0] === 'observe_property').map((c) => c.command[2]);
-  for (const name of ['playlist-pos', 'playlist-count', 'pause', 'time-pos', 'loop-playlist', 'idle-active', 'path', 'media-title']) assert.ok(observed.includes(name), name);
+  for (const name of ['playlist-pos', 'playlist-count', 'pause', 'time-pos', 'loop-playlist', 'idle-active', 'path', 'media-title', 'user-data/youtube-shuffled']) assert.ok(observed.includes(name), name);
   const get = sent.filter((c) => c.command[0] === 'get_property');
   assert.deepEqual(get.map((c) => c.command[1]), ['user-data/youtube']);
   assert.equal(typeof get[0].request_id, 'number');
@@ -106,6 +106,7 @@ test('m stores the row in mpv, then replaces the Queue with it titled as the row
   assert.deepEqual(Q.itemLines(playing({ count: 3 }), ARUARIAN, 'play').map((l) => JSON.parse(l)), [
     { command: ['set_property', 'user-data/youtube/fakeVid0001', { title: 'Aruarian Dance', channel: 'Nujabes - Topic', secs: 267 }] },
     { command: ['loadfile', watch('fakeVid0001'), 'replace', -1, { 'force-media-title': 'Aruarian Dance' }] },
+    { command: ['set_property', 'user-data/youtube-shuffled', false] },
     { command: ['set_property', 'pause', false] },
   ]);
 });
@@ -166,8 +167,9 @@ test('a pressed 20 times with no Queue starts one unit and sends 20 adds in orde
   assert.equal(link.status, 'starting');
   const done = Q.connected(link);
   assert.deepEqual(done.link, { status: 'up', pending: [] });
-  assert.equal(done.write.length, 41, 'a store and a load per row, and the replace clears pause');
-  assert.deepEqual(JSON.parse(done.write[2]).command, ['set_property', 'pause', false]);
+  assert.equal(done.write.length, 42, 'a store and a load per row, and the replace clears shuffled and pause');
+  assert.deepEqual(JSON.parse(done.write[2]).command, ['set_property', 'user-data/youtube-shuffled', false]);
+  assert.deepEqual(JSON.parse(done.write[3]).command, ['set_property', 'pause', false]);
   const loads = done.write.map((l) => JSON.parse(l).command).filter((c) => c[0] === 'loadfile');
   assert.deepEqual(loads.map((c) => c[1]), rows.map((r) => watch(r.id)));
   assert.deepEqual(loads.map((c) => c[2]), ['replace', ...Array(19).fill('append-play')]);
@@ -188,4 +190,76 @@ test('Space toggles pause, a video sets it, and r toggles repeat between inf and
   assert.deepEqual(JSON.parse(Q.setPauseLine(true)), { command: ['set_property', 'pause', true] });
   assert.deepEqual(JSON.parse(Q.repeatLine(playing())), { command: ['set_property', 'loop-playlist', 'inf'] });
   assert.deepEqual(JSON.parse(Q.repeatLine(playing({ loop: true }))), { command: ['set_property', 'loop-playlist', 'no'] });
+});
+
+const row = (n, over) => Object.assign({ id: `fakeVid${String(n).padStart(4, '0')}`, title: `Song ${n}`, channel: 'Nujabes', secs: 100 + n }, over);
+const rows5 = [1, 2, 3, 4, 5].map((n) => row(n));
+const cmds = (lines) => lines.map((l) => JSON.parse(l).command);
+const loads = (lines) => cmds(lines).filter((c) => c[0] === 'loadfile');
+const SHUF = 'user-data/youtube-shuffled';
+
+test('a playlist played loads its rows in order, the first replacing, then unpauses', () => {
+  const lines = Q.listLines(playing({ count: 3, paused: true }), [row(1), row(2), row(3)], 'play');
+  assert.deepEqual(loads(lines).map((c) => [c[1], c[2]]), [[watch('fakeVid0001'), 'replace'], [watch('fakeVid0002'), 'append-play'], [watch('fakeVid0003'), 'append-play']]);
+  assert.deepEqual(cmds(lines).filter((c) => c[1] === SHUF), [['set_property', SHUF, false]]);
+  assert.deepEqual(cmds(lines).at(-1), ['set_property', 'pause', false]);
+  assert.deepEqual(cmds(lines)[0], ['set_property', 'user-data/youtube/fakeVid0001', { title: 'Song 1', channel: 'Nujabes', secs: 101 }]);
+});
+
+test('an unavailable row never reaches mpv, and a list of only those sends nothing', () => {
+  const lines = Q.listLines(Q.initial(), [row(1), row(2, { unavailable: 'Private video' }), row(3)], 'play');
+  assert.deepEqual(loads(lines).map((c) => c[1]), [watch('fakeVid0001'), watch('fakeVid0003')]);
+  assert.ok(!lines.join('').includes('fakeVid0002'));
+  assert.deepEqual(Q.listLines(Q.initial(), [row(1, { unavailable: 'Deleted video' })], 'play'), []);
+  assert.deepEqual(Q.listLines(Q.initial(), [], 'add'), []);
+});
+
+test('a playlist added appends its rows in order to a running Queue and leaves the shuffled flag alone', () => {
+  const lines = Q.listLines(playing(), [row(1), row(2), row(3)], 'add');
+  assert.deepEqual(loads(lines).map((c) => c[2]), ['append-play', 'append-play', 'append-play']);
+  assert.deepEqual(loads(lines).map((c) => c[1]), [watch('fakeVid0001'), watch('fakeVid0002'), watch('fakeVid0003')]);
+  assert.ok(!lines.join('').includes(SHUF));
+  assert.equal(lines.length, 6);
+});
+
+test('a playlist added to a stopped Queue starts afresh once, and counts as one ask', () => {
+  let s = Q.initial();
+  const first = Q.listLines(s, [row(1), row(2)], 'add');
+  assert.deepEqual(loads(first).map((c) => c[2]), ['replace', 'append-play']);
+  assert.deepEqual(cmds(first).at(-1), ['set_property', 'pause', false]);
+  s = Q.asked(s);
+  assert.equal(s.asked, 1);
+  assert.deepEqual(loads(Q.listLines(s, [row(3)], 'add')).map((c) => c[2]), ['append-play']);
+});
+
+test('shuffle returns a new array in a fixed order for a seed, and leaves its input alone', () => {
+  const copy = rows5.slice();
+  const a = Q.shuffle(rows5, 7);
+  assert.deepEqual(rows5, copy);
+  assert.notStrictEqual(a, rows5);
+  assert.deepEqual(a.map((r) => r.id).sort(), rows5.map((r) => r.id));
+  assert.notDeepEqual(a.map((r) => r.id), rows5.map((r) => r.id));
+  assert.deepEqual(Q.shuffle(rows5, 7), a);
+  assert.equal(Q.shuffle(rows5).length, 5);
+});
+
+test('a shuffled playlist loads the seed\'s order, replaces the Queue and sets the shuffled flag', () => {
+  const lines = Q.shuffledLines(playing(), rows5, 7);
+  const order = Q.shuffle(rows5, 7).map((r) => watch(r.id));
+  assert.deepEqual(loads(lines).map((c) => c[1]), order);
+  assert.notDeepEqual(order, rows5.map((r) => watch(r.id)));
+  assert.deepEqual(loads(lines).map((c) => c[2]), ['replace', ...Array(4).fill('append-play')]);
+  assert.deepEqual(cmds(lines).filter((c) => c[1] === SHUF), [['set_property', SHUF, true]]);
+  assert.deepEqual(cmds(lines).at(-1), ['set_property', 'pause', false]);
+  assert.deepEqual(Q.shuffledLines(playing(), [row(1, { unavailable: 'x' })], 7), []);
+});
+
+test('the shuffled flag shows on the now-playing line, and a new mpv reads as not shuffled', () => {
+  const items = { fakeVid0001: { title: 'Aruarian Dance', channel: 'Nujabes - Topic', secs: 267 } };
+  const s = feed(playing({ count: 15, pos: 0, items }), [ev(SHUF, true)]);
+  assert.equal(s.shuffled, true);
+  assert.equal(Q.nowLine(s), '▶ Aruarian Dance — Nujabes - Topic · 0:00 / 4:27 · +14 · shuffled');
+  assert.equal(Q.nowLine(playing({ shuffled: true })), '▶ Aruarian Dance — Nujabes - Topic · 0:00 / 4:27 · shuffled');
+  assert.equal(feed(s, [ev(SHUF)]).shuffled, false);
+  assert.equal(feed(s, [ev(SHUF, 'true')]).shuffled, false);
 });

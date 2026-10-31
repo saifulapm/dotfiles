@@ -4,17 +4,19 @@ import { duration } from './youtube.mjs';
 // The reply to the items get on connect carries this id, so the reducer can tell it from the observe replies.
 const ITEMS_REQUEST = 1;
 const ITEMS = 'user-data/youtube';
+// Set by the App when it loads a shuffled playlist, so a reopened App still reads the Queue as shuffled.
+const SHUFFLED = 'user-data/youtube-shuffled';
 
 const line = (command) => JSON.stringify({ command });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
 
 // asked counts the items asked for while the Queue read stopped, until mpv reports one playing; items is mpv's user-data by video id.
-export const initial = () => ({ pos: -1, count: 0, paused: false, time: null, loop: false, idle: true, path: '', title: '', channel: '', secs: null, items: {}, asked: 0 });
+export const initial = () => ({ pos: -1, count: 0, paused: false, time: null, loop: false, idle: true, path: '', title: '', channel: '', secs: null, items: {}, asked: 0, shuffled: false });
 
 // user-data/youtube is observed too, so a row the App just loaded shows its channel without a reconnect.
 export const connectLines = () => [
-  ...['playlist-pos', 'playlist-count', 'pause', 'time-pos', 'loop-playlist', 'idle-active', 'path', 'media-title', ITEMS].map((name, i) => line(['observe_property', i + 1, name])),
+  ...['playlist-pos', 'playlist-count', 'pause', 'time-pos', 'loop-playlist', 'idle-active', 'path', 'media-title', ITEMS, SHUFFLED].map((name, i) => line(['observe_property', i + 1, name])),
   JSON.stringify({ command: ['get_property', ITEMS], request_id: ITEMS_REQUEST }),
 ];
 
@@ -37,6 +39,7 @@ const PROPS = {
   path: (v) => ({ path: typeof v === 'string' ? v : '' }),
   'media-title': (v) => ({ title: typeof v === 'string' ? v : '' }),
   [ITEMS]: (v) => ({ items: isObject(v) ? v : {} }),
+  [SHUFFLED]: (v) => ({ shuffled: v === true }),
 };
 
 export function reduce(state, text) {
@@ -61,7 +64,8 @@ export function nowLine(state) {
     (state.channel ? ` — ${state.channel}` : '') +
     ` · ${duration(state.time === null ? 0 : state.time)}` +
     (state.secs === null ? '' : ` / ${duration(state.secs)}`) +
-    (left > 0 ? ` · +${left}` : '')
+    (left > 0 ? ` · +${left}` : '') +
+    (state.shuffled ? ' · shuffled' : '')
   );
 }
 
@@ -74,9 +78,53 @@ export function itemLines(state, row, how) {
     line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]),
     line(['loadfile', watch(row.id), mode, -1, { 'force-media-title': row.title }]),
   ];
-  // mpv keeps pause from one file to the next, so a Queue a video paused would load the row paused and stay silent.
-  return mode === 'replace' ? lines.concat([setPauseLine(false)]) : lines;
+  // mpv keeps pause from one file to the next, so a Queue a video paused would load the row paused and stay silent. A single row replacing the Queue is no longer a shuffled playlist.
+  return mode === 'replace' ? lines.concat([shuffledLine(false), setPauseLine(false)]) : lines;
 }
+
+const shuffledLine = (on) => line(['set_property', SHUFFLED, on]);
+const loadable = (rows) => rows.filter((r) => !r.unavailable);
+
+// A whole playlist's rows in order: 'play' replaces the Queue, 'add' appends, and a stopped Queue with no ask yet starts afresh. A row YouTube marks unavailable stays out, since mpv would only skip it.
+export const listLines = (state, rows, how) => load(state, rows, how, false);
+
+function load(state, rows, how, shuffled) {
+  const list = loadable(rows);
+  if (list.length === 0) return [];
+  const replace = how === 'play' || (stopped(state) && state.asked === 0);
+  const lines = [];
+  list.forEach((row, i) => {
+    lines.push(line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]));
+    lines.push(line(['loadfile', watch(row.id), replace && i === 0 ? 'replace' : 'append-play', -1, { 'force-media-title': row.title }]));
+  });
+  if (how === 'play') lines.push(shuffledLine(shuffled));
+  return replace ? lines.concat([setPauseLine(false)]) : lines;
+}
+
+// A seeded Mulberry32, so a seed gives the same order twice.
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// Fisher-Yates on a copy; a seed that is no finite number draws from Math.random.
+export function shuffle(rows, seed) {
+  const rand = Number.isFinite(seed) ? mulberry32(seed) : Math.random;
+  const out = rows.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+export const shuffledLines = (state, rows, seed) => load(state, shuffle(rows, seed), 'play', true);
 
 // The App calls this after each itemLines, since mpv reports nothing back before the next press can come.
 export const asked = (state) => (stopped(state) ? Object.assign({}, state, { asked: state.asked + 1 }) : state);

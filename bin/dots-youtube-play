@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# dots-youtube-play video <id>: plays a YouTube video in an mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}. dots-youtube-play audio: starts the Queue, one audio-only mpv idle in the unit youtube-audio, unless it runs already, and prints {"unit", "socket"} once its JSON IPC socket is there; the App loads every item through that socket.
+# dots-youtube-play video <id>...: plays one or more YouTube videos, in order, in one mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}. dots-youtube-play audio: starts the Queue, one audio-only mpv idle in the unit youtube-audio, unless it runs already, and prints {"unit", "socket"} once its JSON IPC socket is there; the App loads every item through that socket.
 set -uo pipefail
 {
 usage() {
-  echo "dots-youtube-play: usage: video <video id> | audio" >&2
+  echo "dots-youtube-play: usage: video <video id>... | audio" >&2
   exit 2
 }
 case "${1:-}" in
 video)
-  [ $# = 2 ] || usage
+  [ $# -ge 2 ] || usage
   # An id is all the App plays here, so nothing else reaches mpv's command line as an option.
-  [[ $2 =~ ^[A-Za-z0-9_-]{11}$ ]] || usage
+  for id in "${@:2}"; do
+    [[ $id =~ ^[A-Za-z0-9_-]{11}$ ]] || usage
+  done
   ;;
 audio) [ $# = 1 ] || usage ;;
 *) usage ;;
@@ -54,13 +56,14 @@ if [ "$1" = audio ]; then
   exit 1
 fi
 
-url=https://www.youtube.com/watch?v=$2
+urls=()
+for id in "${@:2}"; do urls+=("https://www.youtube.com/watch?v=$id"); done
 player+=(--force-window=immediate "--ytdl-format=bv*[height<=1080]+ba/b[height<=1080]")
 # The first free number; systemd-run refuses a name another play took a moment ago, so the next is tried.
 for n in $(seq 1 99); do
   unit=youtube-video-$n
   systemctl --user is-active --quiet "$unit.service" && continue
-  if systemd-run --user --collect --quiet --unit "$unit" "${pass[@]}" -- "${player[@]}" "$url" 2>/dev/null; then
+  if systemd-run --user --collect --quiet --unit "$unit" "${pass[@]}" -- "${player[@]}" "${urls[@]}" 2>/dev/null; then
     jq -nc --arg u "$unit" '{unit: $u}'
     exit 0
   fi
