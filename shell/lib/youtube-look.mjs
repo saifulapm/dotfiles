@@ -49,7 +49,7 @@ export function youtubeLook(tokens) {
     },
     empty(view) {
       if (view === 'saved') return { head: EMPTY.saved.head, key: EMPTY.saved.key, rest: EMPTY.saved.rest };
-      if (view === 'history') return { head: '', key: '', rest: 'Enter or m plays a video' };
+      if (view === 'history') return { head: '', key: '↵', rest: 'or m plays a video' };
       return null;
     },
     failed: {

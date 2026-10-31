@@ -21,12 +21,13 @@ ShellRoot {
     property string pane: "list"
     readonly property string focusAt: board.fieldFocused ? "field" : pane
     readonly property string query: board.queryText
-    // The last search's rows and Saved's, as youtube.mjs rows() makes them; the list draws the view's, with the cursor on one.
+    // The last search's rows, Saved's and History's, as youtube.mjs rows() makes them; the list draws the view's, with the cursor on one.
     property var results: []
     readonly property var savedRows: YT.rows({
         rows: store.saved
     })
-    readonly property var rows: view === "search" ? results : view === "saved" ? savedRows : []
+    readonly property var historyRows: history.rows
+    readonly property var rows: view === "search" ? results : view === "saved" ? savedRows : historyRows
     property int cursor: 0
     // Each search's number: an answer from any search but the last is dropped.
     property int searchSeq: 0
@@ -37,7 +38,7 @@ ShellRoot {
     // The youtube-video-<n> units this App started, in order.
     property var units: []
     readonly property int savedCount: savedRows.length
-    property int historyCount: 0
+    readonly property int historyCount: historyRows.length
     // The Queue as mpv reports it over youtube-audio's socket, and the buffer that holds what m and a send while the unit starts.
     property var queue: Q.initial()
     property var link: Q.link()
@@ -92,6 +93,7 @@ ShellRoot {
     function play(row) {
         if (!row)
             return;
+        history.add(row);
         queueCommand(Q.setPauseLine(true));
         // The repo's bin is on the session PATH only through fish, so the player is found beside the shell.
         run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video", row.id], answer => {
@@ -104,6 +106,7 @@ ShellRoot {
     function queueItem(row, how) {
         if (!row)
             return;
+        history.add(row);
         const lines = Q.itemLines(queue, row, how);
         queue = Q.asked(queue);
         const r = Q.send(link, lines);
@@ -164,8 +167,9 @@ ShellRoot {
 
     // Each view's list starts at its top.
     onViewChanged: cursor = 0
-    // Saved draws from the store with no search behind it, so a thumbnail no list has fetched yet is asked for here.
+    // Saved and History draw from their files with no search behind them, so a thumbnail no list has fetched yet is asked for here.
     onSavedRowsChanged: fetchThumbs(savedRows.filter(r => !thumbs[r.thumb]))
+    onHistoryRowsChanged: fetchThumbs(historyRows.filter(r => !thumbs[r.thumb]))
 
     // One thumbs call for a list's ids; a thumb it does not name keeps its row's placeholder.
     function fetchThumbs(list) {
@@ -217,6 +221,10 @@ ShellRoot {
 
     YouTubeStore {
         id: store
+    }
+
+    YouTubeHistory {
+        id: history
     }
 
     Component {

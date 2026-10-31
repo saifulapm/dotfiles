@@ -33,7 +33,7 @@ test('an empty view names the key that fills it, and its legend keeps search, si
   for (const name of ['paper', 'artboard', 'blueprint']) {
     const l = look(name);
     assert.deepEqual(l.empty('saved'), { head: 'Nothing saved yet', key: 's', rest: 'saves a video' }, name);
-    assert.deepEqual(l.empty('history'), { head: '', key: '', rest: 'Enter or m plays a video' }, name);
+    assert.deepEqual(l.empty('history'), { head: '', key: '↵', rest: 'or m plays a video' }, name);
     assert.equal(l.empty('search'), null, name);
     assert.equal(l.noPlaylists, 'n makes one', name);
   }
