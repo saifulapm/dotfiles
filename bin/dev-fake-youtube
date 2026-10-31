@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev's dots-youtube-api: answers search and thumbs from the canned JSON and thumbnails in dev/youtube, so a nested check never reaches YouTube, and logs each call to DOTS_DEV_DIR/youtube.log.
+# just dev's dots-youtube-api: answers search, channel, playlist, resolve and thumbs from the canned JSON and thumbnails in dev/youtube, so a nested check never reaches YouTube, and logs each call to DOTS_DEV_DIR/youtube.log.
 set -euo pipefail
 {
 [ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-youtube: run it from a sourced just dev env" >&2; exit 1; }
@@ -7,16 +7,72 @@ fixtures=$(dirname "$(realpath "$0")")/../dev/youtube
 fixtures=$(realpath "$fixtures")
 echo "$*" >>"$DOTS_DEV_DIR/youtube.log"
 
-case "${1:-}" in
-search)
-  [ $# = 4 ] || { echo "dev-fake-youtube: usage: search <query> <type> <offset>" >&2; exit 2; }
-  # With DOTS_DEV_DIR/youtube-fail naming runtime, extraction or network, every search fails that way until the file goes, as the real CLI does with no deno, a stale yt-dlp or no network.
-  fail=$DOTS_DEV_DIR/youtube-fail
+# With DOTS_DEV_DIR/youtube-fail naming runtime, extraction or network, every verb but thumbs fails that way until the file goes, as the real CLI does with no deno, a stale yt-dlp or no network.
+fail_if_asked() {
+  local fail=$DOTS_DEV_DIR/youtube-fail
   if [ -f "$fail" ]; then
     jq -c . "$fixtures/fail-$(tr -d '[:space:]' <"$fail").json"
     exit 1
   fi
-  jq -c --argjson at "$4" '(.rows | length) as $n | .rows |= .[$at:$at + 20] | .next = ([$at + 20, $n] | min)' "$fixtures/search.json"
+}
+
+case "${1:-}" in
+search)
+  [ $# = 4 ] || { echo "dev-fake-youtube: usage: search <query> <type> <offset>" >&2; exit 2; }
+  fail_if_asked
+  case $3 in
+  videos) file=search ;;
+  playlists | channels) file=$3 ;;
+  *) echo "dev-fake-youtube: unknown search type: $3" >&2; exit 2 ;;
+  esac
+  jq -c --argjson at "$4" '(.rows | length) as $n | .rows |= .[$at:$at + 20] | .next = ([$at + 20, $n] | min)' "$fixtures/$file.json"
+  ;;
+channel)
+  [ $# = 3 ] || { echo "dev-fake-youtube: usage: channel <UC-id|@handle> <offset>" >&2; exit 2; }
+  fail_if_asked
+  id=$2
+  [ "$id" != @nujabes ] || id=UCfakeChan00000000000001
+  # A channel with no videos tab, and one the fixtures lack, answer an empty page that stays at its offset.
+  jq -c -n --arg id "$id" --argjson at "$3" --slurpfile all "$fixtures/uploads.json" '
+    ($all[0][$id] // {title: null, rows: []}) as $c
+    | $c | (.rows | length) as $n
+    | .next = (if $n == 0 then $at else ([$at + 20, $n] | min) end)
+    | .rows |= .[$at:$at + 20]'
+  ;;
+playlist)
+  [ $# = 2 ] || { echo "dev-fake-youtube: usage: playlist <id|url>" >&2; exit 2; }
+  fail_if_asked
+  id=$2
+  [[ $id =~ list=([A-Za-z0-9_-]+) ]] && id=${BASH_REMATCH[1]}
+  if ! jq -ce --arg id "$id" '.[$id] // empty' "$fixtures/playlist-items.json" | grep .; then
+    jq -nc --arg id "$id" '{error: "The playlist does not exist.", kind: "extraction", raw: "ERROR: [youtube:tab] \($id): YouTube said: The playlist does not exist."}'
+    exit 1
+  fi
+  ;;
+resolve)
+  [ $# = 2 ] || { echo "dev-fake-youtube: usage: resolve <url>" >&2; exit 2; }
+  fail_if_asked
+  url=${2#http://}
+  url=${url#https://}
+  vid='[A-Za-z0-9_-]{11}'
+  video=
+  if [[ $url =~ ^(www\.|m\.|music\.)?youtube\.com/watch\?(.*&)?v=($vid)(&|$) ]]; then
+    video=${BASH_REMATCH[3]}
+  elif [[ $url =~ ^youtu\.be/($vid)([?/&]|$) ]]; then
+    video=${BASH_REMATCH[1]}
+  fi
+  if [ -n "$video" ]; then
+    # A pasted id the fixtures lack gets a stand-in row.
+    jq -c --arg id "$video" '(.rows | map(select(.id == $id))[0]) // {id: $id, kind: "video", title: "Pasted video", channel: "Pasted", duration: 61, thumb: $id} | {kind: "video", id: $id, rows: [.]}' "$fixtures/search.json"
+  elif [[ $url =~ ^(www\.|m\.)?youtube\.com/playlist\?(.*&)?list=([A-Za-z0-9_-]+) ]]; then
+    jq -nc --arg id "${BASH_REMATCH[3]}" '{kind: "playlist", id: $id}'
+  elif [[ $url =~ ^(www\.|m\.)?youtube\.com/(@[A-Za-z0-9_.-]+)(/|\?|$) ]]; then
+    jq -nc --arg id "${BASH_REMATCH[2]}" '{kind: "channel", id: $id}'
+  elif [[ $url =~ ^(www\.|m\.)?youtube\.com/channel/(UC[A-Za-z0-9_-]{22})(/|\?|$) ]]; then
+    jq -nc --arg id "${BASH_REMATCH[2]}" '{kind: "channel", id: $id}'
+  else
+    echo '{"kind":"none"}'
+  fi
   ;;
 thumbs)
   shift

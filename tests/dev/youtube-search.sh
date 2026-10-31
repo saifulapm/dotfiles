@@ -67,7 +67,7 @@ check "fakeVid0008 has no file and keeps Paper's hatched placeholder ($(yt_state
   yt_is '.look.viewFont == "Instrument Serif" and (.drawn[7] | .id == "fakeVid0008" and .thumb.shown == false and .thumb.placeholder == "hatched")'
 check "each shown thumbnail decodes at no more than twice its drawn 72x40 ($(yt_state | jq -c '.drawn[0].thumb | {width, height, decodedWidth, decodedHeight}'))" \
   yt_is '[.drawn[] | select(.thumb.shown) | .thumb] | length == 19 and all(.width == 72 and .height == 40 and .decodedWidth > 0 and .decodedHeight > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height)'
-page_ids=$(jq -r '[.rows[].thumb] | join(" ")' "$repo/dev/youtube/search.json")
+page_ids=$(jq -r '[.rows[0:20][].thumb] | join(" ")' "$repo/dev/youtube/search.json")
 check "the App asked thumbs once, for the page's 20 ids ($(grep -c '^thumbs ' "$calls" 2>/dev/null))" \
   test "$(grep '^thumbs ' "$calls" 2>/dev/null)" = "thumbs $page_ids"
 check "with 20 thumbnails drawn the first frame was $(yt_state | jq .firstFrameMs) ms and RSS is $(yt_state | jq .rssKiB) KiB, under 250 MiB" \
