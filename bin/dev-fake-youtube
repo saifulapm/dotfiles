@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# just dev's dots-youtube-api: answers search and thumbs from the canned JSON and thumbnails in dev/youtube, so a nested check never reaches YouTube, and logs each call to DOTS_DEV_DIR/youtube.log.
+set -euo pipefail
+{
+[ -n "${DOTS_DEV_DIR:-}" ] || { echo "dev-fake-youtube: run it from a sourced just dev env" >&2; exit 1; }
+fixtures=$(dirname "$(realpath "$0")")/../dev/youtube
+fixtures=$(realpath "$fixtures")
+echo "$*" >>"$DOTS_DEV_DIR/youtube.log"
+
+case "${1:-}" in
+search)
+  [ $# = 4 ] || { echo "dev-fake-youtube: usage: search <query> <type> <offset>" >&2; exit 2; }
+  # With DOTS_DEV_DIR/youtube-fail naming runtime, extraction or network, every search fails that way until the file goes, as the real CLI does with no deno, a stale yt-dlp or no network.
+  fail=$DOTS_DEV_DIR/youtube-fail
+  if [ -f "$fail" ]; then
+    jq -c . "$fixtures/fail-$(tr -d '[:space:]' <"$fail").json"
+    exit 1
+  fi
+  jq -c --argjson at "$4" '.rows |= .[$at:$at + 20]' "$fixtures/search.json"
+  ;;
+thumbs)
+  shift
+  # fakeVid0008 has no thumbnail, as a failed fetch leaves a row on its placeholder.
+  files='{}'
+  for id; do
+    [[ $id =~ ^[A-Za-z0-9_-]{11}$ && -f $fixtures/thumbs/$id.jpg ]] || continue
+    files=$(jq -c --arg id "$id" --arg f "$fixtures/thumbs/$id.jpg" '. + {($id): $f}' <<<"$files")
+  done
+  jq -nc --arg dir "$fixtures/thumbs" --argjson files "$files" '{dir: $dir, files: $files}'
+  ;;
+*)
+  echo "dev-fake-youtube: unknown verb: $*" >&2
+  exit 2
+  ;;
+esac
+exit
+}
