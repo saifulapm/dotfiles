@@ -20,6 +20,9 @@ check() {
   if "$@"; then echo "ok   $name"; else echo "FAIL $name"; fails=$((fails + 1)); fi
 }
 
+# An App spawned with a scratch XDG_DATA_HOME or XDG_CACHE_HOME hides mise's own dirs, and mise's first call in a fresh one fetches for seconds before it fails, so dots-youtube-play's deno lookup stalls a check's first play; its launch line names them.
+mise_dirs="MISE_DATA_DIR=${MISE_DATA_DIR:-$HOME/.local/share/mise} MISE_CACHE_DIR=${MISE_CACHE_DIR:-$HOME/.cache/mise}"
+
 now_ms() { echo $(($(date +%s%N) / 1000000)); }
 
 # A stale instance socket after a kill can make a bare call hang, so every call is bounded.

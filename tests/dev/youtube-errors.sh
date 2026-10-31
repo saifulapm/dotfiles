@@ -26,7 +26,7 @@ fails_with() { yt_is --arg e "$1" '.failed.fix == $e'; }
 "$repo/bin/dots" theme paper >/dev/null
 until_ok 3000 status_theme paper
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 

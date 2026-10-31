@@ -35,7 +35,7 @@ open_app() {
 }
 
 systemctl --user stop youtube-audio 2>/dev/null
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 open_app
 wtype /
 until_ok 1000 yt_is '.focus == "field"'

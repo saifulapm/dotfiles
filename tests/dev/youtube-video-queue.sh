@@ -51,7 +51,7 @@ busctl --user call org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.m
 until_ok 2000 other_is Paused
 check "another MPRIS player is on the bus first, paused" other_is Paused
 
-exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 wtype /
