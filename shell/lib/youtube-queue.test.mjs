@@ -265,3 +265,13 @@ test('the shuffled flag shows on the now-playing line, and a new mpv reads as no
   assert.equal(feed(s, [ev(SHUF)]).shuffled, false);
   assert.equal(feed(s, [ev(SHUF, 'true')]).shuffled, false);
 });
+
+// S must change the order: Fisher-Yates alone returns the list as it was one time in n!, two shuffles in eleven of a 3-song Playlist on the walk.
+test('S never loads a Playlist of two or more in its own order, whatever the seed, an unavailable row aside', () => {
+  const lists = [[row(1), row(2)], [row(1), row(2), row(3)], [row(1), row(9, { unavailable: 'made private' }), row(2), row(3)]];
+  for (const rows of lists) {
+    const own = rows.filter((r) => !r.unavailable).map((r) => watch(r.id)).join(' ');
+    for (let seed = 0; seed < 300; seed++) assert.notEqual(loads(Q.shuffledLines(Q.initial(), rows, seed)).map((c) => c[1]).join(' '), own, `seed ${seed}`);
+  }
+  assert.deepEqual(loads(Q.shuffledLines(Q.initial(), [row(1)], 3)).map((c) => c[1]), [watch('fakeVid0001')]);
+});

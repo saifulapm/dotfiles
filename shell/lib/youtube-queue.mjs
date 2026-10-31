@@ -125,7 +125,13 @@ export function shuffle(rows, seed) {
   return out;
 }
 
-export const shuffledLines = (state, rows, seed) => load(state, shuffle(rows, seed), 'play', true);
+// S changes the order of what plays: a draw that leaves the loadable rows as they were turns them by one.
+export function shuffledLines(state, rows, seed) {
+  const list = loadable(rows);
+  const drawn = shuffle(list, seed);
+  const same = drawn.every((r, i) => r === list[i]);
+  return load(state, same && list.length > 1 ? list.slice(1).concat(list.slice(0, 1)) : drawn, 'play', true);
+}
 
 // The App calls this after each itemLines, since mpv reports nothing back before the next press can come.
 export const asked = (state) => (stopped(state) ? Object.assign({}, state, { asked: state.asked + 1 }) : state);
