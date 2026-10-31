@@ -1,0 +1,823 @@
+import QtQuick
+import QtQuick.Layouts
+
+// The YouTube window as each theme's board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
+Rectangle {
+    id: board
+
+    required property var yt
+
+    readonly property var c: yt.c
+    readonly property var look: yt.look
+    readonly property string voice: yt.voice
+    readonly property bool plain: voice === "plain"
+    readonly property bool bracket: voice === "bracket"
+    readonly property bool caps: voice === "caps"
+    readonly property string bodyFont: (bracket ? yt.fonts.mono : yt.fonts.ui) ?? ""
+    readonly property color ruleColor: (caps ? c.ink : c.line) ?? "gray"
+    readonly property bool fieldFocused: field.activeFocus
+    readonly property string queryText: field.text
+    readonly property var emptyText: yt.look.empty(yt.view)
+
+    function focusField() {
+        field.forceActiveFocus();
+    }
+
+    function focusKeys() {
+        keyTarget.forceActiveFocus();
+    }
+
+    function state() {
+        const sidebar = [];
+        if (libraryLabel.visible)
+            sidebar.push(libraryLabel.text);
+        for (let i = 0; i < placeList.count; i++)
+            sidebar.push(placeList.itemAt(i).drawn());
+        sidebar.push(playlistsLabel.text, [noneKey.text, noneRest.text].filter(t => t).join(" "));
+        return {
+            empty: emptyBlock.visible ? [emptyHead.text, [emptyKey.text, emptyRest.text].filter(t => t).join(" ")].filter(t => t) : [],
+            look: {
+                title: [labelText.text, viewName.text, fromText.text],
+                viewFont: viewName.font.family,
+                viewBold: viewName.font.weight >= Font.Bold,
+                pills: [labelPill.color.a > 0, fromPill.color.a > 0],
+                frameRadius: board.radius,
+                fieldRadius: fieldBox.radius,
+                ruleDashed: headRule.dashed,
+                placeholder: placeholderText.text,
+                hint: hintText.text,
+                chips: Array.from({
+                    length: chipList.count
+                }, (_, i) => chipList.itemAt(i).text),
+                results: [resultsHead.text, resultsCount.text],
+                nowPlaying: [nowLine.text, repeatText.text],
+                sidebar: sidebar,
+                legend: Array.from({
+                    length: legendList.count
+                }, (_, i) => legendList.itemAt(i).drawn())
+            }
+        };
+    }
+
+    // Artboard's window is rounded as niri rounds its geometry; Paper and Blueprint are square.
+    radius: plain ? 14 : 0
+    color: c.surface ?? "white"
+    clip: true
+
+    Item {
+        id: keyTarget
+        anchors.fill: parent
+        focus: true
+
+        Keys.onPressed: event => {
+            const k = event.key;
+            const t = event.text;
+            if (t === "/")
+                board.yt.focusField();
+            else if (k === Qt.Key_Tab || k === Qt.Key_Backtab)
+                board.yt.focusPane(board.yt.pane === "list" ? "sidebar" : "list");
+            else if (t === "j" || k === Qt.Key_Down)
+                board.yt.move(1);
+            else if (t === "k" || k === Qt.Key_Up)
+                board.yt.move(-1);
+            else if (k === Qt.Key_Escape)
+                board.yt.back();
+            else
+                return;
+            event.accepted = true;
+        }
+    }
+
+    ColumnLayout {
+        anchors.fill: parent
+        spacing: 0
+
+        // The title strip: the App's label, the view's name, and how it opened; Artboard pills the label in its accent and the note in grey.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: plain ? 52 : -1
+            Layout.leftMargin: plain ? 18 : 14
+            Layout.rightMargin: plain ? 18 : 14
+            Layout.topMargin: plain ? 0 : 12
+            Layout.bottomMargin: plain ? 0 : 12
+            spacing: plain ? 12 : 10
+
+            Rectangle {
+                id: labelPill
+                implicitWidth: labelText.implicitWidth + (plain ? 18 : 0)
+                implicitHeight: labelText.implicitHeight + (plain ? 6 : 0)
+                radius: 8
+                color: plain ? look.tint.tint : "transparent"
+
+                Text {
+                    id: labelText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: look.title.label
+                    color: (plain ? c.accent : c.muted) ?? "gray"
+                    font.family: board.bodyFont
+                    font.pixelSize: plain ? 12 : 10
+                    font.weight: plain ? Font.Medium : Font.Normal
+                    font.letterSpacing: plain ? 0 : 1.4
+                }
+            }
+            Text {
+                id: viewName
+                textFormat: Text.PlainText
+                text: look.title.view(board.yt.view)
+                color: c.ink ?? "black"
+                font.family: look.viewFont ?? ""
+                font.pixelSize: look.viewSize
+                font.weight: caps ? Font.Normal : Font.Bold
+            }
+            Item {
+                Layout.fillWidth: true
+            }
+            Rectangle {
+                id: fromPill
+                implicitWidth: fromText.implicitWidth + (plain ? 18 : 0)
+                implicitHeight: fromText.implicitHeight + (plain ? 6 : 0)
+                radius: 8
+                color: plain ? look.tint.tile : "transparent"
+
+                Text {
+                    id: fromText
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: look.title.from
+                    color: c.muted ?? "gray"
+                    font.family: board.bodyFont
+                    font.pixelSize: bracket ? 10 : 11
+                    font.weight: plain ? Font.Medium : Font.Normal
+                    font.letterSpacing: bracket ? 1.4 : 0
+                }
+            }
+        }
+
+        Rule {
+            id: headRule
+            Layout.fillWidth: true
+            dashed: look.ruleDashed
+            color: board.ruleColor
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            spacing: 0
+
+            // The sidebar: the views with their icons and counts, then the Playlists, of which m67 has none.
+            Rectangle {
+                id: sidebarPane
+                Layout.preferredWidth: 219
+                Layout.fillHeight: true
+                color: "transparent"
+
+                FocusMark {
+                    shown: board.yt.focusAt === "sidebar"
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: 8
+                    anchors.topMargin: plain ? 4 : 8
+                    spacing: 0
+
+                    Text {
+                        id: libraryLabel
+                        visible: text !== ""
+                        Layout.leftMargin: 12
+                        Layout.topMargin: 6
+                        Layout.bottomMargin: 6
+                        textFormat: Text.PlainText
+                        text: look.library
+                        color: c.muted ?? "gray"
+                        font.family: board.bodyFont
+                        font.pixelSize: 10
+                        font.letterSpacing: 1.4
+                    }
+
+                    Repeater {
+                        id: placeList
+                        model: look.places
+
+                        Rectangle {
+                            id: place
+                            required property var modelData
+                            readonly property bool chosen: board.yt.view === modelData.view
+                            readonly property string countText: modelData.view === "saved" ? String(board.yt.savedCount) : modelData.view === "history" ? String(board.yt.historyCount) : ""
+
+                            function drawn() {
+                                return [placeName.text, placeCount.text].filter(t => t).join(" ");
+                            }
+
+                            Layout.fillWidth: true
+                            implicitHeight: plain ? 38 : 34
+                            radius: plain ? 10 : 0
+                            color: !chosen || bracket ? "transparent" : plain ? look.tint.tint : look.tint.chosen
+                            border.width: chosen && bracket ? 1 : 0
+                            border.color: c.accent ?? "cyan"
+
+                            // Blueprint fills the chosen view with its accent at a tenth.
+                            Rectangle {
+                                visible: place.chosen && bracket
+                                anchors.fill: parent
+                                color: c.accent ?? "cyan"
+                                opacity: 0.1
+                            }
+                            // Paper marks the chosen view with a 2 px ink bar at its left.
+                            Rectangle {
+                                visible: place.chosen && caps
+                                width: 2
+                                height: parent.height
+                                color: c.ink ?? "black"
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 10
+
+                                Rectangle {
+                                    implicitWidth: plain ? 28 : 16
+                                    implicitHeight: plain ? 28 : 16
+                                    radius: 9
+                                    color: !plain ? "transparent" : place.chosen ? c.surface ?? "white" : look.tint.tile
+
+                                    FilesIcon {
+                                        anchors.centerIn: parent
+                                        path: ({
+                                                search: "M7 2.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9 M10.3 10.3L14 14",
+                                                saved: "M4.5 2.5h7v11L8 10.8l-3.5 2.7z",
+                                                history: "M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11 M8 5v3.2l2 1.3"
+                                            })[place.modelData.view]
+                                        color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
+                                    }
+                                }
+                                Text {
+                                    id: placeName
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: place.modelData.name
+                                    color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 13
+                                    font.weight: !place.chosen ? Font.Normal : bracket ? Font.Bold : Font.Medium
+                                }
+                                Text {
+                                    id: placeCount
+                                    textFormat: Text.PlainText
+                                    text: place.countText
+                                    color: (place.chosen && plain ? look.tint.deep : place.chosen && bracket ? c.accent : c.muted) ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 11
+                                    font.letterSpacing: bracket ? 0.66 : 0
+                                }
+                            }
+                        }
+                    }
+
+                    Text {
+                        id: playlistsLabel
+                        Layout.leftMargin: plain ? 10 : 12
+                        Layout.topMargin: plain ? 12 : 12
+                        Layout.bottomMargin: plain ? 2 : 6
+                        textFormat: Text.PlainText
+                        text: look.playlists
+                        color: c.muted ?? "gray"
+                        font.family: board.bodyFont
+                        font.pixelSize: plain ? 11 : 10
+                        font.letterSpacing: plain ? 0.66 : 1.4
+                    }
+
+                    // n makes one: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
+                    Row {
+                        Layout.leftMargin: 10
+                        Layout.topMargin: 8
+                        spacing: plain ? 8 : 0
+
+                        Rectangle {
+                            visible: plain
+                            implicitWidth: noneKey.implicitWidth + 14
+                            implicitHeight: noneKey.implicitHeight + 6
+                            radius: 6
+                            color: look.tint.tile ?? "transparent"
+
+                            Text {
+                                id: noneKey
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: plain ? look.noPlaylists.split(" ")[0] : ""
+                                color: c.ink ?? "black"
+                                font.family: board.bodyFont
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
+                            }
+                        }
+                        Text {
+                            id: noneRest
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: plain ? look.noPlaylists.split(" ").slice(1).join(" ") : look.noPlaylists
+                            color: c.muted ?? "gray"
+                            font.family: caps ? look.viewFont ?? "" : board.bodyFont
+                            font.pixelSize: caps ? 17 : 12
+                            font.italic: caps
+                        }
+                    }
+
+                    Item {
+                        Layout.fillHeight: true
+                    }
+                }
+            }
+
+            VRule {
+                Layout.fillHeight: true
+                dashed: look.ruleDashed
+                color: board.ruleColor
+            }
+
+            // The list pane: on Search the field, the type chips and the results; on the other views their name and their rows or empty text.
+            Item {
+                id: listPane
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+
+                FocusMark {
+                    shown: board.yt.focusAt !== "sidebar"
+                }
+
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: bracket ? 8 : 18
+                    anchors.rightMargin: bracket ? 8 : 18
+                    anchors.topMargin: bracket ? 8 : 0
+                    spacing: 0
+
+                    // The field: Paper's ruled box, Artboard's filled pill, Blueprint's box in its line colour.
+                    Rectangle {
+                        id: fieldBox
+                        visible: board.yt.view === "search"
+                        Layout.fillWidth: true
+                        Layout.topMargin: plain ? 12 : bracket ? 6 : 14
+                        Layout.leftMargin: bracket ? 4 : 0
+                        Layout.rightMargin: bracket ? 4 : 0
+                        implicitHeight: plain ? 44 : 40
+                        radius: look.fieldRadius
+                        color: plain ? look.tint.field : "transparent"
+                        border.width: plain ? 0 : 1
+                        border.color: (bracket ? c.line : c.muted) ?? "gray"
+
+                        FilesIcon {
+                            id: searchIcon
+                            anchors.left: parent.left
+                            anchors.leftMargin: plain ? 16 : 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            path: "M11.5 7A4.5 4.5 0 1 1 2.5 7A4.5 4.5 0 1 1 11.5 7M10.5 10.5L14 14"
+                            stroke: 1.4
+                            color: (plain ? c.muted : bracket ? c.accent : c.ink) ?? "black"
+                        }
+                        TextInput {
+                            id: field
+                            anchors.left: searchIcon.right
+                            anchors.leftMargin: 12
+                            anchors.right: hint.left
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            clip: true
+                            color: c.ink ?? "black"
+                            selectionColor: c.accent ?? "red"
+                            selectedTextColor: c.surface ?? "white"
+                            font.family: board.bodyFont
+                            font.pixelSize: caps ? 15 : 14
+                            // Esc leaves the field for the list; Enter is where a search will start.
+                            Keys.onEscapePressed: board.yt.focusPane("list")
+
+                            Text {
+                                id: placeholderText
+                                anchors.fill: parent
+                                visible: field.text === ""
+                                textFormat: Text.PlainText
+                                text: look.placeholder
+                                color: c.muted ?? "gray"
+                                font: field.font
+                            }
+                        }
+                        Rectangle {
+                            id: hint
+                            anchors.right: parent.right
+                            anchors.rightMargin: plain ? 16 : 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            implicitWidth: hintText.implicitWidth + (plain ? 14 : 0)
+                            implicitHeight: hintText.implicitHeight + (plain ? 4 : 0)
+                            radius: 6
+                            color: plain ? c.surface ?? "white" : "transparent"
+
+                            Text {
+                                id: hintText
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: look.hint
+                                color: c.muted ?? "gray"
+                                font.family: board.bodyFont
+                                font.pixelSize: bracket ? 10 : 11
+                                font.weight: plain ? Font.Medium : Font.Normal
+                                font.letterSpacing: bracket ? 1.4 : 0
+                            }
+                        }
+                    }
+
+                    // The type chips, drawn only: Videos is the one type this App searches yet.
+                    RowLayout {
+                        visible: board.yt.view === "search"
+                        Layout.topMargin: bracket ? 6 : 10
+                        Layout.leftMargin: bracket ? 4 : 0
+                        spacing: 8
+
+                        Text {
+                            visible: text !== ""
+                            Layout.rightMargin: 6
+                            textFormat: Text.PlainText
+                            text: look.typeLabel
+                            color: c.muted ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.4
+                        }
+                        Rectangle {
+                            implicitWidth: chipRow.implicitWidth + (plain ? 6 : 0)
+                            implicitHeight: chipRow.implicitHeight + (plain ? 6 : 0)
+                            radius: 11
+                            color: plain ? look.tint.tile : "transparent"
+
+                            Row {
+                                id: chipRow
+                                anchors.centerIn: parent
+                                spacing: plain ? 2 : 8
+
+                                Repeater {
+                                    id: chipList
+                                    model: look.chips
+
+                                    Rectangle {
+                                        id: chip
+                                        required property string modelData
+                                        required property int index
+                                        readonly property bool chosen: index === 0
+                                        readonly property string text: chipText.text
+                                        implicitWidth: chipText.implicitWidth + (bracket ? 20 : 24)
+                                        implicitHeight: chipText.implicitHeight + 8
+                                        radius: plain ? 8 : 0
+                                        color: !chosen ? "transparent" : plain ? c.surface ?? "white" : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+                                        border.width: plain ? 0 : 1
+                                        border.color: (chosen ? (bracket ? c.accent : c.ink) : bracket ? c.line : c.muted) ?? "gray"
+
+                                        Text {
+                                            id: chipText
+                                            anchors.centerIn: parent
+                                            textFormat: Text.PlainText
+                                            text: chip.modelData
+                                            color: (chip.chosen ? (plain ? look.tint.deep : c.surface) : c.muted) ?? "gray"
+                                            font.family: board.bodyFont
+                                            font.pixelSize: plain ? 12 : 11
+                                            font.weight: chip.chosen && plain ? Font.Medium : chip.chosen && bracket ? Font.Bold : Font.Normal
+                                            font.letterSpacing: bracket ? 1.54 : 0
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // The list's head: RESULTS and their count on Search, the view's name elsewhere; Paper's empty views draw none.
+                    RowLayout {
+                        visible: board.yt.view === "search" || !caps
+                        Layout.fillWidth: true
+                        Layout.topMargin: plain ? 8 : 10
+                        Layout.preferredHeight: 26
+                        Layout.leftMargin: caps ? 0 : 12
+                        Layout.rightMargin: caps ? 0 : 12
+                        spacing: 6
+
+                        Text {
+                            visible: bracket
+                            textFormat: Text.PlainText
+                            text: "◆"
+                            color: c.accent ?? "cyan"
+                            font.family: board.bodyFont
+                            font.pixelSize: 11
+                        }
+                        Text {
+                            id: resultsHead
+                            Layout.fillWidth: true
+                            textFormat: Text.PlainText
+                            text: board.yt.view === "search" ? look.results : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
+                            color: (plain && board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: plain && board.yt.view !== "search" ? 16 : caps ? 10 : 11
+                            font.weight: plain && board.yt.view !== "search" ? Font.Bold : Font.Normal
+                            font.letterSpacing: plain ? 0 : bracket ? 1.54 : 1.4
+                        }
+                        Text {
+                            id: resultsCount
+                            textFormat: Text.PlainText
+                            text: plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : String(board.yt.rows.length)
+                            color: c.muted ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: caps ? 10 : 11
+                            font.letterSpacing: plain ? 0 : bracket ? 1.54 : 1.4
+                        }
+                    }
+                    Rule {
+                        visible: !plain && (board.yt.view === "search" || !caps)
+                        Layout.fillWidth: true
+                        dashed: look.ruleDashed
+                        color: (caps ? look.tint.rule : c.line) ?? "gray"
+                    }
+
+                    // The rows the list draws; a later search fills them.
+                    ListView {
+                        id: rowList
+                        visible: !emptyBlock.visible
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        clip: true
+                        interactive: false
+                        model: board.yt.rows
+                        currentIndex: board.yt.cursor
+
+                        delegate: Rectangle {
+                            id: rowItem
+                            required property var modelData
+                            required property int index
+                            readonly property bool lit: index === board.yt.cursor && board.yt.focusAt === "list"
+                            width: ListView.view.width
+                            height: plain ? 54 : 52
+                            radius: look.rowRadius
+                            color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                spacing: 14
+
+                                Rectangle {
+                                    implicitWidth: caps ? 72 : 80
+                                    implicitHeight: caps ? 40 : 45
+                                    radius: plain ? 8 : 0
+                                    color: plain ? look.tint.thumb : "transparent"
+                                    border.width: plain ? 0 : 1
+                                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+                                }
+                                ColumnLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 3
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        textFormat: Text.PlainText
+                                        text: rowItem.modelData.title
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        color: (rowItem.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: plain ? 14 : 13
+                                        font.weight: Font.Medium
+                                    }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        textFormat: Text.PlainText
+                                        text: rowItem.modelData.channel
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        color: (rowItem.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: 11
+                                    }
+                                }
+                                Text {
+                                    Layout.preferredWidth: 64
+                                    horizontalAlignment: Text.AlignRight
+                                    textFormat: Text.PlainText
+                                    text: rowItem.modelData.duration
+                                    color: (rowItem.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 12
+                                    font.features: {
+                                        "tnum": 1
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // An empty view names the key that fills it: Paper's serif headline at the top, Artboard's and Blueprint's centred lines.
+                    Item {
+                        id: emptyBlock
+                        visible: board.emptyText !== null && board.yt.rows.length === 0
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        Column {
+                            x: caps ? 22 : (parent.width - width) / 2
+                            y: caps ? 64 : (parent.height - 80 - height) / 2
+                            spacing: 10
+
+                            Text {
+                                id: emptyHead
+                                visible: text !== ""
+                                anchors.horizontalCenter: caps ? undefined : parent.horizontalCenter
+                                textFormat: Text.PlainText
+                                text: board.emptyText ? board.emptyText.head : ""
+                                color: (bracket ? c.ink : c.muted) ?? "gray"
+                                font.family: caps ? look.viewFont ?? "" : board.bodyFont
+                                font.pixelSize: caps ? 25 : 16
+                                font.weight: bracket ? Font.Medium : Font.Normal
+                            }
+                            Row {
+                                anchors.horizontalCenter: caps ? undefined : parent.horizontalCenter
+                                spacing: emptyKey.text ? 6 : 0
+
+                                Rectangle {
+                                    visible: emptyKey.text !== ""
+                                    implicitWidth: emptyKey.implicitWidth + (plain ? 14 : 0)
+                                    implicitHeight: emptyKey.implicitHeight + (plain ? 6 : 0)
+                                    radius: 6
+                                    color: plain ? look.tint.tile : "transparent"
+
+                                    Text {
+                                        id: emptyKey
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: board.emptyText ? board.emptyText.key : ""
+                                        color: (bracket ? c.accent : c.ink) ?? "black"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: 13
+                                        font.weight: plain ? Font.Medium : Font.Bold
+                                    }
+                                }
+                                Text {
+                                    id: emptyRest
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: board.emptyText ? board.emptyText.rest : ""
+                                    color: c.muted ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 13
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rule {
+            Layout.fillWidth: true
+            dashed: look.ruleDashed
+            color: board.ruleColor
+        }
+
+        // The now-playing line: empty while the Queue is stopped, with the repeat state at its right.
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: plain ? 40 : bracket ? 34 : 38
+            Layout.leftMargin: plain ? 18 : 16
+            Layout.rightMargin: plain ? 18 : 16
+            spacing: 10
+
+            Text {
+                id: nowLine
+                Layout.fillWidth: true
+                textFormat: Text.PlainText
+                text: board.yt.nowPlaying
+                elide: Text.ElideRight
+                maximumLineCount: 1
+                color: c.ink ?? "black"
+                font.family: board.bodyFont
+                font.pixelSize: 12
+            }
+            Text {
+                id: repeatText
+                textFormat: Text.PlainText
+                text: look.repeat
+                color: c.muted ?? "gray"
+                font.family: board.bodyFont
+                font.pixelSize: plain ? 12 : 11
+                font.letterSpacing: bracket ? 1.54 : 0
+            }
+        }
+
+        Rule {
+            Layout.fillWidth: true
+            dashed: look.ruleDashed
+            color: board.ruleColor
+        }
+
+        // The keys, as each board strips them: Paper's tracked caps, Artboard's grey chips, Blueprint's bracketed accent keys.
+        Flow {
+            Layout.fillWidth: true
+            Layout.leftMargin: plain ? 14 : 16
+            Layout.rightMargin: plain ? 14 : 16
+            Layout.topMargin: plain ? 10 : 11
+            Layout.bottomMargin: plain ? 10 : 11
+            spacing: plain ? 8 : 16
+
+            Repeater {
+                id: legendList
+                model: look.legend(board.yt.view)
+
+                Rectangle {
+                    required property var modelData
+
+                    function drawn() {
+                        return keyName.text + " " + keyWord.text;
+                    }
+                    implicitWidth: keyPair.implicitWidth + (plain ? 14 : 0)
+                    implicitHeight: keyPair.implicitHeight + (plain ? 6 : 0)
+                    radius: 6
+                    color: plain ? look.tint.tile : "transparent"
+
+                    Row {
+                        id: keyPair
+                        anchors.centerIn: parent
+                        spacing: bracket ? 8 : 6
+
+                        Text {
+                            id: keyName
+                            textFormat: Text.PlainText
+                            text: modelData.key
+                            color: (bracket ? c.accent : c.ink) ?? "black"
+                            font.family: board.bodyFont
+                            font.pixelSize: caps ? 10 : 11
+                            font.weight: plain ? Font.Medium : Font.Bold
+                            font.letterSpacing: caps ? 1 : bracket ? 1.54 : 0
+                        }
+                        Text {
+                            id: keyWord
+                            textFormat: Text.PlainText
+                            text: modelData.word
+                            color: c.muted ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: caps ? 10 : 11
+                            font.letterSpacing: caps ? 1 : bracket ? 1.54 : 0
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Paper marks the pane with focus by a 2 px accent line along its top.
+    component FocusMark: Rectangle {
+        property bool shown: false
+        visible: shown && board.caps
+        width: parent.width
+        height: 2
+        color: board.c.accent ?? "red"
+    }
+
+    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
+    component Rule: Item {
+        property bool dashed: false
+        property color color: "black"
+        implicitHeight: 1
+
+        Rectangle {
+            anchors.fill: parent
+            visible: !parent.dashed
+            color: parent.color
+        }
+        Dashed {
+            anchors.fill: parent
+            visible: parent.dashed
+            color: parent.color
+        }
+    }
+
+    // The sidebar's edge: a one-pixel column, the dashed one a turned rule.
+    component VRule: Item {
+        id: vrule
+        property bool dashed: false
+        property color color: "black"
+        implicitWidth: 1
+
+        Rectangle {
+            anchors.fill: parent
+            visible: !vrule.dashed
+            color: vrule.color
+        }
+        Dashed {
+            visible: vrule.dashed
+            x: 1
+            width: vrule.height
+            height: 1
+            rotation: 90
+            transformOrigin: Item.TopLeft
+            color: vrule.color
+        }
+    }
+}

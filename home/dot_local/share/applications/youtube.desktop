@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=YouTube
+GenericName=Videos
+Comment=Search YouTube, and watch it or listen to it in mpv
+Exec=dots-youtube
+Icon=video-x-generic
+Terminal=false
+Categories=AudioVideo;Video;
