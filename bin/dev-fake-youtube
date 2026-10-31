@@ -16,7 +16,7 @@ search)
     jq -c . "$fixtures/fail-$(tr -d '[:space:]' <"$fail").json"
     exit 1
   fi
-  jq -c --argjson at "$4" '.rows |= .[$at:$at + 20]' "$fixtures/search.json"
+  jq -c --argjson at "$4" '(.rows | length) as $n | .rows |= .[$at:$at + 20] | .next = ([$at + 20, $n] | min)' "$fixtures/search.json"
   ;;
 thumbs)
   shift

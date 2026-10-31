@@ -20,8 +20,9 @@ test('search prints 20 rows, each with exactly the real CLI\'s five fields, and 
   const r = run('search', 'nujabes', 'videos', '0');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trimEnd().split('\n').length, 1, 'one line of JSON');
-  const { rows } = JSON.parse(r.stdout);
+  const { rows, next } = JSON.parse(r.stdout);
   assert.equal(rows.length, 20);
+  assert.equal(next, 20, 'where the following page starts, as the real CLI says');
   for (const row of rows) assert.deepEqual(Object.keys(row).sort(), ['channel', 'duration', 'id', 'thumb', 'title']);
   assert.match(rows[3].title, /\n/, 'a title the App must flatten');
   assert.equal(rows[5].title.length, 300);
@@ -30,7 +31,7 @@ test('search prints 20 rows, each with exactly the real CLI\'s five fields, and 
 
 test('search past the canned rows lists none', (t) => {
   const { run } = rig(t);
-  assert.deepEqual(JSON.parse(run('search', 'nujabes', 'videos', '20').stdout), { rows: [] });
+  assert.deepEqual(JSON.parse(run('search', 'nujabes', 'videos', '20').stdout), { rows: [], next: 20 });
 });
 
 test('with youtube-fail naming a kind, search prints that failure as the real CLI does and exits 1', (t) => {

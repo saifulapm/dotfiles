@@ -28,8 +28,8 @@ function rig(t, { deno = '2.9.8', mise = true } = {}) {
 }
 
 // 20 flat-playlist entries as yt-dlp gives them, with fields the CLI must drop; entry 1 has no channel, only an uploader, and entry 2 no duration.
-function canned() {
-  const entries = Array.from({ length: 20 }, (_, i) => ({
+function canned(length = 20) {
+  const entries = Array.from({ length }, (_, i) => ({
     _type: 'url',
     ie_key: 'Youtube',
     id: `vid${String(i).padStart(8, '0')}`,
@@ -64,9 +64,27 @@ test('search prints 20 rows of id, title, channel, duration and thumb, asking yt
   const after = (flag) => argv[argv.indexOf(flag) + 1];
   assert.ok(argv.includes('--flat-playlist') && argv.includes('-J'), argv.join(' '));
   assert.equal(after('--playlist-start'), '41');
-  assert.equal(after('--playlist-end'), '60');
+  assert.equal(after('--playlist-end'), '70', 'ten past the page, for the channel cards the filter lets through');
   assert.equal(after('--js-runtimes'), `deno:${dir}/deno/deno`);
   assert.ok(argv.includes('https://www.youtube.com/results?search_query=lo+fi&sp=EgIQAQ%3D%3D'), argv.join(' '));
+});
+
+// YouTube's videos filter still lists a channel's card now and then (live, 2 of 20 for nujabes); a card is no video to play, so the page fills from the entries past it, and next says where the following page starts.
+test('a channel card or a null entry among the videos is dropped, the page still holds 20, and next follows the last one kept', (t) => {
+  const { dir, act, run } = rig(t);
+  const data = JSON.parse(canned(30));
+  data.entries[0] = { _type: 'url', ie_key: 'YoutubeTab', id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', url: 'https://www.youtube.com/channel/UCO5XcuQe_fLJVI3sZ0LmGCA', title: 'Nujabes', channel: 'Nujabes' };
+  data.entries[6] = { _type: 'url', ie_key: 'YoutubeTab', id: 'UCxQQET-tQsC4cwzLow9ZsuQ', url: 'https://www.youtube.com/channel/UCxQQET-tQsC4cwzLow9ZsuQ', title: 'Nujabes - Topic' };
+  data.entries[9] = null;
+  writeFileSync(join(dir, 'canned.json'), JSON.stringify(data));
+  act(`cat "${dir}/canned.json"`);
+  const r = run('search', 'nujabes', 'videos', '40');
+  assert.equal(r.status, 0, r.stderr);
+  const a = JSON.parse(r.stdout);
+  assert.equal(a.rows.length, 20);
+  assert.ok(a.rows.every((row) => /^vid[0-9]{8}$/.test(row.id)), a.rows.map((row) => row.id).join(' '));
+  assert.equal(a.rows[19].id, 'vid00000022');
+  assert.equal(a.next, 63);
 });
 
 const denoLine = { error: 'yt-dlp needs deno 2.3 or newer: run dots update', kind: 'runtime', raw: '' };

@@ -14,6 +14,8 @@ import urllib.request
 
 FILTERS = {"videos": "EgIQAQ%3D%3D", "playlists": "EgIQAw%3D%3D", "channels": "EgIQAg%3D%3D"}
 PAGE = 20
+# YouTube's videos filter still lists a channel's card now and then (2 of 20 for nujabes, 2026-10-31), so a page asks past itself to fill 20.
+SPARE = 10
 CAP = 200 * 1024 * 1024
 ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
 NETWORK = re.compile(r"name resolution|connection refused|connection reset|network is unreachable|timed out|urlopen error", re.I)
@@ -79,7 +81,7 @@ def search(query, kind, offset):
     signal.signal(signal.SIGHUP, stop)
     # A group of its own, so stop() also reaches whatever yt-dlp starts.
     child = subprocess.Popen(
-        ["yt-dlp", "--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE), "--js-runtimes", "deno:" + runtime, url],
+        ["yt-dlp", "--flat-playlist", "-J", "--playlist-start", str(offset + 1), "--playlist-end", str(offset + PAGE + SPARE), "--js-runtimes", "deno:" + runtime, url],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, process_group=0, preexec_fn=die_with_parent,
     )
     stdout, stderr = child.communicate()
@@ -95,11 +97,19 @@ def search(query, kind, offset):
         version = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True).stdout.strip()
         fail("yt-dlp %s may be behind YouTube: run dots bump, then dots update" % version, "extraction", raw)
     rows = []
-    for e in entries[:PAGE]:
+    # next is where the following page starts, past the last entry this one kept.
+    following = offset
+    for at, e in enumerate(entries):
+        if len(rows) == PAGE:
+            break
+        # A videos search keeps only videos: a channel card or a null entry is nothing to play.
+        if not isinstance(e, dict) or kind == "videos" and not (e.get("ie_key") in (None, "Youtube") and ID.match(str(e.get("id")))):
+            continue
+        following = offset + at + 1
         # A playlist row's thumbnail is one of its videos; a row with no ytimg thumbnail falls back to its own id.
         thumb = next((m[1] for t in e.get("thumbnails") or [] if (m := re.search(r"/vi/([A-Za-z0-9_-]{11})/", t.get("url", "")))), e["id"])
         rows.append({"id": e["id"], "title": e.get("title"), "channel": e.get("channel") or e.get("uploader"), "duration": e.get("duration"), "thumb": thumb})
-    out({"rows": rows})
+    out({"rows": rows, "next": following})
 
 
 def thumbs(ids):
