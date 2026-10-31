@@ -88,23 +88,23 @@ sha256 = "cda1f75957a997f39edad1c0324d094a7b08e07e8a53212f061cb475b33292df"
 
 [[pin]]
 name = "deen-data"
-version = "1c8c32be71332128a74a1586616fa760b9e63c02"
+version = "a41631aede9bc3423fb22cc893cc8a324bc3a2fb"
 repo = "saifulapm/deen-data"
 track = "commit"
 fetch = "gh"
 install = "~/.local/share/deen-data, the sources deen builds its data from, each checked against its manifest.toml; a private repo, so it waits for the gh login"
 url = "https://github.com/saifulapm/deen-data/archive/{version}.tar.gz"
-sha256 = "a6d36983c56451a078278998947be6949e1353582df0987f483b0891a2898984"
+sha256 = "6d816966ade324192bb82716af7dfff1332a12f3ee309984bc05f20c40cb77f8"
 
 [[pin]]
 name = "deen"
-version = "db2d671c0b809f2764998fcc7ce806c4e78fe60d"
+version = "cb8d68f74308ef75734503056ae425e24711e9bb"
 repo = "saifulapm/deen"
 track = "commit"
 install = "~/.local/bin/deen, Deen's backend, built with cargo, and the Quran text, word meanings and Hisn al-Muslim it builds from deen-data in ~/.local/share/deen"
 runs = "deen --version"
 url = "https://github.com/saifulapm/deen/archive/{version}.tar.gz"
-sha256 = "b54072a6a554c928764677a41b170e4eead2e2443119db81e7f38ad2db9893e7"
+sha256 = "6e818f8652a9ad65f699721b0ddcec1cc1c4eb9ea9aed686ddbbbeea477863bb"
 
 [[pin]]
 name = "lazygit"
