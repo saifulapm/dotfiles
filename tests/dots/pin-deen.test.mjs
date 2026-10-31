@@ -12,12 +12,12 @@ const scripts = join(repo, 'home/.chezmoiscripts');
 const SCRIPTS = ['run_onchange_after_29-pin-deen-data.sh.tmpl', 'run_onchange_after_29-pin-deen.sh.tmpl'];
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
-// build-data logs its sources, then writes each file from them, or fails without writing when FAIL names it.
+// build-data logs its sources, then writes each file from them, with what the deen it was handed answers, or fails without writing when FAIL names it.
 const BUILD = `#!/bin/sh
 echo "build-data $1" >>"$FETCH_LOG"
 [ "$FAIL" = build-data ] && exit 1
 mkdir -p "$2"
-printf '{"bn":"%s"}' "$(cat "$1/quran/ben-abubakrzakaria.json")" >"$2/quran.json"
+printf '{"bn":"%s","deen":"%s"}' "$(cat "$1/quran/ben-abubakrzakaria.json")" "$("$DEEN_BIN")" >"$2/quran.json"
 printf '{}' >"$2/words.json"
 printf '{}' >"$2/duas.json"
 `;
@@ -130,6 +130,8 @@ test('the pins build deen, take deen-data through gh and build the data from it'
   assert.equal(r.status, 0, r.stderr);
   assert.equal(spawnSync(join(root, '.local/bin/deen'), { encoding: 'utf8' }).stdout, 'deen\n');
   assert.equal(bn(root), ZAKARIA);
+  // build-data runs the pronunciation with the deen this pin has just installed.
+  assert.equal(JSON.parse(readFileSync(join(data(root), 'quran.json'), 'utf8')).deen, 'deen');
   assert.deepEqual(readdirSync(data(root)).sort(), ['built-from', 'duas.json', 'quran.json', 'words.json']);
   assert.equal(readFileSync(join(sources(root), '.commit'), 'utf8').trim(), 'c1');
   assert.equal(readFileSync(join(sources(root), 'quran/ben-abubakrzakaria.json'), 'utf8'), ZAKARIA);

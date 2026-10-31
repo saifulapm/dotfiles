@@ -27,7 +27,7 @@ fi
 mkdir -p "$work"/{config,cache/deen/audio/wbw,state,data,hadith,editions,mpv}
 # The Quran text, its word meanings and Hisn al-Muslim, built by the backend from the deen-data checkout as the pin's apply builds them.
 texts=$work/texts
-if ! "$backend/scripts/build-data" "$sources" "$texts"; then
+if ! DEEN_BIN=$deen_bin "$backend/scripts/build-data" "$sources" "$texts"; then
   echo "FAIL the backend builds its data from $sources"
   exit 1
 fi

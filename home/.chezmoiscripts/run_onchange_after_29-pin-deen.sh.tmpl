@@ -7,13 +7,13 @@ tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 src=$pin_tmp/deen-$pin_version
 pin_cargo "$src" deen
-# The Quran text, its word meanings and Hisn al-Muslim are built from the deen-data tree, again whenever deen or that tree moves; only the hadith corpus waits for Deen's first open.
+# The Quran text, its word meanings and Hisn al-Muslim are built from the deen-data tree, again whenever deen or that tree moves, with the pronunciation from the deen just installed; only the hadith corpus waits for Deen's first open.
 data=$HOME/.local/share/deen
 sources=$HOME/.local/share/deen-data
 if [[ -f $sources/.commit ]]; then
   built="$pin_version $(cat "$sources/.commit")"
   if [[ $(cat "$data/built-from" 2>/dev/null) != "$built" ]]; then
-    "$src/scripts/build-data" "$sources" "$data" || die "pin deen: scripts/build-data failed"
+    DEEN_BIN=$HOME/.local/bin/deen "$src/scripts/build-data" "$sources" "$data" || die "pin deen: scripts/build-data failed"
     echo "$built" >"$data/built-from"
   fi
 fi
