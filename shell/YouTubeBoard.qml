@@ -69,6 +69,9 @@ Rectangle {
                 chips: Array.from({
                     length: chipList.count
                 }, (_, i) => chipList.itemAt(i).text),
+                chipsOn: Array.from({
+                    length: chipList.count
+                }, (_, i) => chipList.itemAt(i).chosen),
                 results: [resultsHead.text, resultsCount.text],
                 nowPlaying: [nowLine.text, repeatText.text],
                 sidebar: sidebar,
@@ -100,6 +103,10 @@ Rectangle {
                 board.yt.move(1);
             else if (t === "k" || k === Qt.Key_Up)
                 board.yt.move(-1);
+            else if ((t === "h" || k === Qt.Key_Left) && board.yt.pane === "list" && board.yt.view === "search")
+                board.yt.moveType(-1);
+            else if ((t === "l" || k === Qt.Key_Right) && board.yt.pane === "list" && board.yt.view === "search")
+                board.yt.moveType(1);
             else if (k === Qt.Key_Escape)
                 board.yt.back();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
@@ -464,7 +471,7 @@ Rectangle {
                         }
                     }
 
-                    // The type chips, drawn only: Videos is the one type this App searches yet.
+                    // The type filter: the chip of the type Enter searches for is on, and h and l move it.
                     RowLayout {
                         visible: board.yt.view === "search"
                         Layout.topMargin: bracket ? 6 : 10
@@ -500,7 +507,7 @@ Rectangle {
                                         id: chip
                                         required property string modelData
                                         required property int index
-                                        readonly property bool chosen: index === 0
+                                        readonly property bool chosen: index === board.yt.types.indexOf(board.yt.type)
                                         readonly property string text: chipText.text
                                         implicitWidth: chipText.implicitWidth + (bracket ? 20 : 24)
                                         implicitHeight: chipText.implicitHeight + 8
@@ -674,7 +681,8 @@ Rectangle {
                                 }
                                 Text {
                                     id: durationText
-                                    Layout.preferredWidth: bracket ? 76 : 64
+                                    // A playlist's count may run wider than a duration, 1,234 videos.
+                                    Layout.preferredWidth: Math.max(bracket ? 76 : 64, implicitWidth)
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
                                     text: rowItem.modelData.duration

@@ -21,6 +21,9 @@ ShellRoot {
     property string pane: "list"
     readonly property string focusAt: board.fieldFocused ? "field" : pane
     readonly property string query: board.queryText
+    // The type filter under the field: what Enter in the field searches for.
+    readonly property var types: ["videos", "playlists", "channels"]
+    property string type: "videos"
     // The last search's rows, Saved's and History's, as youtube.mjs rows() makes them; the list draws the view's, with the cursor on one.
     property var results: []
     readonly property var savedRows: YT.rows({
@@ -76,6 +79,16 @@ ShellRoot {
             cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
     }
 
+    // h and l on Search: the filter moves one type, and a query in the field is searched again under it.
+    function moveType(step) {
+        const next = types[Math.max(0, Math.min(types.length - 1, types.indexOf(type) + step))];
+        if (next === type)
+            return;
+        type = next;
+        if (query.trim() !== "")
+            search();
+    }
+
     // Runs a command off the render loop and hands done its one JSON answer, or null when it failed.
     function run(command, done) {
         const call = caller.createObject(app, {
@@ -91,7 +104,7 @@ ShellRoot {
 
     // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window; it pauses the Queue first, and nothing resumes the Queue by itself.
     function play(row) {
-        if (!row)
+        if (!row || row.kind !== "video")
             return;
         history.add(row);
         queueCommand(Q.setPauseLine(true));
@@ -104,7 +117,7 @@ ShellRoot {
 
     // m plays a row in the Queue in place of what it holds, a appends it; the first ask with no Queue connected starts youtube-audio, and what follows waits for its socket.
     function queueItem(row, how) {
-        if (!row)
+        if (!row || row.kind !== "video")
             return;
         history.add(row);
         const lines = Q.itemLines(queue, row, how);
@@ -149,7 +162,7 @@ ShellRoot {
         searchSeq += 1;
         const seq = searchSeq;
         focusPane("list");
-        api(["search", q, "videos", "0"], answer => {
+        api(["search", q, type, "0"], answer => {
             if (seq !== app.searchSeq)
                 return;
             app.failed = YT.failure(answer);
@@ -159,9 +172,9 @@ ShellRoot {
         });
     }
 
-    // s on a row: Saved keeps it in the store, at most once.
+    // s on a video row: Saved keeps it in the store, at most once; a playlist's snapshot is m70's.
     function save(row) {
-        if (row)
+        if (row && row.kind === "video")
             store.save(row);
     }
 
@@ -285,6 +298,7 @@ ShellRoot {
                 view: app.view,
                 focus: app.focusAt,
                 query: app.query,
+                type: app.type,
                 rows: app.rows,
                 cursor: app.cursor,
                 searchSeq: app.searchSeq,
