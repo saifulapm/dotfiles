@@ -72,7 +72,7 @@ mpv_playing() {
 }
 tab_to() { until deen_is --arg t "$1" '.tab == $t'; do wtype -k Tab; sleep 0.2; done; }
 
-env_line="DOTS_DEEN=$deen_bin DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$work/hadith DEEN_STATE=$work/data/hifz.json DEEN_SOURCES=$sources DEEN_ALADHAN_URL=$aladhan_url DEEN_CONFIG=$work/config/none.toml DOTS_DEEN_NOW=2026-10-23T14:32 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv"
+env_line="DOTS_DEEN=$deen_bin DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$work/hadith DEEN_STATE=$work/data/hifz.json DEEN_SOURCES=$sources DEEN_ALADHAN_URL=$aladhan_url DEEN_CONFIG=$work/config/none.toml DOTS_DEEN_NOW=2026-10-23T14:32 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv $mise_dirs"
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 open_deen() { niri msg action spawn -- sh -c "exec env $env_line $exec_line >>'$log' 2>&1"; }
 

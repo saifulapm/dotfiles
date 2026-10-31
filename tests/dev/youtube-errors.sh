@@ -78,7 +78,7 @@ printf '#!/bin/sh\ntouch %s/yt-dlp-ran\nexit 1\n' "$work" >"$work/bin/yt-dlp"
 chmod +x "$work/bin/yt-dlp"
 no_mise() { env PATH="$work/bin" python3 -c 'import shutil, sys; sys.exit(shutil.which("mise") is not None)'; }
 check "the PATH holds no mise" no_mise
-exec_line="env PATH=$work/bin DOTS_YOUTUBE=$repo/bin/dots-youtube-api XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
+exec_line="env PATH=$work/bin DOTS_YOUTUBE=$repo/bin/dots-youtube-api $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
 until_ok 5000 yt_up
 wtype /

@@ -42,7 +42,7 @@ peer=$(jq -r .peer "$work/hello")
 check "fake_services seeds the clip and serves TMDB, Torrentio and apibay on loopback ($(cat "$work/hello"))" \
   bash -c "[[ '$base' == http://127.0.0.1:* && '$peer' == 127.0.0.1:* ]]"
 
-env_line="DOTS_DEKHO=$dekho_bin DOTS_DEKHO_UNIT=$DOTS_DEKHO_UNIT TMDB_API_KEY=fake-key DEKHO_TMDB_URL=$base DEKHO_TMDB_IMAGE_URL=$base DEKHO_TORRENTIO_URL=$base DEKHO_APIBAY_URL=$base DEKHO_PEERS=$peer DEKHO_NO_DHT=1 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv"
+env_line="DOTS_DEKHO=$dekho_bin DOTS_DEKHO_UNIT=$DOTS_DEKHO_UNIT TMDB_API_KEY=fake-key DEKHO_TMDB_URL=$base DEKHO_TMDB_IMAGE_URL=$base DEKHO_TORRENTIO_URL=$base DEKHO_APIBAY_URL=$base DEKHO_PEERS=$peer DEKHO_NO_DHT=1 XDG_CONFIG_HOME=$work/config XDG_CACHE_HOME=$work/cache XDG_STATE_HOME=$work/state MPV_HOME=$work/mpv $mise_dirs"
 open_dekho() { niri msg action spawn -- sh -c "exec env $env_line '$repo/bin/dots-dekho' >>'$log' 2>&1"; }
 
 dekho_state() { timeout 0.5 qs ipc -p "$dekho_qml" call dekho state 2>/dev/null; }
