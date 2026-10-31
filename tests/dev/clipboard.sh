@@ -46,6 +46,30 @@ typed_ok() { [ "$(cat "$typed" 2>/dev/null)" = first ]; }
 until_ok 3000 typed_ok
 check "Enter pastes first into the foot it came from" typed_ok
 
+# Shift+Enter copies the pick and presses nothing: the foot it came from reads no line.
+quiet=$(mktemp -u)
+cleanup_quiet() { rm -f "$quiet"; }
+niri msg action spawn -- foot -c /dev/null -e sh -c "timeout 3 sh -c 'read x; echo \"\$x\"' > $quiet; echo done >> $quiet"
+sleep 0.5
+until_ok 5000 foot_focused
+wl-copy third
+until_ok 3000 listed third
+mod_v
+until_ok 3000 state_is '.open and .mode == "clipboard" and .results[0] == "third"'
+check "the clipboard legend names Shift+Enter copy" state_is '.legend | test("⇧↵ copy"; "i")'
+wtype j
+until_ok 2000 state_is '.selected == 1'
+pick=$(launcher_state | jq -r '.results[1]')
+wtype -M shift -k Return -m shift
+until_ok 2000 state_is '.open == false'
+copied() { [ "$(wl-paste 2>/dev/null)" = "$pick" ]; }
+until_ok 3000 copied
+check "Shift+Enter puts $pick on the clipboard" copied
+quiet_ok() { [ "$(cat "$quiet" 2>/dev/null)" = done ]; }
+until_ok 5000 quiet_ok
+check "and pastes nothing into the foot it came from ($(tr '\n' ' ' <"$quiet" 2>/dev/null))" quiet_ok
+cleanup_quiet
+
 # A paste, not typed keys: a 200 KB line is past any argv, and a newline is never pressed as Return.
 long=$(mktemp -u)
 cleanup_long() { rm -f "$long"; }

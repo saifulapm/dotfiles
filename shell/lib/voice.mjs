@@ -34,12 +34,14 @@ export function launcherLook(tokens) {
   const key = (k) => (voice === 'bracket' ? `[${upper(k)}]` : caps ? upper(k) : k);
   // Reminder mode names the keys its rows take; Paper also names Enter's, as its board does.
   const REMINDER_KEYS = voice === 'caps' ? [['↵', 'set'], ['d', 'delete']] : [['d', 'delete']];
+  // Clipboard mode names Shift+Enter, which copies a clip without pasting it.
+  const CLIP_KEYS = [['⇧↵', 'copy']];
   const legend = (mode) => ({
     keys:
       mode === 'apps'
         ? PREFIXES.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : PLAIN_WORD[w] || w }))
-        : mode === 'reminder'
-          ? REMINDER_KEYS.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : w }))
+        : mode === 'reminder' || mode === 'clipboard'
+          ? (mode === 'reminder' ? REMINDER_KEYS : CLIP_KEYS).map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : w }))
           : [],
     tail: caps ? 'J/K · ↵ · ESC' : 'j/k · ↵ · esc',
     chips: voice === 'plain',

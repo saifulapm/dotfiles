@@ -31,6 +31,16 @@ test('Enter copies a clip, then presses the paste key of the window it came from
   }
 });
 
+test('Shift+Enter only copies: the clip is decoded into wl-copy, no key is pressed, and the db and id travel as argv', () => {
+  for (const i of [0, 1]) {
+    const copy = clipRows(list, '', db)[i].copyExec;
+    assert.deepEqual(copy.slice(0, 2), ['sh', '-c']);
+    assert.deepEqual(copy.slice(3), ['sh', db, i === 0 ? '12' : '9']);
+    assert.match(copy[2], /decode "\$2" \| wl-copy/);
+    assert.doesNotMatch(copy[2], /wtype/);
+  }
+});
+
 test('a terminal pastes on Ctrl+Shift+V and every other window on Ctrl+V', () => {
   const script = clipRows(list, '', db)[0].exec[2];
   assert.match(script, /wtype -M ctrl -M shift -k v -m shift -m ctrl/);

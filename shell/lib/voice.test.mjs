@@ -58,12 +58,14 @@ test('the apps legend names the five prefixes in each voice, then the moving key
   assert.equal(look('blueprint').legend('apps').chips, false);
 });
 
-test('inside a mode the legend keeps to the moving keys and drops the prefixes', () => {
+test('inside a mode the legend keeps to the moving keys and drops the prefixes; clipboard adds Shift+Enter copy', () => {
   for (const n of ['paper', 'artboard', 'blueprint']) {
+    assert.deepEqual(look(n).legend('emoji').keys, [], n);
     const l = look(n).legend('clipboard');
-    assert.deepEqual(l.keys, [], n);
     assert.match(l.tail, /j\/k.*↵.*esc/i, n);
   }
+  const keys = (n) => look(n).legend('clipboard').keys.map((k) => `${k.key} ${k.word}`);
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map(keys), [['⇧↵ COPY'], ['⇧↵ copy'], ['[⇧↵] COPY']]);
 });
 
 test('the legend reads as one line for the state and the footer checks', () => {

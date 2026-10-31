@@ -7,6 +7,9 @@ const PASTE =
   'cliphist -db-path "$1" decode "$2" | wl-copy; sleep 0.1; ' +
   'case " $3 " in *" $(niri msg -j focused-window | jq -r \'.app_id // ""\') "*) wtype -M ctrl -M shift -k v -m shift -m ctrl ;; *) wtype -M ctrl -k v -m ctrl ;; esac';
 
+// Shift+Enter puts the clip on the clipboard and presses nothing.
+const COPY = 'cliphist -db-path "$1" decode "$2" | wl-copy';
+
 export function clipRows(text, q, db) {
   const needle = q.trim().toLowerCase();
   return text
@@ -22,6 +25,7 @@ export function clipRows(text, q, db) {
         glyph: image ? '◫' : '¶',
         id,
         exec: ['sh', '-c', PASTE, 'sh', db, id, TERMINALS.join(' ')],
+        copyExec: ['sh', '-c', COPY, 'sh', db, id],
       };
     })
     .filter((r) => r.title.toLowerCase().includes(needle));

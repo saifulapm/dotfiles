@@ -135,8 +135,8 @@ Item {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
-    // An app is spawned through niri, so it is niri's child and outlives a shell restart.
-    function launch() {
+    // An app is spawned through niri, so it is niri's child and outlives a shell restart; copyOnly (Shift+Enter) runs a row's copyExec instead, when it has one.
+    function launch(copyOnly) {
         const row = rows[selected];
         // A pending reminder or one that cannot be set has nothing to run.
         if (!row || (mode === "reminder" && !row.remind))
@@ -152,7 +152,9 @@ Item {
         }
         close();
         launched();
-        if (row.exec)
+        if (copyOnly && row.copyExec)
+            Quickshell.execDetached(row.copyExec);
+        else if (row.exec)
             Quickshell.execDetached(row.exec);
         else if (row.copy)
             Quickshell.execDetached(["wl-copy", "--", row.copy]);
@@ -415,7 +417,7 @@ Item {
                             else if (event.key === Qt.Key_Tab)
                                 results.forceActiveFocus();
                             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                                launcher.launch();
+                                launcher.launch(event.modifiers & Qt.ShiftModifier);
                             else if (event.key === Qt.Key_Escape)
                                 launcher.close();
                             else
@@ -471,7 +473,7 @@ Item {
                         else if (event.key === Qt.Key_D && launcher.mode === "reminder")
                             launcher.deleteReminder();
                         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            launcher.launch();
+                            launcher.launch(event.modifiers & Qt.ShiftModifier);
                         else if (event.key === Qt.Key_Escape)
                             launcher.close();
                         else
