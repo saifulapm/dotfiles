@@ -27,7 +27,7 @@ export const oneLine = (s) => pickerLine(String(s ?? '').replace(/[‪-‮⁦-�
 // Amiri is the boards' face; until a machine has it, Noto Naskh Arabic, which every machine has, draws the Arabic.
 export const arabicFamily = (families) => (families.indexOf('Amiri') >= 0 ? 'Amiri' : 'Noto Naskh Arabic');
 
-// Paper's serif Bangla matches its Fraunces; Artboard and Blueprint draw sans.
+// Paper draws Bangla in a serif, Artboard and Blueprint in a sans.
 export const bengaliFamily = (voice) => (voice === 'caps' ? 'Noto Serif Bengali' : 'Noto Sans Bengali');
 
 // Drawn as it is in every theme: Blueprint's capitals would change the commands it names.
