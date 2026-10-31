@@ -5,7 +5,28 @@ import * as Y from './youtube.mjs';
 const row = (o) => Object.assign({ id: 'dQw4w9WgXcQ', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: 267, thumb: 'dQw4w9WgXcQ' }, o);
 
 test('a search answer lists its rows as the row draws them', () => {
-  assert.deepEqual(Y.rows({ rows: [row()] }), [{ id: 'dQw4w9WgXcQ', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '4:27', secs: 267, thumb: 'dQw4w9WgXcQ' }]);
+  assert.deepEqual(Y.rows({ rows: [row()] }), [{ id: 'dQw4w9WgXcQ', kind: 'video', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '4:27', secs: 267, thumb: 'dQw4w9WgXcQ' }]);
+});
+
+// Saved and History keep rows from before kinds, so a row with none is a video.
+test('a row with no kind is a video, and one of a kind the App does not know is dropped', () => {
+  assert.equal(Y.rows({ rows: [row({ kind: 'video' })] })[0].kind, 'video');
+  assert.deepEqual(Y.rows({ rows: [row({ kind: 'mix' }), row({ kind: 7 })] }), []);
+});
+
+// A playlist id is YouTube's PL, OLAK5uy_ or RD run, and a channel's is UC and 22 more; each still names no file, so only YouTube's id characters pass.
+test('a playlist row keeps its id and its count, and draws its count where a video draws its duration', () => {
+  const [p] = Y.rows({ rows: [{ id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', kind: 'playlist', title: 'Modal Soul', channel: 'Nujabes', duration: null, thumb: 'hQ5x8pHoIPA', count: 300 }] });
+  assert.deepEqual(p, { id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO', kind: 'playlist', title: 'Modal Soul', channel: 'Nujabes', duration: '300 videos', secs: null, thumb: 'hQ5x8pHoIPA', count: 300 });
+  const counts = Y.rows({ rows: [1, null, 'x', 1234].map((count, i) => ({ id: 'PLfakeList000' + i, kind: 'playlist', title: 't', channel: 'c', duration: null, thumb: '', count })) });
+  assert.deepEqual(counts.map((r) => [r.count, r.duration]), [[1, '1 video'], [null, ''], [null, ''], [1234, '1,234 videos']]);
+  assert.deepEqual(Y.rows({ rows: [{ id: 'PL/../x', kind: 'playlist', title: 't', count: 1 }] }), []);
+});
+
+test('a channel row keeps its UC id, its handle as the channel line, and no duration', () => {
+  const [c] = Y.rows({ rows: [{ id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', kind: 'channel', title: 'Nujabes', channel: '@Nujabes19740207', duration: null, thumb: '' }] });
+  assert.deepEqual(c, { id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', kind: 'channel', title: 'Nujabes', channel: '@Nujabes19740207', duration: '', secs: null, thumb: '' });
+  assert.deepEqual(Y.rows({ rows: [{ id: 'dQw4w9WgXcQ', kind: 'channel', title: 'x' }] }), [], 'a video id is no channel');
 });
 
 // Saving a row keeps its seconds, so Saved draws its duration with no network.

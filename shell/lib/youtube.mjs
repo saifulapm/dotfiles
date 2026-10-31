@@ -2,8 +2,9 @@
 import { oneLine } from './picker.mjs';
 export { answer } from './dekho.mjs';
 
-// A video id names a thumbnail's cache file and a URL, so only YouTube's 11 id characters pass.
+// A video id names a thumbnail's cache file and a URL, so only YouTube's 11 id characters pass; a playlist's is YouTube's PL, OLAK5uy_ or RD run, a channel's UC and 22 more.
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
+const IDS = { video: VIDEO_ID, playlist: /^[A-Za-z0-9_-]{2,64}$/, channel: /^UC[A-Za-z0-9_-]{22}$/ };
 
 const two = (n) => String(n).padStart(2, '0');
 
@@ -16,20 +17,31 @@ export function duration(secs) {
   return h > 0 ? `${h}:${two(m)}:${two(s % 60)}` : `${m}:${two(s % 60)}`;
 }
 
-// YouTube's titles and channels are whatever their uploaders typed, so each draws as one plain line.
+// A playlist row draws its count where a video draws its duration: 1 video, 1,234 videos.
+export function count(n) {
+  if (!Number.isInteger(n) || n < 0) return '';
+  return `${String(n).replace(/\B(?=(\d{3})+$)/g, ',')} ${n === 1 ? 'video' : 'videos'}`;
+}
+
+// YouTube's titles and channels are whatever their uploaders typed, so each draws as one plain line. Saved and History keep rows from before kinds, so a row with none is a video.
 export function rows(answer) {
   const list = answer && Array.isArray(answer.rows) ? answer.rows : [];
   const out = [];
   for (const r of list) {
-    if (!r || typeof r !== 'object' || !VIDEO_ID.test(r.id)) continue;
-    out.push({
+    if (!r || typeof r !== 'object') continue;
+    const kind = r.kind === undefined ? 'video' : r.kind;
+    if (!Object.prototype.hasOwnProperty.call(IDS, kind) || !IDS[kind].test(r.id)) continue;
+    const row = {
       id: r.id,
+      kind,
       title: oneLine(r.title),
       channel: oneLine(r.channel),
-      duration: duration(r.duration),
-      secs: duration(r.duration) ? r.duration : null,
+      duration: kind === 'playlist' ? count(r.count) : duration(r.duration),
+      secs: kind === 'video' && duration(r.duration) ? r.duration : null,
       thumb: VIDEO_ID.test(r.thumb) ? r.thumb : '',
-    });
+    };
+    if (kind === 'playlist') row.count = count(r.count) ? r.count : null;
+    out.push(row);
   }
   return out;
 }

@@ -69,8 +69,8 @@ test('a history survives a write and a read, and the text ends in a newline', ()
 test('rows draw like youtube.mjs rows, duration text and all', () => {
   const h = H.add(H.add(H.empty(), row('fakeVid0001', { secs: 3734 }), 1), row('fakeVid0002', { secs: null }), 2);
   assert.deepEqual(H.rows(h), [
-    { id: 'fakeVid0002', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '', secs: null, thumb: 'fakeVid0002' },
-    { id: 'fakeVid0001', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '1:02:14', secs: 3734, thumb: 'fakeVid0001' },
+    { id: 'fakeVid0002', kind: 'video', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '', secs: null, thumb: 'fakeVid0002' },
+    { id: 'fakeVid0001', kind: 'video', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '1:02:14', secs: 3734, thumb: 'fakeVid0001' },
   ]);
   assert.deepEqual(H.rows(h), Y.rows({ rows: [{ id: 'fakeVid0002', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: null, thumb: 'fakeVid0002' }, { id: 'fakeVid0001', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: 3734, thumb: 'fakeVid0001' }] }));
 });
