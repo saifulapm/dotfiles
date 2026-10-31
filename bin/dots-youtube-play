@@ -25,10 +25,10 @@ player=(
 ytdlp=$(command -v yt-dlp) && player+=("--script-opts=ytdl_hook-ytdl_path=$ytdlp")
 deno=$(mise which deno 2>/dev/null) && [ -n "$deno" ] && player+=("--ytdl-raw-options=js-runtimes=deno:$deno")
 
-# The display mpv opens on and a nested check's dirs reach the unit only by name.
+# The display mpv opens on, the bus mpv-mpris shows it on and a nested check's dirs reach the unit only by name.
 pass=()
 for name in $(compgen -e); do
-  case $name in WAYLAND_DISPLAY | XDG_RUNTIME_DIR | XDG_CONFIG_HOME | XDG_CACHE_HOME | XDG_STATE_HOME | MPV_HOME | DOTS_DEV_DIR) pass+=("--setenv=$name") ;; esac
+  case $name in WAYLAND_DISPLAY | DBUS_SESSION_BUS_ADDRESS | XDG_RUNTIME_DIR | XDG_CONFIG_HOME | XDG_CACHE_HOME | XDG_STATE_HOME | MPV_HOME | DOTS_DEV_DIR) pass+=("--setenv=$name") ;; esac
 done
 
 if [ "$1" = audio ]; then

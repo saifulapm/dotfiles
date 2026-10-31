@@ -57,11 +57,12 @@ test('a second video while the first plays gets the next free unit, each its own
   assert.deepEqual(JSON.parse(run('video', 'fakeVid0001').stdout), { unit: 'youtube-video-3' });
 });
 
-test('DOTS_YOUTUBE_MPV names the player, and the caller\'s display, dirs and dev dir reach the unit by name', (t) => {
-  const { run, argv } = rig(t, { DOTS_YOUTUBE_MPV: '/repo/dev/youtube/mpv', WAYLAND_DISPLAY: 'wayland-7', XDG_CACHE_HOME: '/c', DOTS_DEV_DIR: '/d', OTHER: 'x' });
+// mpv-mpris shows a player on the caller's session bus, which a nested check's own bus is, and the user manager's is not.
+test('DOTS_YOUTUBE_MPV names the player, and the caller\'s display, bus, dirs and dev dir reach the unit by name', (t) => {
+  const { run, argv } = rig(t, { DOTS_YOUTUBE_MPV: '/repo/dev/youtube/mpv', WAYLAND_DISPLAY: 'wayland-7', DBUS_SESSION_BUS_ADDRESS: 'unix:path=/b', XDG_CACHE_HOME: '/c', DOTS_DEV_DIR: '/d', OTHER: 'x' });
   run('video', 'fakeVid0001');
   const a = argv('youtube-video-1');
-  assert.deepEqual(a.filter((x) => x.startsWith('--setenv')).sort(), ['--setenv=DOTS_DEV_DIR', '--setenv=WAYLAND_DISPLAY', '--setenv=XDG_CACHE_HOME', '--setenv=XDG_RUNTIME_DIR']);
+  assert.deepEqual(a.filter((x) => x.startsWith('--setenv')).sort(), ['--setenv=DBUS_SESSION_BUS_ADDRESS', '--setenv=DOTS_DEV_DIR', '--setenv=WAYLAND_DISPLAY', '--setenv=XDG_CACHE_HOME', '--setenv=XDG_RUNTIME_DIR']);
   assert.equal(a[a.indexOf('--') + 1], '/repo/dev/youtube/mpv');
 });
 
