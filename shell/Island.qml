@@ -101,6 +101,14 @@ PanelWindow {
     // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
     property var sending: null
     readonly property var sendingLook: V.sendingLook(theme.tokens)
+    // A YouTube download: the one underneath, {n, total, list, title, pct, kind}, and a failure held 5 s over it, {title, reason}. Either one fills the slot.
+    property var download: null
+    property var failure: null
+    readonly property var downloading: download || failure ? Object.assign({ n: 1, total: 1, list: "", title: "", pct: 0, kind: "" }, download, { failure }) : null
+    property var heldDownloading: null
+    onDownloadingChanged: if (downloading)
+        heldDownloading = downloading
+    readonly property var downloadingLook: V.downloadingLook(theme.tokens)
     property var playing: null
     // What each part last showed, so a part can leave with its content after its slot has emptied.
     property var heldCalendar: null
@@ -137,6 +145,7 @@ PanelWindow {
             toast,
             capture,
             sending,
+            downloading,
             playing,
             notice
         })
@@ -171,6 +180,7 @@ PanelWindow {
             capture: captureLook.card ? [0, 0] : [I.boxWidth(Math.ceil(captureRow.implicitWidth) + 2 * captureLook.pad), captureLook.height],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
+            downloading: [downloadingLook.width, downloadingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
@@ -179,14 +189,14 @@ PanelWindow {
             osd: [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
-    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -546,6 +556,45 @@ PanelWindow {
         sending = null;
     }
 
+    // dots-call downloading: start names the place in the queue once, progress follows, failed holds its words 5 s whatever starts meanwhile, and done ends the queue without cutting that hold short; a percent outside a download is dropped.
+    function downloadStart(n, total, list, title, kind) {
+        download = { n: parseInt(n) || 1, total: parseInt(total) || 1, list: String(list), title: String(title), pct: 0, kind: String(kind) };
+    }
+
+    function downloadProgress(pct) {
+        if (download)
+            download = Object.assign({}, download, { pct: Math.max(0, Math.min(100, parseInt(pct) || 0)) });
+    }
+
+    function downloadFailed(title, reason) {
+        failure = { title: String(title), reason: String(reason) };
+        failureTick.restart();
+    }
+
+    function downloadDone() {
+        download = null;
+    }
+
+    // What the downloading slot draws, for `island state`.
+    function downloadingState() {
+        if (mode !== "downloading")
+            return null;
+        const last = dlTail.visible ? dlTail : dlMain;
+        return {
+            failed: !!heldDownloading.failure,
+            head: downloadingLook.head ? [dlHeadLeft.text, dlHeadRight.text] : [],
+            chip: dlChip.visible ? dlChipText.text : "",
+            line: dlChip.visible ? dlChipText.text + " " + dlMain.text : dlMain.text + dlTail.text,
+            elided: dlMain.truncated,
+            lines: dlMain.lineCount,
+            barFill: dlBar.visible ? Math.round(dlFill.width) : 0,
+            barWidth: Math.round(dlBar.width),
+            barHeight: dlBar.visible ? Math.round(dlBar.height) : 0,
+            right: Math.round(last.mapToItem(downloadingPart, last.width, 0).x),
+            frame: String(box.style.frame.color)
+        };
+    }
+
     // What the sending slot draws, for `island state`.
     function sendingState() {
         if (mode !== "sending")
@@ -813,6 +862,12 @@ PanelWindow {
     }
 
     Tick {
+        id: failureTick
+        interval: 5000
+        onTriggered: island.failure = null
+    }
+
+    Tick {
         id: noticeTick
         interval: 5000
         onTriggered: island.notice = ""
@@ -843,7 +898,7 @@ PanelWindow {
         tokens: island.theme.tokens
         role: "island"
         // The lease card's own frame, and the slot's last minute: Paper's sheet and vermilion rule, Blueprint's amber frame and glow.
-        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : island.mode === "notification" && island.noteDragging && island.chipLook.frame ? { frame: island.chipLook.frame } : null
+        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : island.mode === "downloading" && island.downloading.failure ? island.downloadingLook.failure.box : island.mode === "notification" && island.noteDragging && island.chipLook.frame ? { frame: island.chipLook.frame } : null
 
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
@@ -1181,6 +1236,183 @@ PanelWindow {
                     height: track.height
                     radius: sendingPart.look.bar.radius
                     color: sendingPart.look.bar.fill
+                }
+            }
+
+            IslandPart {
+                id: downloadingPart
+                shown: island.part === "downloading"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.downloading[0]
+                height: island.sizes.downloading[1]
+                readonly property var look: island.downloadingLook
+                readonly property var held: island.heldDownloading
+                readonly property bool failed: held ? !!held.failure : false
+                readonly property var words: held ? I.downloadingParts(held, look.chip !== null) : { chip: "", main: "", tail: "" }
+                readonly property color ink: failed && look.failure.color ? look.failure.color : look.line.color || box.style.text
+
+                // Artboard's tile holds a play glyph.
+                Rectangle {
+                    id: dlTile
+                    visible: downloadingPart.look.tile !== null
+                    x: downloadingPart.look.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: downloadingPart.look.tile?.size ?? 0
+                    height: width
+                    radius: downloadingPart.look.tile?.radius ?? 0
+                    color: downloadingPart.look.tile?.fill ?? "transparent"
+
+                    Shape {
+                        anchors.centerIn: parent
+                        width: 20
+                        height: 20
+                        preferredRendererType: Shape.CurveRenderer
+                        ShapePath {
+                            strokeColor: box.style.text
+                            strokeWidth: 1.5
+                            fillColor: "transparent"
+                            PathSvg {
+                                path: "M5.5 4h9A3.5 3.5 0 0 1 18 7.5v5a3.5 3.5 0 0 1-3.5 3.5h-9A3.5 3.5 0 0 1 2 12.5v-5A3.5 3.5 0 0 1 5.5 4z"
+                            }
+                        }
+                        ShapePath {
+                            strokeColor: "transparent"
+                            fillColor: box.style.text
+                            PathSvg {
+                                path: "M8.4 7.4v5.2L13 10z"
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    id: dlColumn
+                    x: downloadingPart.look.pad + (dlTile.visible ? dlTile.width + 14 : 0)
+                    width: downloadingPart.width - x - downloadingPart.look.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: downloadingPart.look.gap
+
+                    Item {
+                        visible: downloadingPart.look.head !== null
+                        width: parent.width
+                        height: visible ? dlHeadLeft.implicitHeight : 0
+
+                        Text {
+                            id: dlHeadLeft
+                            textFormat: Text.PlainText
+                            text: downloadingPart.look.head?.left ?? ""
+                            color: downloadingPart.look.head?.color ?? box.style.text
+                            font.family: downloadingPart.look.head?.font ?? ""
+                            font.pixelSize: downloadingPart.look.head?.size ?? 12
+                            font.letterSpacing: downloadingPart.look.head?.spacing ?? 0
+                        }
+
+                        Text {
+                            id: dlHeadRight
+                            anchors.right: parent.right
+                            textFormat: Text.PlainText
+                            text: downloadingPart.look.head?.right(downloadingPart.held?.kind ?? "", I.islandText("rest", {}, clock.now)) ?? ""
+                            color: downloadingPart.look.head?.color ?? box.style.text
+                            font.family: downloadingPart.look.head?.font ?? ""
+                            font.pixelSize: downloadingPart.look.head?.size ?? 12
+                            font.letterSpacing: downloadingPart.look.head?.spacing ?? 0
+                        }
+                    }
+
+                    // The failure's mark or chip, then the title and reason (or the download's title) eliding before the percent, which never does.
+                    Row {
+                        id: dlLine
+                        height: Math.max(dlMain.implicitHeight, dlChip.height)
+
+                        Item {
+                            id: dlMark
+                            visible: downloadingPart.failed && downloadingPart.look.failure.mark !== null
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: visible ? downloadingPart.look.failure.mark.size + 8 : 0
+                            height: visible ? downloadingPart.look.failure.mark.size : 0
+
+                            Rectangle {
+                                width: parent.height
+                                height: parent.height
+                                color: downloadingPart.look.failure.mark?.color ?? "transparent"
+                            }
+                        }
+
+                        Item {
+                            id: dlChip
+                            visible: downloadingPart.failed && downloadingPart.words.chip !== ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: visible ? dlChipBox.width + 8 : 0
+                            height: visible ? dlChipBox.height : 0
+
+                            Rectangle {
+                                id: dlChipBox
+                                width: dlChipText.implicitWidth + 2 * (downloadingPart.look.chip?.padX ?? 0)
+                                height: dlChipText.implicitHeight + 2 * (downloadingPart.look.chip?.padY ?? 0)
+                                radius: downloadingPart.look.chip?.radius ?? 0
+                                color: downloadingPart.look.chip?.fill ?? "transparent"
+
+                                Text {
+                                    id: dlChipText
+                                    anchors.centerIn: parent
+                                    textFormat: Text.PlainText
+                                    text: downloadingPart.words.chip
+                                    color: downloadingPart.look.chip?.color ?? box.style.text
+                                    font.family: downloadingPart.look.line.font
+                                    font.pixelSize: downloadingPart.look.line.size
+                                    font.weight: downloadingPart.look.line.weight
+                                }
+                            }
+                        }
+
+                        Text {
+                            id: dlMain
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            width: Math.max(0, Math.min(implicitWidth, dlColumn.width - dlMark.width - dlChip.width - dlTail.implicitWidth))
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            text: downloadingPart.words.main
+                            color: downloadingPart.ink
+                            font.family: downloadingPart.look.line.font
+                            font.pixelSize: downloadingPart.look.line.size
+                            font.weight: downloadingPart.look.line.weight
+                            font.letterSpacing: downloadingPart.look.line.spacing
+                        }
+
+                        Text {
+                            id: dlTail
+                            visible: downloadingPart.words.tail !== ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: downloadingPart.words.tail
+                            color: downloadingPart.ink
+                            font.family: downloadingPart.look.line.font
+                            font.pixelSize: downloadingPart.look.line.size
+                            font.weight: downloadingPart.look.line.weight
+                            font.letterSpacing: downloadingPart.look.line.spacing
+                            font.features: { "tnum": 1 }
+                        }
+                    }
+
+                    Rectangle {
+                        id: dlBar
+                        visible: !downloadingPart.failed
+                        width: parent.width
+                        height: visible ? downloadingPart.look.bar.height : 0
+                        radius: downloadingPart.look.bar.radius
+                        color: downloadingPart.look.bar.track
+
+                        Rectangle {
+                            id: dlFill
+                            width: parent.width * (downloadingPart.held?.pct ?? 0) / 100
+                            height: parent.height
+                            radius: parent.radius
+                            color: downloadingPart.look.bar.fill
+                        }
+                    }
                 }
             }
 

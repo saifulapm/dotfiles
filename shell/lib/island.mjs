@@ -5,8 +5,8 @@ import { connectText } from './bluetooth.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening, and a device's connect state right after the OSD (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment.
-const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'btConnect', 'toast', 'capture', 'sending', 'playing'];
+// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening, and a device's connect state right after the OSD (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment, and a YouTube download, which ranks just under a send, the same.
+const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'btConnect', 'toast', 'capture', 'sending', 'downloading', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -110,11 +110,25 @@ export function islandText(mode, slots, now) {
       return captureText(slots.capture);
     case 'sending':
       return `Sending ${filesText(slots.sending.count)} to ${oneLine(slots.sending.to)} · ${slots.sending.pct}%`;
+    case 'downloading': {
+      const p = downloadingParts(slots.downloading, false);
+      return p.main + p.tail;
+    }
     case 'playing':
       return `${[slots.playing.title, slots.playing.artist].filter((p) => p).join(' — ')}  ${clockText(now)}`;
     default:
       return slots.notice || clockText(now);
   }
+}
+
+// What the download slot draws, as {n, total, list, title, pct, failure}: a failure replaces the progress while it is held. A chipped theme (Artboard) sets the failure's first words apart; the title and reason come from YouTube, so each passes oneLine.
+export function downloadingParts(d, chipped) {
+  if (d.failure) {
+    const rest = `${oneLine(d.failure.title)} · ${oneLine(d.failure.reason)}`;
+    return chipped ? { chip: '↓ failed', main: `· ${rest}`, tail: '' } : { chip: '', main: `↓ failed · ${rest}`, tail: '' };
+  }
+  const place = d.list ? `${oneLine(d.list)} ${d.n} / ${d.total} · ` : '';
+  return { chip: '', main: `↓ ${place}${oneLine(d.title)}`, tail: ` · ${d.pct}%` };
 }
 
 export const boxWidth = (contentWidth) => Math.min(contentWidth, MAX_WIDTH);
@@ -136,7 +150,7 @@ export function shiftMonth(year, month, by) {
 }
 
 // The one-line modes the island closes into; the rest open it into a card.
-export const isCompact = (mode) => ['rest', 'lease', 'sending', 'playing', 'sharing', 'mic', 'recording', 'btConnect', 'toast', 'capture'].includes(mode);
+export const isCompact = (mode) => ['rest', 'lease', 'sending', 'downloading', 'playing', 'sharing', 'mic', 'recording', 'btConnect', 'toast', 'capture'].includes(mode);
 
 // Curves are 61 samples at even steps of time, which ease reads as CSS linear() does; Qt's BezierSpline crashed on a sampled curve.
 const STEPS = 60;

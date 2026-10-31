@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -439,6 +439,34 @@ test("Blueprint's sending slot: 420 by 34, [ TAILDROP ] → NUC 2 FILES in mono,
 
 test('one part of each slot names the machine, and only that one elides', () => {
   for (const t of ['paper', 'artboard', 'blueprint']) assert.equal(sending(t).parts.filter((p) => p.name).length, 1, t);
+});
+
+const downloading = (name) => downloadingLook(theme(name));
+
+test("Paper's downloading slot: 480 by 46, a 12 px line over a 4 px accent bar on #4A4338, a red square before a failure", () => {
+  const d = downloading('paper');
+  assert.deepEqual([d.width, d.height, d.pad, d.head, d.tile, d.chip], [480, 46, 16, null, null, null]);
+  assert.deepEqual([d.line.size, d.line.weight, d.line.color], [12, 400, '']);
+  assert.deepEqual([d.bar.height, d.bar.radius, d.bar.track, d.bar.fill], [4, 0, '#4A4338', '#C8381E']);
+  assert.deepEqual([d.failure.mark, d.failure.color, d.failure.box], [{ shape: 'square', size: 8, color: '#C8381E' }, '', null]);
+});
+
+test("Artboard's downloading slot: 440 wide with a 40 px play tile, YouTube and the folder at 12 px, a 15 px bold line, a 4 px rounded bar and a failed chip", () => {
+  const d = downloading('artboard');
+  assert.deepEqual([d.width, d.height, d.tile.size, d.tile.radius, d.tile.fill], [440, 76, 40, 12, '#2B2F36']);
+  assert.deepEqual([d.head.left, d.head.right('audio', '14:32'), d.head.right('video', '14:32'), d.head.right('', '14:32'), d.head.size], ['YouTube', '~/Music/YouTube', '~/Videos/YouTube', '', 12]);
+  assert.deepEqual([d.line.size, d.line.weight], [15, 700]);
+  assert.deepEqual([d.bar.height, d.bar.radius, d.bar.track, d.bar.fill], [4, 2, '#2B2F36', '#6C83FF']);
+  assert.deepEqual(d.chip, { fill: '#FFF1E8', color: '#B4380B', radius: 8, padX: 8, padY: 2 });
+});
+
+test("Blueprint's downloading slot: 420 wide, [ YOUTUBE ] and the clock at 10 px, a 14 px bold accent line, a 3 px bar on the line colour and an amber failure frame", () => {
+  const d = downloading('blueprint');
+  assert.deepEqual([d.width, d.height, d.tile], [420, 70, null]);
+  assert.deepEqual([d.head.left, d.head.right('audio', '14:32'), d.head.size, d.head.color], ['[ YOUTUBE ]', '14:32', 10, '#80A4C2']);
+  assert.deepEqual([d.line.size, d.line.weight, d.line.color], [14, 700, '#7FE3F0']);
+  assert.deepEqual([d.bar.height, d.bar.track, d.bar.fill], [3, '#2E5A72', '#7FE3F0']);
+  assert.deepEqual([d.failure.color, d.failure.box], ['#FFB547', { frame: { width: 1, color: '#FFB547' }, glow: '#FFB547' }]);
 });
 
 const chip = (name) => chipLook(theme(name));

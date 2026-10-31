@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -152,6 +152,35 @@ test('a send reads how many files go where and how far it got, on one line', () 
   assert.equal(islandText('sending', { sending: { count: 2, to: 'nuc', pct: 48 } }, AT), 'Sending 2 files to nuc · 48%');
   assert.equal(islandText('sending', { sending: { count: 1, to: 'nu\nc', pct: 0 } }, AT), 'Sending 1 file to nu c · 0%');
   assert.equal(isCompact('sending'), true);
+});
+
+const one = { n: 1, total: 1, list: '', title: 'Feather', pct: 37, kind: 'audio', failure: null };
+const list = { n: 3, total: 18, list: 'Focus', title: 'Feather', pct: 37, kind: 'audio', failure: null };
+
+test('a download sits under a send and over the media player, and is a compact mode', () => {
+  assert.equal(pick({ downloading: one, playing: { title: 'T', artist: 'A' } }), 'downloading');
+  assert.equal(pick({ downloading: one, sending: { count: 1, to: 'nuc', pct: 1 } }), 'sending');
+  assert.equal(pick({ downloading: one, toast: 'Captured' }), 'toast');
+  assert.equal(isCompact('downloading'), true);
+});
+
+test('a download reads its title and percent, a Playlist its place in the list, a failure its reason', () => {
+  assert.equal(islandText('downloading', { downloading: one }, AT), '↓ Feather · 37%');
+  assert.equal(islandText('downloading', { downloading: list }, AT), '↓ Focus 3 / 18 · Feather · 37%');
+  assert.equal(islandText('downloading', { downloading: { ...list, failure: { title: 'Feather', reason: 'HTTP 403' } } }, AT), '↓ failed · Feather · HTTP 403');
+});
+
+test('a title, list or reason from YouTube draws as one line without its bidi marks', () => {
+  const forged = { ...list, list: 'Fo\ncus\u202e', title: 'Fea\u0085ther\u200f\tx' };
+  assert.equal(islandText('downloading', { downloading: forged }, AT), '↓ Fo cus 3 / 18 · Fea ther x · 37%');
+  assert.equal(islandText('downloading', { downloading: { ...one, failure: { title: 'a\nb', reason: 'x\u202ey' } } }, AT), '↓ failed · a b · xy');
+});
+
+test('a chipped theme draws the failure as a chip before the rest, the others as one run', () => {
+  const f = { ...one, failure: { title: 'Feather', reason: 'HTTP 403' } };
+  assert.deepEqual(downloadingParts(f, true), { chip: '↓ failed', main: '· Feather · HTTP 403', tail: '' });
+  assert.deepEqual(downloadingParts(f, false), { chip: '', main: '↓ failed · Feather · HTTP 403', tail: '' });
+  assert.deepEqual(downloadingParts(list, true), { chip: '', main: '↓ Focus 3 / 18 · Feather', tail: ' · 37%' });
 });
 
 test('a capture result shows just below a toast, with its kind, title and detail', () => {

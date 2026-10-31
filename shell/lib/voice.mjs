@@ -123,7 +123,7 @@ export function launcherLook(tokens) {
 
 // The island's board tints on its dark box, which no token carries.
 const ISLAND = {
-  caps: { head: '#B9AE99', body: '#D9CFBB' },
+  caps: { head: '#B9AE99', body: '#D9CFBB', track: '#4A4338' },
   plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF' },
 };
 
@@ -363,6 +363,55 @@ export function sendingLook(tokens) {
     parts: [Object.assign(text(10, '', { spacing: 1.4, name: true }), { text: (count, to) => `SENDING ${upper(files(count))} TO ${upper(line(to))} ·` })],
     pct: Object.assign(text(20, '', { font: t.display }), { text: (p) => `${p}%` }),
     bar: { at: 'bottom', height: 4, radius: 0, track: c.paper, fill: c.accent },
+  };
+}
+
+// How the island draws a YouTube download in place of the clock, as the boards do: a line over a bar, with Artboard's tile and folder and Blueprint's [ YOUTUBE ] and clock above it; a failure keeps the box and drops the bar. A colour left empty is the island's own text colour.
+export function downloadingLook(tokens) {
+  const c = (tokens || UNTHEMED).color;
+  const t = (tokens || UNTHEMED).type;
+  const voice = t.voice;
+  const text = (font, size, color, extra) => Object.assign({ font, size, color, weight: 400, spacing: 0 }, extra);
+  if (voice === 'plain') {
+    const folders = { audio: '~/Music/YouTube', video: '~/Videos/YouTube' };
+    return {
+      width: 440,
+      height: 76,
+      pad: 16,
+      gap: 6,
+      tile: { size: 40, radius: 12, fill: ISLAND.plain.tile },
+      head: Object.assign(text(t.ui, 12, ISLAND.plain.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
+      line: text(t.ui, 15, '', { weight: 700 }),
+      bar: { height: 4, radius: 2, track: ISLAND.plain.tile, fill: ISLAND.plain.bar },
+      chip: { fill: LEASE.artboardChip, color: LEASE.artboardWarn, radius: 8, padX: 8, padY: 2 },
+      failure: { mark: null, color: '', box: null },
+    };
+  }
+  if (voice === 'bracket') {
+    return {
+      width: 420,
+      height: 70,
+      pad: 18,
+      gap: 6,
+      tile: null,
+      head: Object.assign(text(t.mono, 10, c.muted, { spacing: 1.6 }), { left: '[ YOUTUBE ]', right: (kind, clock) => clock }),
+      line: text(t.mono, 14, c.accent, { weight: 700 }),
+      bar: { height: 3, radius: 0, track: c.line, fill: c.accent },
+      chip: null,
+      failure: { mark: null, color: c.danger, box: { frame: { width: 1, color: c.danger }, glow: c.danger } },
+    };
+  }
+  return {
+    width: 480,
+    height: 46,
+    pad: 16,
+    gap: 7,
+    tile: null,
+    head: null,
+    line: text(t.mono, 12, ''),
+    bar: { height: 4, radius: 0, track: tokens ? ISLAND.caps.track : c.muted, fill: c.accent },
+    chip: null,
+    failure: { mark: { shape: 'square', size: 8, color: c.accent }, color: '', box: null },
   };
 }
 
