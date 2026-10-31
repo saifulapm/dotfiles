@@ -224,18 +224,51 @@ ShellRoot {
         queue = Q.initial();
     }
 
-    // Enter in the field: the list takes focus at once, and the rows come when the CLI answers.
+    // Enter in the field: the list takes focus at once, and the rows come when the CLI answers; a pasted YouTube link opens its item instead.
     function search() {
         const q = query.trim();
         if (q === "")
             return;
+        focusPane("list");
+        if (F.isLink(q))
+            paste(q);
+        else
+            searchText(q);
+    }
+
+    // resolve says what a link names: a video is the only row, a playlist or channel opens as Enter on its row does, and a YouTube URL it cannot place is searched as text.
+    function paste(q) {
+        searchSeq += 1;
+        const seq = searchSeq;
+        api(["resolve", q], answer => {
+            if (seq !== app.searchSeq)
+                return;
+            const failure = YT.failure(answer);
+            if (!failure && (answer.kind === "playlist" || answer.kind === "channel"))
+                return app.open({
+                    kind: answer.kind,
+                    id: answer.id,
+                    title: "",
+                    count: null
+                });
+            if (!failure && answer.kind !== "video")
+                return app.searchText(q);
+            app.opened = null;
+            app.searchFailed = failure;
+            app.searched = null;
+            app.found = F.page(failure ? null : answer);
+            app.cursor = 0;
+            app.fetchThumbs(app.results);
+        });
+    }
+
+    function searchText(q) {
         searchSeq += 1;
         const seq = searchSeq;
         const asked = {
             query: q,
             type: type
         };
-        focusPane("list");
         api(["search", q, type, "0"], answer => {
             if (seq !== app.searchSeq)
                 return;

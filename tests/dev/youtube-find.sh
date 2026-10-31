@@ -178,6 +178,54 @@ wtype -k Escape
 until_ok 1000 yt_is '.opened == null and .error == null'
 check "Esc returns to the playlist results on row 3 ($(yt_state | jq -c '{cursor, n: (.rows | length)}'))" yt_is '.cursor == 2 and (.rows | length) == 3'
 
+# A pasted YouTube link opens its item instead of searching; another site's is searched as text.
+paste_enter() {
+  wtype /
+  until_ok 1000 yt_is '.focus == "field"'
+  wtype -M ctrl a -m ctrl
+  wtype -- "$1"
+  until_ok 1000 yt_is --arg q "$1" '.query == $q'
+  wtype -k Return
+}
+watch='https://www.youtube.com/watch?v=fakeVid0003&list=PLfakeList0001&t=30'
+paste_enter "$watch"
+until_ok 3000 yt_is '(.rows | length) == 1 and .rows[0].id == "fakeVid0003"'
+check "a watch URL with list= and t= resolves to its video, the only row, not the playlist ($(calls_text))" \
+  yt_is '(.rows | length) == 1 and .rows[0].id == "fakeVid0003" and .opened == null and .look.results == ["RESULTS", "1"]'
+check "and asks for no search and no playlist ($(calls_text))" \
+  bash -c "tail -n 2 '$calls' | grep -qxF 'resolve $watch' && [ \"\$(grep -c '^playlist PLfakeList0001' '$calls')\" = 1 ]"
+wtype -k Return
+until_ok 3000 yt_is '.units | length == 2'
+check "Enter on it plays it ($(yt_state | jq -c .units))" yt_is '.units | length == 2'
+until_ok 5000 mpv_count 1
+systemctl --user stop "$(yt_state | jq -r '.units[1]').service"
+until_ok 3000 mpv_count 0
+until_ok 3000 yt_focused
+paste_enter https://youtu.be/fakeVid0004
+until_ok 3000 yt_is '.rows[0].id == "fakeVid0004"'
+check "a youtu.be link opens its video ($(yt_state | jq -c '[.rows[].id]'))" yt_is '[.rows[].id] == ["fakeVid0004"]'
+paste_enter 'https://music.youtube.com/watch?v=fakeVid0005'
+until_ok 3000 yt_is '.rows[0].id == "fakeVid0005"'
+check "a music.youtube.com link opens its video ($(yt_state | jq -c '[.rows[].id]'))" yt_is '[.rows[].id] == ["fakeVid0005"]'
+paste_enter 'https://www.youtube.com/playlist?list=PLfakeList0002'
+until_ok 3000 yt_is '.opened.kind == "playlist" and (.rows | length) == 300'
+check "a playlist link lists its items under its title and count ($(yt_state | jq -c '{head: .look.results, n: (.rows | length)}'))" \
+  yt_is '.look.results == ["Lofi Archive", "300 videos"] and (.rows | length) == 300'
+paste_enter https://www.youtube.com/@nujabes
+until_ok 3000 yt_is '.opened.kind == "channel" and (.rows | length) == 20'
+check "an @handle link lists that channel's uploads ($(calls_text))" \
+  yt_is '.look.results == ["Nujabes", "20"] and .rows[0].id == "fakeUpl0001"'
+check "asking for the handle's uploads ($(calls_text))" logged "channel @nujabes 0"
+paste_enter https://www.youtube.com/channel/UCfakeChan00000000000003
+until_ok 3000 yt_is '.opened.id == "UCfakeChan00000000000003" and (.rows | length) == 3'
+check "a /channel/ link lists that channel's uploads ($(yt_state | jq -c '{head: .look.results}'))" yt_is '.look.results == ["Hydeout Productions", "3"]'
+paste_enter https://vimeo.com/123
+until_ok 3000 logged "search https://vimeo.com/123 playlists 0"
+check "another site's URL is searched as text, with no resolve ($(calls_text))" \
+  bash -c "! grep -q '^resolve https://vimeo' '$calls'"
+until_ok 3000 yt_is '.opened == null'
+check "its results replace the opened channel ($(yt_state | jq -c '{opened, head: .look.results}'))" yt_is '.opened == null and .look.results[0] == "RESULTS"'
+
 wtype -k Escape
 until_ok 3000 yt_gone
 check "Esc closes the App" yt_gone
