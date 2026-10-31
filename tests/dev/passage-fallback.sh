@@ -92,7 +92,7 @@ check "with deen answering {} for a dua, dua day 2026-11-05 falls back ($(passag
 
 mode long
 on_day 2026-11-12
-check "with deen answering a hadith 100,000 characters long, 2026-11-12 falls back ($(passage | jq -c '[.fallback, .kind, (.en | length)]'))" passage_is '.fallback == true and .kind == "hadith" and (.en | length) <= 280'
+check "with deen answering a hadith 100,000 characters long, 2026-11-12 falls back ($(passage | jq -c '[.fallback, .kind, (.bn | length)]'))" passage_is '.fallback == true and .kind == "hadith" and .bn == "" and .en != ""'
 
 exit $((fails > 0))
 }

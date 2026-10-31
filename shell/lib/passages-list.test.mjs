@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { answer } from './deen.mjs';
 import * as P from './passage.mjs';
 
 // The real deen, as the shell calls it; the list is only as good as what deen answers for each line.
@@ -10,11 +11,12 @@ const list = readFileSync(new URL('../data/passages.txt', import.meta.url), 'utf
 
 const run = (args) => new Promise((resolve) => execFile(deen, args, (err, stdout) => resolve(stdout)));
 
-// A machine whose deen predates deen-data, or has none of its texts yet, answers in English alone; the list is checked only against a deen that answers in Bangla.
+// A machine whose deen predates deen-data, or has none of its texts yet, answers an ayah with no Bangla pronunciation, or no Bangla at all; the list is checked only against a deen that answers in Bangla, and any other answer fails it.
 let skip = false;
 try {
   execFileSync('sh', ['-c', `command -v "$0"`, deen], { stdio: 'ignore' });
-  if (!(P.shape({ kind: 'ayah', ref: '94:6' }, await run(['api', 'ayah', '94:6']), '') || {}).bn) skip = `${deen} answers 94:6 with no Bangla, so the list is not checked against it`;
+  const a = answer(await run(['api', 'ayah', '94:6']));
+  if (a && a.ayah && a.ayah.ar && !(a.ayah.bn && a.ayah.bn_pron)) skip = `${deen} answers 94:6 with no Bangla pronunciation and meaning, so the list is not checked against it`;
 } catch (e) {
   skip = `${deen} is not installed, so the list is not checked against it`;
 }
@@ -33,6 +35,7 @@ async function problems(text, ask) {
     const at = `line ${e.line} ${e.kind} ${e.ref ?? e.author}`;
     if (!d) found.push(`${at}: a drawn line is empty`);
     else if (P.overLimit(d)) found.push(`${at}: ${P.overLimit(d)}`);
+    else if (e.kind !== 'quote' && [d.ar, d.bn_pron, d.bn, d.ref].some((l) => /[A-Za-z0-9]/.test(l))) found.push(`${at}: a Latin letter or digit is drawn`);
   });
   return found;
 }
@@ -61,16 +64,18 @@ const FAKE = {
   'api ayah 94:5': { ayah: { s: 94, a: 5, ar: 'فَإِنَّ', bn_pron: 'ফাইন্না', bn: 'ক'.repeat(281) } },
   'hadith show muslim:1': { hit: { collection: 'muslim', bn: 'সহীহ মুসলিম', hadith: { n: '1', bn: '' } } },
   'dua show 16': { dua: { id: '16', ar: 'ب'.repeat(281), bn_pron: 'বিসমিল্লা-হি', bn: 'আল্লাহর নামে' } },
+  'dua show 75a': { dua: { id: '75a', ar: 'ب', bn_pron: 'বি', bn: 'আল্লাহর নামে' } },
 };
 const fake = async (args) => JSON.stringify(FAKE[args.join(' ')] ?? {});
 
-test('an entry with a line past 280 characters, an empty hadith or a range of ayat fails, naming its line', async () => {
+test('an entry with a line past 280 characters, an empty hadith, a range of ayat or a Latin letter in its Bangla fails, naming its line', async () => {
   const long = `quote ${'x'.repeat(281)} — Someone`;
-  assert.deepEqual(await problems(`ayah 94:6\n${long}\nhadith muslim:1\nayah 94:5-6\nayah 94:5\ndua 16\n`, fake), [
+  assert.deepEqual(await problems(`ayah 94:6\n${long}\nhadith muslim:1\nayah 94:5-6\nayah 94:5\ndua 16\ndua 75a\n`, fake), [
     'line 4 ayah 94:5-6: not one ayah',
     'line 2 quote Someone: English is 281 characters',
     'line 3 hadith muslim:1: a drawn line is empty',
     'line 5 ayah 94:5: Bangla is 281 characters',
     'line 6 dua 16: Arabic is 281 characters',
+    'line 7 dua 75a: a Latin letter or digit is drawn',
   ]);
 });
