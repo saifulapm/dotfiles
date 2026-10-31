@@ -5,7 +5,13 @@ import * as Y from './youtube.mjs';
 const row = (o) => Object.assign({ id: 'dQw4w9WgXcQ', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: 267, thumb: 'dQw4w9WgXcQ' }, o);
 
 test('a search answer lists its rows as the row draws them', () => {
-  assert.deepEqual(Y.rows({ rows: [row()] }), [{ id: 'dQw4w9WgXcQ', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '4:27', thumb: 'dQw4w9WgXcQ' }]);
+  assert.deepEqual(Y.rows({ rows: [row()] }), [{ id: 'dQw4w9WgXcQ', title: 'Aruarian Dance', channel: 'Nujabes - Topic', duration: '4:27', secs: 267, thumb: 'dQw4w9WgXcQ' }]);
+});
+
+// Saving a row keeps its seconds, so Saved draws its duration with no network.
+test('a row keeps its duration in seconds beside the drawn one, null when yt-dlp gave none', () => {
+  assert.equal(Y.rows({ rows: [row({ duration: null })] })[0].secs, null);
+  assert.equal(Y.rows({ rows: [row({ duration: 'x' })] })[0].secs, null);
 });
 
 test('a title or channel with a newline, U+202E and ESC is one line without them', () => {

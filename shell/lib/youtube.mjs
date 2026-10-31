@@ -27,6 +27,7 @@ export function rows(answer) {
       title: oneLine(r.title),
       channel: oneLine(r.channel),
       duration: duration(r.duration),
+      secs: duration(r.duration) ? r.duration : null,
       thumb: VIDEO_ID.test(r.thumb) ? r.thumb : '',
     });
   }
