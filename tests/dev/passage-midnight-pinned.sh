@@ -4,13 +4,13 @@
 source "$(dirname "$0")/lib-midnight.sh" 25
 
 dots-call passage date 2026-11-03
-until_ok 5000 passage_is '.date == "2026-11-03" and .en != ""'
+until_ok 5000 passage_is '.date == "2026-11-03" and (.bn != "" or .en != "")'
 n=$(reads)
 until_midnight 3
-check "the tick at midnight leaves 2026-11-03 on screen ($(passage | jq -c '[.date, .ref]'))" passage_is '.date == "2026-11-03" and .ref == "Ash-Sharh 94:6" and .fallback == false'
+check "the tick at midnight leaves 2026-11-03 on screen ($(passage | jq -c '[.date, .ref]'))" passage_is '.date == "2026-11-03" and .ref == "সূরা আশ-শারহ ৯৪:৬" and .fallback == false'
 check "and reads deen no more ($n then $(reads))" test "$(reads)" = "$n"
 dots-call passage date ""
-until_ok 5000 passage_is --arg d "$after" '.date == $d and .en != ""'
+until_ok 5000 passage_is --arg d "$after" '.date == $d and (.bn != "" or .en != "")'
 check "back to today it is $after's, the date the clock turned to ($(passage | jq -c '[.date, .ref]'))" passage_is --arg d "$after" '.date == $d'
 
 exit $((fails > 0))

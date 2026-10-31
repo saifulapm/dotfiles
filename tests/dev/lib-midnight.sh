@@ -1,13 +1,13 @@
 # Sourced by the passage midnight checks in place of lib.sh: a deen that logs each call, and a shell in a zone whose midnight comes at least $1 s after this runs.
-texts=$HOME/.local/share/deen
 work=$(mktemp -d)
+source "$(dirname "${BASH_SOURCE[0]}")/lib-deen-bangla.sh"
 echo ok >"$work/mode"
-# ok passes to the real deen on dots apply's texts; hang never answers.
+# ok passes to the real deen on the texts it builds from deen-data; hang never answers.
 cat >"$work/deen" <<FAKE
 #!/bin/sh
 echo "\$*" >>$work/calls
 [ "\$(cat $work/mode)" != hang ] || exec sleep 600
-DEEN_DATA=$texts/quran.json DEEN_WORDS=$texts/words.json DEEN_DUAS=$texts/duas.json DEEN_HADITH=$texts/hadith exec $(command -v deen) "\$@"
+exec $work/deen-bangla "\$@"
 FAKE
 chmod +x "$work/deen"
 export DOTS_DEV_DEEN=$work/deen
