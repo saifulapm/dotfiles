@@ -114,6 +114,17 @@ check "the play key resumes the Queue after both close ($(mpv_get pause))" mpv_i
 check "the island shows its song ($(island | jq -r .text))" island_shows "Aruarian Dance"
 check "and the other player stays paused ($(mpris org.mpris.MediaPlayer2.dotsfake PlaybackStatus | jq -r .data))" other_is Paused
 
+# mpv keeps pause from one file to the next, so m after a video must clear the pause the video left.
+wtype -k Return
+until_ok 5000 mpv_count 1
+until_ok 3000 mpv_is pause true
+systemctl --user stop 'youtube-video-*'
+until_ok 3000 mpv_count 0
+until_ok 3000 yt_is '.focus == "list"'
+wtype m
+until_ok 5000 line_is '^▶ Feather'
+check "m after a video closed plays its row, not paused ($(line), pause $(mpv_get pause))" mpv_is pause false
+
 wtype -k Escape
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "YouTube's log has no QML errors${errs:+: $(head -c 300 <<<"$errs")}" test -z "$errs"

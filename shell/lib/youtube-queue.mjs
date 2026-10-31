@@ -70,10 +70,12 @@ const stopped = (state) => state.idle || state.count === 0;
 // a starts a stopped Queue afresh rather than adding to the entries of one that ended, but only the first ask does, or a fast second press would replace the first.
 export function itemLines(state, row, how) {
   const mode = how === 'play' || (stopped(state) && state.asked === 0) ? 'replace' : 'append-play';
-  return [
+  const lines = [
     line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]),
     line(['loadfile', watch(row.id), mode, -1, { 'force-media-title': row.title }]),
   ];
+  // mpv keeps pause from one file to the next, so a Queue a video paused would load the row paused and stay silent.
+  return mode === 'replace' ? lines.concat([setPauseLine(false)]) : lines;
 }
 
 // The App calls this after each itemLines, since mpv reports nothing back before the next press can come.

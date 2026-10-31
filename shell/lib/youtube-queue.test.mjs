@@ -106,7 +106,16 @@ test('m stores the row in mpv, then replaces the Queue with it titled as the row
   assert.deepEqual(Q.itemLines(playing({ count: 3 }), ARUARIAN, 'play').map((l) => JSON.parse(l)), [
     { command: ['set_property', 'user-data/youtube/fakeVid0001', { title: 'Aruarian Dance', channel: 'Nujabes - Topic', secs: 267 }] },
     { command: ['loadfile', watch('fakeVid0001'), 'replace', -1, { 'force-media-title': 'Aruarian Dance' }] },
+    { command: ['set_property', 'pause', false] },
   ]);
+});
+
+// mpv keeps pause from one file to the next, so a Queue a video paused would load m's row paused and stay silent.
+test('a replace plays even on a Queue a video paused, and an append leaves a paused Queue paused', () => {
+  const paused = playing({ paused: true });
+  assert.deepEqual(JSON.parse(Q.itemLines(paused, ARUARIAN, 'play').at(-1)), { command: ['set_property', 'pause', false] });
+  assert.deepEqual(JSON.parse(Q.itemLines(Q.initial(), ARUARIAN, 'add').at(-1)), { command: ['set_property', 'pause', false] });
+  assert.equal(Q.itemLines(paused, FEATHER, 'add').length, 2);
 });
 
 test('a appends to a running Queue, and replaces a stopped or empty one', () => {
@@ -157,7 +166,8 @@ test('a pressed 20 times with no Queue starts one unit and sends 20 adds in orde
   assert.equal(link.status, 'starting');
   const done = Q.connected(link);
   assert.deepEqual(done.link, { status: 'up', pending: [] });
-  assert.equal(done.write.length, 40);
+  assert.equal(done.write.length, 41, 'a store and a load per row, and the replace clears pause');
+  assert.deepEqual(JSON.parse(done.write[2]).command, ['set_property', 'pause', false]);
   const loads = done.write.map((l) => JSON.parse(l).command).filter((c) => c[0] === 'loadfile');
   assert.deepEqual(loads.map((c) => c[1]), rows.map((r) => watch(r.id)));
   assert.deepEqual(loads.map((c) => c[2]), ['replace', ...Array(19).fill('append-play')]);
