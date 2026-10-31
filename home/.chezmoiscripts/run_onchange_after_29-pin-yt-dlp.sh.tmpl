@@ -1,0 +1,6 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "yt-dlp") }}
+binary=$(pin_fetch)
+install -D -m 0755 "$binary" "$HOME/.local/bin/yt-dlp"
+pin_done
