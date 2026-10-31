@@ -136,6 +136,16 @@ test('every pin in versions.toml has its own script, and every pin script a pin'
   }
 });
 
+// GitHub's archive URL answers 404 for a private repo, so a private repo's pin has to download through gh with the login.
+test('the private repos\' pins download through gh', () => {
+  const blocks = readFileSync(join(repo, 'versions.toml'), 'utf8').split(/^(?=\[\[)/m).filter((b) => b.startsWith('[[pin]]'));
+  for (const name of ['elfeed-kak', 'deen-data']) {
+    const block = blocks.find((b) => b.match(/^name = "([^"]+)"/m)[1] === name);
+    assert.ok(block, `versions.toml has a ${name} pin`);
+    assert.match(block, /^fetch = "gh"$/m, name);
+  }
+});
+
 // Every pin script renders pin.sh, so a helper only some pins use belongs in its own template, or editing it re-runs every pin.
 test('every function pin.sh defines is called by every pin script', () => {
   const dir = join(repo, 'home/.chezmoiscripts');

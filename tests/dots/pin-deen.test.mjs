@@ -178,6 +178,17 @@ test('a file that differs from the manifest stops the apply, names it, and leave
   assert.doesNotMatch(r.stdout, /dots: pin deen-data c2/);
 });
 
+// A snapshot committed without its manifest entry would go in unchecked, so the tree may hold only the files its manifest sums, beside the manifest, README.md and .gitattributes.
+test('a file the manifest does not list stops the apply and names it', () => {
+  const root = source();
+  pin(root, 'c1', deenData(root, 'c1', SOURCES(ZAKARIA), { 'quran/extra.json': '{}' }));
+  const r = run(root);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /deen-data: quran\/extra\.json is not in manifest\.toml/);
+  assert.equal(existsSync(sources(root)), false);
+  assert.equal(existsSync(join(data(root), 'quran.json')), false);
+});
+
 // GitHub builds a tarball on request, so the same commit can come back as other bytes: the pin's own sum says so, before any file is checked.
 test('a tarball whose sum is not the pinned one stops the apply at that check', () => {
   const root = source();

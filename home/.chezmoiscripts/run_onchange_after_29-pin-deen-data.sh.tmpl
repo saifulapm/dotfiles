@@ -13,11 +13,19 @@ tarball=$(pin_fetch)
 tar -xzf "$tarball" -C "$pin_tmp"
 tree=$(dirname "$(find "$pin_tmp" -mindepth 2 -maxdepth 2 -name manifest.toml)")
 [[ -f $tree/manifest.toml ]] || die "pin deen-data: the tarball has no manifest.toml"
-# Every file has to be the one its manifest names; the first that is not stops the apply before anything is replaced.
+# Every file has to be the one its manifest names, and the manifest has to name every file but itself, README.md and .gitattributes; the first that is not stops the apply before anything is replaced.
 python3 -I - "$tree" <<'PY' || exit 1
-import hashlib, sys, tomllib
+import hashlib, os, sys, tomllib
 tree = sys.argv[1]
-for f in tomllib.load(open(f"{tree}/manifest.toml", "rb"))["file"]:
+files = tomllib.load(open(f"{tree}/manifest.toml", "rb"))["file"]
+listed = {f["path"] for f in files} | {"manifest.toml", "README.md", ".gitattributes"}
+for d, _, names in os.walk(tree):
+    for n in names:
+        path = os.path.relpath(os.path.join(d, n), tree)
+        if path not in listed:
+            print(f"dots: deen-data: {path} is not in manifest.toml", file=sys.stderr)
+            sys.exit(1)
+for f in files:
     try:
         ok = hashlib.sha256(open(f"{tree}/{f['path']}", "rb").read()).hexdigest() == f["sha256"]
     except FileNotFoundError:
