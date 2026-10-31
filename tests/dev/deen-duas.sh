@@ -34,7 +34,8 @@ ch111='"মোরগের ডাক ও গাধার স্বর অথব�
 pron16='"বিসমিল্লাহি, তাও\u09dfাককালতু ‘আলাল্লা-হি, ও\u09dfালা হাওলা ও\u09dfালা কুও\u09dfাতা ইল্লা বিল্লাহ"'
 meaning16='"আল্লাহ্\u200cর নামে (বের হচ্ছি)। আল্লাহর উপর ভরসা করলাম। আর আল্লাহর সাহায্য ছা\u09dcা (পাপ কাজ থেকে দূরে থাকার) কোনো উপা\u09df এবং (সৎকাজ করার) কোনো শক্তি কারো নেই"'
 source16='"আবূ দাউদ ৪/৩২৫, নং ৫০৯৫; তিরমিযী ৫/৪৯০, ৩৪২৬। আরও দেখুন, সহীহুত তিরমিযী, ৩/১৫১"'
-pron229='"ইযা সামি‘তুম নুবা-হাল কিলা-বি ওয\u09bcা নাহীক্বাল হামীর"'
+# 229's pronunciation is the engine's, so it is read from the fixture the engine's output was copied into.
+pron229=$(jq -c '.duas[] | select(.id == "229") | .bn_pron' "$fixture")
 # Dua 229 is not in the Bangla book, so its meaning and reference are the English, under an English label in each theme's case.
 english229() {
   local label=$1 bangla=$2 mark=$3

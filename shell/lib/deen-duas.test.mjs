@@ -13,7 +13,7 @@ const letters = (s) => s.replace(/[ً-ٰٟۖ-ۭـ࣓-ࣿ]/g, '').replace(/[آأ�
 // The book writes most য় and ড় as one code point (U+09DF, U+09DC), which an editor's NFC splits, so those and U+200C are escaped; 16's আল্লাহ্‌র holds a U+200C.
 const meaning16 = 'আল্লাহ্\u200cর নামে (বের হচ্ছি)। আল্লাহর উপর ভরসা করলাম। আর আল্লাহর সাহায্য ছা\u09dcা (পাপ কাজ থেকে দূরে থাকার) কোনো উপা\u09df এবং (সৎকাজ করার) কোনো শক্তি কারো নেই';
 const pron16 = 'বিসমিল্লাহি, তাও\u09dfাককালতু ‘আলাল্লা-হি, ও\u09dfালা হাওলা ও\u09dfালা কুও\u09dfাতা ইল্লা বিল্লাহ';
-const pron229 = 'ইযা সামি‘তুম নুবা-হাল কিলা-বি ওয\u09bcা নাহীক্বাল হামীর';
+const pron229 = 'ইযা- সামি‘তুম নুবা-হালকিলা-বি ওয\u09bcানাহীক্বালহামীরি বিল্লাইলি ফাতা‘আউওয\u09bcাযূ বিল্লা-হি মিনহুন্ন, ফাইন্নাহুন্না ইয\u09bcারাইনা মা- লা- তারাউন';
 
 test('the backend\'s list is read chapter by chapter with each chapter\'s own duas, and the book\'s count', () => {
   assert.equal(book.count, 268);
