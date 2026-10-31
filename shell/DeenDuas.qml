@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-duas.mjs" as U
 
-// Deen's Duas: Hisn al-Muslim's chapters on the left, the open dua on the right with its Arabic, transliteration, meaning and source.
+// Deen's Duas: Hisn al-Muslim's chapters on the left, the open dua on the right with its Arabic, Bangla pronunciation, meaning and source.
 FocusScope {
     id: page
 
@@ -37,7 +37,7 @@ FocusScope {
         deen.api(["dua", "list"], answer => {
             const parsed = U.parseList(answer);
             page.failed = parsed === null;
-            page.noData = D.noData(answer);
+            page.noData = U.noData(answer);
             page.book = parsed;
         });
     }
@@ -95,18 +95,22 @@ FocusScope {
             pane: {
                 shown: pane.visible,
                 title: titleText.text,
+                titleFamily: titleText.font.family,
                 head: headText.text,
                 ar: arText.text,
                 arFamily: arText.font.family,
                 arRtl: arText.horizontalAlignment === Text.AlignRight && arText.wrapMode !== Text.NoWrap,
                 arLines: arText.lineCount,
                 arSize: arText.font.pixelSize,
-                trLabel: trLabel.text,
-                tr: trText.text,
-                enLabel: enLabel.text,
-                en: enText.text,
+                pronLabel: pronLabel.text,
+                pron: pronText.text,
+                pronFamily: pronText.font.family,
+                meaningLabel: meaningLabel.text,
+                meaning: meaningText.text,
+                meaningFamily: meaningText.font.family,
                 sourceLabel: sourceLabel.text,
                 source: sourceText.text,
+                sourceFamily: sourceText.font.family,
                 sourceLines: sourceText.lineCount,
                 hint: emptyText.visible ? emptyText.text : ""
             },
@@ -119,7 +123,7 @@ FocusScope {
                 fieldFill: fieldBox.color.a > 0 ? String(fieldBox.color) : "",
                 fieldBorder: fieldBox.border.width,
                 dividerDashed: divider.dashed,
-                italic: trText.font.italic
+                italic: pronText.font.italic
             }
         };
     }
@@ -279,6 +283,7 @@ FocusScope {
                             const top = mapToItem(list, 0, 0).y;
                             return {
                                 text: rowText.text,
+                                family: rowText.font.family,
                                 current: current,
                                 truncated: rowText.truncated,
                                 lines: rowText.lineCount,
@@ -306,7 +311,7 @@ FocusScope {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                             color: (row.current ? look.cursor.text : c.ink) ?? "black"
-                            font.family: page.bodyFont
+                            font.family: deen.bengali
                             font.pixelSize: plain ? 14 : 13
                             font.weight: row.current && !bracket ? Font.Medium : Font.Normal
                         }
@@ -364,7 +369,7 @@ FocusScope {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                             color: c.ink ?? "black"
-                            font.family: (caps ? fonts.display : page.bodyFont) ?? ""
+                            font.family: deen.bengali
                             font.pixelSize: caps ? 25 : plain ? 20 : 18
                             font.weight: caps ? Font.Normal : Font.Bold
                         }
@@ -402,23 +407,22 @@ FocusScope {
                             spacing: 3
 
                             Text {
-                                id: trLabel
+                                id: pronLabel
                                 textFormat: Text.PlainText
-                                text: look.tabText("Transliteration")
+                                text: look.tabText("Pronunciation")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: plain ? 11 : 10
                                 font.letterSpacing: plain ? 0 : 1.4
                             }
                             Text {
-                                id: trText
+                                id: pronText
                                 Layout.fillWidth: true
                                 textFormat: Text.PlainText
-                                text: page.openDua ? page.openDua.tr : ""
+                                text: page.openDua ? page.openDua.pron : ""
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
-                                font.family: page.bodyFont
-                                font.italic: true
+                                font.family: deen.bengali
                                 font.pixelSize: plain ? 16 : bracket ? 14 : 15
                             }
                         }
@@ -427,22 +431,23 @@ FocusScope {
                             spacing: 3
 
                             Text {
-                                id: enLabel
+                                id: meaningLabel
                                 textFormat: Text.PlainText
-                                text: look.tabText("Meaning")
+                                // Where the book lacks the meaning, the label marks the English that stands in.
+                                text: look.tabText(page.openDua && page.openDua.meaningEnglish ? "English" : "Meaning")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: plain ? 11 : 10
                                 font.letterSpacing: plain ? 0 : 1.4
                             }
                             Text {
-                                id: enText
+                                id: meaningText
                                 Layout.fillWidth: true
                                 textFormat: Text.PlainText
-                                text: page.openDua ? page.openDua.en : ""
+                                text: page.openDua ? page.openDua.meaning : ""
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
-                                font.family: page.bodyFont
+                                font.family: page.openDua && page.openDua.meaningEnglish ? page.bodyFont : deen.bengali
                                 font.pixelSize: plain ? 16 : bracket ? 14 : 15
                             }
                         }
@@ -453,7 +458,7 @@ FocusScope {
                             Text {
                                 id: sourceLabel
                                 textFormat: Text.PlainText
-                                text: look.tabText("Source")
+                                text: look.tabText(page.openDua && page.openDua.sourceEnglish ? "English" : "Source")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: plain ? 11 : 10
@@ -463,10 +468,10 @@ FocusScope {
                                 id: sourceText
                                 Layout.fillWidth: true
                                 textFormat: Text.PlainText
-                                text: page.openDua ? U.sourceLine(page.openDua) : ""
+                                text: page.openDua ? page.openDua.source : ""
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
-                                font.family: page.bodyFont
+                                font.family: page.openDua && page.openDua.sourceEnglish ? page.bodyFont : deen.bengali
                                 font.pixelSize: plain ? 14 : 13
                             }
                         }
