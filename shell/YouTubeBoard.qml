@@ -89,6 +89,8 @@ Rectangle {
                 board.yt.move(-1);
             else if (k === Qt.Key_Escape)
                 board.yt.back();
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
+                board.yt.play(board.yt.rows[board.yt.cursor]);
             else
                 return;
             event.accepted = true;

@@ -27,6 +27,8 @@ ShellRoot {
     property int searchSeq: 0
     // Thumbnail files by thumb id, as dots-youtube-api thumbs answers them.
     property var thumbs: ({})
+    // The youtube-video-<n> units this App started, in order.
+    property var units: []
     property int savedCount: 0
     property int historyCount: 0
     // What the Queue plays, as the now-playing line writes it; empty while it is stopped.
@@ -60,13 +62,28 @@ ShellRoot {
             cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
     }
 
-    // Runs `<backend> <args>` off the render loop and hands done its one JSON answer, or null when it failed.
-    function api(args, done) {
+    // Runs a command off the render loop and hands done its one JSON answer, or null when it failed.
+    function run(command, done) {
         const call = caller.createObject(app, {
-            command: [backend].concat(args)
+            command: command
         });
         call.done = done;
         call.running = true;
+    }
+
+    function api(args, done) {
+        run([backend].concat(args), done);
+    }
+
+    // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window.
+    function play(row) {
+        if (!row)
+            return;
+        // The repo's bin is on the session PATH only through fish, so the player is found beside the shell.
+        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video", row.id], answer => {
+            if (answer && typeof answer.unit === "string")
+                app.units = app.units.concat([answer.unit]);
+        });
     }
 
     // Enter in the field: the list takes focus at once, and the rows come when the CLI answers.
@@ -177,6 +194,7 @@ ShellRoot {
                 rows: app.rows,
                 cursor: app.cursor,
                 searchSeq: app.searchSeq,
+                units: app.units,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
                 voice: app.voice
