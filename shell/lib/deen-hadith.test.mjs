@@ -105,3 +105,113 @@ test('y copies the name and number, the Arabic, the English with its narrator an
   const hit = { collection: 'bukhari', name: 'Sahih al Bukhari', url: 'https://sunnah.com/bukhari:1', hadith: { n: '1', ar: 'إِنَّمَا', en: "Narrated 'Umar: Actions are by intentions." } };
   assert.equal(H.copyText(hit), "Sahih al-Bukhari 1\n\nإِنَّمَا\n\nActions are by intentions.\nNarrated by 'Umar\n\nhttps://sunnah.com/bukhari:1");
 });
+
+const bukhari = { slug: 'bukhari', name: 'Sahih al Bukhari', bn: 'সহীহ বুখারী', hadiths: 7589, count: 7589 };
+const n1bn = '‘আলক্বামাহ ইবনু ওয়াক্কাস আল-লায়সী (রহ.) হতে বর্ণিত।';
+const listed = {
+  collection: 'bukhari',
+  bn: 'সহীহ বুখারী',
+  name: 'Sahih al Bukhari',
+  book: { n: 1, bn: 'ওহীর সূচনা', en: 'Revelation', count: 7 },
+  hadiths: [{ n: '1', ar: 'إِنَّمَا', en: "Narrated 'Umar: Actions are by intentions.", bn: n1bn, grades: [], book: 1, in_book: 1 }],
+};
+
+test('a collection row reads its Bangla name, the board’s English name and its count', () => {
+  assert.equal(H.rowText(H.collectionRow(bukhari)), 'সহীহ বুখারী  Sahih al-Bukhari  7589');
+  assert.deepEqual(H.collectionRow(bukhari).cells.map((c) => c.face), ['bn', 'en', 'count']);
+});
+
+test('a book row numbers it in Bangla digits beside its count, and book 0 draws without a number', () => {
+  assert.equal(H.rowText(H.bookRow({ n: 1, bn: 'ওহীর সূচনা', en: 'Revelation', count: 7 })), '১. ওহীর সূচনা  7');
+  assert.equal(H.rowText(H.bookRow({ n: 97, bn: 'তাওহীদ', en: 'Oneness', count: 192 })), '৯৭. তাওহীদ  192');
+  assert.equal(H.rowText(H.bookRow({ n: 0, bn: 'অন্যান্য', en: '', count: 311 })), 'অন্যান্য  311');
+});
+
+test('a narration row is one line of its Bangla, or of its English under the English mark', () => {
+  assert.deepEqual(H.narrationRow({ n: '1', bn: 'কাজ\nনিয়্যাত অনুযায়ী।', en: 'Narrated Umar: Actions' }), { english: false, cells: [{ text: 'কাজ নিয়্যাত অনুযায়ী।', face: 'bn' }] });
+  const qudsi = H.narrationRow({ n: '1', en: 'Narrated Abu Hurairah: When Allah decreed the Creation' });
+  assert.equal(qudsi.english, true);
+  assert.equal(H.rowText(qudsi), 'English  When Allah decreed the Creation');
+  assert.equal(H.narrationRow({ n: '1', bn: '', en: 'Forged' }).english, true);
+});
+
+test('a search hit row leads with its Bangla reference', () => {
+  const hit = { collection: 'bukhari', bn: 'সহীহ বুখারী', hadith: { n: '1', bn: n1bn, en: 'x' } };
+  assert.equal(H.rowText(H.hitRow(hit)), `সহীহ বুখারী ১  ${n1bn}`);
+  assert.equal(H.rowText(H.hitRow({ collection: 'qudsi', bn: 'চল্লিশ হাদীসে কুদসী', hadith: { n: '12', en: 'Allah said' } })), 'চল্লিশ হাদীসে কুদসী ১২  English  Allah said');
+});
+
+test('a reference is the collection’s Bangla name and the number in Bangla digits', () => {
+  assert.equal(H.reference('সহীহ বুখারী', '1'), 'সহীহ বুখারী ১');
+  assert.equal(H.reference('সুনান আবূ দাউদ', '402.2'), 'সুনান আবূ দাউদ ৪০২.২');
+  assert.equal(H.bnDigits(6114), '৬১১৪');
+});
+
+test('a listed narration opens as a hit with its collection, book and sunnah.com url', () => {
+  assert.deepEqual(H.listHit(listed, listed.hadiths[0]), {
+    collection: 'bukhari',
+    name: 'Sahih al Bukhari',
+    bn: 'সহীহ বুখারী',
+    book: { n: 1, bn: 'ওহীর সূচনা', en: 'Revelation' },
+    url: 'https://sunnah.com/bukhari:1',
+    hadith: listed.hadiths[0],
+  });
+});
+
+test('an opened narration draws its Arabic, Bangla and Bangla reference, and no English or grade', () => {
+  assert.deepEqual(H.pane(H.listHit(listed, listed.hadiths[0])), {
+    title: 'ওহীর সূচনা',
+    ar: 'إِنَّمَا',
+    text: n1bn,
+    english: false,
+    by: '',
+    grade: '',
+    reference: 'সহীহ বুখারী ১',
+  });
+});
+
+test('a narration without Bangla draws its English, narrator and grade, still with the Bangla reference', () => {
+  const hit = { collection: 'qudsi', name: 'Forty Hadith Qudsi', bn: 'চল্লিশ হাদীসে কুদসী', book: { n: 1, bn: 'চল্লিশ হাদীসে কুদসী', en: 'Forty Hadith Qudsi' }, hadith: { n: '1', ar: 'لَمَّا', en: 'Narrated Abu Hurairah: When Allah decreed\nthe Creation', grades: [] } };
+  assert.deepEqual(H.pane(hit), {
+    title: 'চল্লিশ হাদীসে কুদসী',
+    ar: 'لَمَّا',
+    text: 'When Allah decreed\nthe Creation',
+    english: true,
+    by: 'Abu Hurairah',
+    grade: 'ungraded',
+    reference: 'চল্লিশ হাদীসে কুদসী ১',
+  });
+});
+
+test('Enter goes down a level, Esc back up keeping the cursor, and Esc on the collections closes', () => {
+  let s = H.LEVELS;
+  assert.deepEqual(s, [{ level: 'collections', cursor: 0 }]);
+  assert.equal(H.up(s), null);
+  s = H.withCursor(s, 3);
+  s = H.down(s, { level: 'books', data: listed });
+  assert.deepEqual(s.map((e) => [e.level, e.cursor]), [['collections', 3], ['books', 0]]);
+  s = H.down(H.withCursor(s, 2), { level: 'narrations', data: listed });
+  s = H.down(s, { level: 'narration' });
+  assert.equal(H.listEntry(s).level, 'narrations');
+  s = H.up(s);
+  assert.equal(s[s.length - 1].level, 'narrations');
+  s = H.up(H.up(s));
+  assert.deepEqual(s, [{ level: 'collections', cursor: 3 }]);
+});
+
+test('/ opens search over any level once, and Esc from it returns to that level', () => {
+  const books = H.down(H.LEVELS, { level: 'books', data: listed });
+  const s = H.search(books);
+  assert.equal(s[s.length - 1].level, 'search');
+  assert.equal(H.search(s), s);
+  assert.equal(H.listEntry(s).level, 'search');
+  assert.deepEqual(H.up(s), books);
+});
+
+test('the heading names where the list is', () => {
+  assert.equal(H.heading(H.LEVELS), 'Collections');
+  const books = H.down(H.LEVELS, { level: 'books', data: { collection: 'bukhari', bn: 'সহীহ বুখারী', books: [] } });
+  assert.equal(H.heading(books), 'সহীহ বুখারী');
+  assert.equal(H.heading(H.down(books, { level: 'narrations', data: listed })), 'সহীহ বুখারী · ওহীর সূচনা');
+  assert.equal(H.heading(H.search(books)), '');
+});

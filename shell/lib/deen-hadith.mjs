@@ -98,6 +98,98 @@ export function searchArgs(query) {
 
 export const resultsText = (n) => `${n} ${n === 1 ? 'result' : 'results'}`;
 
+// A number in Bangla digits, as a reference beside a Bangla name is written; a sub-number such as 402.2 keeps its dot.
+export const bnDigits = (n) => String(n).replace(/[0-9]/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+
+export const reference = (bn, n) => `${oneLine(bn)} ${bnDigits(oneLine(n))}`;
+
+// A row is cells along one line, each drawn in its face: bn and ref in the Bangla face, en and count in the body face, mark as the English label.
+export const rowText = (row) => row.cells.map((c) => c.text).join('  ');
+
+export const collectionRow = (c) => ({
+  english: false,
+  cells: [
+    { text: oneLine(c.bn), face: 'bn' },
+    { text: boardName(c.slug, c.name), face: 'en' },
+    { text: oneLine(c.count), face: 'count' },
+  ],
+});
+
+// Book 0 gathers the narrations the corpus files under no book, so it has a name and no number.
+export const bookRow = (b) => ({
+  english: false,
+  cells: [
+    { text: b.n === 0 ? oneLine(b.bn) : `${bnDigits(b.n)}. ${oneLine(b.bn)}`, face: 'bn' },
+    { text: oneLine(b.count), face: 'count' },
+  ],
+});
+
+// English is drawn only where the narration has no Bangla.
+export function narrationRow(h) {
+  const bn = oneLine(h.bn);
+  if (bn) return { english: false, cells: [{ text: bn, face: 'bn' }] };
+  return { english: true, cells: [{ text: 'English', face: 'mark' }, { text: oneLine(narrator(h.en).body), face: 'en' }] };
+}
+
+export function hitRow(hit) {
+  const row = narrationRow(hit.hadith || {});
+  return { english: row.english, cells: [{ text: reference(hit.bn, (hit.hadith || {}).n), face: 'ref' }].concat(row.cells) };
+}
+
+// A narration from `hadith list` made into the shape a search hit has, so both open and copy alike.
+export const listHit = (answer, h) => ({
+  collection: answer.collection,
+  name: answer.name,
+  bn: answer.bn,
+  book: { n: answer.book.n, bn: answer.book.bn, en: answer.book.en },
+  url: `https://sunnah.com/${answer.collection}:${h.n}`,
+  hadith: h,
+});
+
+// An opened narration: its Arabic, then its Bangla, or its English with narrator and grade where it has no Bangla, and its reference in Bangla.
+export function pane(hit) {
+  const h = hit.hadith || {};
+  const english = oneLine(h.bn) === '';
+  const told = english ? narrator(h.en) : { by: '', body: h.bn };
+  return {
+    title: oneLine(hit.book && hit.book.bn),
+    ar: wrapped(h.ar),
+    text: wrapped(told.body),
+    english,
+    by: oneLine(told.by),
+    grade: english ? gradeText(hit.collection, h.grades) : '',
+    reference: reference(hit.bn, h.n),
+  };
+}
+
+// The levels as a stack: Enter pushes one, Esc pops one, and Esc on the collections, with nothing under them, closes Deen.
+export const LEVELS = [{ level: 'collections', cursor: 0 }];
+
+export const down = (s, entry) => s.concat([Object.assign({ cursor: 0 }, entry)]);
+
+export const up = (s) => (s.length > 1 ? s.slice(0, -1) : null);
+
+const top = (s) => s[s.length - 1];
+
+// An open narration shows over its book's list, so the cursor and rows are that list's.
+export const listEntry = (s) => (top(s).level === 'narration' ? s[s.length - 2] : top(s));
+
+export function withCursor(s, cursor) {
+  const i = s.indexOf(listEntry(s));
+  return s.slice(0, i).concat([Object.assign({}, s[i], { cursor })], s.slice(i + 1));
+}
+
+// / from search stays in it; from any other level it opens over that level.
+export const search = (s) => (top(s).level === 'search' ? s : down(s, { level: 'search' }));
+
+export function heading(s) {
+  const e = listEntry(s);
+  if (e.level === 'collections') return 'Collections';
+  if (e.level === 'books') return oneLine(e.data.bn);
+  if (e.level === 'narrations') return `${oneLine(e.data.bn)} · ${oneLine(e.data.book.bn)}`;
+  return '';
+}
+
 export function copyText(hit) {
   const h = hit.hadith || {};
   const n = narrator(h.en);
