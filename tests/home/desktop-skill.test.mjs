@@ -978,3 +978,52 @@ test('a Noul under 0.5 exits 4 even with no Box in the answer', () => {
   assert.equal(r.status, 4, r.stderr);
   assert.deepEqual(JSON.parse(r.stdout), { found: false, on_screen: 0.1 });
 });
+
+// gui pick's request: widgets as text, never a shot, so no image header and no asset.
+const desk = join(scripts, 'desk');
+const choice = (c, confidence = 0.8) => ({ type: 'choice', choice: c, confidence, probabilities: {} });
+function choose(j, candidates, intent = 'the check box') {
+  writeFileSync(join(j.dir, 'candidates.json'), JSON.stringify(candidates));
+  return spawnSync(desk, ['jev', 'choice', intent, join(j.dir, 'candidates.json')], { env: j.env, encoding: 'utf8' });
+}
+const widgets = { 's1a2b:3': "check box 'checkbutton'", 's1a2b:4': "push button 'OK'" };
+
+test('desk jev choice asks one Choice over the candidates and none, with present and destructive Nouls, and prints all four', () => {
+  const j = jevStubs({ answers: { target: choice('s1a2b:3'), present: noul(0.9), destructive: noul(0.1) } });
+  const r = choose(j, widgets);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { choice: 's1a2b:3', confidence: 0.8, present: 0.9, destructive: 0.1 });
+  assert.equal(sent(j.log, /^curl /).length, 1);
+  assert.ok(!j.argv().includes('TypeSafe-Danger-Zone-Images: true'), j.argv().join(' '));
+  assert.equal(j.stdin(), `Authorization: Bearer ${KEY}\n`);
+  const b = j.body();
+  assert.equal(b.model, 'typesafe/jev-1.14');
+  assert.equal(b.assets, undefined);
+  assert.equal(b.questions.target.type, 'choice');
+  assert.deepEqual(Object.keys(b.questions.target.criteria).sort(), ['none', 's1a2b:3', 's1a2b:4']);
+  assert.equal(b.questions.target.criteria['s1a2b:3'], "check box 'checkbutton'");
+  assert.equal(b.questions.present.type, 'noul');
+  assert.equal(b.questions.destructive.type, 'noul');
+  for (const q of Object.values(b.questions)) assert.ok(q.instructions.includes('the check box'), q.instructions);
+});
+
+for (const [why, answers] of [
+  ['a choice that is no candidate', { target: choice('s1a2b:9'), present: noul(0.9), destructive: noul(0.1) }],
+  ['no confidence', { target: { type: 'choice', choice: 's1a2b:3' }, present: noul(0.9), destructive: noul(0.1) }],
+  ['no destructive Noul', { target: choice('s1a2b:3'), present: noul(0.9) }],
+]) {
+  test(`desk jev choice exits 1 with the fallback line on ${why}`, () => {
+    const j = jevStubs({ answers });
+    const r = choose(j, widgets);
+    assert.equal(r.status, 1, r.stdout);
+    assert.equal(r.stdout, '');
+    assert.match(r.stderr, /fall back to gui or OCR/);
+  });
+}
+
+test('desk jev choice prints none as a choice', () => {
+  const j = jevStubs({ answers: { target: choice('none', 0.95), present: noul(0.05), destructive: noul(0) } });
+  const r = choose(j, widgets, 'a purple elephant');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { choice: 'none', confidence: 0.95, present: 0.05, destructive: 0 });
+});

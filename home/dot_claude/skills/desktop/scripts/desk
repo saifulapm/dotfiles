@@ -10,6 +10,7 @@
   desk doctor            whether an agent can drive this desktop now: JSON, exit 1 with blockers
   desk wait COND [--timeout S]   until COND holds on niri's event stream; exit 1 at the timeout
   desk jev find|check TEXT PNG   ask JEV where TEXT is in the shot, or whether it holds; exit 4 when not on screen
+  desk jev choice INTENT FILE    ask JEV which widget of FILE's {ref: description} fits INTENT, or none
 
 A window is an agent window when it opens within 5 s after a launch, or
 after an agent action in an agent window (a Save As dialog). One watcher per
@@ -568,23 +569,10 @@ def number(v):
     return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 1
 
 
-def jev(kind, text, shot, t0):
-    """One request to JEV over the shot: find asks a Box and a Noul, check one Noul; prints the answer in shot pixels.
+def ask(body, t0):
+    """One request to JEV, its answers back; any failure exits 1 through jev_fail.
 
     The 10 s run from t0, when the command began, so the shot and pass come out of curl's share."""
-    with open(shot, "rb") as f:
-        data = f.read()
-    w, h = png_size(data)
-    image, pw, ph = padded(data)
-    ref = f"shot-{uuid.uuid4()}"
-    if kind == "find":
-        questions = {
-            "target": {"type": "box", "instructions": f"{text} in `shot`"},
-            "on_screen": {"type": "noul", "instructions": f"Is {text} visible in `shot`?"},
-        }
-    else:
-        questions = {"answer": {"type": "noul", "instructions": f"About the screenshot `shot`: {text}"}}
-    body = {"model": JEV_MODEL, "state": {"shot": ref}, "assets": {ref: {"type": "image", "format": "png", "data_base64": base64.b64encode(image).decode()}}, "questions": questions}
     left = lambda: JEV_S - (now_ms() - t0) / 1000
     # The key is read at each call; with no passphrase prompt, a locked store fails at once, and a stalled gpg at the 10 s.
     try:
@@ -598,6 +586,7 @@ def jev(kind, text, shot, t0):
         # A store that needs its passphrase fails here too, and gpg says so.
         jev_fail("no key from pass AI/openrouter/main" + "".join(f" ({l})" for l in r.stderr.strip().splitlines()[-1:]))
     # A file of this call's own, so two finds on one niri never send each other's shot.
+    os.makedirs(state_dir(), mode=0o700, exist_ok=True)
     fd, path = tempfile.mkstemp(prefix="jev-", suffix=".json", dir=state_dir())
     with os.fdopen(fd, "w") as f:
         json.dump(body, f)
@@ -606,7 +595,8 @@ def jev(kind, text, shot, t0):
         jev_fail(f"no time left of {JEV_S} s for the request", key)
     try:
         # The key goes as a header on curl's stdin, never its argv; --max-time bounds the whole call, DNS too, and curl never retries unasked.
-        r = subprocess.run(["curl", "-sS", "--max-time", f"{left():.3f}", "-H", "@-", "-H", "Content-Type: application/json", "-H", "TypeSafe-Danger-Zone-Images: true",
+        images = ["-H", "TypeSafe-Danger-Zone-Images: true"] if body.get("assets") else []
+        r = subprocess.run(["curl", "-sS", "--max-time", f"{left():.3f}", "-H", "@-", "-H", "Content-Type: application/json", *images,
                             "--data-binary", f"@{path}", "-w", "\n%{http_code}", JEV_URL], input=f"Authorization: Bearer {key}\n", capture_output=True, text=True, errors="replace")
     except OSError as e:
         jev_fail(f"curl: {e.strerror}", key)
@@ -624,6 +614,24 @@ def jev(kind, text, shot, t0):
         jev_fail(f"HTTP {code}" + (f": {msg}" if msg else ""), key)
     if not isinstance(at(answer, "answers"), dict):
         jev_fail("an answer with no answers", key)
+    return answer, key
+
+
+def jev(kind, text, shot, t0):
+    """One request to JEV over the shot: find asks a Box and a Noul, check one Noul; prints the answer in shot pixels."""
+    with open(shot, "rb") as f:
+        data = f.read()
+    w, h = png_size(data)
+    image, pw, ph = padded(data)
+    ref = f"shot-{uuid.uuid4()}"
+    if kind == "find":
+        questions = {
+            "target": {"type": "box", "instructions": f"{text} in `shot`"},
+            "on_screen": {"type": "noul", "instructions": f"Is {text} visible in `shot`?"},
+        }
+    else:
+        questions = {"answer": {"type": "noul", "instructions": f"About the screenshot `shot`: {text}"}}
+    answer, key = ask({"model": JEV_MODEL, "state": {"shot": ref}, "assets": {ref: {"type": "image", "format": "png", "data_base64": base64.b64encode(image).decode()}}, "questions": questions}, t0)
     if kind == "check":
         p = at(answer, "answers", "answer", "noul")
         if not number(p):
@@ -648,6 +656,26 @@ def jev(kind, text, shot, t0):
     jev_note(out)
     print(json.dumps(out))
     sys.exit(4 if out.get("found") is False else 0)
+
+
+def choose(intent, candidates, t0):
+    """One request to JEV over widgets as text, never a shot: a Choice among the candidates or none, and Nouls for present and destructive."""
+    criteria = {**candidates, "none": "no widget here fits"}
+    questions = {
+        "target": {"type": "choice", "instructions": f"Which widget would a person act on for: {intent}", "criteria": criteria},
+        "present": {"type": "noul", "instructions": f"Is a widget for {intent} among these widgets?"},
+        "destructive": {"type": "noul", "instructions": f"Would acting on the widget for {intent} delete, send, pay for or otherwise do something that cannot be undone?"},
+    }
+    answer, key = ask({"model": JEV_MODEL, "state": {"widgets": "\n".join(f"{k}: {v}" for k, v in candidates.items())}, "questions": questions}, t0)
+    c, confidence = at(answer, "answers", "target", "choice"), at(answer, "answers", "target", "confidence")
+    p, d = at(answer, "answers", "present", "noul"), at(answer, "answers", "destructive", "noul")
+    if c not in criteria or not number(confidence):
+        jev_fail("an answer with no Choice among the widgets", key)
+    if not number(p) or not number(d):
+        jev_fail("an answer with no Noul", key)
+    out = {"choice": c, "confidence": confidence, "present": p, "destructive": d}
+    jev_note(out)
+    print(json.dumps(out))
 
 
 def main(argv):
@@ -683,6 +711,11 @@ def main(argv):
         sys.exit(0 if w else 4)
     elif cmd == "jev" and len(argv) == 5 and argv[2] in ("find", "check"):
         jev(argv[2], argv[3], argv[4], int(os.environ.get("DESK_T0") or now_ms()))
+    elif cmd == "jev" and len(argv) == 5 and argv[2] == "choice":
+        candidates = read_json(argv[4], None)
+        if not isinstance(candidates, dict) or not candidates:
+            die(f"no candidates in {argv[4]}")
+        choose(argv[3], candidates, int(os.environ.get("DESK_T0") or now_ms()))
     elif cmd == "acted" and len(argv) == 3 and argv[2].isdigit():
         w = window(int(argv[2]))
         if w and w["agent"]:

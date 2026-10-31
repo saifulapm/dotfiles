@@ -24,9 +24,13 @@ fi
 tz=()
 [ -z "${DOTS_DEV_TZ:-}" ] || tz=(-E "TZ=$DOTS_DEV_TZ")
 
+# A check that sets DOTS_DEV_A11Y=1 gets the shell on the nested a11y bus, as QT_ACCESSIBILITY=1 would put the live one.
+a11y=()
+[ "${DOTS_DEV_A11Y:-}" != 1 ] || a11y=(-E "QT_ACCESSIBILITY=1" -E AT_SPI_BUS_ADDRESS)
+
 # qs drops console.log and console.debug unless qml.debug is on, and a check that reads the journal for a leaked secret must see them.
 NIRI_SOCKET=$shell_socket PATH=$shell_path systemd-run --user --quiet --collect --unit "$DOTS_DEV_UNIT" \
-  -p Restart=always -p RestartSec=500ms -p StartLimitIntervalSec=0 "${tz[@]}" \
+  -p Restart=always -p RestartSec=500ms -p StartLimitIntervalSec=0 "${tz[@]}" "${a11y[@]}" \
   -E WAYLAND_DISPLAY -E NIRI_SOCKET -E DBUS_SESSION_BUS_ADDRESS \
   -E DBUS_SYSTEM_BUS_ADDRESS -E PATH \
   -E XDG_STATE_HOME -E XDG_DATA_HOME -E QS_CONFIG_PATH -E TMUX_TMPDIR -E DCONF_PROFILE -E DOTS_AGENT_HOME -E DOTS_HUB_QUESTIONS -E DOTS_NIRI_BINDS -E DOTS_MACHINE -E PIPEWIRE_RUNTIME_DIR -E DOTS_RECORDINGS_DIR -E DOTS_WORKFLOW -E DOTS_NOTIFY_PHONE -E DOTS_PICK_FILES -E DOTS_DEKHO -E DOTS_DEEN -E DOTS_ACCOUNTS -E DOTS_DNS -E DOTS_DEV_DIR -E DOTS_PAM_DIR -E RCLONE_CONFIG -E DOTS_AGE_IDENTITY -E PASSWORD_STORE_DIR -E GNUPGHOME -E DOTS_MOTION_SLOWDOWN -E QT_QPA_PLATFORMTHEME= -E QSG_RENDER_LOOP=basic -E FONTCONFIG_FILE=$QS_CONFIG_PATH/fonts.conf \
