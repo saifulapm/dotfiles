@@ -1,5 +1,5 @@
 // The YouTube App's History, ~/.local/state/dots/youtube/history.json: the single videos played, newest first, each video once. Kept pure so node can test it.
-import { duration } from './youtube.mjs';
+import { rows as cliRows } from './youtube.mjs';
 
 export const MAX = 200;
 
@@ -36,6 +36,5 @@ export function add(history, row, now) {
   return [entry].concat(history.filter((e) => e.id !== row.id)).slice(0, MAX);
 }
 
-// The rows a list draws, shaped like youtube.mjs rows() so History and a search draw the same.
-export const rows = (history) =>
-  history.map((e) => ({ id: e.id, title: e.title, channel: e.channel, duration: duration(e.duration), secs: e.duration, thumb: e.thumb }));
+// An entry is a row as dots-youtube-api answers it, so History draws through the same reading as a search, a title edited into the file included.
+export const rows = (history) => cliRows({ rows: history });
