@@ -17,7 +17,7 @@ cleanup() {
   return 0
 }
 
-# Each entry is named for gui by its accessible label: Name takes writes, Fixed is read-only, Stubborn puts "old" back after every change, Frozen stops its own process on a change, before GTK answers the write.
+# Each entry is named for gui by its accessible label: Name takes writes, Fixed is read-only, Greyed is insensitive, Stubborn puts "old" back after every change, Frozen stops its own process on a change, before GTK answers the write.
 cat >"$DOTS_DEV_DIR/delivery.py" <<'PY'
 import os, signal, gi
 gi.require_version("Gtk", "4.0")
@@ -38,6 +38,10 @@ def activate(app):
     stubborn.set_text("old")
     stubborn.connect("changed", lambda e: e.get_text() != "old" and GLib.idle_add(lambda: e.set_text("old")))
     box.append(stubborn)
+    greyed = labelled(Gtk.Entry(), "Greyed")
+    greyed.set_text("keep")
+    greyed.set_sensitive(False)
+    box.append(greyed)
     frozen = labelled(Gtk.Entry(), "Frozen")
     frozen.connect("changed", lambda e: e.get_text() and os.kill(os.getpid(), signal.SIGSTOP))
     box.append(frozen)
@@ -89,6 +93,12 @@ rc=$?
 check "gui type into a read-only entry exits 3 (got $rc)" test "$rc" = 3
 check "printing not editable: $out" jq -e '.refused == "not editable"' <<<"$out"
 check "and the entry still reads keep" test "$(text_of Fixed)" = keep
+
+out=$("$gui" type delivery Greyed hello --any)
+rc=$?
+check "gui type into an insensitive entry exits 3 (got $rc)" test "$rc" = 3
+check "printing not editable: $out" jq -e '.refused == "not editable"' <<<"$out"
+check "and the entry still reads keep" test "$(text_of Greyed)" = keep
 
 out=$("$gui" type delivery Stubborn hello --any)
 rc=$?

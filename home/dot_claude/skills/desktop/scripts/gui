@@ -19,7 +19,7 @@ Chromium need --force-renderer-accessibility to appear.
                                 until a name or field holds T, none does, or the widget has the state;
                                 10 s by default, 60 at most, exit 1 at the timeout with the last state seen
   gui get <app> <text> [text|states|box]   one property, or all three (a password field's text is withheld)
-  gui click <app> <text> [--any] [--then shot|windows|tree]       activate the first match semantically
+  gui click <app> <text> [--any] [--then shot|windows|tree]       activate the one widget it names
   gui type <app> <text> <val> [--any] [--then shot|windows|tree]  set an entry's text
   gui text <app>                all readable text in the app
 
@@ -27,12 +27,12 @@ Chromium need --force-renderer-accessibility to appear.
 role, so `gui click files 'Save'` is enough; where a text matches an
 interactive widget, only those count, and two or more print {"ambiguous":
 [...]} with up to 10 refs, exit 4. A ref `s<hex>:<i>` from `gui tree` names
-one node until the app changes: re-found by its path, it must keep its role
-and name, else {"stale": "<cause>"}, exit 4. Nothing acts in either case. click and type act only in an agent window: the
+one node until the app changes: re-found by its path, it must keep its role,
+name and object, else {"stale": "<cause>"}, exit 4. Nothing acts in either case. click and type act only in an agent window: the
 element's app pid and window title must match one `screen launch` opened
 (scripts/desk), else they exit 3 printing the refusal; --any lifts that for
-a brief that grants it. click and type print {"ok": ...} with the result the
-accessibility call reported, exit 1 when it failed; --then adds the look
+a brief that grants it. click and type print {"ok": ..., "delivery": ...}
+from what a read of the widget shows after, exit 1 when nothing landed; --then adds the look
 `screen look` takes once the screen is still, the tree of this app. tree prints at most 1000
 nodes and 32 KB; a longer tree is written whole to a file in the desk state
 directory, named under "spill". Both refuse with exit 3 unless `dots-call lock
@@ -147,7 +147,8 @@ def agent_window(desk, app, path):
     global seen
     window = toplevel(app, path)
     pid, title = app.get_process_id(), (window.get_name() if window else "") or ""
-    hits = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
+    # A window with no name on the bus (gtk3-widget-factory's) could be any of the app's, so it is all of them.
+    hits = [w for w in desk.windows().values() if w["pid"] == pid and (w["title"] == title or not title)]
     seen = {k: hits[0][k] for k in ("id", "app_id", "title")} if hits else {"pid": pid, "title": title}
     agents = [w for w in hits if w["agent"]]
     # Two windows of one app with one title are one to AT-SPI, so either could be the agent's.
@@ -198,10 +199,16 @@ def walk(node, want=None, path=(), budget=None, below=None):
             yield path, node
         if below == 0:
             return
-        for i in range(node.get_child_count()):
-            yield from walk(node.get_child_at_index(i), want, path + (i,), budget, None if below is None else below - 1)
+        count = node.get_child_count()
     except Exception:
         return  # a widget can vanish mid-walk; that is not an error
+    for i in range(count):
+        # One child that vanishes, or does not answer, costs only its own subtree.
+        try:
+            child = node.get_child_at_index(i)
+        except Exception:
+            continue
+        yield from walk(child, want, path + (i,), budget, None if below is None else below - 1)
 
 
 def coords(node, kind=Atspi.CoordType.SCREEN):
@@ -260,6 +267,11 @@ class Boxes:
         return [round(o[0] + box[0]), round(o[1] + box[1]), box[2], box[3]], None
 
 
+def read_states(node):
+    """The node's states; raises when the app does not answer, so a check never mistakes no answer for no state."""
+    return {s.value_nick for s in node.get_state_set().get_states()}
+
+
 def states(node):
     try:
         return {s.value_nick for s in node.get_state_set().get_states()}
@@ -309,12 +321,12 @@ def sweep():
 
 
 def snapshot(app, rows):
-    """Writes each node's path, role and name under a fresh 4-hex id, returned; None off niri, where refs have nowhere to live."""
+    """Writes each node's path, role, name and AT-SPI object path under a fresh 4-hex id, returned; None off niri, where refs have nowhere to live."""
     if not os.environ.get("NIRI_SOCKET"):
         return None
     state = load_desk().state_dir()
     os.makedirs(state, mode=0o700, exist_ok=True)
-    body = {"app": app.get_name() or "", "pid": app.get_process_id(), "nodes": [[list(p), role, name] for _, p, _, role, name in rows]}
+    body = {"app": app.get_name() or "", "pid": app.get_process_id(), "nodes": [[list(p), role, name, n.path] for _, p, n, role, name in rows]}
     while True:
         hexid = os.urandom(2).hex()
         try:
@@ -352,7 +364,7 @@ def target(app, arg):
         i = int(m[2])
         if snap.get("pid") != app.get_process_id() or i >= len(snap["nodes"]):
             refuse4({"stale": "path_gone"})
-        path, role, name = snap["nodes"][i]
+        path, role, name, obj = snap["nodes"][i]
         node = app
         try:
             for k in path:
@@ -366,6 +378,9 @@ def target(app, arg):
             refuse4({"stale": "role_changed"})
         if now_name != name:
             refuse4({"stale": "name_changed"})
+        # An unnamed sibling that shifted into the path keeps role and name; its object is another.
+        if node.path != obj:
+            refuse4({"stale": "replaced"})
         return arg, tuple(path), node, role, name
     if not arg:
         usage()
@@ -506,10 +521,13 @@ def shown(node):
     return {s.value_nick for s in node.get_state_set().get_states()} & SHOWN
 
 
-def press(node, action, index):
+def press(node, role, action, index):
     """Runs the action, then judges a toggle or expander by its state; a plain click stays unverified."""
-    st = states(node)
-    toggle = node.get_role_name() in TOGGLES or bool(st & (SHOWN | {"checkable", "expandable"}))
+    try:
+        st = read_states(node)
+    except Exception:
+        return delivery("not_delivered", "timeout")
+    toggle = role in TOGGLES or bool(st & (SHOWN | {"checkable", "expandable"}))
     before = st & SHOWN
     try:
         if not Atspi.Action.do_action(action, index):
@@ -569,8 +587,8 @@ def wait(app, kind, args, timeout):
             rows, row = holding(app, args[0])
             seen = seen or row is not None
             last = {"present": row is not None}
-            # A --gone right after an opener would pass before the thing shows, so it first sees it or waits 2 s.
-            done = row is not None if kind == "--text" else row is None and (seen or time.monotonic() - t0 >= GONE_SEE_S)
+            # A --gone right after an opener would pass before the thing shows, so it first sees it or waits 2 s; a walk that read nothing is an app not answering, never a sign it went.
+            done = row is not None if kind == "--text" else bool(rows) and row is None and (seen or time.monotonic() - t0 >= GONE_SEE_S)
             if done:
                 out = {"ok": True, "ms": int((time.monotonic() - t0) * 1000)}
                 if row:
@@ -728,7 +746,7 @@ def main(argv):
         print(json.dumps(tree(app, everything, depth, root and target(app, root))))
         return
     if cmd == "pick":
-        # gui pick <app> INTENT, then --jev, --values, --root REF and --any in any order; the grant comes first, before anything is read.
+        # gui pick <app> INTENT, then --jev, --values and --root REF in any order, and --any last; the grant comes first, before anything is read.
         rest = argv[4:]
         jev, values, root = False, False, None
         while rest:
@@ -826,14 +844,18 @@ def main(argv):
         if not anywhere:
             confine(app, path)
         guard()
-        finish({**press(node, action, index), "action": names[index], "widget": w}, then, app)
+        finish({**press(node, role, action, index), "action": names[index], "widget": w}, then, app)
 
     if cmd in ("check", "uncheck"):
         r, path, node, role, name = target(app, needle)
         w = widget(r, role, name)
         want = cmd == "check"
+        try:
+            st = read_states(node)
+        except Exception:
+            finish({**delivery("not_delivered", "timeout"), "widget": w}, None, app)
         # Already as asked: nothing to press, and pressing would undo it.
-        if ("checked" in states(node)) == want:
+        if ("checked" in st) == want:
             finish({**delivery("verified"), "already": True, "widget": w}, None, app)
         try:
             action = node.get_action()
@@ -846,10 +868,13 @@ def main(argv):
         if not anywhere:
             confine(app, path)
         guard()
-        out = press(node, action, index)
+        out = press(node, role, action, index)
         # The change press saw must be the one asked for.
-        if out["delivery"] == "verified" and ("checked" in states(node)) != want:
-            out = delivery("unverified")
+        try:
+            if out["delivery"] == "verified" and ("checked" in read_states(node)) != want:
+                out = delivery("unverified")
+        except Exception:
+            out = delivery("unverified", "timeout")
         finish({**out, "action": names[index], "widget": w}, None, app)
 
     if cmd == "type":
@@ -866,9 +891,12 @@ def main(argv):
             editable = node.get_editable_text()
         except Exception:
             editable = None
-        # Editable set and read-only clear, whatever interfaces the widget has.
-        st = states(node)
-        if editable is None or "editable" not in st or "read-only" in st:
+        # Editable and sensitive set and read-only clear, whatever interfaces the widget has: a greyed field takes writes from AT-SPI though a person could not type there.
+        try:
+            st = read_states(node)
+        except Exception:
+            finish({**delivery("not_delivered", "timeout"), "typed": len(value), "widget": w}, then, app)
+        if editable is None or "editable" not in st or "read-only" in st or "sensitive" not in st:
             print(json.dumps({"refused": "not editable", "widget": w}))
             sys.exit(3)
         finish({**write(node, role, editable, value), "typed": len(value), "widget": w}, then, app)

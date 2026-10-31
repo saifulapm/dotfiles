@@ -7,7 +7,7 @@ scripts=$repo/home/dot_claude/skills/desktop/scripts
 gui=$scripts/gui
 cleanup() {
   local id
-  for id in $(niri msg -j windows | jq -r '.[] | select(.app_id == "org.gtk.WidgetFactory4" or .title == "box3") | .id'); do
+  for id in $(niri msg -j windows | jq -r '.[] | select(.app_id == "org.gtk.WidgetFactory4" or .app_id == "org.gtk.WidgetFactory" or .title == "box3") | .id'); do
     niri msg action close-window --id "$id" 2>/dev/null
   done
   return 0
@@ -46,6 +46,15 @@ check "and leaves checked out of its states" unchecked
 out=$("$gui" uncheck box3 Tick)
 check "a second gui uncheck says already: $out" jq -e '.already == true' <<<"$out"
 check "the journal holds the four, each with its delivery" bash -c "[ \$(jq -c 'select(.tool == \"gui\" and (.args[0] == \"check\" or .args[0] == \"uncheck\")) | .delivery' '$XDG_STATE_HOME/dots/agent-journal.ndjson' | grep -c verified) = 4 ]"
+
+# gtk3-widget-factory's window has no name on the bus, though niri shows its title; screen launch opened it, so its boxes take checks.
+"$scripts/screen" launch gtk3-widget-factory >/dev/null
+until_ok 15000 bash -c "'$gui' tree gtk3-widget-factory | jq -e '[.nodes[] | select(.role == \"check box\")] | length > 0' >/dev/null 2>&1"
+box=$("$gui" tree gtk3-widget-factory | jq -r '[.nodes[] | select(.role == "check box" and (.states | index("checked") | not) and (.states | index("sensitive")))][0].ref')
+out=$("$gui" check gtk3-widget-factory "$box")
+rc=$?
+check "gui check on a clear box of the launched gtk3-widget-factory exits 0 (got $rc): $out" jq -e '.delivery == "verified" and (has("already") | not)' <<<"$out"
+check "and that box reads checked" bash -c "'$gui' get gtk3-widget-factory '$box' states | jq -e '.states | index(\"checked\")' >/dev/null"
 
 niri msg action spawn -- gtk4-widget-factory
 until_ok 15000 bash -c "'$gui' find gtk4-widget-factory Lorem >/dev/null 2>&1"

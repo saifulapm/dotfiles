@@ -65,6 +65,42 @@ until_ok 3000 bash -c "'$gui' find gtk4-widget-factory Lorem >/dev/null 2>&1"
 now=$("$gui" tree gtk4-widget-factory | jq -r '[.nodes[] | select(.role == "toggle button" and .name == "togglebutton")][0].ref')
 check "and back on page 1 that toggle is as it was ($was)" test "$(pressed "$now")" = "$was"
 
+# Three unnamed buttons in a row; Drop removes the first, so the third's path now leads to nothing and the second's to the third, a node of the same role and name.
+cat >"$DOTS_DEV_DIR/shift.py" <<PY
+import gi
+gi.require_version("Gtk", "4.0")
+from gi.repository import GLib, Gtk
+GLib.set_prgname("shift")
+def activate(app):
+    w = Gtk.ApplicationWindow(application=app, title="shift")
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    row = Gtk.Box()
+    for n in range(3):
+        b = Gtk.Button(icon_name="go-next-symbolic")
+        b.connect("clicked", lambda _, n=n: open(f"$DOTS_DEV_DIR/shift-{n}", "a").write("x\n"))
+        row.append(b)
+    box.append(row)
+    drop = Gtk.Button(label="Drop")
+    drop.connect("clicked", lambda _: row.remove(row.get_first_child()))
+    box.append(drop)
+    w.set_child(box)
+    w.present()
+app = Gtk.Application(application_id="org.dots.Shift")
+app.connect("activate", activate)
+app.run([])
+PY
+niri msg action spawn -- python3 "$DOTS_DEV_DIR/shift.py"
+until_ok 8000 bash -c "'$gui' find shift Drop >/dev/null 2>&1"
+second=$("$gui" tree shift | jq -r '[.nodes[] | select(.role == "button" and .name == "")][1].ref')
+"$gui" click shift Drop --any >/dev/null
+until_ok 3000 bash -c "[ \$('$gui' tree shift | jq '[.nodes[] | select(.role == \"button\" and .name == \"\")] | length') = 2 ]"
+out=$("$gui" click shift "$second" --any)
+rc=$?
+check "a ref to an unnamed button whose sibling was dropped exits 4 (got $rc)" test "$rc" = 4
+check "printing it stale, its place taken by another: $out" jq -e '.stale == "replaced"' <<<"$out"
+check "and no button was pressed" bash -c "! ls '$DOTS_DEV_DIR'/shift-* >/dev/null 2>&1"
+for id in $(niri msg -j windows | jq -r '.[] | select(.app_id == "org.dots.Shift") | .id'); do niri msg action close-window --id "$id"; done
+
 missing=$("$gui" get gtk4-widget-factory s0000:5 2>&1)
 check "a ref whose snapshot is gone answers snapshot_gone, exit 4: $missing" bash -c "'$gui' get gtk4-widget-factory s0000:5 >/dev/null 2>&1; [ \$? = 4 ] && jq -e '.stale == \"snapshot_gone\"' <<<'$missing' >/dev/null"
 
