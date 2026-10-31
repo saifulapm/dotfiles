@@ -13,11 +13,13 @@ Scope {
     property var playlists: P.emptyStore()
     // Set while the file does not parse; saving then would replace every Playlist in it.
     property bool broken: false
+    // Set once the file is read, or found missing; a save before then would write an empty store over it.
+    property bool ready: false
     readonly property var saved: P.items(playlists, "saved")
 
     // video is a row as youtube.mjs rows() makes it; a video already in Saved stays one copy.
     function save(video) {
-        if (broken)
+        if (!ready || broken)
             return;
         const next = P.add(playlists, "saved", {
             id: video.id,
@@ -63,6 +65,8 @@ Scope {
                 console.warn("youtube: " + path + " does not parse; nothing is saved until it does");
             else
                 store.playlists = parsed;
+            store.ready = true;
         }
+        onLoadFailed: store.ready = true
     }
 }
