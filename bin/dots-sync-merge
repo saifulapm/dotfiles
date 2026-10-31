@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals> <store> <pulled>...` merges the pulled files into the local store.
+// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals|youtube> <store> <pulled>...` merges the pulled files into the local store.
 import { execFileSync } from 'node:child_process';
 import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import * as goals from '../shell/lib/goals.mjs';
 import * as notes from '../shell/lib/notes.mjs';
+import * as youtube from '../shell/lib/youtube-playlists.mjs';
 
 const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
 const fail = (msg, code) => {
@@ -23,7 +24,7 @@ let restamped = 0;
 
 // Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
 function round(unit, path, others) {
-  const model = { notes, goals }[unit];
+  const model = { notes, goals, youtube }[unit];
   const text = existsSync(path) ? readFileSync(path, 'utf8') : null;
   const local = text === null ? model.emptyStore() : model.parseStore(text);
   if (!local) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
@@ -71,6 +72,10 @@ function recent(unit, store) {
   let dropped = 0;
   const ok = (x) => x.updatedAt <= limit || (dropped++, false);
   if (unit === 'notes') return { store: Object.assign({}, store, { notes: store.notes.filter(ok) }), dropped };
+  if (unit === 'youtube') {
+    const kept = eachPlaylist(store, (l) => (newest(l) <= limit ? keep(l, ok) : (dropped++, null)));
+    return { store: kept, dropped };
+  }
   const kept = store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) }));
   return { store: Object.assign({}, store, { goals: kept }), dropped };
 }
@@ -90,13 +95,15 @@ function restamp(unit, store) {
   const out =
     unit === 'notes'
       ? Object.assign({}, store, { notes: store.notes.map(fix) })
-      : Object.assign({}, store, { goals: store.goals.map((g) => Object.assign({}, fix(g), { tasks: g.tasks.map(fix) })) });
+      : unit === 'youtube'
+        ? eachPlaylist(store, (l) => mapItems(fixList(l, limit, now, () => fixed++), fix))
+        : Object.assign({}, store, { goals: store.goals.map((g) => Object.assign({}, fix(g), { tasks: g.tasks.map(fix) })) });
   return { store: out, fixed };
 }
 
 // A pulled file that does not parse, or its records stamped ahead, are left out and the rest still merge; exit 5 then names them last, so the unit shows the error while this machine's store still goes up.
 function merge(unit, path, files) {
-  const model = { notes, goals }[unit];
+  const model = { notes, goals, youtube }[unit];
   const others = [];
   const skipped = [];
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
@@ -119,7 +126,34 @@ function merge(unit, path, files) {
   fail(`${unit}: the local store kept changing, so this round left it alone`, 1);
 }
 
+// A Playlist's own stamps: when it was last changed, and when it was named.
+const newest = (l) => Math.max(l.updatedAt || 0, l.nameAt || 0);
+
+// fn gives each Playlist back changed, or null to leave it out.
+function eachPlaylist(store, fn) {
+  const playlists = {};
+  for (const [id, l] of Object.entries(store.playlists)) {
+    const out = fn(l);
+    if (out) playlists[id] = out;
+  }
+  return Object.assign({}, store, { playlists });
+}
+
+const keep = (l, ok) => Object.assign({}, l, { items: Object.fromEntries(Object.entries(l.items).filter(([, it]) => ok(it))) });
+
+const mapItems = (l, fn) => Object.assign({}, l, { items: Object.fromEntries(Object.entries(l.items).map(([k, it]) => [k, fn(it)])) });
+
+// A Playlist counts once however many of its stamps ran ahead.
+function fixList(l, limit, now, count) {
+  if (newest(l) <= limit) return l;
+  count();
+  const out = Object.assign({}, l);
+  if (l.nameAt > limit) out.nameAt = now;
+  if (l.updatedAt > limit) out.updatedAt = now;
+  return out;
+}
+
 const [cmd, path, ...files] = process.argv.slice(2);
 if (cmd === 'machine') process.stdout.write(machine() + '\n');
-else if ((cmd === 'notes' || cmd === 'goals') && path) merge(cmd, path, files);
-else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals> <store> <other>...', 2);
+else if ((cmd === 'notes' || cmd === 'goals' || cmd === 'youtube') && path) merge(cmd, path, files);
+else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals|youtube> <store> <other>...', 2);
