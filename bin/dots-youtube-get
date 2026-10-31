@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+# dots-youtube-get audio|video [--playlist <name>]: queues the {"id", "title"} JSON rows on stdin not yet queued or downloaded, starts the worker unit youtube-get unless it runs, and prints {"queued": <count>}. dots-youtube-get run: the worker, downloading the queue one item at a time with yt-dlp and telling the island through dots-call downloading. dots-youtube-get where [<id>...]: drops index entries whose file is gone and prints {"files"} for the ids asked, all when none is named.
+import ctypes
+import fcntl
+import json
+import os
+import re
+import shutil
+import signal
+import subprocess
+import sys
+import tempfile
+import time
+from contextlib import contextmanager
+
+ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+FORMATS = {
+    "audio": ["-f", "bestaudio", "-x", "--embed-thumbnail", "--embed-metadata", "--convert-thumbnails", "jpg"],
+    "video": ["-f", "bv*[height<=1080]+ba/b[height<=1080]", "--embed-metadata"],
+}
+TEMPLATE = 'download:{"pct":"%(progress._percent_str)s","s":"%(progress.status)s"}'
+# The after_move line's prefix: a progress line starts with {, this one never does.
+SAVED = "file "
+# .150B cuts a title to 150 bytes, so a long one stays under the filesystem's 255-byte name limit.
+NAME = "%(title).150B [%(id)s].%(ext)s"
+PASS = ["WAYLAND_DISPLAY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "XDG_MUSIC_DIR", "XDG_VIDEOS_DIR", "HOME", "DOTS_DEV_DIR"]
+# dots-call beside this script: the shell starts it by path, and the nested session's PATH holds no bin/.
+DOTS_CALL = os.path.join(os.path.dirname(os.path.realpath(__file__)), "dots-call")
+HOME = os.path.expanduser("~")
+
+# The running yt-dlp, which a SIGTERM takes down with the worker.
+child = None
+
+
+# A title or a reason reaches the island as one line, no control characters or bidi marks.
+def clean(text):
+    text = re.sub(r"[‪-‮⁦-⁩‎‏؜]", "", text)
+    text = re.sub(r"[\x00-\x1f\x7f-\x9f]+", " ", text)
+    return " ".join(text.split())
+
+
+def out(obj):
+    print(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), flush=True)
+
+
+# A nested check keeps its queue and unit apart from a live download.
+def queue_path():
+    dev = os.environ.get("DOTS_DEV_DIR")
+    return os.path.join(dev, "youtube-get.json") if dev else os.path.join(os.environ["XDG_RUNTIME_DIR"], "dots", "youtube-get.json")
+
+
+def unit_name():
+    return "youtube-get-dev" if os.environ.get("DOTS_DEV_DIR") else "youtube-get"
+
+
+def index_path():
+    state = os.environ.get("XDG_STATE_HOME") or os.path.join(HOME, ".local", "state")
+    return os.path.join(state, "dots", "youtube", "downloads.json")
+
+
+def folder(kind):
+    if kind == "audio":
+        return os.path.join(os.environ.get("XDG_MUSIC_DIR") or os.path.join(HOME, "Music"), "YouTube")
+    return os.path.join(os.environ.get("XDG_VIDEOS_DIR") or os.path.join(HOME, "Videos"), "YouTube")
+
+
+def temp_dir(video):
+    cache = os.environ.get("XDG_CACHE_HOME") or os.path.join(HOME, ".cache")
+    return os.path.join(cache, "dots", "youtube-get", video)
+
+
+# One lock beside the queue guards both the queue and the index.
+@contextmanager
+def locked():
+    path = queue_path()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd = os.open(path + ".lock", os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
+
+
+def load(path, empty):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return empty
+
+
+# Written whole to a temp file and renamed over, so a reader never sees half of it.
+def save(path, data):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".tmp-")
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, ensure_ascii=False)
+    os.replace(tmp, path)
+
+
+def load_queue():
+    return load(queue_path(), {"running": False, "items": []})
+
+
+def load_index():
+    return load(index_path(), {"files": {}, "failed": {}})
+
+
+def downloaded(index, video, kind):
+    path = index["files"].get(video, {}).get(kind)
+    return path is not None and os.path.isfile(path)
+
+
+def active():
+    return subprocess.run(["systemctl", "--user", "is-active", "--quiet", unit_name() + ".service"]).returncode == 0
+
+
+# Called under the lock, so no second enqueue sees the queue running before its unit is up; systemd refuses the name while the last worker still exits, so it tries again for 3 s.
+def start_unit(ytdlp):
+    command = ["systemd-run", "--user", "--collect", "--quiet", "--unit", unit_name(), "--setenv=DOTS_YOUTUBE_YTDLP=" + ytdlp]
+    try:
+        deno = subprocess.run(["mise", "which", "deno"], capture_output=True, text=True, timeout=10).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        deno = ""
+    if deno:
+        command.append("--setenv=DOTS_YOUTUBE_DENO=" + deno)
+    command += ["--setenv=" + name for name in PASS if name in os.environ]
+    command += ["--", os.path.realpath(__file__), "run"]
+    deadline = time.monotonic() + 3
+    while subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0:
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.1)
+    return True
+
+
+def enqueue(kind, playlist):
+    ytdlp = os.environ.get("DOTS_YOUTUBE_YTDLP") or shutil.which("yt-dlp")
+    if not ytdlp:
+        out({"error": "yt-dlp is missing: run dots update"})
+        return 1
+    rows = []
+    for line in sys.stdin:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict) and isinstance(row.get("id"), str) and ID.match(row["id"]):
+            rows.append((row["id"], str(row.get("title") or row["id"])))
+    with locked():
+        queue, index = load_queue(), load_index()
+        taken = {(item["id"], item["kind"]) for item in queue["items"]}
+        accepted = []
+        for video, title in rows:
+            if (video, kind) in taken or downloaded(index, video, kind):
+                continue
+            taken.add((video, kind))
+            accepted.append((video, title))
+        for n, (video, title) in enumerate(accepted, 1):
+            single = playlist is None
+            queue["items"].append({"id": video, "kind": kind, "title": title, "n": 1 if single else n, "total": 1 if single else len(accepted), "list": playlist or ""})
+            index["failed"].pop(video, None)
+        if accepted:
+            save(index_path(), index)
+        # A queue marked running whose unit is gone lost its worker to a crash, and a new one takes over.
+        crashed = queue["running"] and not active()
+        if (accepted and not queue["running"]) or crashed:
+            queue["running"] = True
+            save(queue_path(), queue)
+            if not start_unit(ytdlp):
+                queue["running"] = False
+                save(queue_path(), queue)
+                out({"error": "the download did not start: systemd-run refused %s for 3 s" % unit_name()})
+                return 1
+        elif accepted:
+            save(queue_path(), queue)
+    out({"queued": len(accepted)})
+    return 0
+
+
+def call(*args):
+    subprocess.run([DOTS_CALL, "downloading"] + [str(a) for a in args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+# Runs as the child between fork and exec: the kernel kills it when the worker dies, even by SIGKILL, which no handler sees.
+def die_with_parent():
+    ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL)  # PR_SET_PDEATHSIG
+
+
+def stop(signum, _frame):
+    if child is not None:
+        try:
+            os.killpg(child.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    call("done")
+    sys.exit(128 + signum)
+
+
+# The island's reason: yt-dlp's last ERROR line, shortened to what a person acts on.
+def reason(stderr):
+    raw = next((line for line in reversed(stderr.splitlines()) if line.startswith("ERROR:")), "")
+    if "No space left on device" in raw:
+        return "disk full"
+    http = re.search(r"HTTP Error (\d+)", raw)
+    if http:
+        return "HTTP " + http[1]
+    text = re.sub(r"^\[[^\]]+\] [A-Za-z0-9_-]+: ", "", raw[len("ERROR:"):].strip())
+    return clean(text)[:120]
+
+
+# Downloads one item; answers the file's path inside its folder, or None and the reason it failed.
+def download(item):
+    global child
+    home = folder(item["kind"])
+    args = [os.environ.get("DOTS_YOUTUBE_YTDLP") or "yt-dlp", *FORMATS[item["kind"]], "--no-playlist", "--newline", "--progress", "--progress-template", TEMPLATE,
+            "-o", NAME, "-P", "home:" + home, "-P", "temp:" + temp_dir(item["id"]), "--print", "after_move:" + SAVED + "%(filepath)s"]
+    if os.environ.get("DOTS_YOUTUBE_DENO"):
+        args += ["--js-runtimes", "deno:" + os.environ["DOTS_YOUTUBE_DENO"]]
+    args.append("https://www.youtube.com/watch?v=" + item["id"])
+    errors = tempfile.TemporaryFile("w+")
+    # A group of its own, so stop() also reaches the ffmpeg yt-dlp starts.
+    child = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=errors, text=True, process_group=0, preexec_fn=die_with_parent)
+    shown, saved = -1, None
+    for line in child.stdout:
+        line = line.rstrip("\n")
+        if line.startswith(SAVED):
+            saved = line[len(SAVED):]
+            continue
+        try:
+            pct = int(float(json.loads(line)["pct"].strip().rstrip("%")))
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+        # A video's second stream starts again at 0, so the island shows the item's running maximum.
+        if pct > shown:
+            shown = pct
+            call("progress", pct)
+    code = child.wait()
+    child = None
+    errors.seek(0)
+    said = errors.read()
+    if code != 0:
+        return None, reason(said) or "yt-dlp exited %d" % code
+    inside = os.path.realpath(home) + os.sep
+    if saved is None or not os.path.realpath(saved).startswith(inside) or not os.path.isfile(saved):
+        return None, "yt-dlp saved no file in the folder"
+    return os.path.realpath(saved), None
+
+
+def run():
+    signal.signal(signal.SIGTERM, stop)
+    while True:
+        with locked():
+            queue = load_queue()
+            if not queue["items"]:
+                # Told under the lock, so an enqueue that starts the next worker cannot see its start before this done.
+                call("done")
+                queue["running"] = False
+                save(queue_path(), queue)
+                return 0
+            item = queue["items"].pop(0)
+            save(queue_path(), queue)
+            present = downloaded(load_index(), item["id"], item["kind"])
+        if present:
+            continue
+        title = clean(item["title"])
+        call("start", item["n"], item["total"], item["list"], title, item["kind"])
+        try:
+            path, why = download(item)
+        finally:
+            shutil.rmtree(temp_dir(item["id"]), ignore_errors=True)
+        if why:
+            call("failed", title, why)
+        with locked():
+            index = load_index()
+            if path:
+                index["files"].setdefault(item["id"], {})[item["kind"]] = path
+                index["failed"].pop(item["id"], None)
+            else:
+                index["failed"][item["id"]] = {"kind": item["kind"], "title": item["title"], "reason": why}
+            save(index_path(), index)
+
+
+def where(ids):
+    with locked():
+        exists = os.path.exists(index_path())
+        index = load_index()
+        changed = not exists
+        for video in list(index["files"]):
+            if ids and video not in ids:
+                continue
+            kinds = {kind: path for kind, path in index["files"][video].items() if os.path.isfile(path)}
+            if kinds != index["files"][video]:
+                changed = True
+                if kinds:
+                    index["files"][video] = kinds
+                else:
+                    del index["files"][video]
+        if changed:
+            save(index_path(), index)
+    out({"files": {video: kinds for video, kinds in index["files"].items() if not ids or video in ids}})
+    return 0
+
+
+def usage():
+    print("dots-youtube-get: usage: audio|video [--playlist <name>] | run | where [<id>...]", file=sys.stderr)
+    return 2
+
+
+def main(argv):
+    if argv[:1] in (["audio"], ["video"]):
+        if len(argv) == 1:
+            return enqueue(argv[0], None)
+        if len(argv) == 3 and argv[1] == "--playlist":
+            return enqueue(argv[0], argv[2])
+        return usage()
+    if argv == ["run"]:
+        return run()
+    if argv[:1] == ["where"]:
+        return where(argv[1:])
+    return usage()
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

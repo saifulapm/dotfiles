@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+# The YouTube nested checks' yt-dlp, which DOTS_YOUTUBE_YTDLP names for dots-youtube-get: logs its command line to DOTS_DEV_DIR/youtube-get.log, prints progress in the template's shape, then writes a 5 s silent .opus (or a black .webm for video) with ffmpeg where -o and -P put it, so a check downloads with no network. An id listed in DOTS_DEV_DIR/youtube-get-fail fails with HTTP 403 after one progress line; DOTS_DEV_DIR/youtube-get-pace holds the seconds between progress lines.
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+dev = os.environ["DOTS_DEV_DIR"]
+with open(os.path.join(dev, "youtube-get.log"), "a") as log:
+    log.write(" ".join(sys.argv[1:]) + "\n")
+
+audio, name, home, temp, saved, template = False, "%(title)s [%(id)s].%(ext)s", ".", ".", None, None
+args = iter(sys.argv[1:-1])
+for arg in args:
+    if arg == "-x":
+        audio = True
+    elif arg == "-o":
+        name = next(args)
+    elif arg == "-P":
+        where, _, path = next(args).partition(":")
+        home, temp = (path, temp) if where == "home" else (home, path)
+    elif arg == "--print":
+        saved = next(args).removeprefix("after_move:")
+    elif arg == "--progress-template":
+        template = next(args).removeprefix("download:")
+    elif arg in ("-f", "--convert-thumbnails", "--js-runtimes"):
+        next(args)
+video = sys.argv[-1].rpartition("v=")[2]
+
+
+def read(path, fallback):
+    try:
+        with open(path) as f:
+            return f.read()
+    except OSError:
+        return fallback
+
+
+pace = float(read(os.path.join(dev, "youtube-get-pace"), "0.2").strip() or 0.2)
+
+
+def tick(pct, status):
+    if template:
+        print(template.replace("%(progress._percent_str)s", "%5.1f%%" % pct).replace("%(progress.status)s", status), flush=True)
+    time.sleep(pace)
+
+
+if video in read(os.path.join(dev, "youtube-get-fail"), "").split():
+    tick(0, "downloading")
+    print("ERROR: [youtube] %s: Unable to download video data: HTTP Error 403: Forbidden" % video, file=sys.stderr)
+    sys.exit(1)
+
+# A video downloads its picture and its sound apart, each from 0 to 100, as the real one does.
+for _ in range(1 if audio else 2):
+    for pct in (0, 25, 50, 75, 100):
+        tick(pct, "finished" if pct == 100 else "downloading")
+
+here = os.path.dirname(os.path.realpath(__file__))
+rows = json.loads(read(os.path.join(here, "search.json"), '{"rows": []}'))["rows"]
+title = next((row["title"] for row in rows if row["id"] == video), "Fake " + video)
+ext = "opus" if audio else "webm"
+
+
+def field(m):
+    value = {"title": title, "id": video, "ext": ext}[m[1]]
+    # yt-dlp's own sanitising turns / into a look-alike slash, and .<n>B cuts to n bytes.
+    value = value.replace("/", "⧸")
+    if m[2]:
+        value = value.encode()[: int(m[2])].decode(errors="ignore")
+    return value
+
+
+filename = re.sub(r"%\((\w+)\)(?:\.(\d+)B|s)", field, name)
+os.makedirs(temp, exist_ok=True)
+os.makedirs(home, exist_ok=True)
+part = os.path.join(temp, filename)
+inputs = ["-f", "lavfi", "-i", "anullsrc=r=8000:cl=mono"]
+if not audio:
+    inputs += ["-f", "lavfi", "-i", "color=c=black:s=320x180:d=5", "-c:v", "libvpx-vp9", "-deadline", "realtime"]
+# -t ends the output: anullsrc never ends by itself.
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", *inputs, "-t", "5", "-c:a", "libopus", "-metadata", "title=" + title, part], check=True)
+path = os.path.join(home, filename)
+shutil.move(part, path)
+if saved:
+    print(saved.replace("%(filepath)s", path), flush=True)
