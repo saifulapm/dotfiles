@@ -46,6 +46,13 @@ test('no file reads as a new store; a broken or wrong-shaped one reads null', ()
   assert.equal(P.parse('{"playlists":[]}'), null);
 });
 
+// A file another machine wrote reaches the merge through parse, so a Playlist or item of the wrong shape must not get past it.
+test('a store with a Playlist or an item of the wrong shape reads null', () => {
+  for (const bad of [{ x: 'str' }, { x: null }, { x: { id: 'x', name: 'X', items: null } }, { x: { id: 'x', name: 'X', items: [] } }, { x: { id: 'x', name: 5, items: {} } }, { x: { id: 'x', name: 'X', items: { v: null } } }, { x: { id: 'x', name: 'X', items: { v: 'v' } } }]) {
+    assert.equal(P.parse(JSON.stringify({ version: 1, playlists: bad })), null, JSON.stringify(bad));
+  }
+});
+
 test('a store whose file lost saved gets it back', () => {
   assert.deepEqual(P.items(P.parse('{"version":1,"playlists":{}}'), 'saved'), []);
 });

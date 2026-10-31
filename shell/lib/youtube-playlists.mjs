@@ -17,6 +17,9 @@ const saved = () => ({ id: 'saved', name: 'Saved', updatedAt: 0, items: {} });
 
 export const emptyStore = () => ({ version: 1, playlists: { saved: saved() } });
 
+// Every view and the sync merge read a Playlist's items and name, so a Playlist without them is no store at all.
+const wellFormed = (l) => isObject(l) && isObject(l.items) && (l.name === undefined || typeof l.name === 'string') && Object.values(l.items).every(isObject);
+
 // No file yet is a new store; a file that is broken or the wrong shape is null, so nothing ever saves over the Playlists it holds.
 export function parse(text) {
   if (String(text).trim() === '') return emptyStore();
@@ -26,7 +29,7 @@ export function parse(text) {
   } catch (e) {
     return null;
   }
-  if (!isObject(s) || !isObject(s.playlists)) return null;
+  if (!isObject(s) || !isObject(s.playlists) || !Object.values(s.playlists).every(wellFormed)) return null;
   return s.playlists.saved ? s : Object.assign({}, s, { playlists: Object.assign({}, s.playlists, { saved: saved() }) });
 }
 

@@ -93,10 +93,15 @@ test('another machine file that does not parse fails the unit by its name, what 
   await ok(c);
   writeFileSync(join(w.remote, 'dots-sync/youtube/other.json'), '{"playlists":');
   write(storePath(a), P.add(P.emptyStore(), 'saved', video('s1'), T));
-  const r = await sync(a, ['--only', 'youtube']);
+  let r = await sync(a, ['--only', 'youtube']);
   assert.equal(r.code, 5, r.stderr);
   assert.deepEqual([status(a).youtube.ok, status(a).youtube.error], [false, 'youtube: skipped other.json, which does not parse']);
   assert.deepEqual(ids(store(a), 'focus'), ['v1', 'v2', 'v3']);
+  // JSON of the wrong shape is skipped the same way, not a crash that holds this machine's store back.
+  writeFileSync(join(w.remote, 'dots-sync/youtube/other.json'), '{"version":1,"playlists":{"x":{"id":"x","name":"X","items":null}}}');
+  r = await sync(a, ['--only', 'youtube']);
+  assert.equal(r.code, 5, r.stderr);
+  assert.equal(status(a).youtube.error, 'youtube: skipped other.json, which does not parse');
   const pushed = P.parseStore(readFileSync(join(w.remote, 'dots-sync/youtube/a.json'), 'utf8'));
   assert.deepEqual([ids(pushed, 'focus'), ids(pushed, 'saved')], [['v1', 'v2', 'v3'], ['s1']]);
   writeFileSync(join(w.remote, 'dots-sync/youtube/other.json'), P.serialize(P.emptyStore()));
