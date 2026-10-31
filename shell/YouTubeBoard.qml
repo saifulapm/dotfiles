@@ -28,7 +28,10 @@ Rectangle {
 
     // The boards' download arrow into a tray, on Artboard's grey tile; on a lit row Paper's and Blueprint's take the row's light colour.
     component DownloadMark: Rectangle {
+        id: mark
         property bool lit: false
+        // A ShapePath is no Item and has no parent of its own, so it reads the stroke from here by id.
+        readonly property color ink: lit && !board.plain ? board.c.surface ?? "white" : board.look.mark.stroke || (board.c.ink ?? "black")
         anchors.centerIn: parent
         width: board.look.mark.tile ? board.look.mark.tile.width : board.look.mark.size
         height: board.look.mark.tile ? board.look.mark.tile.height : board.look.mark.size
@@ -41,7 +44,7 @@ Rectangle {
             height: board.look.mark.size
             preferredRendererType: Shape.CurveRenderer
             ShapePath {
-                strokeColor: parent.parent.lit && !board.plain ? board.c.surface ?? "white" : board.look.mark.stroke || (board.c.ink ?? "black")
+                strokeColor: mark.ink
                 strokeWidth: board.look.mark.width
                 fillColor: "transparent"
                 capStyle: ShapePath.RoundCap
@@ -1018,6 +1021,7 @@ Rectangle {
                                     channelElided: channelText.truncated,
                                     channelColor: String(channelText.color),
                                     mark: rowItem.saved,
+                                    markInk: String((look.mark.at === "end" ? endMark : beforeMark).ink),
                                     duration: durationText.text,
                                     thumb: picture.drawn()
                                 };
@@ -1105,6 +1109,7 @@ Rectangle {
                                     implicitHeight: 20
 
                                     DownloadMark {
+                                        id: beforeMark
                                         visible: rowItem.saved && look.mark.at === "before"
                                         lit: rowItem.lit
                                     }
@@ -1130,6 +1135,7 @@ Rectangle {
                                     implicitHeight: 16
 
                                     DownloadMark {
+                                        id: endMark
                                         visible: rowItem.saved && look.mark.at === "end"
                                         lit: rowItem.lit
                                     }

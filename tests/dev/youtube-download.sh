@@ -78,6 +78,9 @@ for theme in artboard blueprint paper; do
   "$repo/bin/dots" theme "$theme" >/dev/null
   until_ok 3000 status_theme "$theme"
   check "$theme: the downloaded row draws its mark, and only it ($(yt_state | jq -c '[.drawn[0:3][].mark]'))" yt_is '.drawn[0].mark and (.drawn[1].mark | not)'
+  # The cursor's row is lit: Paper's ink and Blueprint's accent fill it, so its mark takes the surface colour; Artboard's light tint keeps the blue.
+  case $theme in paper) ink='#faf6ec' ;; blueprint) ink='#0a1526' ;; artboard) ink='#2638c9' ;; esac
+  check "$theme: the lit row's mark draws in $ink ($(yt_state | jq -c '[.cursor, .drawn[0].markInk]'))" yt_is --arg ink "$ink" '.cursor == 0 and .drawn[0].markInk == $ink'
 done
 
 before=$(gets)
