@@ -106,7 +106,7 @@ test('y copies the name and number, the Arabic, the English with its narrator an
   assert.equal(H.copyText(hit), "Sahih al-Bukhari 1\n\nإِنَّمَا\n\nActions are by intentions.\nNarrated by 'Umar\n\nhttps://sunnah.com/bukhari:1");
 });
 
-const bukhari = { slug: 'bukhari', name: 'Sahih al Bukhari', bn: 'সহীহ বুখারী', hadiths: 7589, count: 7589 };
+const bukhari = { slug: 'bukhari', name: 'Sahih al Bukhari', bn: 'সহীহ বুখারী', hadiths: 7589, count: 7583 };
 const n1bn = '‘আলক্বামাহ ইবনু ওয়াক্কাস আল-লায়সী (রহ.) হতে বর্ণিত।';
 const listed = {
   collection: 'bukhari',
@@ -117,14 +117,14 @@ const listed = {
 };
 
 test('a collection row reads its Bangla name, the board’s English name and its count', () => {
-  assert.equal(H.rowText(H.collectionRow(bukhari)), 'সহীহ বুখারী  Sahih al-Bukhari  7589');
+  assert.equal(H.rowText(H.collectionRow(bukhari)), 'সহীহ বুখারী  Sahih al-Bukhari  7583');
   assert.deepEqual(H.collectionRow(bukhari).cells.map((c) => c.face), ['bn', 'en', 'count']);
 });
 
 test('a book row numbers it in Bangla digits beside its count, and book 0 draws without a number', () => {
   assert.equal(H.rowText(H.bookRow({ n: 1, bn: 'ওহীর সূচনা', en: 'Revelation', count: 7 })), '১. ওহীর সূচনা  7');
   assert.equal(H.rowText(H.bookRow({ n: 97, bn: 'তাওহীদ', en: 'Oneness', count: 192 })), '৯৭. তাওহীদ  192');
-  assert.equal(H.rowText(H.bookRow({ n: 0, bn: 'অন্যান্য', en: '', count: 311 })), 'অন্যান্য  311');
+  assert.equal(H.rowText(H.bookRow({ n: 0, bn: 'অন্যান্য', en: '', count: 307 })), 'অন্যান্য  307');
 });
 
 test('a narration row is one line of its Bangla, or of its English under the English mark', () => {
