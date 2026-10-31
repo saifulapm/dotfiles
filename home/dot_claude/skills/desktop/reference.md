@@ -12,7 +12,7 @@ call, `gui click|type`) refuses with exit 3 and prints
 |---|---|---|
 | `locked` | `dots-call lock state` reads locked | unlock only if the brief says to; else hand back |
 | `auth prompt` | a polkit or pinentry password prompt is open (`dots-call polkit state` or `dots-call pinentry state` reads anything but `"open": false`) | refused even with `--any`; stop, hand the task back to Saiful, never type a password |
-| `jev not granted` | `screen find` or `screen check` ran without `--jev` | pass `--jev` only if the brief says "JEV allowed"; else use `gui` or OCR |
+| `jev not granted` | `screen find`, `screen check` or `gui pick` ran without `--jev` | pass `--jev` only if the brief says "JEV allowed"; else use `gui` or OCR |
 | `overview open` | `screen find` or `check` without `--any` while niri's overview shows every workspace | retry once it is closed; the overview may be Saiful's, so if the agent did not open it, hand back |
 | `not an agent window` | the focused window (keys) or the window under the point (clicks) is not one `screen launch` opened; for `screen find` and `check`, any window on the focused output's active workspace that is not | `screen launch` the app, or `--any` if the brief grants it |
 | `windows share a title` | `gui click` or `type` in an app with two windows of one title, only one of them an agent window: AT-SPI cannot tell them apart | close the other window or rename yours; hand back if the other is Saiful's |

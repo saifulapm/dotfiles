@@ -12,6 +12,9 @@ Chromium need --force-renderer-accessibility to appear.
   gui tree --pid <n> [--all]    the same for the app with process id n
   gui find <app> <text>         matching widgets + screen coords
   gui check|uncheck <app> <text>   tick or clear a check box; one already so prints "already": true
+  gui pick <app> <intent> --jev [--values] [--root REF] [--any]
+                                ask JEV which widget fits intent: {"ref", "confidence", "destructive", "decision"};
+                                act at 0.70 (0.90 when destructive), confirm from 0.55; never acts
   gui wait <app> --text T | --gone T | --state <text> <state> [--timeout S]
                                 until a name or field holds T, none does, or the widget has the state;
                                 10 s by default, 60 at most, exit 1 at the timeout with the last state seen
@@ -45,6 +48,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 import warnings
 
@@ -78,6 +82,7 @@ CALL_MS = 3000  # every AT-SPI call; a stopped app never answers, and libatspi w
 READ_FROM_S, READ_EVERY_S, READ_UNTIL_S = 0.3, 0.1, 2.0  # a write's effect lands a beat after its reply
 seen = None  # the window an action saw, for its journal line
 delivered = None  # an action's delivery, for its journal line
+sent = None  # what JEV answered a pick, for its journal line
 STARTED_MS = int(time.time() * 1000)  # the 2 s a --then look waits count from here
 
 
@@ -137,21 +142,26 @@ def guard():
     no_prompt()
 
 
-def confine(app, path):
-    """Returns only when the node at path sits in an agent window, noting the action there; else refuses with exit 3."""
+def agent_window(desk, app, path):
+    """The agent window the node at path sits in; else refuses with exit 3."""
     global seen
-    desk = load_desk()
     window = toplevel(app, path)
     pid, title = app.get_process_id(), (window.get_name() if window else "") or ""
     hits = [w for w in desk.windows().values() if w["pid"] == pid and w["title"] == title]
     seen = {k: hits[0][k] for k in ("id", "app_id", "title")} if hits else {"pid": pid, "title": title}
     agents = [w for w in hits if w["agent"]]
     # Two windows of one app with one title are one to AT-SPI, so either could be the agent's.
-    if len(agents) < len(hits):
+    if not agents or len(agents) < len(hits):
         print(json.dumps({"refused": "not an agent window" if not agents else "windows share a title", "window": seen}))
         sys.exit(3)
     seen = {k: agents[0][k] for k in ("id", "app_id", "title")}
-    desk.note("act", str(agents[0]["id"]))
+    return agents[0]
+
+
+def confine(app, path):
+    """Returns only when the node at path sits in an agent window, noting the action there; else refuses with exit 3."""
+    desk = load_desk()
+    desk.note("act", str(agent_window(desk, app, path)["id"]))
 
 
 def apps():
@@ -484,6 +494,9 @@ def write(node, role, editable, value):
 
 
 ACTS = ("click", "type", "check", "uncheck")  # the commands that act, each guarded and journalled
+PICK_MAX = 254  # JEV's Choice takes 255 options, none among them
+ACT_AT, ACT_DESTRUCTIVE_AT, CONFIRM_AT = 0.70, 0.90, 0.55
+VALUE_CHARS = 60
 TOGGLES = {"check box", "toggle button", "radio button", "check menu item", "radio menu item"}
 SHOWN = {"checked", "pressed", "expanded"}  # what a toggle's or an expander's click changes
 
@@ -571,6 +584,79 @@ def wait(app, kind, args, timeout):
         time.sleep(WAIT_EVERY_S)
 
 
+def candidate(node, role, values):
+    """What JEV reads of a widget a person could act on, as a compact JSON string; None for any other node."""
+    st = states(node)
+    if "sensitive" not in st or "showing" not in st:
+        return None
+    try:
+        action = node.get_action()
+        names = [Atspi.Action.get_action_name(action, k) for k in range(Atspi.Action.get_n_actions(action))]
+    except Exception:
+        names = []
+    # GTK4 lists every label's and window's menu actions as group.name (clipboard.copy, window.close); a widget's own is a bare click, activate, toggle or press.
+    if not any("." not in n for n in names) and not st & {"editable", "checkable", "expandable"}:
+        return None
+    out = {"role": role, "name": node.get_name() or "", "states": sorted(st & FLAGS - {"sensitive"})}
+    if values and role != "password text":
+        v = value(node)
+        if v is None and role in FIELDS:
+            try:
+                v = read_text(node)[:VALUE_CHARS]
+            except Exception:
+                v = None
+        if v is not None:
+            out["value"] = v
+    return json.dumps(out, ensure_ascii=False, separators=(",", ":"))
+
+
+def pick(app, intent, values, root, anywhere):
+    """Asks JEV which widget fits intent and prints its ref with a decision; it never acts, and exits 1 when JEV fails."""
+    global sent
+    rows = walked(app, root and root[2], root[1] if root else ())
+    hexid = snapshot(app, rows)
+    found = {}
+    for i, path, node, role, _ in rows:
+        c = candidate(node, role, values)
+        if c:
+            found[ref(hexid, i)] = (path, c)
+    if len(found) > PICK_MAX:
+        refuse4({"truncated": len(found)})
+    if not found:
+        nothing("no widget to pick from")
+    # The widgets' names leave the machine only from agent windows, like screen find's shot.
+    if not anywhere:
+        desk = load_desk()
+        for k in sorted({p[0] for p, _ in found.values() if p}):
+            agent_window(desk, app, (k,))
+    guard()
+    state = load_desk().state_dir()
+    os.makedirs(state, mode=0o700, exist_ok=True)
+    fd, path = tempfile.mkstemp(prefix="pick-", suffix=".json", dir=state)
+    note = path[:-5] + "-jev.json"
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump({r: c for r, (_, c) in found.items()}, f)
+        desk = os.path.join(os.path.dirname(os.path.realpath(__file__)), "desk")
+        r = subprocess.run([desk, "jev", "choice", intent, path], capture_output=True, text=True, env={**os.environ, "DESK_T0": str(STARTED_MS), "DESK_JEV": note})
+        sent = load_desk().read_json(note, None)
+    finally:
+        for f in (path, note):
+            if os.path.exists(f):
+                os.unlink(f)
+    if r.returncode != 0:
+        print(r.stderr.strip(), file=sys.stderr)
+        sys.exit(1)
+    a = json.loads(r.stdout)
+    chosen = a["choice"] if a["choice"] in found else None
+    bar = ACT_DESTRUCTIVE_AT if a["destructive"] >= 0.5 else ACT_AT
+    if chosen is None or a["present"] < 0.5 or a["confidence"] < CONFIRM_AT:
+        decision = "abstain"
+    else:
+        decision = "act" if a["confidence"] >= bar else "confirm"
+    print(json.dumps({"ref": chosen, "confidence": a["confidence"], "present": a["present"], "destructive": a["destructive"], "decision": decision}))
+
+
 def finish(out, then, app):
     """Prints an action's JSON, with the look --then asked for once it worked; exit 1 when it did not."""
     global delivered
@@ -640,6 +726,28 @@ def main(argv):
         else:
             app = find_app(argv[2])
         print(json.dumps(tree(app, everything, depth, root and target(app, root))))
+        return
+    if cmd == "pick":
+        # gui pick <app> INTENT, then --jev, --values, --root REF and --any in any order; the grant comes first, before anything is read.
+        rest = argv[4:]
+        jev, values, root = False, False, None
+        while rest:
+            if rest[0] == "--jev":
+                jev, rest = True, rest[1:]
+            elif rest[0] == "--values":
+                values, rest = True, rest[1:]
+            elif rest[0] == "--root" and len(rest) > 1 and REF.match(rest[1]):
+                root, rest = rest[1], rest[2:]
+            else:
+                usage()
+        if len(argv) < 4 or not argv[3]:
+            usage()
+        if not jev:
+            print(json.dumps({"refused": "jev not granted"}))
+            sys.exit(3)
+        guard()
+        app = find_app(argv[2])
+        pick(app, argv[3], values, root and target(app, root), anywhere)
         return
     if cmd == "wait":
         # gui wait <app> --text T | --gone T | --state TARGET STATE, then --timeout S.
@@ -777,6 +885,6 @@ if __name__ == "__main__":
         rc = e.code if isinstance(e.code, int) else (0 if e.code is None else 1)
         raise
     finally:
-        # click and type are actions, and each leaves one journal line, refusals included.
-        if sys.argv[1:2] in ([a] for a in ACTS):
-            load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:], delivery=delivered)
+        # Actions and picks each leave one journal line, refusals included.
+        if sys.argv[1:2] in ([a] for a in (*ACTS, "pick")):
+            load_desk().journal("gui", rc, int((time.monotonic() - started) * 1000), seen, sys.argv[1:], sent, delivery=delivered)

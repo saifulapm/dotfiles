@@ -199,6 +199,13 @@ clicks: they skip the lock, prompt and window checks the scripts make.
   machine, to OpenRouter and TypeSafe, on Saiful's credits. Without it, exit 3
   `{"refused":"jev not granted"}`. On exit 1, fall back to `gui find`,
   `gui tree` or OCR of `screen zoom`; never retry JEV in a loop.
+  `gui pick <app> "<intent>" --jev` sends no shot, only the app's widgets
+  a person could act on, as role, name and states (field values only with
+  `--values`, never a password's), and prints `{"ref", "confidence",
+  "destructive", "decision"}`: act on the ref at `"act"`, ask first at
+  `"confirm"`, look again at `"abstain"`. It never acts itself. More than
+  254 widgets exit 4 `{"truncated": n}`: narrow with `--root <ref>`. It
+  takes the same grant and checks as `screen find`.
 - Moving the pointer can close an open surface. Prefer `gui click`.
 
 Refusal reasons, the journal and the rest: [reference.md](reference.md).
