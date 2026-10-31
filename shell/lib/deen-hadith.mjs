@@ -3,7 +3,6 @@ import { answer, oneLine } from './deen.mjs';
 
 const MB = 1e6;
 const whole = (bytes) => Math.round((bytes || 0) / MB);
-export const mb = (bytes) => `${whole(bytes)} MB`;
 const sizeOf = (d) => `${whole(d.done)} of ${whole(d.total)} MB`;
 
 function leftText(s) {
@@ -46,11 +45,15 @@ export function afterEvent(d, e) {
 // fetch that ends without its done event has failed, whether or not it said why.
 export const afterExit = (d) => (d.phase === 'done' || d.phase === 'failed' ? d : update(d, { phase: 'failed' }));
 
+// The corpus is joined in one go, so a failure keeps nothing and r starts it again.
 export function failText(d) {
   const why = oneLine(d.message);
   const lead = why ? why.charAt(0).toUpperCase() + why.slice(1) : 'The download stopped';
-  return `${lead} at ${sizeOf(d)}. The part already saved is kept, so retrying carries on from there.`;
+  return `${lead} at ${sizeOf(d)}.`;
 }
+
+// deen joins the corpus from deen-data, so with no deen-data on this machine there is nothing to retry.
+export const noData = (d) => d.phase === 'failed' && String(d.message || '').startsWith('cannot read the hadith editions at ');
 
 const NAMES = {
   bukhari: 'Sahih al-Bukhari',
@@ -86,7 +89,7 @@ export const wrapped = (s) => String(s ?? '').replace(/[\u0000-\u0009\u000b-\u00
 
 export function narrations(a) {
   if (!a || !Array.isArray(a.collections)) return '';
-  const n = a.collections.reduce((sum, c) => sum + (c.hadiths || 0), 0);
+  const n = a.collections.reduce((sum, c) => sum + (c.count || 0), 0);
   return String(n).replace(/\B(?=(\d{3})+$)/g, ',');
 }
 

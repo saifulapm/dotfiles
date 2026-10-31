@@ -45,12 +45,11 @@ test('the download moves from running to converting to done, and fails on an err
   assert.deepEqual(H.afterExit(d), { phase: 'failed', done: 20000000, total: 123880000, rate: 6200000, message: '' });
 });
 
-test('a failure reads where it stopped and what is kept', () => {
+test('a failure reads where it stopped', () => {
   const cut = { phase: 'failed', done: 38000000, total: 123880000, rate: 0, message: 'the connection dropped' };
-  assert.equal(H.failText(cut), 'The connection dropped at 38 of 124 MB. The part already saved is kept, so retrying carries on from there.');
-  assert.equal(H.failText({ phase: 'failed', done: 38000000, total: 123880000, rate: 0, message: '' }), 'The download stopped at 38 of 124 MB. The part already saved is kept, so retrying carries on from there.');
-  assert.equal(H.failText({ phase: 'failed', done: 0, total: 0, rate: 0, message: 'boom\n‮\u001b[2J' }), 'Boom [2J at 0 of 0 MB. The part already saved is kept, so retrying carries on from there.');
-  assert.equal(H.mb(38000000), '38 MB');
+  assert.equal(H.failText(cut), 'The connection dropped at 38 of 124 MB.');
+  assert.equal(H.failText({ phase: 'failed', done: 38000000, total: 123880000, rate: 0, message: '' }), 'The download stopped at 38 of 124 MB.');
+  assert.equal(H.failText({ phase: 'failed', done: 0, total: 0, rate: 0, message: 'boom\n‮\u001b[2J' }), 'Boom [2J at 0 of 0 MB.');
 });
 
 test('collections draw by the boards’ names, and an unknown slug by the backend’s', () => {
@@ -85,9 +84,9 @@ test('wrapped outside text keeps its lines but loses controls and bidi overrides
   assert.equal(H.wrapped('one\ntwo‮ three\u001b[2J⁦x'), 'one\ntwo three[2Jx');
 });
 
-test('the narrations sum every collection with a thousands comma', () => {
-  assert.equal(H.narrations({ collections: [{ hadiths: 7589 }, { hadiths: 28923 }] }), '36,512');
-  assert.equal(H.narrations({ collections: [{ hadiths: 40 }] }), '40');
+test('the narrations sum every collection\'s narrations with text, with a thousands comma', () => {
+  assert.equal(H.narrations({ collections: [{ hadiths: 7589, count: 7583 }, { hadiths: 28923, count: 28606 }] }), '36,189');
+  assert.equal(H.narrations({ collections: [{ hadiths: 40, count: 40 }] }), '40');
   assert.equal(H.narrations(null), '');
 });
 
@@ -214,4 +213,11 @@ test('the heading names where the list is', () => {
   assert.equal(H.heading(books), 'সহীহ বুখারী');
   assert.equal(H.heading(H.down(books, { level: 'narrations', data: listed })), 'সহীহ বুখারী · ওহীর সূচনা');
   assert.equal(H.heading(H.search(books)), '');
+});
+
+test('a fetch that finds no deen-data is no data, any other failure is not', () => {
+  const failed = (message) => H.afterEvent(H.START, { event: 'error', message, done: 0, total: 0 });
+  assert.equal(H.noData(failed('cannot read the hadith editions at /home/s/.local/share/deen-data/hadith: run dots update, or set DEEN_SOURCES')), true);
+  assert.equal(H.noData(failed('building the corpus failed: boom')), false);
+  assert.equal(H.noData(H.START), false);
 });

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deen's Hadith: with no corpus, opening Deen starts the download, which the tab draws and a cut leaves kept for r to resume; then Enter browses collection, book and narration, Esc goes back up, and / searches from any level.
+# Deen's Hadith: with no corpus, opening Deen starts the download, which the tab draws, a cut stops and r starts again; then Enter browses collection, book and narration, Esc goes back up, and / searches from any level; with no deen-data the tab says so.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -80,8 +80,8 @@ check "Tab moves on to Read while the download runs (fetch ${fetch_pid:-none} al
 until_ok 4000 hadith_is '.download.fail != ""'
 wtype -M shift -k Tab -k Tab -m shift
 until_ok 1000 deen_is '.tab == "hadith"'
-check "state 2 says where it stopped ($(hadith '.download | [.title, .fail, .kept, .savedIn]'))" \
-  hadith_is '.download.title == "The download did not finish" and .download.fail == "The connection dropped at 38 of 124 MB. The part already saved is kept, so retrying carries on from there." and .download.kept == "38 MB" and (.download.savedIn | startswith("~/"))'
+check "state 2 says where it stopped ($(hadith '.download | [.title, .fail, .savedIn]'))" \
+  hadith_is '.download.title == "The download did not finish" and .download.fail == "The connection dropped at 38 of 124 MB." and .download.noData == "" and (.download.savedIn | startswith("~/"))'
 check "paper: state 2's box is square, ruled in one pixel, its title in the display face ($(hadith '.download.look'))" \
   hadith_is '.download.look.radius == 0 and .download.look.border == 1 and .download.label == "2 · IF IT FAILS"'
 in_theme artboard
@@ -90,7 +90,7 @@ check "artboard: state 2's box is rounded 14 and grey, its title in #B4380B ($(h
   hadith_is '.download.look.radius == 14 and .download.look.fill == "#f6f7f9" and .download.look.titleColor == "#b4380b" and .download.label == "2 · if it fails"'
 in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
-check "blueprint: state 2 reads in brackets and capitals over a dashed rule ($(hadith '.download | [.label, .kept, .keyLine, .look.ruleDashed]'))" \
+check "blueprint: state 2 reads in brackets and capitals over a dashed rule ($(hadith '.download | [.label, .fail, .keyLine, .look.ruleDashed]'))" \
   hadith_is '.download.label == "[2 · IF IT FAILS]" and .download.look.ruleDashed and .download.keyLine == "[R] RETRY · [ESC] LEAVE"'
 in_theme paper
 until_ok 3000 deen_is '.voice == "caps"'
@@ -101,7 +101,7 @@ until_ok 2000 fetches_are 2
 check "r starts a second fetch ($(fetches))" fetches_are 2
 until_ok 6000 hadith_is '.ready and .foot != "offline"'
 check "the download ran to done and the browse is on ($(hadith '[.browse, .foot]'))" \
-  hadith_is '.browse and .download.shown == false and .foot == "offline · 36,512 narrations"'
+  hadith_is '.browse and .download.shown == false and .foot == "offline · 36,339 narrations"'
 
 # The Show path: collections, Bukhari's books, book 1's narrations, narration 1.
 until_ok 2000 hadith_is '.count == 10'
@@ -194,7 +194,7 @@ check "artboard: the field rounds 14, the cursor row fills #EEF1FF, the mark rea
 in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
 check "blueprint: the count and foot read in capitals over a dashed pane rule ($(hadith '[.search.count, .foot, .look.paneRuleDashed]'))" \
-  hadith_is '.search.count == "4 RESULTS" and .look.paneRuleDashed and .foot == "OFFLINE · 36,512 NARRATIONS"'
+  hadith_is '.search.count == "4 RESULTS" and .look.paneRuleDashed and .foot == "OFFLINE · 36,339 NARRATIONS"'
 in_theme paper
 until_ok 3000 deen_is '.voice == "caps"'
 
@@ -263,6 +263,21 @@ check "Esc up through the books and collections closes the window" deen_gone
 until_ok 3000 no_deen_process
 check "and no qs with -p .../shell/deen.qml is left" no_deen_process
 check "and no fetch script is left (${fetch_pid:-none} ${fetch_now})" eval '[ -z "$(fetch_pids)" ] && [ ! -d "/proc/$fetch_pid" ]'
+
+# With no deen-data on this machine the fetch has nothing to join, and the tab says what to do in place of its body.
+echo partial >"$DOTS_DEV_DIR/deen-hadith"
+touch "$DOTS_DEV_DIR/deen-hadith-nodata"
+open_deen
+until_ok 5000 deen_up
+wtype -k Tab -k Tab -k Tab
+until_ok 1000 deen_is '.tab == "hadith"'
+until_ok 4000 hadith_is '.download.noData != ""'
+check "with no deen-data the tab reads what to do, not a download ($(hadith '[.download.noData, .download.shown]'))" \
+  hadith_is '.download.noData == "Bangla data is not on this machine: gh auth login, then dots update" and .download.shown == false and .browse == false'
+rm "$DOTS_DEV_DIR/deen-hadith-nodata"
+wtype -k Escape
+until_ok 3000 deen_gone
+check "Esc there closes Deen" deen_gone
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable|Binding loop' "$log")
 check "Deen's log has no QML errors${errs:+: $(head -c 300 <<<"$errs")}" test -z "$errs"

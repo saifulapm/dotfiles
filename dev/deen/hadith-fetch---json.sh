@@ -3,6 +3,11 @@
 set -euo pipefail
 {
 total=123880000
+# deen-hadith-nodata stands for a machine with no deen-data: the fetch fails before it starts.
+if [ -e "$DOTS_DEV_DIR/deen-hadith-nodata" ]; then
+  echo '{"event":"error","message":"cannot read the hadith editions at /home/s/.local/share/deen-data/hadith: run dots update, or set DEEN_SOURCES","done":0,"total":0}'
+  exit 1
+fi
 step() { printf '{"event":"progress","done":%d,"total":%d,"rate":6200000}\n' "$1" "$total"; sleep 0.15; }
 for mb in $(seq 20 38); do step $((mb * 1000000)); done
 if [ -e "$DOTS_DEV_DIR/deen-hadith-cut" ]; then

@@ -255,7 +255,7 @@ FocusScope {
                 speed: speedRow.visible ? speedRow.value : "",
                 left: leftRow.visible ? leftRow.value : "",
                 fail: failText.visible ? failText.text : "",
-                kept: keptRow.visible ? keptRow.value : "",
+                noData: noDataText.visible ? noDataText.text : "",
                 savedIn: savedRow.visible ? savedRow.value : "",
                 meanwhile: [meanwhileHead.text, meanwhileLine.drawn(), meanwhileWait.text],
                 keyLine: cardKeys.drawn(),
@@ -310,7 +310,19 @@ FocusScope {
     // The download starts when Deen opens, whether or not this tab shows.
     Component.onCompleted: checkStatus()
 
-    // One JSON event per line; fetch that ends without done has failed, and keeps what it saved.
+    // In place of the tab's body, as Read and Duas draw it.
+    Text {
+        id: noDataText
+        anchors.centerIn: parent
+        visible: !page.ready && H.noData(page.download)
+        textFormat: Text.PlainText
+        text: D.NO_DATA
+        color: page.c.muted ?? "gray"
+        font.family: page.bodyFont
+        font.pixelSize: 14
+    }
+
+    // One JSON event per line; fetch that ends without done has failed.
     Process {
         id: fetch
         command: [page.deen.backend, "hadith", "fetch", "--json"]
@@ -351,7 +363,7 @@ FocusScope {
             id: downloadView
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !page.ready
+            visible: !page.ready && !H.noData(page.download)
             spacing: 0
 
             RowLayout {
@@ -533,13 +545,6 @@ FocusScope {
                             visible: !card.failed && page.shown.left !== ""
                             label: "left"
                             value: page.say(page.shown.left)
-                        }
-                        Pair {
-                            id: keptRow
-                            host: page
-                            visible: card.failed
-                            label: "kept"
-                            value: page.say(H.mb(page.download.done))
                         }
                         Pair {
                             id: savedRow
