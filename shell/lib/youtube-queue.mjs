@@ -81,7 +81,9 @@ export function itemLines(state, row, how) {
 // The App calls this after each itemLines, since mpv reports nothing back before the next press can come.
 export const asked = (state) => (stopped(state) ? Object.assign({}, state, { asked: state.asked + 1 }) : state);
 
-export const setPauseLine = (paused) => line(['set_property', 'pause', paused]);
+export function setPauseLine(paused) {
+  return line(['set_property', 'pause', paused]);
+}
 export const pauseLine = (state) => setPauseLine(!state.paused);
 export const repeatLine = (state) => line(['set_property', 'loop-playlist', state.loop ? 'no' : 'inf']);
 

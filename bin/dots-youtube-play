@@ -42,7 +42,8 @@ if [ "$1" = audio ]; then
   fi
   mkdir -p "$(dirname "$sock")"
   rm -f "$sock"
-  player+=(--no-video --idle=yes "--input-ipc-server=$sock" --ytdl-format=bestaudio/best)
+  # mpv.conf resumes and saves positions for videos; a song in the Queue starts at its top.
+  player+=(--no-video --idle=yes "--input-ipc-server=$sock" --ytdl-format=bestaudio/best --resume-playback=no --save-position-on-quit=no)
   systemd-run --user --collect --quiet --unit "$unit" "${pass[@]}" -- "${player[@]}" 2>/dev/null
   # mpv binds and listens in one step as it starts, so the socket's file is the sign it answers.
   for _ in $(seq 30); do

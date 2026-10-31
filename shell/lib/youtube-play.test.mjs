@@ -80,6 +80,15 @@ test('audio starts the Queue: mpv idle in the unit youtube-audio, audio only, on
   assert.ok(!cmd.some((x) => x.startsWith('https://')), 'the App loads every item over the socket');
 });
 
+// mpv.conf saves each position on quit for videos; a song m plays starts at its top, as the line's 0:00 says.
+test('the Queue neither resumes an item where an earlier mpv left it nor saves where it stops', (t) => {
+  const { run, argv } = rig(t);
+  run('audio');
+  const cmd = argv('youtube-audio');
+  assert.ok(cmd.includes('--resume-playback=no'), cmd.join(' '));
+  assert.ok(cmd.includes('--save-position-on-quit=no'), cmd.join(' '));
+});
+
 test('audio with the Queue running and its socket there starts nothing and names it', (t) => {
   const { dir, run, ran } = rig(t, { ACTIVE: 'youtube-audio' });
   mkdirSync(`${dir}/dots`);
