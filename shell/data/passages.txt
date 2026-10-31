@@ -23,7 +23,7 @@ ayah 3:92
 ayah 18:46
 ayah 64:11
 ayah 9:51
-ayah 49:13
+ayah 15:9
 ayah 16:97
 ayah 1:2
 ayah 7:55
@@ -31,7 +31,7 @@ ayah 21:35
 ayah 57:3
 
 # Hadith, as deen hadith show takes them
-hadith bukhari:1
+hadith bukhari:6807
 hadith bukhari:6013
 hadith bukhari:7376
 hadith bukhari:6125

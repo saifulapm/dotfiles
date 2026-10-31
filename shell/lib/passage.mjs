@@ -1,6 +1,6 @@
 // The daily passage: the list's lines read, the day's pick, deen's answer shaped to draw, and its label and reference line in each voice.
 import { answer, oneLine } from './deen.mjs';
-import { boardName, narrator } from './deen-hadith.mjs';
+import { bnDigits, reference } from './deen-hadith.mjs';
 import { pad2 } from './margins.mjs';
 
 export const KINDS = ['ayah', 'hadith', 'dua', 'quote'];
@@ -69,38 +69,46 @@ export function deenArgs(item) {
   return null;
 }
 
-// A hadith that opens a quote it never closes ends with the closing mark.
-const closed = (s) => ((s.match(/"/g) || []).length % 2 ? s + '"' : s);
+const NONE = { ar: '', bn_pron: '', bn: '', en: '' };
 
-function hadithText(hit) {
-  const h = hit.hadith || {};
-  const n = oneLine(h.n);
-  if (hit.collection === 'muslim') return { en: closed(oneLine(h.en).replace(/:(?=[^\s\d])/g, ': ')), ref: `${boardName('muslim')} ${n}` };
-  const said = narrator(oneLine(h.en));
-  return { en: closed(said.body), ref: `${boardName(hit.collection)} ${n}${said.by ? ` · ${said.by}` : ''}` };
-}
+// The lines an ayah or dua draws: its Arabic, its Bangla pronunciation and its Bangla meaning.
+const threeLines = (x) => ({ ar: oneLine(x.ar), bn_pron: oneLine(x.bn_pron), bn: oneLine(x.bn) });
 
 function drawn(item, a, surahs) {
-  if (item.kind === 'quote') return { ar: '', en: oneLine(item.text), ref: oneLine(item.author) };
+  if (item.kind === 'quote') return Object.assign({}, NONE, { en: oneLine(item.text), ref: oneLine(item.author) });
   if (!a) return null;
   if (item.kind === 'ayah' && a.ayah) {
     const s = ((surahs && surahs.surahs) || []).find((x) => x.n === a.ayah.s);
-    return { ar: oneLine(a.ayah.ar), en: oneLine(a.ayah.en), ref: `${s ? oneLine(s.en) : 'Surah'} ${a.ayah.s}:${a.ayah.a}` };
+    const name = s && oneLine(s.bn) ? oneLine(s.bn) : 'সূরা';
+    return Object.assign({}, NONE, threeLines(a.ayah), { ref: `${name} ${bnDigits(a.ayah.s)}:${bnDigits(a.ayah.a)}` });
   }
-  if (item.kind === 'hadith' && a.hit) return Object.assign({ ar: '' }, hadithText(a.hit));
-  if (item.kind === 'dua' && a.dua) return { ar: oneLine(a.dua.ar), en: oneLine(a.dua.en), ref: `Hisn al-Muslim ${oneLine(a.dua.id)}` };
+  // deen gives a hadith's Bangla cleaned, its narrator left in; the collection's Bangla name is what an older deen, with no clean Bangla, lacks.
+  if (item.kind === 'hadith' && a.hit && oneLine(a.hit.bn)) {
+    const h = a.hit.hadith || {};
+    return Object.assign({}, NONE, { bn: oneLine(h.bn), ref: reference(a.hit.bn, h.n) });
+  }
+  if (item.kind === 'dua' && a.dua) return Object.assign({}, NONE, threeLines(a.dua), { ref: `হিসনুল মুসলিম ${bnDigits(oneLine(a.dua.id))}` });
   return null;
 }
 
-// What the passage draws from deen's answer and `deen api surahs`; null when deen gave no answer or left a drawn field empty.
+// What the passage draws from deen's answer and `deen api surahs`; null when deen gave no answer or left a drawn line empty: a quote its English, a hadith its Bangla, an ayah or dua any of its three lines.
 export function shape(item, text, surahsText) {
   const d = drawn(item, answer(text), answer(surahsText));
-  if (!d || !d.en || (item.kind !== 'hadith' && item.kind !== 'quote' && !d.ar)) return null;
-  return d;
+  if (!d) return null;
+  const lines = item.kind === 'quote' ? ['en'] : item.kind === 'hadith' ? ['bn'] : ['ar', 'bn_pron', 'bn'];
+  return lines.every((l) => d[l]) ? d : null;
+}
+
+const NAMES = { ar: 'Arabic', bn_pron: 'pronunciation', bn: 'Bangla', en: 'English' };
+
+// The first drawn line past the list's 280 characters, as "<line> is <n> characters"; null when every line keeps to it.
+export function overLimit(d) {
+  const l = Object.keys(NAMES).find((k) => d[k].length > 280);
+  return l ? `${NAMES[l]} is ${d[l].length} characters` : null;
 }
 
 // The list's limits, which a day's answer from deen keeps too, or the day falls back.
-export const within = (d) => d !== null && d.en.length <= 280 && d.ar.length <= 280;
+export const within = (d) => d !== null && overLimit(d) === null;
 
 // Paper's tracked capitals, Artboard's frame label, Blueprint's brackets and capitals.
 export function voiced(voice, kind, ref) {

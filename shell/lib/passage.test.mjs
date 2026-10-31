@@ -93,66 +93,78 @@ test('each kind asks deen its own way, and a quote asks nothing', () => {
   assert.equal(P.deenArgs({ kind: 'quote', text: 't', author: 'a' }), null);
 });
 
-const SURAHS = JSON.stringify({ surahs: [{ n: 93, en: 'Ad-Dhuhaa' }, { n: 94, en: 'Ash-Sharh' }] });
+const SURAHS = JSON.stringify({ surahs: [{ n: 93, en: 'Ad-Dhuhaa', bn: 'সূরা আদ-দুহা' }, { n: 94, en: 'Ash-Sharh', bn: 'সূরা আশ-শারহ' }] });
 const json = (o) => JSON.stringify(o);
+const AYAH = { s: 94, a: 6, ar: 'إِنَّ مَعَ ٱلْعُسْرِ يُسْرًا', bn_pron: 'ইন্না মা‘আল‘উসরি ইউসরা-', bn: 'নিশ্চয় কষ্টের সাথেই স্বস্তি আছে।', en: 'Indeed, with hardship [will be] ease.' };
 
-test('an ayah draws its Arabic over its English, its brackets kept, under its surah and number', () => {
-  const a = json({ ayah: { s: 94, a: 6, ar: 'إِنَّ مَعَ ٱلْعُسْرِ يُسْرًا', en: 'Indeed, with hardship [will be] ease.' } });
-  assert.deepEqual(P.shape({ kind: 'ayah', ref: '94:6' }, a, SURAHS), { ar: 'إِنَّ مَعَ ٱلْعُسْرِ يُسْرًا', en: 'Indeed, with hardship [will be] ease.', ref: 'Ash-Sharh 94:6' });
-});
-
-const hadith = (collection, n, en) => json({ hit: { collection, name: 'x', hadith: { n, ar: 'حَدَّثَنَا', en } } });
-
-test("a Bukhari hadith's narrator moves from its text to the reference line", () => {
-  const h = hadith('bukhari', '6114', "Narrated Abu Huraira:Allah's Messenger (ﷺ) said, \"The strong is not the one who overcomes the people by his strength.\"");
-  assert.deepEqual(P.shape({ kind: 'hadith', ref: 'bukhari:6114' }, h, SURAHS), {
-    ar: '',
-    en: "Allah's Messenger (ﷺ) said, \"The strong is not the one who overcomes the people by his strength.\"",
-    ref: 'Sahih al-Bukhari 6114 · Abu Huraira',
+test('an ayah draws its Arabic, Bangla pronunciation and Bangla meaning, under its surah in Bangla and Bangla digits', () => {
+  assert.deepEqual(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: AYAH }), SURAHS), {
+    ar: 'إِنَّ مَعَ ٱلْعُسْرِ يُسْرًا',
+    bn_pron: 'ইন্না মা‘আল‘উসরি ইউসরা-',
+    bn: 'নিশ্চয় কষ্টের সাথেই স্বস্তি আছে।',
+    en: '',
+    ref: 'সূরা আশ-শারহ ৯৪:৬',
   });
 });
 
-test('a hadith that opens a quote it never closes gains the closing mark, and a balanced one none', () => {
-  const open = hadith('bukhari', '6013', 'Narrated Jarir bin `Abdullah:The Prophet (ﷺ) said, "He who is not merciful to others, will not be treated mercifully');
-  assert.equal(P.shape({ kind: 'hadith', ref: 'bukhari:6013' }, open, SURAHS).en, 'The Prophet (ﷺ) said, "He who is not merciful to others, will not be treated mercifully"');
-  const shut = hadith('bukhari', '1', 'Narrated \'Umar bin Al-Khattab: I heard him saying, "Deeds are by intentions."');
-  assert.equal(P.shape({ kind: 'hadith', ref: 'bukhari:1' }, shut, SURAHS).en, 'I heard him saying, "Deeds are by intentions."');
+test('an ayah whose surah deen did not name still reads its number in Bangla', () => {
+  assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: AYAH }), '').ref, 'সূরা ৯৪:৬');
 });
 
-test('a Muslim hadith draws as given, a space after a run-on colon, with no narrator in its reference', () => {
-  const h = hadith('muslim', '6602', "A'isha, the wife of Allah's Apostle (ﷺ), reported Allah's Apostle (ﷺ) as saying:Kindness is not to be found in anything but that it adds to its beauty.");
-  assert.deepEqual(P.shape({ kind: 'hadith', ref: 'muslim:6602' }, h, SURAHS), {
+const hadith = (collection, bn, n, text) => json({ hit: { collection, bn, name: 'x', hadith: { n, ar: 'حَدَّثَنَا', bn: text, bn_raw: `x ..... ${text}`, en: 'Narrated x:y' } } });
+
+test('a hadith draws only its cleaned Bangla, narrator in it, over its collection in Bangla and its number in Bangla digits', () => {
+  const h = hadith('bukhari', 'সহীহ বুখারী', '6807', 'সাহল ইবনু সা‘দ সা‘ঈদী (রাঃ) হতে বর্ণিত। নবী সাল্লাল্লাহু আলাইহি ওয়াসাল্লাম বলেছেনঃ যে কেউ আমার জন্য দায়িত্ব নেবে।');
+  assert.deepEqual(P.shape({ kind: 'hadith', ref: 'bukhari:6807' }, h, SURAHS), {
     ar: '',
-    en: "A'isha, the wife of Allah's Apostle (ﷺ), reported Allah's Apostle (ﷺ) as saying: Kindness is not to be found in anything but that it adds to its beauty.",
-    ref: 'Sahih Muslim 6602',
+    bn_pron: '',
+    bn: 'সাহল ইবনু সা‘দ সা‘ঈদী (রাঃ) হতে বর্ণিত। নবী সাল্লাল্লাহু আলাইহি ওয়াসাল্লাম বলেছেনঃ যে কেউ আমার জন্য দায়িত্ব নেবে।',
+    en: '',
+    ref: 'সহীহ বুখারী ৬৮০৭',
   });
-  assert.equal(P.shape({ kind: 'hadith', ref: 'muslim:1' }, hadith('muslim', '1', 'Prayed at 4:30 and said: go'), SURAHS).en, 'Prayed at 4:30 and said: go');
+  assert.equal(P.shape({ kind: 'hadith', ref: 'muslim:6602' }, hadith('muslim', 'সহীহ মুসলিম', '6602', 'নম্রতা'), SURAHS).ref, 'সহীহ মুসলিম ৬৬০২');
 });
 
-test("a dua draws its Arabic as the book spells it, over its English, from Hisn al-Muslim", () => {
-  const d = json({ dua: { id: '16', ar: 'بِسْمِ اللهِ ، تَوَكَّلْـتُ عَلى اللهِ', en: 'In the Name of Allah, I have placed my trust in Allah.' } });
-  assert.deepEqual(P.shape({ kind: 'dua', ref: '16' }, d, SURAHS), { ar: 'بِسْمِ اللهِ ، تَوَكَّلْـتُ عَلى اللهِ', en: 'In the Name of Allah, I have placed my trust in Allah.', ref: 'Hisn al-Muslim 16' });
+test('a dua draws its Arabic as the book spells it, the Bangla book\'s pronunciation and meaning, from Hisnul Muslim in Bangla digits', () => {
+  const d = json({ dua: { id: '235', ar: 'رَبَّنَا آتِنَا', bn_pron: 'রব্বানা আ-তিনা', bn: 'হে আমাদের রব্ব!', bn_ref: 'আবূ দাউদ ২/১৭৯', en: 'Our Lord', ref: 'Abu Dawud 2/179' } });
+  assert.deepEqual(P.shape({ kind: 'dua', ref: '235' }, d, SURAHS), { ar: 'رَبَّنَا آتِنَا', bn_pron: 'রব্বানা আ-তিনা', bn: 'হে আমাদের রব্ব!', en: '', ref: 'হিসনুল মুসলিম ২৩৫' });
 });
 
-test('a quote draws its sentence over its author, with no deen answer', () => {
+test('a quote draws its English sentence over its author, with no deen answer', () => {
   assert.deepEqual(P.shape({ kind: 'quote', text: 'The best way to get started is to quit talking and begin doing.', author: 'Walt Disney' }, '', SURAHS), {
     ar: '',
+    bn_pron: '',
+    bn: '',
     en: 'The best way to get started is to quit talking and begin doing.',
     ref: 'Walt Disney',
   });
 });
 
-test('an answer that leaves a drawn field empty, or no answer, shapes to nothing', () => {
-  assert.equal(P.shape({ kind: 'hadith', ref: 'muslim:1' }, hadith('muslim', '1', ''), SURAHS), null);
-  assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: { s: 94, a: 6, ar: '', en: 'x' } }), SURAHS), null);
-  assert.equal(P.shape({ kind: 'dua', ref: '16' }, json({ dua: { id: '16', ar: 'x', en: ' ' } }), SURAHS), null);
+test('an answer that leaves a drawn line empty, or no answer, shapes to nothing', () => {
+  assert.equal(P.shape({ kind: 'hadith', ref: 'muslim:1' }, hadith('muslim', 'সহীহ মুসলিম', '1', ''), SURAHS), null);
+  assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: { ...AYAH, ar: '' } }), SURAHS), null);
+  assert.equal(P.shape({ kind: 'dua', ref: '16' }, json({ dua: { id: '16', ar: 'x', bn_pron: 'y', bn: ' ' } }), SURAHS), null);
   assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, 'deen: no such ayah', SURAHS), null);
 });
 
-test("an answer past the list's 280 characters, in either line, is not drawn", () => {
-  assert.equal(P.within({ ar: '', en: 'x'.repeat(280), ref: 'r' }), true);
-  assert.equal(P.within({ ar: '', en: 'x'.repeat(281), ref: 'r' }), false);
-  assert.equal(P.within({ ar: 'ا'.repeat(281), en: 'x', ref: 'r' }), false);
+test('a deen with no Bangla data, answering in English alone, shapes to nothing, so the day falls back', () => {
+  const { bn, bn_pron, ...english } = AYAH;
+  assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: english }), SURAHS), null);
+  assert.equal(P.shape({ kind: 'ayah', ref: '94:6' }, json({ ayah: { ...english, bn } }), SURAHS), null);
+  assert.equal(P.shape({ kind: 'dua', ref: '16' }, json({ dua: { id: '16', ar: 'x', en: 'In the Name of Allah' } }), SURAHS), null);
+  // An older deen gave a hadith its raw Bangla but no collection name in Bangla.
+  assert.equal(P.shape({ kind: 'hadith', ref: 'bukhari:1' }, json({ hit: { collection: 'bukhari', name: 'x', hadith: { n: '1', bn: 'x', en: 'y' } } }), SURAHS), null);
+});
+
+test("an answer past the list's 280 characters, in any drawn line, is not drawn, and the line is named", () => {
+  const ok = { ar: 'ا'.repeat(280), bn_pron: 'ক'.repeat(280), bn: 'ক'.repeat(280), en: '', ref: 'r' };
+  assert.equal(P.within(ok), true);
+  assert.equal(P.overLimit(ok), null);
+  for (const [line, name] of [['ar', 'Arabic'], ['bn_pron', 'pronunciation'], ['bn', 'Bangla'], ['en', 'English']]) {
+    const d = { ...ok, [line]: 'x'.repeat(281) };
+    assert.equal(P.within(d), false, line);
+    assert.equal(P.overLimit(d), `${name} is 281 characters`);
+  }
   assert.equal(P.within(null), false);
 });
 
