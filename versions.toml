@@ -98,13 +98,13 @@ sha256 = "6d816966ade324192bb82716af7dfff1332a12f3ee309984bc05f20c40cb77f8"
 
 [[pin]]
 name = "deen"
-version = "a0b28b4bdbf320846dc08a315772c6855bc829b7"
+version = "7ea7ebc0b8561da8c1925f9a92a776b10c0bc542"
 repo = "saifulapm/deen"
 track = "commit"
 install = "~/.local/bin/deen, Deen's backend, built with cargo, and the Quran text, word meanings and Hisn al-Muslim it builds from deen-data in ~/.local/share/deen; the hadith corpus it joins from deen-data at Deen's first open"
 runs = "deen --version"
 url = "https://github.com/saifulapm/deen/archive/{version}.tar.gz"
-sha256 = "e2870042f51ee270683cf8285b5471578f6d6e91d6a7091d266fc1e1946c24dd"
+sha256 = "aa85f02c4dd9c8662b804b09e31c66c909c2a5a2bff4d1c7a872c097470bc125"
 
 [[pin]]
 name = "lazygit"
