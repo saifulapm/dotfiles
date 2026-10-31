@@ -344,3 +344,10 @@ test('one app with two capture streams is one app in the mic slot', () => {
   const three = [...streams, rec(42, { 'application.name': 'Zoom', 'object.serial': '200' })];
   assert.equal(islandText('mic', { mic: micApps(three, [from(MIC, 40), from(MIC, 41), from(MIC, 42)], MIC, 0) }, AT), '● MIC · Chromium +1');
 });
+
+test("the media player's title and artist read as one line, whatever a video's uploader typed", () => {
+  const now = new Date(2026, 10, 1, 4, 28);
+  const text = islandText('playing', { playing: { title: 'Low\nTide‮\u001b Radio', artist: 'lofi⁦ archive' } }, now);
+  assert.equal(text.replace(/  \S+$/, ''), 'Low Tide Radio — lofi archive');
+  assert.doesNotMatch(text, /[\u0000-\u001f‪-‮⁦-⁩]/);
+});

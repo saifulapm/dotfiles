@@ -115,7 +115,7 @@ export function islandText(mode, slots, now) {
       return p.main + p.tail;
     }
     case 'playing':
-      return `${[slots.playing.title, slots.playing.artist].filter((p) => p).join(' — ')}  ${clockText(now)}`;
+      return `${[slots.playing.title, slots.playing.artist].map((p) => oneLine(p ?? '')).filter((p) => p).join(' — ')}  ${clockText(now)}`;
     default:
       return slots.notice || clockText(now);
   }
