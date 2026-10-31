@@ -16,6 +16,8 @@ Item {
     readonly property var voiced: P.voiced(tokens.type.voice, text.kind, text.ref)
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property real side: look.pad[1]
+    // An ayah, hadith or dua day draws Bangla; a quote, its fallback too, draws English.
+    readonly property bool bangla: text.bn !== ""
 
     // What this sheet draws, for passage state: each line's text and drawn family, and the block's box in the window.
     function drawn() {
@@ -25,10 +27,20 @@ Item {
         return {
             label: label.text,
             ar: arText.visible ? arText.text : "",
-            en: enText.text,
+            bn_pron: pronText.visible ? pronText.text : "",
+            bn: bnText.visible ? bnText.text : "",
+            en: enText.visible ? enText.text : "",
             ref: refText.text,
-            family: { label: label.fontInfo.family, ar: arText.visible ? arText.fontInfo.family : "", en: enText.fontInfo.family, ref: refText.fontInfo.family },
+            family: {
+                label: label.fontInfo.family,
+                ar: arText.visible ? arText.fontInfo.family : "",
+                bn_pron: pronText.visible ? pronText.fontInfo.family : "",
+                bn: bnText.visible ? bnText.fontInfo.family : "",
+                en: enText.visible ? enText.fontInfo.family : "",
+                ref: refText.fontInfo.family
+            },
             enLines: { count: enText.lineCount, height: enText.contentHeight, pitch: enText.font.pixelSize * words.look.en.height },
+            bnLines: { count: bnText.lineCount, height: bnText.contentHeight, pitch: bnText.font.pixelSize * words.look.bn.height },
             box: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }
         };
     }
@@ -133,7 +145,39 @@ Item {
             }
 
             Text {
+                id: pronText
+                visible: words.text.bn_pron !== ""
+                width: stack.width
+                horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
+                wrapMode: Text.WordWrap
+                textFormat: Text.PlainText
+                text: words.text.bn_pron
+                color: words.look.pron.color
+                font.family: words.look.pron.font
+                font.pixelSize: words.look.pron.size
+                lineHeightMode: Text.FixedHeight
+                lineHeight: words.look.pron.size * words.look.pron.height
+            }
+
+            // The meaning in Bangla, upright in every theme.
+            Text {
+                id: bnText
+                visible: words.bangla
+                width: stack.width
+                horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
+                wrapMode: Text.WordWrap
+                textFormat: Text.PlainText
+                text: words.text.bn
+                color: words.tokens.color.ink
+                font.family: words.look.bn.font
+                font.pixelSize: words.look.bn.size
+                lineHeightMode: Text.FixedHeight
+                lineHeight: words.look.bn.size * words.look.bn.height
+            }
+
+            Text {
                 id: enText
+                visible: words.text.en !== ""
                 width: stack.width
                 horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
                 wrapMode: Text.WordWrap
@@ -198,9 +242,10 @@ Item {
                     textFormat: Text.PlainText
                     text: words.voiced.ref
                     color: words.look.ref.color
-                    font.family: words.look.ref.font
-                    font.pixelSize: words.look.ref.size
-                    font.letterSpacing: words.look.ref.spacing
+                    font.family: words.bangla ? words.look.bnRef.font : words.look.ref.font
+                    font.pixelSize: words.bangla ? words.look.bnRef.size : words.look.ref.size
+                    // Spacing would break Bangla's conjuncts apart.
+                    font.letterSpacing: words.bangla ? 0 : words.look.ref.spacing
                 }
             }
         }

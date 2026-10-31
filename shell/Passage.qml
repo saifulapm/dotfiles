@@ -150,6 +150,8 @@ Scope {
                 ref: passage.voiced ? passage.voiced.ref : "",
                 label: passage.voiced ? passage.voiced.label : "",
                 ar: t ? t.ar : "",
+                bn_pron: t ? t.bn_pron : "",
+                bn: t ? t.bn : "",
                 en: t ? t.en : "",
                 family: shown ? shown.family : null,
                 // Per output, what each of its sheets draws; one entry each once a theme switch settles.
