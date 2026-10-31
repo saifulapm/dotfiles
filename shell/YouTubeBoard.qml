@@ -33,6 +33,60 @@ Rectangle {
         keyTarget.forceActiveFocus();
     }
 
+    // Scrolls a Flickable just enough that the band y to y + h of its content shows.
+    function reveal(flick, y, h) {
+        if (y < flick.contentY)
+            flick.contentY = y;
+        else if (y + h > flick.contentY + flick.height)
+            flick.contentY = Math.max(0, y + h - flick.height);
+    }
+
+    function shown(flick, item) {
+        return item.y >= flick.contentY - 0.5 && item.y + item.height <= flick.contentY + flick.height + 0.5;
+    }
+
+    function chosenPlace() {
+        for (let i = 0; i < listList.count; i++) {
+            const it = listList.itemAt(i);
+            if (it && it.chosen)
+                return it;
+        }
+        return null;
+    }
+
+    // The name field, else the chosen Playlist with any question under it, stays in view.
+    function revealSidebar() {
+        const it = nameBox.visible ? nameBox : chosenPlace();
+        if (it)
+            reveal(listScroll, it.y, it.height);
+    }
+
+    function revealPick() {
+        const it = yt.picking ? pickRows.itemAt(yt.picking.cursor) : null;
+        if (it)
+            reveal(pickScroll, it.y, it.height);
+    }
+
+    // Each waits a turn for the layout to place what changed.
+    Connections {
+        target: board.yt
+        function onSideKeyChanged() {
+            Qt.callLater(board.revealSidebar);
+        }
+        function onNamingChanged() {
+            Qt.callLater(board.revealSidebar);
+        }
+        function onConfirmingChanged() {
+            Qt.callLater(board.revealSidebar);
+        }
+        function onListsChanged() {
+            Qt.callLater(board.revealSidebar);
+        }
+        function onPickingChanged() {
+            Qt.callLater(board.revealPick);
+        }
+    }
+
     function focusName(text) {
         nameInput.text = text;
         nameInput.forceActiveFocus();
@@ -58,7 +112,13 @@ Rectangle {
             if (row)
                 drawn.push(row.drawn());
         }
+        const chosen = chosenPlace();
         return {
+            // Whether the chosen Playlist and the name field sit wholly inside the sidebar's view.
+            seen: {
+                chosen: chosen ? shown(listScroll, chosen) : null,
+                name: nameBox.visible ? shown(listScroll, nameBox) : null
+            },
             nameField: nameBox.visible ? nameInput.text : null,
             confirm: asked,
             dimmed: listColumn.opacity < 1,
@@ -70,6 +130,8 @@ Rectangle {
                 }, (_, i) => pickRows.itemAt(i).drawn()),
                 fresh: [pickNewKey.text, pickNewWord.text].join(" "),
                 lit: board.yt.picking.cursor,
+                litSeen: board.yt.picking.cursor >= pickRows.count || shown(pickScroll, pickRows.itemAt(board.yt.picking.cursor)),
+                bottom: picker.y + picker.height <= board.height,
                 keys: Array.from({
                     length: pickKeys.count
                 }, (_, i) => pickKeys.itemAt(i).text),
@@ -342,52 +404,108 @@ Rectangle {
                         font.letterSpacing: plain ? 0.66 : 1.4
                     }
 
-                    // Each Playlist with its count, oldest first; its key is pl:<id>.
-                    Repeater {
-                        id: listList
-                        model: board.yt.lists.map(l => ({
-                                    key: "pl:" + l.id,
-                                    name: l.name,
-                                    count: String(l.count)
-                                }))
-                        delegate: sideRow
-                    }
-
-                    // n and e name a Playlist here: Enter keeps a name with something in it, Esc leaves things as they were.
-                    Rectangle {
-                        id: nameBox
-                        visible: board.yt.naming !== ""
+                    // The Playlists scroll beneath PLAYLISTS once they outgrow the sidebar, keeping the chosen one, its question and the name field in view.
+                    Flickable {
+                        id: listScroll
                         Layout.fillWidth: true
-                        Layout.topMargin: 4
-                        implicitHeight: plain ? 36 : 32
-                        radius: plain ? 10 : 0
-                        color: plain ? look.tint.field : "transparent"
-                        border.width: plain ? 1.5 : 1
-                        border.color: (caps ? c.ink : c.accent) ?? "black"
+                        Layout.fillHeight: true
+                        clip: true
+                        interactive: false
+                        contentWidth: width
+                        contentHeight: listsColumn.implicitHeight
+                        boundsBehavior: Flickable.StopAtBounds
 
-                        TextInput {
-                            id: nameInput
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-                            verticalAlignment: TextInput.AlignVCenter
-                            clip: true
-                            color: c.ink ?? "black"
-                            selectionColor: c.accent ?? "red"
-                            selectedTextColor: c.surface ?? "white"
-                            font.family: board.bodyFont
-                            font.pixelSize: 13
-                            Keys.onEscapePressed: board.yt.cancelName()
-                            onAccepted: board.yt.commitName(text)
+                        ColumnLayout {
+                            id: listsColumn
+                            width: listScroll.width
+                            spacing: 0
 
-                            Text {
-                                anchors.fill: parent
-                                verticalAlignment: Text.AlignVCenter
-                                visible: nameInput.text === ""
-                                textFormat: Text.PlainText
-                                text: look.namePlaceholder
-                                color: c.muted ?? "gray"
-                                font: nameInput.font
+                            // n makes one, while there is none: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
+                            Row {
+                                id: noneLine
+                                visible: board.yt.lists.length === 0
+                                Layout.leftMargin: 10
+                                Layout.topMargin: 8
+                                spacing: plain ? 8 : 0
+
+                                Rectangle {
+                                    visible: plain
+                                    implicitWidth: noneKey.implicitWidth + 14
+                                    implicitHeight: noneKey.implicitHeight + 6
+                                    radius: 6
+                                    color: look.tint.tile ?? "transparent"
+
+                                    Text {
+                                        id: noneKey
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: plain ? look.noPlaylists.split(" ")[0] : ""
+                                        color: c.ink ?? "black"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: 12
+                                        font.weight: Font.Medium
+                                    }
+                                }
+                                Text {
+                                    id: noneRest
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: plain ? look.noPlaylists.split(" ").slice(1).join(" ") : look.noPlaylists
+                                    color: c.muted ?? "gray"
+                                    font.family: caps ? look.viewFont ?? "" : board.bodyFont
+                                    font.pixelSize: caps ? 17 : 12
+                                    font.italic: caps
+                                }
+                            }
+
+                            // Each Playlist with its count, oldest first; its key is pl:<id>.
+                            Repeater {
+                                id: listList
+                                model: board.yt.lists.map(l => ({
+                                            key: "pl:" + l.id,
+                                            name: l.name,
+                                            count: String(l.count)
+                                        }))
+                                delegate: sideRow
+                            }
+
+                            // n and e name a Playlist here: Enter keeps a name with something in it, Esc leaves things as they were.
+                            Rectangle {
+                                id: nameBox
+                                visible: board.yt.naming !== ""
+                                Layout.fillWidth: true
+                                Layout.topMargin: 4
+                                implicitHeight: plain ? 36 : 32
+                                radius: plain ? 10 : 0
+                                color: plain ? look.tint.field : "transparent"
+                                border.width: plain ? 1.5 : 1
+                                border.color: (caps ? c.ink : c.accent) ?? "black"
+
+                                TextInput {
+                                    id: nameInput
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    clip: true
+                                    color: c.ink ?? "black"
+                                    selectionColor: c.accent ?? "red"
+                                    selectedTextColor: c.surface ?? "white"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 13
+                                    Keys.onEscapePressed: board.yt.cancelName()
+                                    onAccepted: board.yt.commitName(text)
+
+                                    Text {
+                                        anchors.fill: parent
+                                        verticalAlignment: Text.AlignVCenter
+                                        visible: nameInput.text === ""
+                                        textFormat: Text.PlainText
+                                        text: look.namePlaceholder
+                                        color: c.muted ?? "gray"
+                                        font: nameInput.font
+                                    }
+                                }
                             }
                         }
                     }
@@ -588,47 +706,6 @@ Rectangle {
                         }
                     }
 
-                    // n makes one, while there is none: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
-                    Row {
-                        id: noneLine
-                        visible: board.yt.lists.length === 0
-                        Layout.leftMargin: 10
-                        Layout.topMargin: 8
-                        spacing: plain ? 8 : 0
-
-                        Rectangle {
-                            visible: plain
-                            implicitWidth: noneKey.implicitWidth + 14
-                            implicitHeight: noneKey.implicitHeight + 6
-                            radius: 6
-                            color: look.tint.tile ?? "transparent"
-
-                            Text {
-                                id: noneKey
-                                anchors.centerIn: parent
-                                textFormat: Text.PlainText
-                                text: plain ? look.noPlaylists.split(" ")[0] : ""
-                                color: c.ink ?? "black"
-                                font.family: board.bodyFont
-                                font.pixelSize: 12
-                                font.weight: Font.Medium
-                            }
-                        }
-                        Text {
-                            id: noneRest
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            text: plain ? look.noPlaylists.split(" ").slice(1).join(" ") : look.noPlaylists
-                            color: c.muted ?? "gray"
-                            font.family: caps ? look.viewFont ?? "" : board.bodyFont
-                            font.pixelSize: caps ? 17 : 12
-                            font.italic: caps
-                        }
-                    }
-
-                    Item {
-                        Layout.fillHeight: true
-                    }
                 }
             }
 
@@ -1444,77 +1521,92 @@ Rectangle {
                 color: (caps ? look.tint.rule : c.line) ?? "gray"
             }
 
-            // One row per Playlist with its count; the one holding the video says so.
-            Repeater {
-                id: pickRows
-                model: board.yt.picking ? board.yt.lists : []
+            // One row per Playlist with its count; the one holding the video says so; past eight they scroll, the lit one kept in view.
+            Flickable {
+                id: pickScroll
+                width: parent.width
+                height: Math.min(pickList.implicitHeight, (plain ? 38 : 36) * 8)
+                clip: true
+                interactive: false
+                contentWidth: width
+                contentHeight: pickList.implicitHeight
 
-                Rectangle {
-                    id: pickRow
-                    required property var modelData
-                    required property int index
-                    readonly property bool lit: board.yt.picking !== null && index === board.yt.picking.cursor
-                    readonly property bool holds: board.yt.picking !== null && board.yt.holds(modelData.id, board.yt.picking.video.id)
+                Column {
+                    id: pickList
+                    width: parent.width
 
-                    function drawn() {
-                        return [pickName.text, pickCount.text].concat(pickHas.visible ? [pickHas.text] : []).join(" ");
-                    }
+                    Repeater {
+                        id: pickRows
+                        model: board.yt.picking ? board.yt.lists : []
 
-                    x: plain ? 8 : 0
-                    width: picker.width - (plain ? 16 : 0)
-                    height: plain ? 38 : 36
-                    radius: plain ? 10 : 0
-                    color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
-                    border.width: lit && plain ? 1.5 : 0
-                    border.color: c.accent ?? "blue"
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: plain ? 12 : 16
-                        anchors.rightMargin: plain ? 12 : 16
-                        spacing: 10
-
-                        Text {
-                            id: pickName
-                            Layout.maximumWidth: picker.width - 170
-                            textFormat: Text.PlainText
-                            text: pickRow.modelData.name
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                            color: (pickRow.lit ? (plain ? look.tint.deep : c.surface) : pickRow.holds ? c.muted : c.ink) ?? "black"
-                            font.family: board.bodyFont
-                            font.pixelSize: plain ? 14 : 13
-                            font.weight: pickRow.lit && bracket ? Font.Bold : Font.Medium
-                        }
-                        Text {
-                            id: pickCount
-                            textFormat: Text.PlainText
-                            text: String(pickRow.modelData.count)
-                            color: (pickRow.lit && !plain ? c.surface : c.muted) ?? "gray"
-                            font.family: board.bodyFont
-                            font.pixelSize: 11
-                        }
-                        Item {
-                            Layout.fillWidth: true
-                        }
                         Rectangle {
-                            visible: pickRow.holds
-                            implicitWidth: pickHas.implicitWidth + 12
-                            implicitHeight: pickHas.implicitHeight + 4
-                            radius: plain ? 6 : 0
-                            color: plain ? look.tint.tile : "transparent"
-                            border.width: plain ? 0 : 1
-                            border.color: (bracket ? c.line : c.muted) ?? "gray"
+                            id: pickRow
+                            required property var modelData
+                            required property int index
+                            readonly property bool lit: board.yt.picking !== null && index === board.yt.picking.cursor
+                            readonly property bool holds: board.yt.picking !== null && board.yt.holds(modelData.id, board.yt.picking.video.id)
 
-                            Text {
-                                id: pickHas
-                                anchors.centerIn: parent
-                                textFormat: Text.PlainText
-                                text: look.pick.already
-                                color: c.muted ?? "gray"
-                                font.family: board.bodyFont
-                                font.pixelSize: plain ? 11 : 9
-                                font.letterSpacing: plain ? 0 : 1.26
+                            function drawn() {
+                                return [pickName.text, pickCount.text].concat(pickHas.visible ? [pickHas.text] : []).join(" ");
+                            }
+
+                            x: plain ? 8 : 0
+                            width: picker.width - (plain ? 16 : 0)
+                            height: plain ? 38 : 36
+                            radius: plain ? 10 : 0
+                            color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+                            border.width: lit && plain ? 1.5 : 0
+                            border.color: c.accent ?? "blue"
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: plain ? 12 : 16
+                                anchors.rightMargin: plain ? 12 : 16
+                                spacing: 10
+
+                                Text {
+                                    id: pickName
+                                    Layout.maximumWidth: picker.width - 170
+                                    textFormat: Text.PlainText
+                                    text: pickRow.modelData.name
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    color: (pickRow.lit ? (plain ? look.tint.deep : c.surface) : pickRow.holds ? c.muted : c.ink) ?? "black"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: plain ? 14 : 13
+                                    font.weight: pickRow.lit && bracket ? Font.Bold : Font.Medium
+                                }
+                                Text {
+                                    id: pickCount
+                                    textFormat: Text.PlainText
+                                    text: String(pickRow.modelData.count)
+                                    color: (pickRow.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 11
+                                }
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+                                Rectangle {
+                                    visible: pickRow.holds
+                                    implicitWidth: pickHas.implicitWidth + 12
+                                    implicitHeight: pickHas.implicitHeight + 4
+                                    radius: plain ? 6 : 0
+                                    color: plain ? look.tint.tile : "transparent"
+                                    border.width: plain ? 0 : 1
+                                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+
+                                    Text {
+                                        id: pickHas
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: look.pick.already
+                                        color: c.muted ?? "gray"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: plain ? 11 : 9
+                                        font.letterSpacing: plain ? 0 : 1.26
+                                    }
+                                }
                             }
                         }
                     }
