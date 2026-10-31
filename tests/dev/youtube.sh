@@ -62,6 +62,16 @@ wtype j
 until_ok 1000 yt_is '.view == "saved"'
 check "j in the sidebar opens Saved, which draws its empty text ($(yt_state | jq -c '{view, empty, title: .look.title}'))" \
   yt_is '.view == "saved" and .focus == "sidebar" and .empty == ["Nothing saved yet", "s saves a video"] and .look.title[1] == "Saved"'
+# Saved draws no field, so / from there goes to Search's.
+wtype /
+until_ok 1000 yt_is '.focus == "field"'
+check "/ on Saved opens Search with the cursor in its field ($(yt_state | jq -c '{view, focus}'))" yt_is '.view == "search" and .focus == "field"'
+wtype -k Escape
+until_ok 1000 yt_is '.focus == "list"'
+wtype -k Tab
+until_ok 1000 yt_is '.focus == "sidebar"'
+wtype j
+until_ok 1000 yt_is '.view == "saved"'
 wtype k
 until_ok 1000 yt_is '.view == "search"'
 check "k goes back up to Search, which draws no empty text ($(yt_state | jq -c '{view, empty}'))" yt_is '.view == "search" and .empty == []'

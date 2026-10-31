@@ -50,7 +50,10 @@ ShellRoot {
         ender.running = true;
     }
 
+    // Only Search draws the field, so / from Saved or History goes there first; Esc in the field returns to its list.
     function focusField() {
+        view = "search";
+        pane = "list";
         board.focusField();
     }
 
