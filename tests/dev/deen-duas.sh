@@ -96,7 +96,11 @@ until_ok 3000 copied
 check "y puts the four lines on the clipboard" copied
 check "the key strip says it was copied" duas_is '.keys[3] == ["Y","COPIED"]'
 
-wtype nnnnnnn
+wtype nnnnn
+until_ok 2000 duas_is '.pane.head == "dua 12 of 13"'
+check "dua 110, an instruction sunnah.com typed bare, draws no pronunciation line ($(duas '.pane | [.head, .pron, .pronShown]'))" \
+  duas_is '.pane.head == "dua 12 of 13" and .pane.pron == "" and .pane.pronShown == false and .pane.meaningLabel == "ENGLISH"'
+wtype nn
 until_ok 2000 duas_is '.pane.head == "dua 1 of 13"'
 check "n past the chapter's last dua wraps to its first ($(duas .pane.head))" duas_is '.pane.head == "dua 1 of 13" and .keys[3] == ["Y","COPY"]'
 

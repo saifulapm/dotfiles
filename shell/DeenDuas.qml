@@ -105,6 +105,7 @@ FocusScope {
                 pronLabel: pronLabel.text,
                 pron: pronText.text,
                 pronFamily: pronText.font.family,
+                pronShown: pronText.visible,
                 meaningLabel: meaningLabel.text,
                 meaning: meaningText.text,
                 meaningFamily: meaningText.font.family,
@@ -402,8 +403,10 @@ FocusScope {
                         visible: page.openDua !== null
                         spacing: 14
 
+                        // 110 and 141, instructions typed bare, have no pronunciation, so neither its label nor its line draws.
                         ColumnLayout {
                             Layout.fillWidth: true
+                            visible: !!page.openDua && page.openDua.pron !== ""
                             spacing: 3
 
                             Text {

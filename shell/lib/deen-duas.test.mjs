@@ -58,6 +58,11 @@ test('dua 229, which the Bangla book lacks, reads its English meaning and refere
   assert.equal(d.sourceEnglish, true);
 });
 
+test('dua 110, an instruction typed bare, has no pronunciation to draw', () => {
+  assert.equal(dua('110').pron, '');
+  assert.equal(dua('110').meaningEnglish, true);
+});
+
 test('dua 236 reads its Bangla meaning though one segment\'s pronunciation is the engine\'s', () => {
   const d = dua('236');
   assert.ok(d.meaning.startsWith('নিশ্চ\u09dfই সাফা ও মারও\u09dfা'));
