@@ -128,21 +128,79 @@ ShellRoot {
         board.focusName(what === "new" || !playlist ? "" : playlist.name);
     }
 
-    // A new Playlist opens beside the sidebar at once, so its empty view says how to fill it.
+    // A new Playlist opens beside the sidebar at once, so its empty view says how to fill it; one named from the picker takes the video instead, and the list it came from keeps the focus.
     function commitName(text) {
+        const video = pendingAdd;
         if (naming === "new") {
             const id = store.create(text);
-            if (id !== "")
+            if (id !== "" && video)
+                store.add(id, video);
+            else if (id !== "")
                 show("pl:" + id);
         } else if (naming !== "")
             store.rename(naming, text);
         naming = "";
-        focusPane("sidebar");
+        pendingAdd = null;
+        focusPane(video ? "list" : "sidebar");
     }
 
     function cancelName() {
+        const video = pendingAdd;
         naming = "";
-        focusPane("sidebar");
+        pendingAdd = null;
+        focusPane(video ? "list" : "sidebar");
+    }
+
+    // p on a video: the video and the picker's cursor, whose last place is new playlist; it starts on the first Playlist that lacks the video. null while the picker is closed.
+    property var picking: null
+    // A video p is adding to a Playlist n is naming from the picker.
+    property var pendingAdd: null
+
+    function pick(row) {
+        if (!row || row.kind !== "video")
+            return;
+        const first = lists.findIndex(l => !store.holds(l.id, row.id));
+        picking = {
+            video: row,
+            cursor: first < 0 ? lists.length : first
+        };
+    }
+
+    function holds(listId, videoId) {
+        return store.holds(listId, videoId);
+    }
+
+    function movePick(step) {
+        picking = Object.assign({}, picking, {
+            cursor: Math.max(0, Math.min(lists.length, picking.cursor + step))
+        });
+    }
+
+    // Enter on a Playlist adds the video to it, once; on new playlist, or n, the name field opens and the video goes to the Playlist it names.
+    function choosePick(fresh) {
+        const at = picking.cursor;
+        const video = picking.video;
+        picking = null;
+        if (fresh || at >= lists.length) {
+            pendingAdd = video;
+            startName("new");
+        } else
+            store.add(lists[at].id, video);
+    }
+
+    // x in a Playlist's list: the item goes and the cursor stays on the row that takes its place.
+    function removeItem(row) {
+        if (!playlist || !row)
+            return;
+        store.removeItem(playlistId, row.id);
+        cursor = Math.max(0, Math.min(cursor, rows.length - 1));
+    }
+
+    // Shift+J and Shift+K: the cursor goes with the item it moves.
+    function moveItem(step) {
+        const row = rows[cursor];
+        if (playlist && row && store.move(playlistId, row.id, step))
+            cursor += step;
     }
 
     // The sidebar moves up to the entry above the deleted Playlist.
@@ -469,6 +527,7 @@ ShellRoot {
                 view: app.view,
                 playlistId: app.playlistId,
                 naming: app.naming,
+                picking: app.picking ? app.picking.cursor : null,
                 confirming: app.confirming,
                 playlists: store.lists,
                 focus: app.focusAt,

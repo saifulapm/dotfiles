@@ -24,15 +24,42 @@ Scope {
 
     // video is a row as youtube.mjs rows() makes it; a video already in Saved stays one copy.
     function save(video) {
+        add("saved", video);
+    }
+
+    // A video is in a Playlist at most once.
+    function add(id, video) {
         if (!ready || broken)
             return;
-        write(P.add(playlists, "saved", {
+        const item = {
             id: video.id,
             title: video.title,
             channel: video.channel,
             duration: video.secs,
             thumb: video.thumb
-        }, Date.now()));
+        };
+        if (video.unavailable)
+            item.unavailable = video.unavailable;
+        write(P.add(playlists, id, item, Date.now()));
+    }
+
+    function holds(id, videoId) {
+        return P.holds(playlists, id, videoId);
+    }
+
+    function removeItem(id, videoId) {
+        if (ready && !broken)
+            write(P.removeItem(playlists, id, videoId, Date.now()));
+    }
+
+    // True when the item moved; the first item up or the last down stays.
+    function move(id, videoId, step) {
+        if (!ready || broken)
+            return false;
+        const next = P.move(playlists, id, videoId, step, Date.now());
+        const moved = next !== playlists;
+        write(next);
+        return moved;
     }
 
     // A new Playlist's id, or "" when the name is blank or the store cannot be written.

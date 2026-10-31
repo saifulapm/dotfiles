@@ -62,6 +62,18 @@ Rectangle {
             nameField: nameBox.visible ? nameInput.text : null,
             confirm: asked,
             dimmed: listColumn.opacity < 1,
+            picker: picker.visible ? {
+                title: [pickChip.text, pickTitle.text],
+                rows: Array.from({
+                    length: pickRows.count
+                }, (_, i) => pickRows.itemAt(i).drawn()),
+                fresh: [pickNewKey.text, pickNewWord.text].join(" "),
+                lit: board.yt.picking.cursor,
+                keys: Array.from({
+                    length: pickKeys.count
+                }, (_, i) => pickKeys.itemAt(i).text),
+                below: picker.y >= board.pickAt - 1
+            } : null,
             drawn: rowList.visible ? drawn : [],
             // The list's own cursor and the rows at its top and bottom edges, so a check sees that a page landing below kept the cursor in view.
             listed: {
@@ -128,6 +140,21 @@ Rectangle {
                 event.accepted = true;
                 return;
             }
+            // While p's picker is open its own keys move, add, make a new Playlist or cancel.
+            if (board.yt.picking) {
+                if (t === "j" || k === Qt.Key_Down)
+                    board.yt.movePick(1);
+                else if (t === "k" || k === Qt.Key_Up)
+                    board.yt.movePick(-1);
+                else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                    board.yt.choosePick(false);
+                else if (t === "n")
+                    board.yt.choosePick(true);
+                else if (k === Qt.Key_Escape)
+                    board.yt.picking = null;
+                event.accepted = true;
+                return;
+            }
             if (t === "/")
                 board.yt.focusField();
             else if (k === Qt.Key_Tab || k === Qt.Key_Backtab)
@@ -154,6 +181,12 @@ Rectangle {
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
             else if (t === "a" && board.yt.pane === "list")
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "add");
+            else if (t === "p" && board.yt.pane === "list")
+                board.yt.pick(board.yt.rows[board.yt.cursor]);
+            else if (t === "x" && board.yt.pane === "list" && board.yt.playlist)
+                board.yt.removeItem(board.yt.rows[board.yt.cursor]);
+            else if ((t === "J" || t === "K") && board.yt.pane === "list" && board.yt.playlist)
+                board.yt.moveItem(t === "J" ? 1 : -1);
             else if (t === "n" && board.yt.pane === "sidebar")
                 board.yt.startName("new");
             else if (t === "e" && board.yt.pane === "sidebar" && board.yt.playlist)
@@ -592,7 +625,7 @@ Rectangle {
                     id: listColumn
                     anchors.fill: parent
                     // The list beside a delete question dims until it is answered.
-                    opacity: board.yt.confirming ? (plain ? 0.45 : 0.4) : 1
+                    opacity: board.yt.confirming || board.yt.picking ? (plain ? 0.45 : 0.4) : 1
                     anchors.leftMargin: bracket ? 8 : 18
                     anchors.rightMargin: bracket ? 8 : 18
                     anchors.topMargin: bracket ? 8 : 0
@@ -1250,6 +1283,229 @@ Rectangle {
                             font.pixelSize: caps ? 10 : 11
                             font.letterSpacing: caps ? 1 : bracket ? 1.54 : 0
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // Where the picker's top goes: under the cursor's row, or above the window's foot when the row is low.
+    readonly property real pickAt: {
+        const row = yt.picking && rowList.currentItem;
+        return row ? row.mapToItem(board, 0, row.height).y : 200;
+    }
+
+    // p's picker over the dimmed list, under the cursor's row: Paper's hard-shadowed box, Artboard's rounded card outlined in its accent, Blueprint's box in its accent.
+    Rectangle {
+        id: picker
+        visible: board.yt.picking !== null
+        x: sidebarPane.width + 120
+        y: Math.max(60, Math.min(board.pickAt, board.height - height - 90))
+        width: bracket ? 440 : 360
+        height: pickColumn.implicitHeight
+        radius: plain ? 14 : 0
+        color: c.surface ?? "white"
+        border.width: caps || plain ? 1.5 : 1
+        border.color: (caps ? c.ink : c.accent) ?? "black"
+
+        // Paper's 6 px hard shadow.
+        Rectangle {
+            visible: caps
+            z: -1
+            x: 6
+            y: 6
+            width: parent.width
+            height: parent.height
+            color: c.ink ?? "black"
+        }
+
+        Column {
+            id: pickColumn
+            width: parent.width
+
+            Row {
+                leftPadding: 16
+                topPadding: 12
+                bottomPadding: 12
+                spacing: 12
+
+                Rectangle {
+                    implicitWidth: pickChip.implicitWidth + (bracket ? 0 : 14)
+                    implicitHeight: pickChip.implicitHeight + (bracket ? 0 : 4)
+                    radius: plain ? 8 : 0
+                    color: (plain ? look.tint.tint : caps ? c.ink : "transparent") ?? "transparent"
+
+                    Text {
+                        id: pickChip
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: look.pick.chip
+                        color: (plain || bracket ? c.accent : c.surface) ?? "black"
+                        font.family: board.bodyFont
+                        font.pixelSize: bracket || caps ? 10 : 12
+                        font.weight: bracket ? Font.Bold : Font.Medium
+                        font.letterSpacing: bracket || caps ? 1.4 : 0
+                    }
+                }
+                Text {
+                    id: pickTitle
+                    width: picker.width - pickChip.implicitWidth - 60
+                    textFormat: Text.PlainText
+                    text: board.yt.picking ? look.pick.title(board.yt.picking.video.title) : ""
+                    elide: Text.ElideRight
+                    maximumLineCount: 1
+                    color: c.ink ?? "black"
+                    font.family: caps ? look.viewFont ?? "" : board.bodyFont
+                    font.pixelSize: caps ? 20 : bracket ? 12 : 14
+                    font.weight: plain ? Font.Bold : Font.Normal
+                }
+            }
+            Rule {
+                width: parent.width
+                dashed: look.ruleDashed
+                color: (caps ? look.tint.rule : c.line) ?? "gray"
+            }
+
+            // One row per Playlist with its count; the one holding the video says so.
+            Repeater {
+                id: pickRows
+                model: board.yt.picking ? board.yt.lists : []
+
+                Rectangle {
+                    id: pickRow
+                    required property var modelData
+                    required property int index
+                    readonly property bool lit: board.yt.picking !== null && index === board.yt.picking.cursor
+                    readonly property bool holds: board.yt.picking !== null && board.yt.holds(modelData.id, board.yt.picking.video.id)
+
+                    function drawn() {
+                        return [pickName.text, pickCount.text].concat(pickHas.visible ? [pickHas.text] : []).join(" ");
+                    }
+
+                    x: plain ? 8 : 0
+                    width: picker.width - (plain ? 16 : 0)
+                    height: plain ? 38 : 36
+                    radius: plain ? 10 : 0
+                    color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+                    border.width: lit && plain ? 1.5 : 0
+                    border.color: c.accent ?? "blue"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: plain ? 12 : 16
+                        anchors.rightMargin: plain ? 12 : 16
+                        spacing: 10
+
+                        Text {
+                            id: pickName
+                            Layout.maximumWidth: picker.width - 170
+                            textFormat: Text.PlainText
+                            text: pickRow.modelData.name
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            color: (pickRow.lit ? (plain ? look.tint.deep : c.surface) : pickRow.holds ? c.muted : c.ink) ?? "black"
+                            font.family: board.bodyFont
+                            font.pixelSize: plain ? 14 : 13
+                            font.weight: pickRow.lit && bracket ? Font.Bold : Font.Medium
+                        }
+                        Text {
+                            id: pickCount
+                            textFormat: Text.PlainText
+                            text: String(pickRow.modelData.count)
+                            color: (pickRow.lit && !plain ? c.surface : c.muted) ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: 11
+                        }
+                        Item {
+                            Layout.fillWidth: true
+                        }
+                        Rectangle {
+                            visible: pickRow.holds
+                            implicitWidth: pickHas.implicitWidth + 12
+                            implicitHeight: pickHas.implicitHeight + 4
+                            radius: plain ? 6 : 0
+                            color: plain ? look.tint.tile : "transparent"
+                            border.width: plain ? 0 : 1
+                            border.color: (bracket ? c.line : c.muted) ?? "gray"
+
+                            Text {
+                                id: pickHas
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: look.pick.already
+                                color: c.muted ?? "gray"
+                                font.family: board.bodyFont
+                                font.pixelSize: plain ? 11 : 9
+                                font.letterSpacing: plain ? 0 : 1.26
+                            }
+                        }
+                    }
+                }
+            }
+            Rule {
+                width: parent.width
+                dashed: look.ruleDashed
+                color: (caps ? look.tint.rule : c.line) ?? "gray"
+            }
+            // The last place: n, or Enter on it, names a new Playlist for the video.
+            Rectangle {
+                readonly property bool lit: board.yt.picking !== null && board.yt.picking.cursor === board.yt.lists.length
+                x: plain ? 8 : 0
+                width: picker.width - (plain ? 16 : 0)
+                height: plain ? 38 : 36
+                radius: plain ? 10 : 0
+                color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
+                border.width: lit && plain ? 1.5 : 0
+                border.color: c.accent ?? "blue"
+
+                Row {
+                    anchors.left: parent.left
+                    anchors.leftMargin: plain ? 12 : 16
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 10
+
+                    Text {
+                        id: pickNewKey
+                        textFormat: Text.PlainText
+                        text: look.pick.newKey
+                        color: (parent.parent.lit ? (plain ? look.tint.deep : c.surface) : bracket ? c.accent : c.ink) ?? "black"
+                        font.family: board.bodyFont
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        id: pickNewWord
+                        textFormat: Text.PlainText
+                        text: look.pick.newWord
+                        color: (parent.parent.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
+                        font.family: board.bodyFont
+                        font.pixelSize: 13
+                    }
+                }
+            }
+            Rule {
+                width: parent.width
+                dashed: look.ruleDashed
+                color: (caps ? c.ink : c.line) ?? "gray"
+            }
+            Flow {
+                width: parent.width
+                padding: 11
+                leftPadding: 16
+                spacing: 16
+
+                Repeater {
+                    id: pickKeys
+                    model: look.pick.keys
+
+                    Text {
+                        required property var modelData
+                        textFormat: Text.PlainText
+                        text: modelData.key + " " + modelData.word
+                        color: c.muted ?? "gray"
+                        font.family: board.bodyFont
+                        font.pixelSize: plain ? 11 : 10
+                        font.letterSpacing: plain ? 0 : 1.4
                     }
                 }
             }

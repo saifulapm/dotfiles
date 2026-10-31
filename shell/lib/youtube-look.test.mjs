@@ -102,3 +102,18 @@ test('the sidebar legend names n, e, x, open and list, and the delete question c
   assert.deepEqual(look('blueprint').confirm.keys.map((k) => `${k.key} ${k.word}`), ['[Y] DELETE', '[ESC] KEEP']);
   assert.deepEqual(look('paper').confirm.keys.map((k) => `${k.key} ${k.word}`), ['y delete', 'esc keep']);
 });
+
+// The pick boards: p's title names the video, a Playlist holding it is marked, n makes a new one, and the picker's legend is its own.
+test('the picker names the video, marks a Playlist already holding it, and keeps its own legend', () => {
+  const keys = (l) => l.pick.keys.map((k) => `${k.key} ${k.word}`);
+  const a = look('artboard');
+  assert.equal(a.pick.title('Feather'), 'Add "Feather" to');
+  assert.deepEqual([a.pick.chip, a.pick.already, a.pick.newKey, a.pick.newWord], ['p', 'already in', 'n', 'new playlist']);
+  assert.deepEqual(keys(a), ['j/k move', '↵ add', 'n new', 'esc cancel']);
+  const p = look('paper');
+  assert.deepEqual([p.pick.chip, p.pick.already, p.pick.newKey], ['P', 'ALREADY IN', 'n']);
+  assert.deepEqual(keys(p), ['J/K MOVE', '↵ ADD', 'N NEW', 'ESC CANCEL']);
+  const b = look('blueprint');
+  assert.deepEqual([b.pick.chip, b.pick.already, b.pick.newKey], ['PLAYLISTS', 'ALREADY IN ✓', '[N]']);
+  assert.deepEqual(keys(b), ['[J/K] MOVE', '[↵] ADD', '[N] NEW', '[ESC] CANCEL']);
+});

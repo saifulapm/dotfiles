@@ -43,6 +43,15 @@ export function youtubeLook(tokens) {
     noPlaylists: EMPTY.playlists,
     placeholder: 'Search YouTube',
     namePlaceholder: 'Playlist name',
+    // p's picker: Paper and Artboard head it with the key, Blueprint with PLAYLISTS; Paper's badge is set in caps as its board's CSS sets it.
+    pick: {
+      title: (t) => `Add "${t}" to`,
+      chip: bracket ? 'PLAYLISTS' : voice === 'caps' ? 'P' : 'p',
+      already: bracket ? 'ALREADY IN ✓' : voice === 'caps' ? 'ALREADY IN' : 'already in',
+      newKey: bracket ? '[N]' : 'n',
+      newWord: 'new playlist',
+      keys: l.keys([['j/k', 'move'], ['↵', 'add'], ['n', 'new'], ['esc', 'cancel']]),
+    },
     hint: bracket ? '[/]' : '/',
     typeLabel: plain ? '' : 'TYPE',
     chips: ['Videos', 'Playlists', 'Channels'].map((w) => (bracket ? w.toUpperCase() : w)),
