@@ -16,6 +16,8 @@ Scope {
     property bool broken: false
     // Set once the file is read, or found missing; a save before then would write an empty store over it.
     property bool ready: false
+    // The text last written, so the reload a save causes is not read back over newer state.
+    property string written: ""
     readonly property var saved: P.items(playlists, "saved")
     // The Playlists Saiful made, oldest first, each {id, name, count, secs}, its name one plain line.
     readonly property var lists: P.playlists(playlists).map(l => Object.assign({}, l, {
@@ -109,7 +111,8 @@ Scope {
         if (next === playlists)
             return;
         playlists = next;
-        storeFile.setText(P.serialize(next));
+        written = P.serialize(next);
+        storeFile.setText(written);
     }
 
     FileView {
@@ -136,7 +139,12 @@ Scope {
     FileView {
         id: storeFile
         printErrors: false
+        // dots sync swaps a new file in, so the store follows it without a restart.
+        watchChanges: true
+        onFileChanged: reload()
         onLoaded: {
+            if (text() === store.written && store.ready && !store.broken)
+                return;
             const parsed = P.parse(text());
             store.broken = parsed === null;
             if (store.broken)
