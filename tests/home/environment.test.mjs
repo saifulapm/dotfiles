@@ -1,4 +1,4 @@
-// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags and OAuth client, the ssh-agent socket and the Android SDK.
+// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags and OAuth client, the ssh-agent socket, the Android SDK and mise's shims.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -44,15 +44,20 @@ test('gpg-agent.socket is enabled at login from the packaged unit', () => {
   assert.equal(readFileSync(join(repo, 'home/dot_config/systemd/user/sockets.target.wants/symlink_gpg-agent.socket'), 'utf8').trim(), '/usr/lib/systemd/user/gpg-agent.socket');
 });
 
+// mpv's ytdl hook in Dekho's trailer unit runs PATH's yt-dlp, the pin in ~/.local/bin, which needs a deno only mise has; the shims come last, so they shadow nothing.
+test('the user manager finds mise\'s deno through its shims, after every other dir', () => {
+  assert.match(read('75-mise.conf'), /^PATH=\$\{PATH\}:\$\{HOME\}\/\.local\/share\/mise\/shims$/m);
+});
+
 test('the environment.d generator expands every file', { skip: !existsSync(generator) }, () => {
   const home = mkdtempSync(join(tmpdir(), 'envd-'));
   mkdirSync(join(home, 'environment.d'));
-  for (const f of ['40-wayland.conf', '60-chromium.conf', '65-ssh-agent.conf', '70-android.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
+  for (const f of ['40-wayland.conf', '60-chromium.conf', '65-ssh-agent.conf', '70-android.conf', '75-mise.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
   const out = execFileSync(generator, { env: { XDG_CONFIG_HOME: home, XDG_RUNTIME_DIR: '/run/user/1000', HOME: home, PATH: '/usr/bin' }, encoding: 'utf8' });
   assert.match(out, /^ELECTRON_OZONE_PLATFORM_HINT=wayland$/m);
   assert.match(out, /^SSH_AUTH_SOCK=\/run\/user\/1000\/ssh-agent\.socket$/m);
   assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
-  assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator$`, 'm'));
+  assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator:${home}/\\.local/share/mise/shims$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
   assert.match(out, /^GOOGLE_DEFAULT_CLIENT_ID=77185425430\.apps\.googleusercontent\.com$/m);
   assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme,${home}/\\.local/state/dots/theme-out/chromium-newtab"?$`, 'm'));
