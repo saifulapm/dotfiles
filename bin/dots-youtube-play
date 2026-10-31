@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots-youtube-play video <id>...: plays one or more YouTube videos, in order, in one mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}. dots-youtube-play audio: starts the Queue, one audio-only mpv idle in the unit youtube-audio, unless it runs already, and prints {"unit", "socket"} once its JSON IPC socket is there; the App loads every item through that socket.
+# dots-youtube-play video <id>...: plays one or more YouTube videos, in order, each from its downloaded file when it has one, in one mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}. dots-youtube-play audio: starts the Queue, one audio-only mpv idle in the unit youtube-audio, unless it runs already, and prints {"unit", "socket"} once its JSON IPC socket is there; the App loads every item through that socket.
 set -uo pipefail
 {
 usage() {
@@ -56,8 +56,13 @@ if [ "$1" = audio ]; then
   exit 1
 fi
 
+# A downloaded item plays from its file, its video before its audio; dots-youtube-get where drops a file gone since, which then streams.
+files=$("$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-youtube-get" where "${@:2}" 2>/dev/null) || files='{}'
 urls=()
-for id in "${@:2}"; do urls+=("https://www.youtube.com/watch?v=$id"); done
+for id in "${@:2}"; do
+  file=$(jq -r --arg id "$id" '.files[$id] // {} | .video // .audio // empty' <<<"$files" 2>/dev/null)
+  [[ $file == /* ]] && urls+=("$file") || urls+=("https://www.youtube.com/watch?v=$id")
+done
 player+=(--force-window=immediate "--ytdl-format=bv*[height<=1080]+ba/b[height<=1080]")
 # The first free number; systemd-run refuses a name another play took a moment ago, so the next is tried.
 for n in $(seq 1 99); do

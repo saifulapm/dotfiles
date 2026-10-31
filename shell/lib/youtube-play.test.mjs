@@ -136,3 +136,24 @@ test('a bad id among several is a usage error and starts nothing', (t) => {
   assert.equal(run('video', 'fakeVid0001', 'short').status, 2);
   assert.equal(ran('youtube-video-1'), false);
 });
+
+test('a downloaded video plays from its file, its video before its audio, and one whose file is gone streams and leaves the index', (t) => {
+  const { dir, run, argv } = rig(t);
+  const index = join(dir, '.local/state/dots/youtube/downloads.json');
+  mkdirSync(join(dir, '.local/state/dots/youtube'), { recursive: true });
+  const file = (name) => {
+    writeFileSync(join(dir, name), 'x');
+    return join(dir, name);
+  };
+  const files = {
+    fakeVid0001: { audio: file('a1.opus'), video: file('v1.webm') },
+    fakeVid0002: { audio: file('a2.opus') },
+    fakeVid0003: { video: join(dir, 'gone.webm') },
+  };
+  writeFileSync(index, JSON.stringify({ files, failed: {} }));
+  const r = run('video', 'fakeVid0001', 'fakeVid0002', 'fakeVid0003', 'fakeVid0004');
+  assert.equal(r.status, 0, r.stderr);
+  const a = argv('youtube-video-1');
+  assert.deepEqual(a.slice(-4), [files.fakeVid0001.video, files.fakeVid0002.audio, 'https://www.youtube.com/watch?v=fakeVid0003', 'https://www.youtube.com/watch?v=fakeVid0004']);
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(index, 'utf8')).files).sort(), ['fakeVid0001', 'fakeVid0002']);
+});
