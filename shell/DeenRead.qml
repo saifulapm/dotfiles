@@ -100,7 +100,7 @@ FocusScope {
     // A theme change gives every row a new height, which moves the cursor's ayah, so it is brought back once the rows have their new sizes.
     onCChanged: keepTimer.restart()
 
-    Timer {
+    Tick {
         id: keepTimer
         interval: 50
         onTriggered: page.keepInView()
