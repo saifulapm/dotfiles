@@ -98,3 +98,8 @@ test('wayvnc and everything wlvncc builds against are declared for every arch', 
 test('yt-dlp is not a package', () => {
   assert.equal(byName.has('yt-dlp'), false);
 });
+
+// A YouTube title can be in any script; with no Korean face Hangul drew as tofu (finding JDNBNDZX).
+test('a CJK face covering Hangul, kana and Han is declared for every arch', () => {
+  assert.equal(byName.get('google-noto-sans-cjk-vf-fonts')?.arch, 'all');
+});

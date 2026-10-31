@@ -191,7 +191,7 @@ Rectangle {
             Layout.fillHeight: true
             spacing: 0
 
-            // The sidebar: the views with their icons and counts, then the Playlists, of which m67 has none.
+            // The sidebar: the views with their icons and counts, then the Playlists, or the key that makes one while there are none.
             Rectangle {
                 id: sidebarPane
                 Layout.preferredWidth: 219
