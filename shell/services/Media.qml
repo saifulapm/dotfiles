@@ -14,13 +14,13 @@ Scope {
         title: player.trackTitle,
         artist: player.trackArtist
     } : null
-    // The player that played last, so Play resumes a paused one while nothing plays.
-    property var last: null
+    // The players that played, newest first, so once a video's window closes Play resumes the paused Queue under it, not the bus's first player.
+    property var played: []
     onPlayerChanged: {
         if (player)
-            last = player;
+            played = [player].concat(played.filter(p => p !== player && Mpris.players.values.includes(p)));
     }
-    readonly property var target: player ?? (Mpris.players.values.includes(last) ? last : null) ?? Mpris.players.values[0] ?? null
+    readonly property var target: player ?? played.find(p => Mpris.players.values.includes(p)) ?? Mpris.players.values[0] ?? null
 
     // The media keys: niri runs qs ipc call media <playPause|next|previous>.
     Root.Ipc {

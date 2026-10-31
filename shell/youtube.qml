@@ -88,10 +88,11 @@ ShellRoot {
         run([backend].concat(args), done);
     }
 
-    // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window.
+    // Enter on a row: each play is an mpv window in a unit of its own, which outlives this window; it pauses the Queue first, and nothing resumes the Queue by itself.
     function play(row) {
         if (!row)
             return;
+        queueCommand(Q.setPauseLine(true));
         // The repo's bin is on the session PATH only through fish, so the player is found beside the shell.
         run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video", row.id], answer => {
             if (answer && typeof answer.unit === "string")
