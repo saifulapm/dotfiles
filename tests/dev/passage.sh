@@ -77,6 +77,7 @@ shot paper-ayah
 on_drawn 2026-11-04 '.ref == "সহীহ বুখারী ৬৮০৭"'
 check "Paper draws bukhari:6807 under HADITH, its Bangla in $bengali with no Arabic line ($(drawn '[.label, .ar, .family.bn, .bn[0:30]]'))" \
   drawn_is '.label == "HADITH" and .ar == "" and .bn_pron == "" and (.bn | startswith("সাহল ইবনু সা‘দ")) and .family.bn == $bengali and .family.ref == $bengali'
+check "its punctuation draws at a proportional width, under a third of an em ($(drawn .bnComma))" drawn_is '.bnComma > 0 and .bnComma < 0.34'
 shot paper-hadith
 
 switched blueprint '.label == "[HADITH]"'
@@ -84,6 +85,8 @@ bengali="Noto Sans Bengali"
 check "Blueprint labels bukhari:6807 [HADITH], its Bangla reference as deen names it ($(passage | jq -c '[.label, .ref, .drawn[0][0].ref]'))" \
   passage_is '.label == "[HADITH]" and .ref == "সহীহ বুখারী ৬৮০৭" and .drawn[0][0].ref == "সহীহ বুখারী ৬৮০৭"'
 check "after the switch settles one sheet draws the passage, its Bangla in $bengali ($(drawn '.family'))" drawn_is '.label == "[HADITH]" and .family.bn == $bengali and .family.ref == $bengali'
+# Noto Sans Bengali has no comma, colon or brackets; a monospace fallback drew them wide and apart from their words.
+check "its punctuation draws at a proportional width, under a third of an em ($(drawn .bnComma))" drawn_is '.bnComma > 0 and .bnComma < 0.34'
 shot blueprint-hadith
 on_drawn 2026-11-03 '.label == "[AYAH]"'
 check "Blueprint draws 94:6 under [AYAH], its Bangla lines in $bengali, no Latin ($(drawn '[.label, .ref, .family]'))" \
@@ -95,6 +98,7 @@ check "Artboard labels it Ayah over the card, its Bangla lines in $bengali, no L
   drawn_is '.label == "Ayah" and .ref == "সূরা আশ-শারহ ৯৪:৬" and '"$in_bangla"
 on_drawn 2026-11-04 '.label == "Hadith"'
 check "Artboard labels bukhari:6807 Hadith ($(drawn '[.label, .ref, .family.bn]'))" drawn_is '.label == "Hadith" and .ref == "সহীহ বুখারী ৬৮০৭" and .family.bn == $bengali'
+check "its punctuation draws at a proportional width, under a third of an em ($(drawn .bnComma))" drawn_is '.bnComma > 0 and .bnComma < 0.34'
 on_drawn 2026-11-01 '.ref == "হিসনুল মুসলিম ২৩৫"'
 check "Artboard draws dua 235 in Arabic, the Bangla book's pronunciation and meaning, no Latin ($(drawn '[.label, .family]'))" drawn_is '.label == "Dua" and .ar != "" and '"$in_bangla"
 shot artboard-dua

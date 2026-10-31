@@ -39,10 +39,17 @@ Item {
                 en: enText.visible ? enText.fontInfo.family : "",
                 ref: refText.fontInfo.family
             },
-            enLines: { count: enText.lineCount, height: enText.contentHeight, pitch: enText.font.pixelSize * words.look.en.height },
             bnLines: { count: bnText.lineCount, height: bnText.contentHeight, pitch: bnText.font.pixelSize * words.look.bn.height },
+            // A comma's advance in the Bangla meaning's font, in ems: a face with no comma of its own takes one from a fallback, wide in a monospace one.
+            bnComma: bnComma.advanceWidth / bnText.font.pixelSize,
             box: { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y }
         };
+    }
+
+    TextMetrics {
+        id: bnComma
+        font: bnText.font
+        text: ","
     }
 
     Item {
