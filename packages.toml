@@ -135,6 +135,11 @@ arch = "all"
 why = "Bangla, the fallback for every font"
 
 [[package]]
+name = "google-noto-serif-bengali-vf-fonts"
+arch = "all"
+why = "Noto Serif Bengali, the face Paper draws Deen's Bangla in"
+
+[[package]]
 name = "google-noto-naskh-arabic-vf-fonts"
 arch = "all"
 why = "Arabic, the fallback for every font"
