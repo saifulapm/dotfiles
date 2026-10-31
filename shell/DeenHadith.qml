@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-hadith.mjs" as H
 
-// Deen's Hadith: a search of the corpus saved on this machine, its hits on the left and the cursored one in full on the right; until the corpus is here, the download Deen started when it opened.
+// Deen's Hadith: the corpus saved on this machine browsed by collection, book and narration, or searched, a list on the left and the open narration on the right; until the corpus is here, the download Deen started when it opened.
 FocusScope {
     id: page
 
@@ -25,23 +25,27 @@ FocusScope {
     readonly property string deep: "#2638C9"
     readonly property string tile: "#F2F3F6"
 
-    // True once status reads ready: search is on and the download view goes.
+    // True once status reads ready: the browse is on and the download view goes.
     property bool ready: false
     property var download: H.START
     property string dir: ""
     property string narrations: ""
+    property var collections: []
+    // Collections, a book list, a book's narrations, an open narration or search, each over the one Esc returns to.
+    property var levels: H.LEVELS
+    readonly property var here: levels[levels.length - 1]
+    readonly property var listing: H.listEntry(levels)
+    readonly property int cursor: listing.cursor
+    // Set when the list changes, not on each cursor move, so the view keeps its place.
+    property var rows: []
     // The query whose answer is awaited; an answer for an older one is dropped.
     property string asked: ""
     property var hits: []
     property int total: 0
-    property string searchError: ""
-    property int cursor: 0
+    property string failure: ""
     property string copied: ""
-    readonly property var hit: hits.length > 0 ? hits[Math.min(cursor, hits.length - 1)] : null
-    readonly property var told: hit ? H.narrator(hit.hadith.en) : ({
-            by: "",
-            body: ""
-        })
+    readonly property var hit: here.level === "narration" ? H.listHit(listing.data, listing.data.hadiths[cursor]) : here.level === "search" && hits.length > 0 ? hits[Math.min(cursor, hits.length - 1)] : null
+    readonly property var opened: hit ? H.pane(hit) : null
     readonly property var shown: H.progress(download)
 
     function say(s) {
@@ -72,7 +76,85 @@ FocusScope {
 
     function becomeReady() {
         ready = true;
-        deen.api(["hadith", "collections"], answer => page.narrations = H.narrations(answer));
+        deen.api(["hadith", "collections"], answer => {
+            page.narrations = H.narrations(answer);
+            page.collections = answer && Array.isArray(answer.collections) ? answer.collections : [];
+            page.showList();
+        });
+    }
+
+    function showList() {
+        const e = listing;
+        rows = e.level === "collections" ? collections.map(H.collectionRow) : e.level === "books" ? e.data.books.map(H.bookRow) : e.level === "narrations" ? e.data.hadiths.map(H.narrationRow) : hits.map(H.hitRow);
+        list.positionViewAtIndex(cursor, ListView.Contain);
+    }
+
+    function goTo(s) {
+        levels = s;
+        failure = "";
+        showList();
+        if (here.level === "search")
+            field.forceActiveFocus();
+        else
+            listKeys.forceActiveFocus();
+    }
+
+    // A level's list is asked of deen; an answer that comes after the cursor or the level moved on is dropped.
+    function ask(args, level, has) {
+        const from = levels;
+        deen.api(args, answer => {
+            if (page.levels !== from)
+                return;
+            if (answer && Array.isArray(answer[has]))
+                page.goTo(H.down(from, {
+                    level: level,
+                    data: answer
+                }));
+            else
+                page.failure = D.oneLine(answer && answer.error ? answer.error : "deen " + args.slice(0, 2).join(" ") + " gave no answer");
+        });
+    }
+
+    function enter() {
+        const e = listing;
+        if (here.level !== e.level || rows.length === 0)
+            return;
+        if (e.level === "collections")
+            ask(["hadith", "books", collections[cursor].slug], "books", "books");
+        else if (e.level === "books")
+            ask(["hadith", "list", e.data.collection, String(e.data.books[cursor].n)], "narrations", "hadiths");
+        else if (e.level === "narrations")
+            goTo(H.down(levels, {
+                level: "narration"
+            }));
+    }
+
+    // Esc goes up one level; on the collections it is left to the frame, which closes Deen.
+    function back() {
+        const s = H.up(levels);
+        if (!s)
+            return false;
+        if (here.level === "search")
+            clearSearch();
+        goTo(s);
+        return true;
+    }
+
+    function clearSearch() {
+        debounce.stop();
+        field.text = "";
+        asked = "";
+        hits = [];
+        total = 0;
+    }
+
+    function openSearch() {
+        if (here.level === "search") {
+            newSearch();
+            return;
+        }
+        clearSearch();
+        goTo(H.search(levels));
     }
 
     function startFetch() {
@@ -106,16 +188,18 @@ FocusScope {
         if (!args) {
             hits = [];
             total = 0;
-            searchError = "";
+            failure = "";
+            showList();
             return;
         }
         deen.api(args, answer => {
-            if (page.asked !== q)
+            if (page.asked !== q || page.here.level !== "search")
                 return;
-            page.cursor = 0;
-            page.searchError = !answer || answer.error ? D.oneLine(answer && answer.error ? answer.error : "deen hadith search gave no answer") : "";
+            page.levels = H.withCursor(page.levels, 0);
+            page.failure = !answer || answer.error ? D.oneLine(answer && answer.error ? answer.error : "deen hadith search gave no answer") : "";
             page.hits = answer && Array.isArray(answer.hits) ? answer.hits : [];
             page.total = answer && answer.total ? answer.total : page.hits.length;
+            page.showList();
         });
     }
 
@@ -125,13 +209,17 @@ FocusScope {
         field.focus = true;
     }
 
+    // In search, k on the first hit goes back to the field.
     function moveCursor(by) {
-        if (by < 0 && cursor === 0) {
-            field.focus = true;
+        if (here.level === "search" && by < 0 && cursor === 0) {
+            field.forceActiveFocus();
             return;
         }
-        cursor = Math.max(0, Math.min(hits.length - 1, cursor + by));
-        resultList.positionViewAtIndex(cursor, ListView.Contain);
+        if (rows.length === 0)
+            return;
+        const to = Math.max(0, Math.min(rows.length - 1, cursor + by));
+        levels = H.withCursor(levels, to);
+        list.positionViewAtIndex(to, ListView.Contain);
     }
 
     function copyHit() {
@@ -142,10 +230,11 @@ FocusScope {
         copied = "copied " + H.boardName(hit.collection, hit.name) + " " + D.oneLine(hit.hadith.n);
     }
 
+    // Only the rows the view has made: a long book's far rows are not drawn until the cursor nears them.
     function rowsDrawn() {
         const out = [];
-        for (let i = 0; i < resultList.count; i++) {
-            const r = resultList.itemAtIndex(i);
+        for (let i = 0; i < list.count; i++) {
+            const r = list.itemAtIndex(i);
             if (r)
                 out.push(r.drawn());
         }
@@ -155,7 +244,7 @@ FocusScope {
     function state() {
         return {
             ready: ready,
-            focus: field.activeFocus ? "field" : resultKeys.activeFocus ? "results" : downloadKeys.activeFocus ? "download" : "",
+            focus: field.activeFocus ? "field" : listKeys.activeFocus ? "list" : downloadKeys.activeFocus ? "download" : "",
             download: {
                 shown: downloadView.visible,
                 label: cardLabel.text,
@@ -179,30 +268,40 @@ FocusScope {
                     titleFont: cardTitle.font.family
                 }
             },
+            browse: browseView.visible,
+            level: here.level,
+            heading: headingText.visible ? headingText.text : "",
+            error: errorText.visible ? errorText.text : "",
+            cursor: cursor,
+            count: rows.length,
+            rows: rowsDrawn(),
+            pane: {
+                shown: detail.visible,
+                title: detailTitle.text,
+                grade: detailGrade.visible ? detailGrade.drawn() : "",
+                ar: detailArabic.text,
+                arFont: detailArabic.font.family,
+                arAlign: detailArabic.horizontalAlignment === Text.AlignRight ? "right" : "left",
+                meaningLabel: meaningLabel.text,
+                meaning: meaningText.text,
+                meaningFamily: meaningText.font.family,
+                narrator: detailNarrator.visible ? detailNarrator.text : "",
+                sourceLabel: sourceLabel.text,
+                reference: referenceText.text,
+                referenceFamily: referenceText.font.family
+            },
             search: {
-                shown: searchView.visible,
+                shown: fieldBox.visible,
                 text: field.text,
-                count: countText.text,
-                error: errorText.visible ? errorText.text : "",
-                cursor: cursor,
-                rows: rowsDrawn(),
-                detail: {
-                    title: detailTitle.visible ? detailTitle.text : "",
-                    grade: detailGrade.visible ? detailGrade.drawn() : "",
-                    ar: detailArabic.visible ? detailArabic.text : "",
-                    arFont: detailArabic.font.family,
-                    arAlign: detailArabic.horizontalAlignment === Text.AlignRight ? "right" : "left",
-                    en: detailEnglish.visible ? detailEnglish.text : "",
-                    narrator: detailNarrator.visible ? detailNarrator.text : ""
-                },
-                foot: footText.text,
-                copied: copiedText.text,
-                look: {
-                    fieldRadius: fieldBox.radius,
-                    fieldBorder: fieldBox.border.width,
-                    paneRuleDashed: paneRule.dashed,
-                    titleFont: detailTitle.font.family
-                }
+                count: countText.text
+            },
+            foot: footText.text,
+            copied: copiedText.text,
+            look: {
+                fieldRadius: fieldBox.radius,
+                fieldBorder: fieldBox.border.width,
+                paneRuleDashed: paneRule.dashed,
+                titleFont: detailTitle.font.family
             },
             keys: keyStrip.drawn()
         };
@@ -568,9 +667,9 @@ FocusScope {
             }
         }
 
-        // Search, once the corpus is here: the field and the hits on the left, the cursored hadith on the right.
+        // Once the corpus is here: the list of the level on the left, a collection's books, a book's narrations or search's hits, and the open narration on the right.
         FocusScope {
-            id: searchView
+            id: browseView
             Layout.fillWidth: true
             Layout.fillHeight: true
             visible: page.ready
@@ -587,10 +686,11 @@ FocusScope {
                     Layout.margins: 12
                     spacing: 10
 
-                    // Paper's two-pixel accent box, Artboard's rounded outline, Blueprint's one-pixel accent box.
+                    // Search's field: Paper's two-pixel accent box, Artboard's rounded outline, Blueprint's one-pixel accent box.
                     Rectangle {
                         id: fieldBox
                         Layout.fillWidth: true
+                        visible: page.here.level === "search"
                         implicitHeight: page.plain ? 44 : 42
                         radius: page.plain ? 14 : 0
                         color: "transparent"
@@ -604,7 +704,6 @@ FocusScope {
                             anchors.right: countBox.left
                             anchors.rightMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
-                            focus: true
                             clip: true
                             color: page.c.ink ?? "black"
                             selectionColor: page.c.accent ?? "red"
@@ -615,8 +714,10 @@ FocusScope {
                             Keys.onPressed: event => {
                                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Down) {
                                     page.runSearch();
-                                    resultKeys.focus = true;
+                                    listKeys.forceActiveFocus();
                                     event.accepted = true;
+                                } else if (event.key === Qt.Key_Escape) {
+                                    event.accepted = page.back();
                                 }
                             }
                         }
@@ -645,12 +746,29 @@ FocusScope {
                         }
                     }
 
+                    // Where the list is: the collections, a collection's Bangla name, or it and the book's.
+                    Text {
+                        id: headingText
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 12
+                        Layout.topMargin: 6
+                        visible: !fieldBox.visible
+                        textFormat: Text.PlainText
+                        text: page.here.level === "collections" ? page.look.tabText(H.heading(page.levels)) : H.heading(page.levels)
+                        color: page.c.muted ?? "gray"
+                        font.family: page.here.level === "collections" ? page.bodyFont : page.deen.bengali
+                        font.pixelSize: page.plain ? 12 : 11
+                        font.letterSpacing: page.here.level === "collections" && !page.plain ? 1.4 : 0
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
                     Text {
                         id: errorText
                         Layout.fillWidth: true
-                        visible: page.searchError !== ""
+                        visible: page.failure !== ""
                         textFormat: Text.PlainText
-                        text: page.searchError
+                        text: page.failure
                         color: page.c.danger ?? "red"
                         font.family: page.bodyFont
                         font.pixelSize: 12
@@ -658,11 +776,12 @@ FocusScope {
                         maximumLineCount: 1
                     }
 
-                    // j and k, or the arrows, move the cursor; the field keeps the letters until ↓ or Enter leaves it.
+                    // j and k, or the arrows, move the cursor, Enter goes down a level, Esc up one, / searches; search's field keeps the letters until ↓ or Enter leaves it.
                     Item {
-                        id: resultKeys
+                        id: listKeys
                         Layout.fillWidth: true
                         Layout.fillHeight: true
+                        focus: true
                         Keys.onPressed: event => {
                             const k = event.key;
                             const t = event.text;
@@ -670,101 +789,88 @@ FocusScope {
                                 page.moveCursor(1);
                             else if (t === "k" || k === Qt.Key_Up)
                                 page.moveCursor(-1);
+                            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                                page.enter();
                             else if (t === "/")
-                                page.newSearch();
+                                page.openSearch();
                             else if (t === "y")
                                 page.copyHit();
-                            else if (k !== Qt.Key_Return && k !== Qt.Key_Enter)
+                            else if (k === Qt.Key_Escape) {
+                                event.accepted = page.back();
+                                return;
+                            } else
                                 return;
                             event.accepted = true;
                         }
 
                         ListView {
-                            id: resultList
+                            id: list
                             anchors.fill: parent
                             clip: true
                             spacing: 2
-                            model: page.hits
+                            model: page.rows
                             boundsBehavior: Flickable.StopAtBounds
 
                             delegate: Rectangle {
-                                id: hitRow
+                                id: row
                                 required property var modelData
                                 required property int index
                                 readonly property bool on: index === page.cursor
-                                readonly property var told: H.narrator(modelData.hadith.en)
 
                                 function drawn() {
+                                    const y = mapToItem(list, 0, 0).y;
+                                    const texts = [];
+                                    const families = [];
+                                    for (let i = 0; i < cells.count; i++) {
+                                        texts.push(cells.itemAt(i).text);
+                                        families.push(cells.itemAt(i).font.family);
+                                    }
                                     return {
-                                        name: hitName.text,
-                                        n: hitNumber.text,
-                                        grade: hitGrade.drawn(),
-                                        text: hitText.text,
-                                        truncated: hitText.truncated,
-                                        lineCount: hitText.lineCount,
+                                        index: index,
+                                        text: texts.join("  "),
+                                        families: families,
+                                        english: modelData.english,
                                         on: on,
-                                        fill: String(color)
+                                        truncated: cells.count > 0 && cells.itemAt(cells.count - 1).truncated,
+                                        fill: on ? String(color) : "",
+                                        inView: y >= 0 && y + height <= list.height
                                     };
                                 }
                                 width: ListView.view.width
-                                implicitHeight: hitColumn.implicitHeight + 20
-                                radius: page.plain ? 12 : 0
+                                height: 34
+                                radius: page.plain ? page.look.cursor.radius : 0
                                 color: on ? page.look.cursor.fill ?? "black" : "transparent"
-                                border.width: on && page.plain ? 1.5 : 0
-                                border.color: page.c.accent ?? "blue"
 
-                                ColumnLayout {
-                                    id: hitColumn
+                                RowLayout {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
                                     anchors.verticalCenter: parent.verticalCenter
-                                    anchors.leftMargin: 14
-                                    anchors.rightMargin: 14
-                                    spacing: 5
+                                    spacing: 10
 
-                                    RowLayout {
-                                        Layout.fillWidth: true
-                                        spacing: 10
+                                    // Each cell in its face; the last one takes the rest of the line and elides.
+                                    Repeater {
+                                        id: cells
+                                        model: row.modelData.cells
 
                                         Text {
-                                            id: hitName
+                                            required property var modelData
+                                            required property int index
+                                            readonly property string face: modelData.face
+                                            readonly property bool last: index === row.modelData.cells.length - 1
+                                            Layout.fillWidth: last
+                                            Layout.preferredWidth: last ? 0 : implicitWidth
                                             textFormat: Text.PlainText
-                                            text: H.boardName(hitRow.modelData.collection, hitRow.modelData.name)
-                                            color: (hitRow.on ? page.look.cursor.text : page.c.ink) ?? "black"
-                                            font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                                            font.pixelSize: page.plain ? 14 : 13
-                                            font.weight: hitRow.on && page.bracket ? Font.Bold : Font.Medium
+                                            text: face === "mark" ? page.look.tabText(modelData.text) : modelData.text
+                                            elide: Text.ElideRight
+                                            maximumLineCount: 1
+                                            color: (row.on ? (face === "bn" || face === "en" ? page.look.cursor.text : page.look.cursor.detail) : face === "bn" || face === "en" ? page.c.ink : page.c.muted) ?? "black"
+                                            font.family: face === "bn" || face === "ref" ? page.deen.bengali : page.bodyFont
+                                            font.pixelSize: face === "mark" ? (page.plain ? 11 : 10) : face === "count" ? 12 : page.plain ? 14 : 13
+                                            font.letterSpacing: face === "mark" && !page.plain ? 1.4 : 0
+                                            font.weight: row.on && !page.bracket && face !== "mark" ? Font.Medium : Font.Normal
                                         }
-                                        Text {
-                                            id: hitNumber
-                                            textFormat: Text.PlainText
-                                            text: "#" + D.oneLine(hitRow.modelData.hadith.n)
-                                            color: (hitRow.on && !page.plain ? page.look.cursor.detail : page.c.muted) ?? "gray"
-                                            font.family: page.bodyFont
-                                            font.pixelSize: 12
-                                            font.letterSpacing: page.bracket ? 0.72 : 0
-                                        }
-                                        Item {
-                                            Layout.fillWidth: true
-                                        }
-                                        Grade {
-                                            id: hitGrade
-                                            Layout.maximumWidth: 260
-                                            host: page
-                                            on: hitRow.on
-                                            words: H.gradeText(hitRow.modelData.collection, hitRow.modelData.hadith.grades)
-                                        }
-                                    }
-                                    Text {
-                                        id: hitText
-                                        Layout.fillWidth: true
-                                        textFormat: Text.PlainText
-                                        text: D.oneLine(hitRow.told.body)
-                                        color: (hitRow.on && !page.plain ? page.look.cursor.detail : page.plain ? "#2B2F36" : page.c.ink) ?? "black"
-                                        font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                                        font.pixelSize: page.plain ? 13 : 12
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
                                     }
                                 }
                             }
@@ -788,6 +894,7 @@ FocusScope {
                     }
                 }
 
+                // The open narration as Duas draws a dua: its Arabic, its Bangla meaning, or the English marked where it has none, and its Bangla reference.
                 Flickable {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
@@ -797,11 +904,11 @@ FocusScope {
 
                     ColumnLayout {
                         id: detail
-                        x: 32
+                        x: 34
                         y: 26
-                        width: parent.width - 64
-                        spacing: 18
-                        visible: page.hit !== null
+                        width: parent.width - 68
+                        spacing: 22
+                        visible: page.opened !== null
 
                         RowLayout {
                             Layout.fillWidth: true
@@ -811,27 +918,29 @@ FocusScope {
                                 id: detailTitle
                                 Layout.fillWidth: true
                                 textFormat: Text.PlainText
-                                text: page.hit ? H.boardName(page.hit.collection, page.hit.name) + " · " + D.oneLine(page.hit.hadith.n) : ""
+                                text: page.opened ? page.opened.title : ""
                                 color: page.c.ink ?? "black"
-                                font.family: page.headFont
-                                font.pixelSize: page.caps ? 25 : page.plain ? 18 : 16
+                                font.family: page.deen.bengali
+                                font.pixelSize: page.caps ? 25 : page.plain ? 20 : 18
                                 font.weight: page.caps ? Font.Normal : Font.Bold
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                             }
+                            // An English grade is drawn only beside English.
                             Grade {
                                 id: detailGrade
                                 Layout.maximumWidth: 320
+                                visible: !!page.opened && page.opened.grade !== ""
                                 host: page
                                 on: false
-                                words: page.hit ? H.gradeText(page.hit.collection, page.hit.hadith.grades) : ""
+                                words: page.opened ? page.opened.grade : ""
                             }
                         }
                         Text {
                             id: detailArabic
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: page.hit ? H.wrapped(page.hit.hadith.ar) : ""
+                            text: page.opened ? page.opened.ar : ""
                             color: page.c.ink ?? "black"
                             font.family: page.deen.arabic
                             font.pixelSize: 34
@@ -839,28 +948,72 @@ FocusScope {
                             horizontalAlignment: Text.AlignRight
                             wrapMode: Text.Wrap
                         }
-                        Text {
-                            id: detailEnglish
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            textFormat: Text.PlainText
-                            text: H.wrapped(page.told.body)
-                            color: page.c.ink ?? "black"
-                            font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                            font.pixelSize: page.caps ? 15 : page.plain ? 16 : 14
-                            lineHeight: 1.55
-                            wrapMode: Text.Wrap
-                        }
-                        Text {
-                            id: detailNarrator
-                            Layout.fillWidth: true
-                            visible: page.told.by !== ""
-                            textFormat: Text.PlainText
-                            text: page.say("Narrated by " + D.oneLine(page.told.by))
-                            color: page.c.muted ?? "gray"
-                            font.family: page.bodyFont
-                            font.pixelSize: 12
-                            font.letterSpacing: page.bracket ? 0.72 : 0
-                            wrapMode: Text.Wrap
+                            spacing: 14
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+
+                                Text {
+                                    id: meaningLabel
+                                    textFormat: Text.PlainText
+                                    // Where the narration has no Bangla, the label marks the English that stands in.
+                                    text: page.look.tabText(page.opened && page.opened.english ? "English" : "Meaning")
+                                    color: page.c.muted ?? "gray"
+                                    font.family: page.bodyFont
+                                    font.pixelSize: page.plain ? 11 : 10
+                                    font.letterSpacing: page.plain ? 0 : 1.4
+                                }
+                                Text {
+                                    id: meaningText
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: page.opened ? page.opened.text : ""
+                                    wrapMode: Text.Wrap
+                                    color: page.c.ink ?? "black"
+                                    font.family: page.opened && page.opened.english ? page.bodyFont : page.deen.bengali
+                                    font.pixelSize: page.plain ? 16 : page.bracket ? 14 : 15
+                                    lineHeight: 1.4
+                                }
+                                Text {
+                                    id: detailNarrator
+                                    Layout.fillWidth: true
+                                    visible: !!page.opened && page.opened.by !== ""
+                                    textFormat: Text.PlainText
+                                    text: page.opened ? page.say("Narrated by " + page.opened.by) : ""
+                                    color: page.c.muted ?? "gray"
+                                    font.family: page.bodyFont
+                                    font.pixelSize: 12
+                                    font.letterSpacing: page.bracket ? 0.72 : 0
+                                    wrapMode: Text.Wrap
+                                }
+                            }
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+
+                                Text {
+                                    id: sourceLabel
+                                    textFormat: Text.PlainText
+                                    text: page.look.tabText("Source")
+                                    color: page.c.muted ?? "gray"
+                                    font.family: page.bodyFont
+                                    font.pixelSize: page.plain ? 11 : 10
+                                    font.letterSpacing: page.plain ? 0 : 1.4
+                                }
+                                Text {
+                                    id: referenceText
+                                    Layout.fillWidth: true
+                                    textFormat: Text.PlainText
+                                    text: page.opened ? page.opened.reference : ""
+                                    wrapMode: Text.Wrap
+                                    color: page.c.ink ?? "black"
+                                    font.family: page.deen.bengali
+                                    font.pixelSize: page.plain ? 14 : 13
+                                }
+                            }
                         }
                     }
                 }
@@ -907,7 +1060,7 @@ FocusScope {
             id: keyStrip
             Layout.fillWidth: true
             deen: page.deen
-            pairs: page.ready ? [["type", "search"], ["↓", "results"], ["↵", "open"], ["y", "copy"], ["/", "new search"], ["tab", "section"], ["esc", "close"]] : [["r", "retry after a failure"], ["tab", "other section"], ["esc", "close"]]
+            pairs: !page.ready ? [["r", "retry after a failure"], ["tab", "other section"], ["esc", "close"]] : page.here.level === "search" ? [["type", "search"], ["↓", "results"], ["y", "copy"], ["/", "new search"], ["tab", "section"], ["esc", "back"]] : page.here.level === "narration" ? [["j/k", "narration"], ["y", "copy"], ["/", "search"], ["tab", "section"], ["esc", "back"]] : [["j/k", "move"], ["↵", "open"], ["/", "search"], ["tab", "section"], ["esc", page.here.level === "collections" ? "close" : "back"]]
         }
     }
 

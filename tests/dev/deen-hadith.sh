@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deen's Hadith: with no corpus, opening Deen starts the download, which the tab draws and a cut leaves kept for r to resume; then search lists the hits and the right pane shows the cursored one.
+# Deen's Hadith: with no corpus, opening Deen starts the download, which the tab draws and a cut leaves kept for r to resume; then Enter browses collection, book and narration, Esc goes back up, and / searches from any level.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -9,7 +9,8 @@ work=$(mktemp -d)
 cleanup() { rm -rf "$work"; }
 log=$work/deen.log
 calls=$DOTS_DEV_DIR/deen.log
-bukhari1_ar=$(jq -r '.hits[0].hadith.ar' "$repo/dev/deen/hadith-search---limit-40----intentions.json")
+bukhari1_ar=$(jq -r '.hadiths[0].ar' "$repo/dev/deen/hadith-list-bukhari-1.json")
+bukhari1_bn=$(jq -r '.hadiths[0].bn' "$repo/dev/deen/hadith-list-bukhari-1.json")
 
 deen_state() { timeout 0.5 qs ipc -p "$deen_qml" call deen state 2>/dev/null; }
 deen_is() { deen_state | jq -e "$@" >/dev/null 2>&1; }
@@ -98,49 +99,153 @@ rm "$DOTS_DEV_DIR/deen-hadith-cut"
 wtype r
 until_ok 2000 fetches_are 2
 check "r starts a second fetch ($(fetches))" fetches_are 2
-until_ok 6000 hadith_is '.ready and .search.foot != "offline"'
-check "the download ran to done and search is on ($(hadith '.search | [.shown, .foot]'))" \
-  hadith_is '.search.shown and .download.shown == false and .search.foot == "offline · 36,512 narrations"'
-check "the field has the keys ($(hadith .focus))" hadith_is '.focus == "field"'
+until_ok 6000 hadith_is '.ready and .foot != "offline"'
+check "the download ran to done and the browse is on ($(hadith '[.browse, .foot]'))" \
+  hadith_is '.browse and .download.shown == false and .foot == "offline · 36,512 narrations"'
 
-wtype intentions
-until_ok 3000 hadith_is '.search.rows | length > 1'
-check "typing intentions lists 35 results, Sahih al-Bukhari #1 first graded Sahih ($(hadith '[.search.count, .search.rows[0].name, .search.rows[0].n, .search.rows[0].grade]'))" \
-  hadith_is '.search.text == "intentions" and .search.count == "35 results" and .search.rows[0].name == "Sahih al-Bukhari" and .search.rows[0].n == "#1" and .search.rows[0].grade == "Sahih" and .search.rows[0].on and .search.detail.grade == "SAHIH"'
-check "the right pane shows it in full with its narrator ($(hadith '.search.detail | [.title, .grade, .narrator, .en[0:40], .arAlign]'))" \
-  deen_is --arg ar "$bukhari1_ar" '.hadith | .search.detail.title == "Sahih al-Bukhari · 1" and .search.detail.narrator == "Narrated by '"'"'Umar bin Al-Khattab" and (.search.detail.en | startswith("I heard Allah")) and .search.detail.ar == $ar and .search.detail.arAlign == "right"'
-check "intentions ran once the typing stopped ($(grep -c '^hadith search' "$calls") searches)" grep -qx 'hadith search --limit 40 -- intentions' "$calls"
-check "paper: the field is a square box ruled in two pixels ($(hadith '.search.look'))" hadith_is '.search.look.fieldRadius == 0 and .search.look.fieldBorder == 2'
-
-wtype -k Down j
-until_ok 1000 hadith_is '.search.cursor == 1'
-check "↓ moves to the results and j to the second hit ($(hadith '[.focus, .search.cursor, .search.detail.title]'))" \
-  hadith_is '.focus == "results" and .search.cursor == 1 and .search.rows[1].on and .search.detail.title == "Sahih al-Bukhari · 1560"'
+# The Show path: collections, Bukhari's books, book 1's narrations, narration 1.
+until_ok 2000 hadith_is '.count == 10'
+check "the tab opens on the 10 collections, Bukhari first by its Bangla and English names and count ($(hadith '[.level, .count, .rows[0].text, .focus]'))" \
+  hadith_is '.level == "collections" and .count == 10 and .rows[0].text == "সহীহ বুখারী  Sahih al-Bukhari  7583" and .rows[0].on and .focus == "list" and .heading == "COLLECTIONS"'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "books"'
+check "Enter on সহীহ বুখারী lists its books, ১. ওহীর সূচনা first and book 0 last ($(hadith '[.heading, .rows[0].text, .rows[-1].text]'))" \
+  hadith_is '.heading == "সহীহ বুখারী" and .count == 4 and .rows[0].text == "১. ওহীর সূচনা  7" and .rows[-1].text == "অন্যান্য  307"'
+check "it asked deen for Bukhari's books" grep -qx 'hadith books bukhari' "$calls"
+wtype -k Return
+until_ok 2000 hadith_is '.level == "narrations"'
+check "Enter on book 1 lists its 7 narrations, each one line of Bangla, narration 1's first ($(hadith '[.heading, .count, .rows[0].text[0:40]]'))" \
+  deen_is --arg bn "$bukhari1_bn" '.hadith | .heading == "সহীহ বুখারী · ওহীর সূচনা" and .count == 7 and .rows[0].text == $bn and ([.rows[] | .english] | all(. == false))'
+check "it asked deen for book 1's list" grep -qx 'hadith list bukhari 1' "$calls"
+wtype -k Return
+until_ok 2000 hadith_is '.level == "narration"'
+pane_is_bukhari1() {
+  deen_is --arg bn "$bukhari1_bn" --arg ar "$bukhari1_ar" --arg fam "$1" '.hadith.pane | .shown and .ar == $ar and .meaning == $bn and .reference == "সহীহ বুখারী ১" and (.meaningLabel | ascii_downcase) == "meaning" and .grade == "" and .narrator == "" and .meaningFamily == $fam and .referenceFamily == $fam and .arAlign == "right"'
+}
+check "Enter opens narration 1: its Arabic, its Bangla and সহীহ বুখারী ১, no English or grade ($(hadith '.pane | [.title, .reference, .meaningLabel, .meaning[0:30], .grade, .narrator]'))" \
+  pane_is_bukhari1 "Noto Serif Bengali"
 in_theme artboard
 until_ok 3000 deen_is '.voice == "plain"'
-check "artboard: the field rounds 14, the cursor row fills #EEF1FF ($(hadith '[.search.look.fieldRadius, .search.rows[1].fill, .search.count]'))" \
-  hadith_is '.search.look.fieldRadius == 14 and .search.rows[1].fill == "#eef1ff" and .search.rows[1].grade == "Sahih"'
+check "artboard draws the open narration in Noto Sans Bengali ($(hadith '.pane | [.meaningFamily, .meaningLabel, .reference]'))" pane_is_bukhari1 "Noto Sans Bengali"
 in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
-check "blueprint: the grade and count read in capitals, the pane's rule dashed ($(hadith '[.search.rows[0].grade, .search.count, .search.detail.narrator, .search.look.paneRuleDashed]'))" \
-  hadith_is '.search.rows[0].grade == "[SAHIH]" and .search.count == "35 RESULTS" and .search.detail.narrator == "NARRATED BY AL-QASIM BIN MUHAMMAD" and .search.look.paneRuleDashed and .search.foot == "OFFLINE · 36,512 NARRATIONS"'
+check "blueprint draws the open narration in Noto Sans Bengali ($(hadith '.pane | [.meaningFamily, .meaningLabel, .reference]'))" pane_is_bukhari1 "Noto Sans Bengali"
+in_theme paper
+until_ok 3000 deen_is '.voice == "caps"'
+wtype y
+until_ok 1000 hadith_is '.copied != ""'
+check "y copies the open narration ($(hadith .copied))" hadith_is '.copied == "copied Sahih al-Bukhari 1"'
+
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "narrations"'
+check "Esc returns to the narrations, the cursor still on narration 1 ($(hadith '[.level, .cursor, .pane.shown]'))" hadith_is '.level == "narrations" and .cursor == 0 and .pane.shown == false'
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "books"'
+check "Esc returns to the books ($(hadith '[.level, .rows[0].text]'))" hadith_is '.level == "books" and .rows[0].text == "১. ওহীর সূচনা  7"'
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "collections"'
+check "Esc returns to the collections ($(hadith '[.level, .rows[0].text]'))" hadith_is '.level == "collections" and .rows[0].on and .count == 10'
+wtype -k Escape
+until_ok 3000 deen_gone
+check "Esc on the collections closes Deen" deen_gone
+until_ok 3000 no_deen_process
+check "and no qs with -p .../shell/deen.qml is left" no_deen_process
+
+# The corpus is ready now, so the next open goes straight to the collections.
+open_deen
+until_ok 5000 deen_up
+wtype -k Shift_L
+wtype -k Tab -k Tab -k Tab
+until_ok 1000 deen_is '.tab == "hadith"'
+until_ok 3000 hadith_is '.ready and .count == 10'
+check "Deen reopens on the collections ($(hadith '[.level, .count]'))" hadith_is '.level == "collections" and .count == 10'
+
+wtype -k Return
+until_ok 2000 hadith_is '.level == "books"'
+wtype /
+until_ok 1000 hadith_is '.level == "search"'
+check "/ from the books opens search with the field's keys ($(hadith '[.level, .focus, .search.shown, .search.text]'))" \
+  hadith_is '.level == "search" and .focus == "field" and .search.shown and .search.text == ""'
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "books"'
+check "Esc from search returns to the books ($(hadith '[.level, .focus, .heading, .rows[0].text]'))" \
+  hadith_is '.level == "books" and .focus == "list" and .search.shown == false and .heading == "সহীহ বুখারী" and .rows[0].text == "১. ওহীর সূচনা  7"'
+
+wtype /
+until_ok 1000 hadith_is '.focus == "field"'
+wtype 'নিয়ত'
+until_ok 3000 hadith_is '.count == 4'
+check "নিয়ত lists Bangla hits, each led by its Bangla reference ($(hadith '[.search.count, .rows[0].text[0:40], [.rows[] | .english]]'))" \
+  deen_is --arg bn "$bukhari1_bn" '.hadith | .search.text == "নিয়ত" and .search.count == "4 results" and .rows[0].text == ("সহীহ বুখারী ১  " + $bn) and ([.rows[] | .english] == [false, false, false, true])'
+check "the hit without Bangla draws its English under the mark ($(hadith '.rows[3].text'))" \
+  hadith_is '.rows[3].text == "সুনান নাসাঈ ৭৫  ENGLISH  It was narrated that '"'"'Umar bin Al-Khattab said: \"The Messenger of Allah (ﷺ) said: '"'"'Actions are only by intentions.'"'"'\""'
+check "the first hit opens in the pane as a narration does ($(hadith '.pane | [.reference, .meaningLabel]'))" \
+  deen_is --arg bn "$bukhari1_bn" '.hadith.pane | .meaning == $bn and .reference == "সহীহ বুখারী ১" and .meaningLabel == "MEANING"'
+check "the search ran on the Bangla word" grep -qx 'hadith search --limit 40 -- নিয়ত' "$calls"
+wtype -k Down jjj
+until_ok 1000 hadith_is '.cursor == 3'
+check "its pane draws the English under ENGLISH with its grade and the Bangla reference ($(hadith '.pane | [.meaningLabel, .meaning[0:30], .grade, .reference, .meaningFamily]'))" \
+  hadith_is '.focus == "list" and .pane.meaningLabel == "ENGLISH" and (.pane.meaning | startswith("It was narrated")) and .pane.grade == "SAHIH" and .pane.reference == "সুনান নাসাঈ ৭৫" and (.pane.meaningFamily | test("Bengali") | not)'
+check "paper: the field is a square box ruled in two pixels ($(hadith '.look'))" hadith_is '.look.fieldRadius == 0 and .look.fieldBorder == 2'
+in_theme artboard
+until_ok 3000 deen_is '.voice == "plain"'
+check "artboard: the field rounds 14, the cursor row fills #EEF1FF, the mark reads English ($(hadith '[.look.fieldRadius, .rows[3].fill, .pane.meaningLabel]'))" \
+  hadith_is '.look.fieldRadius == 14 and .rows[3].fill == "#eef1ff" and .pane.meaningLabel == "English" and (.rows[3].text | contains("  English  "))'
+in_theme blueprint
+until_ok 3000 deen_is '.voice == "bracket"'
+check "blueprint: the count and foot read in capitals over a dashed pane rule ($(hadith '[.search.count, .foot, .look.paneRuleDashed]'))" \
+  hadith_is '.search.count == "4 RESULTS" and .look.paneRuleDashed and .foot == "OFFLINE · 36,512 NARRATIONS"'
 in_theme paper
 until_ok 3000 deen_is '.voice == "caps"'
 
 wtype /
 until_ok 1000 hadith_is '.focus == "field" and .search.text == ""'
-check "/ clears the field and gives it the keys ($(hadith '[.focus, .search.text]'))" hadith_is '.focus == "field" and .search.text == ""'
+check "/ in search clears the field and gives it the keys ($(hadith '[.focus, .search.text]'))" hadith_is '.focus == "field" and .search.text == ""'
 wtype forged
 wtype -k Return
-until_ok 3000 hadith_is '.search.rows | length == 2'
-check "the forged hit draws on one line without its controls ($(hadith '.search.rows[0] | [.text, .lineCount, .grade]'))" \
-  hadith_is '.search.rows[0].text == "first line second reversed [31m red" and .search.rows[0].lineCount == 1 and .search.rows[0].grade == "Sahih (Al-Albani) · Hasan (Shuaib Al Arnaut)"'
-check "the 200-character hit is cut to one line ($(hadith '.search.rows[1] | [.truncated, .lineCount, .grade]'))" \
-  hadith_is '.search.rows[1].truncated and .search.rows[1].lineCount == 1 and .search.rows[1].grade == "UNGRADED"'
-check "Enter moved to the results, and the forged pane wraps without controls ($(hadith '[.focus, .search.detail.en]'))" \
-  hadith_is '.focus == "results" and .search.detail.en == "first line\nsecond reversed[31m red" and .search.detail.narrator == "Narrated by Forged"'
+until_ok 3000 hadith_is '.count == 2'
+check "the forged hit draws on one line without its controls ($(hadith '.rows[0] | [.text, .truncated]'))" \
+  hadith_is '.rows[0].text == "সুনান আবূ দাউদ ১  ENGLISH  first line second reversed [31m red"'
+check "the 200-character hit is cut to one line ($(hadith '.rows[1] | [.truncated]'))" hadith_is '.rows[1].truncated'
+check "Enter moved to the list, and the forged pane wraps without controls ($(hadith '[.focus, .pane.meaning, .pane.grade]'))" \
+  hadith_is '.focus == "list" and .pane.meaning == "first line\nsecond reversed[31m red" and .pane.narrator == "Narrated by Forged" and .pane.grade == "SAHIH (AL-ALBANI) · HASAN (SHUAIB AL ARNAUT)"'
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "books"'
+wtype -k Escape
+until_ok 1000 hadith_is '.level == "collections"'
+check "Esc from search, then Esc from the books, is back on the collections ($(hadith '[.level, .search.text]'))" hadith_is '.level == "collections" and .search.text == ""'
 
-# Esc from the field, which takes typing, still reaches the frame.
+# A collection with no Bangla: every Qudsi narration reads in English, marked.
+wtype jjjjjjjj
+until_ok 1000 hadith_is '.cursor == 8'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "books"'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "narrations"'
+check "Qudsi's narrations list in English under the mark ($(hadith '[.heading, .rows[0].text]'))" \
+  hadith_is '.heading == "চল্লিশ হাদীসে কুদসী · চল্লিশ হাদীসে কুদসী" and ([.rows[] | .english] | all) and (.rows[0].text | startswith("ENGLISH  When Allah decreed the Creation"))'
+wtype -k Return
+until_ok 1000 hadith_is '.level == "narration"'
+check "a Qudsi narration opens in English under ENGLISH with its narrator and Bangla reference ($(hadith '.pane | [.meaningLabel, .meaning[0:30], .narrator, .reference]'))" \
+  hadith_is '.pane.meaningLabel == "ENGLISH" and (.pane.meaning | startswith("When Allah decreed")) and .pane.narrator == "Narrated by Abu Hurairah" and .pane.reference == "চল্লিশ হাদীসে কুদসী ১"'
+wtype -k Escape -k Escape -k Escape
+until_ok 1000 hadith_is '.level == "collections"'
+
+# A long book: the cursor on its last row keeps that row on screen.
+wtype kkkkkkkk
+until_ok 1000 hadith_is '.cursor == 0'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "books"'
+wtype jj
+until_ok 1000 hadith_is '.cursor == 2'
+wtype -k Return
+until_ok 2000 hadith_is '.level == "narrations" and .count == 40'
+wtype "$(printf 'j%.0s' $(seq 39))"
+until_ok 3000 hadith_is '.cursor == 39'
+check "Bukhari 8's last row is drawn on screen with the cursor on it ($(hadith '[.cursor, (.rows[] | select(.on) | [.index, .inView, .text])]'))" \
+  hadith_is '.cursor == 39 and ([.rows[] | select(.on)] | length == 1 and .[0].index == 39 and .[0].inView and .[0].text == "সালাত বিষয়ে বর্ণনা ৩৮৮।")'
+
+# Tab still reaches the frame from the field, and Esc from it goes back, not out.
 fetch_now=$(fetch_pids)
 wtype /
 until_ok 1000 hadith_is '.focus == "field"'
@@ -150,8 +255,11 @@ check "Tab from the field reaches the frame ($(deen_state | jq -c .tab))" deen_i
 wtype -M shift -k Tab -m shift
 until_ok 1000 deen_is '.tab == "hadith" and .hadith.focus == "field"'
 wtype -k Escape
+until_ok 1000 hadith_is '.level == "narrations"'
+check "Esc from the field returns to the narrations ($(hadith '[.level, .cursor]'))" hadith_is '.level == "narrations" and .cursor == 39'
+wtype -k Escape -k Escape -k Escape
 until_ok 3000 deen_gone
-check "Esc from the field closes the window" deen_gone
+check "Esc up through the books and collections closes the window" deen_gone
 until_ok 3000 no_deen_process
 check "and no qs with -p .../shell/deen.qml is left" no_deen_process
 check "and no fetch script is left (${fetch_pid:-none} ${fetch_now})" eval '[ -z "$(fetch_pids)" ] && [ ! -d "/proc/$fetch_pid" ]'
