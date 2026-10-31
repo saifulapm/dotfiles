@@ -23,11 +23,14 @@ export function firstWords(ar) {
   return { shown: all.slice(0, n).join(' '), hidden: Math.max(0, all.length - n) };
 }
 
-// The surah's English name for a card's heading; the number stands in until the names are known.
+// A number in Bangla digits, as a reference beside a Bangla name is written.
+const bnDigits = (n) => String(n).replace(/[0-9]/g, (d) => '০১২৩৪৫৬৭৮৯'[d]);
+
+// The surah's Bangla name for a card's heading; the number stands in until the names are known.
 export function surahName(answer, n) {
   const list = answer && Array.isArray(answer.surahs) ? answer.surahs : [];
   const found = list.find((s) => s && s.n === n);
-  return found && typeof found.en === 'string' && found.en !== '' ? found.en : `Surah ${n}`;
+  return found && typeof found.bn === 'string' && found.bn !== '' ? found.bn : `সূরা ${bnDigits(n)}`;
 }
 
 // The deck as `deen hifz due` answers it, or null when that is no deck.
@@ -76,7 +79,7 @@ export function words(voice) {
     line: (fresh, at, left) => t(`${fresh} new · ${at} of ${left} · self-graded, nothing is recorded`),
     quiet: t('self-graded, nothing is recorded'),
     badge,
-    heading: (name, a) => t(`${name} · ayah ${a}`),
+    heading: (name, s, a) => `${name} ${bnDigits(s)}:${bnDigits(a)}`,
     recite: t('Recite the rest aloud. No microphone: you judge yourself.'),
     hintKey: voice === 'bracket' ? '[SPACE]' : 'space',
     hintWord: t('reveal the rest'),

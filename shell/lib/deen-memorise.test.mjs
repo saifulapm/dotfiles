@@ -91,12 +91,10 @@ test('Paper and Artboard write the count and its line in sentence case, Blueprin
   assert.equal(M.words('bracket').line(2, 1, 7), '2 NEW · 1 OF 7 · SELF-GRADED, NOTHING IS RECORDED');
 });
 
-test('each theme writes the card badge, the heading and the rating head as its board does', () => {
+test('each theme writes the card badge and the rating head as its board does', () => {
   assert.equal(M.words('caps').badge(false), '1 · RECALL');
   assert.equal(M.words('plain').badge(true), '2 · revealed');
   assert.equal(M.words('bracket').badge(false), '[1 · RECALL]');
-  assert.equal(M.words('plain').heading('Al-Faatiha', 2), 'Al-Faatiha · ayah 2');
-  assert.equal(M.words('bracket').heading('Al-Faatiha', 2), 'AL-FAATIHA · AYAH 2');
   assert.equal(M.words('caps').ask, 'HOW DID IT GO · NEXT REVIEW');
   assert.equal(M.words('plain').ask, 'How did it go · next review');
   assert.deepEqual(M.words('bracket').grades, ['AGAIN', 'HARD', 'GOOD', 'EASY']);
@@ -109,10 +107,15 @@ test('the done line names the next review when one is known', () => {
   assert.equal(M.words('plain').nothing, 'Nothing due today. Press m in Read to add a surah to Memorise.');
 });
 
-test('a surah is named by its English name, else by its number', () => {
+test('a surah is named by its Bangla name, else by its number in Bangla digits', () => {
   const surahs = read('api-surahs');
-  assert.equal(M.surahName(surahs, 1), 'Al-Faatiha');
-  assert.equal(M.surahName(null, 112), 'Surah 112');
+  assert.equal(M.surahName(surahs, 94), 'সূরা আশ-শারহ');
+  assert.equal(M.surahName(null, 112), 'সূরা ১১২');
+});
+
+test('a card\'s heading gives its Bangla surah name and its reference in Bangla digits', () => {
+  assert.equal(M.words('caps').heading('সূরা আশ-শারহ', 94, 6), 'সূরা আশ-শারহ ৯৪:৬');
+  assert.equal(M.words('bracket').heading('সূরা আল-ফাতিহা', 1, 2), 'সূরা আল-ফাতিহা ১:২');
 });
 
 // The test files are left out: they name the very tools this test looks for.

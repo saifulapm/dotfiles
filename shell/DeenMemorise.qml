@@ -100,12 +100,17 @@ FocusScope {
                 badge: badgeText.text,
                 badgeFill: String(badgeBox.color),
                 heading: headingText.text,
+                headingFamily: headingText.fontInfo.family,
                 headingTruncated: headingText.truncated,
                 arabic: arabicCue.visible ? arabicCue.text : arabicFull.visible ? arabicFull.text : "",
                 arabicFont: arabicFull.visible ? arabicFull.font.family : arabicCue.font.family,
                 blanks: blankList.visible ? blankList.count : 0,
                 recite: reciteText.visible ? reciteText.text : "",
                 hint: hintBox.visible ? hintKey.text + " " + hintWord.text : "",
+                pron: pronText.visible ? pronText.text : "",
+                pronFamily: pronText.fontInfo.family,
+                pronLines: pronText.visible ? pronText.lineCount : 0,
+                pronTruncated: pronText.visible ? pronText.truncated : false,
                 meaning: meaningText.visible ? meaningText.text : "",
                 meaningFamily: meaningText.fontInfo.family,
                 meaningLines: meaningText.visible ? meaningText.lineCount : 0,
@@ -248,11 +253,11 @@ FocusScope {
                             id: headingText
                             Layout.maximumWidth: card.width * 0.6
                             textFormat: Text.PlainText
-                            text: page.head ? D.oneLine(page.words.heading(M.surahName(page.surahs, page.head.ayah.s), page.head.ayah.a)) : ""
+                            text: page.head ? D.oneLine(page.words.heading(M.surahName(page.surahs, page.head.ayah.s), page.head.ayah.s, page.head.ayah.a)) : ""
                             elide: Text.ElideRight
                             maximumLineCount: 1
                             color: c.muted ?? "gray"
-                            font.family: (plain ? fonts.ui : fonts.mono) ?? ""
+                            font.family: deen.bengali
                             font.pixelSize: 12
                             font.letterSpacing: bracket ? 0.7 : 0
                         }
@@ -312,6 +317,20 @@ FocusScope {
                         color: c.ink ?? "black"
                         font.family: page.bodyFont
                         font.pixelSize: plain ? 14 : 13
+                    }
+                    // The pronunciation shows with the meaning, once space reveals the ayah, so the cue does not read the rest out.
+                    Text {
+                        id: pronText
+                        Layout.fillWidth: true
+                        visible: page.revealed
+                        textFormat: Text.PlainText
+                        text: page.head ? D.oneLine(page.head.ayah.bn_pron) : ""
+                        wrapMode: Text.WordWrap
+                        elide: Text.ElideRight
+                        maximumLineCount: 4
+                        color: c.muted ?? "gray"
+                        font.family: deen.bengali
+                        font.pixelSize: 15
                     }
                     Text {
                         id: meaningText
