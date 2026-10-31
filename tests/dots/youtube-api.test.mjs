@@ -144,6 +144,26 @@ test('thumbs fetches each good id into the cache and lists it, leaving out a fai
   assert.deepEqual(readdirSync(thumbs).sort(), ['aaaaaaaaaaa.jpg', 'bbbbbbbbb-_.jpg']);
 });
 
+// mqdefault is 320x180, the size the App draws at no more than 2x (5TBCGNV6); the CLI runs under python with urlopen recording what it is asked, so no test reaches i.ytimg.com.
+test('thumbs asks i.ytimg.com for the 320x180 mqdefault of each id when nothing replaces the URL', (t) => {
+  const { env } = rig(t);
+  const probe = `import runpy, sys, urllib.request
+asked = []
+def urlopen(url, timeout):
+    asked.append(url)
+    raise OSError("offline")
+urllib.request.urlopen = urlopen
+sys.argv = ["dots-youtube-api", "thumbs", "dQw4w9WgXcQ"]
+try:
+    runpy.run_path(${JSON.stringify(bin)}, run_name="__main__")
+except SystemExit:
+    pass
+print(asked, file=sys.stderr)`;
+  const r = spawnSync('python3', ['-c', probe], { env, encoding: 'utf8', timeout: 15000 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stderr.trim(), "['https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg']");
+});
+
 test('thumbs prunes the cache to 200 MiB, oldest first, keeping the newest', (t) => {
   const { dir, env } = rig(t);
   const thumbs = join(dir, 'cache', 'dots', 'youtube', 'thumbs');
