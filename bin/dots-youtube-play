@@ -1,24 +1,27 @@
 #!/usr/bin/env bash
-# dots-youtube-play video <id>: plays a YouTube video in an mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}.
+# dots-youtube-play video <id>: plays a YouTube video in an mpv window under a transient user unit of its own, youtube-video-<n>, so it outlives the App's window and qs, and two plays are two windows each stoppable by unit; prints {"unit": <name>}. dots-youtube-play audio: starts the Queue, one audio-only mpv idle in the unit youtube-audio, unless it runs already, and prints {"unit", "socket"} once its JSON IPC socket is there; the App loads every item through that socket.
 set -uo pipefail
 {
 usage() {
-  echo "dots-youtube-play: usage: video <video id>" >&2
+  echo "dots-youtube-play: usage: video <video id> | audio" >&2
   exit 2
 }
-[ "${1:-}" = video ] && [ $# = 2 ] || usage
-# An id is all the App plays here, so nothing else reaches mpv's command line as an option.
-[[ $2 =~ ^[A-Za-z0-9_-]{11}$ ]] || usage
-url=https://www.youtube.com/watch?v=$2
+case "${1:-}" in
+video)
+  [ $# = 2 ] || usage
+  # An id is all the App plays here, so nothing else reaches mpv's command line as an option.
+  [[ $2 =~ ^[A-Za-z0-9_-]{11}$ ]] || usage
+  ;;
+audio) [ $# = 1 ] || usage ;;
+*) usage ;;
+esac
 
-# The unit gets the user manager's PATH, so mpv's yt-dlp is named by path, and yt-dlp is handed the deno mise holds (ruling B47Y3V5J).
 player=(
   "${DOTS_YOUTUBE_MPV:-mpv}"
-  --force-window=immediate
-  "--ytdl-format=bv*[height<=1080]+ba/b[height<=1080]"
-  # A stream URL YouTube has since refused answers 403; lavf reconnects instead of ending the video.
+  # A stream URL YouTube has since refused answers 403; lavf reconnects instead of ending the item.
   --stream-lavf-o=reconnect=1,reconnect_on_http_error=403,reconnect_delay_max=3
 )
+# The unit gets the user manager's PATH, so mpv's yt-dlp is named by path, and yt-dlp is handed the deno mise holds (ruling B47Y3V5J).
 ytdlp=$(command -v yt-dlp) && player+=("--script-opts=ytdl_hook-ytdl_path=$ytdlp")
 deno=$(mise which deno 2>/dev/null) && [ -n "$deno" ] && player+=("--ytdl-raw-options=js-runtimes=deno:$deno")
 
@@ -28,6 +31,30 @@ for name in $(compgen -e); do
   case $name in WAYLAND_DISPLAY | XDG_RUNTIME_DIR | XDG_CONFIG_HOME | XDG_CACHE_HOME | XDG_STATE_HOME | MPV_HOME | DOTS_DEV_DIR) pass+=("--setenv=$name") ;; esac
 done
 
+if [ "$1" = audio ]; then
+  unit=youtube-audio
+  sock=$XDG_RUNTIME_DIR/dots/youtube-audio.sock
+  answer() { jq -nc --arg u "$unit" --arg s "$sock" '{unit: $u, socket: $s}'; }
+  if systemctl --user is-active --quiet "$unit.service"; then
+    [ -S "$sock" ] && { answer; exit 0; }
+    # Its socket is gone, so nothing could drive it: a fresh Queue takes its place.
+    systemctl --user stop "$unit.service"
+  fi
+  mkdir -p "$(dirname "$sock")"
+  rm -f "$sock"
+  player+=(--no-video --idle=yes "--input-ipc-server=$sock" --ytdl-format=bestaudio/best)
+  systemd-run --user --collect --quiet --unit "$unit" "${pass[@]}" -- "${player[@]}" 2>/dev/null
+  # mpv binds and listens in one step as it starts, so the socket's file is the sign it answers.
+  for _ in $(seq 30); do
+    [ -S "$sock" ] && { answer; exit 0; }
+    sleep 0.1
+  done
+  jq -nc '{error: "the Queue did not start: youtube-audio made no socket in 3 s"}'
+  exit 1
+fi
+
+url=https://www.youtube.com/watch?v=$2
+player+=(--force-window=immediate "--ytdl-format=bv*[height<=1080]+ba/b[height<=1080]")
 # The first free number; systemd-run refuses a name another play took a moment ago, so the next is tried.
 for n in $(seq 1 99); do
   unit=youtube-video-$n

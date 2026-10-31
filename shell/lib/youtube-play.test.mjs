@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -15,14 +15,18 @@ function rig(t, extra = {}) {
     writeFileSync(join(dir, name), `#!/bin/sh\n${body}\n`);
     chmodSync(join(dir, name), 0o755);
   };
-  stub('systemd-run', `for a; do case $a in youtube-video-*) unit=$a ;; esac; done\ncase " $TAKEN " in *" $unit "*) echo "Unit $unit.service was already loaded" >&2; exit 1 ;; esac\nprintf '%s\\n' "$@" > "${dir}/argv-$unit"`);
-  stub('systemctl', 'exit 3');
+  // The Queue's mpv makes its socket as it starts, unless $NO_SOCKET says it died first.
+  stub('systemd-run', `for a; do case $a in youtube-video-* | youtube-audio) unit=$a ;; --input-ipc-server=*) sock=\${a#*=} ;; esac; done\ncase " $TAKEN " in *" $unit "*) echo "Unit $unit.service was already loaded" >&2; exit 1 ;; esac\nprintf '%s\\n' "$@" > "${dir}/argv-$unit"\n[ -n "$sock" ] && [ -z "$NO_SOCKET" ] && python3 -c 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])' "$sock"\nexit 0`);
+  // Every unit reads inactive unless named in $ACTIVE; each call is logged.
+  stub('systemctl', `echo "$*" >> "${dir}/systemctl.log"\nfor a; do case " $ACTIVE " in *" \${a%.service} "*) exit 0 ;; esac; done\nexit 3`);
   stub('mise', `[ "$1 $2" = "which deno" ] && echo /opt/deno/bin/deno`);
   stub('yt-dlp', 'echo 2026.10.26');
   const env = Object.assign({ PATH: `${dir}:/usr/bin:/bin`, HOME: dir, XDG_RUNTIME_DIR: dir }, extra);
   const run = (...args) => spawnSync('bash', [bin, ...args], { env, encoding: 'utf8', timeout: 5000 });
   const argv = (unit) => readFileSync(join(dir, `argv-${unit}`), 'utf8').trimEnd().split('\n');
-  return { dir, run, argv };
+  const ran = (unit) => existsSync(join(dir, `argv-${unit}`));
+  const systemctl = () => (existsSync(join(dir, 'systemctl.log')) ? readFileSync(join(dir, 'systemctl.log'), 'utf8') : '');
+  return { dir, run, argv, ran, systemctl };
 }
 
 test('a video plays in mpv in the unit youtube-video-1, at most 1080p, reconnecting on 403, with the window up at once', (t) => {
@@ -61,9 +65,49 @@ test('DOTS_YOUTUBE_MPV names the player, and the caller\'s display, dirs and dev
   assert.equal(a[a.indexOf('--') + 1], '/repo/dev/youtube/mpv');
 });
 
+test('audio starts the Queue: mpv idle in the unit youtube-audio, audio only, on its socket under the runtime dir', (t) => {
+  const { dir, run, argv } = rig(t);
+  const r = run('audio');
+  assert.equal(r.status, 0, r.stderr);
+  const sock = `${dir}/dots/youtube-audio.sock`;
+  assert.deepEqual(JSON.parse(r.stdout), { unit: 'youtube-audio', socket: sock });
+  const a = argv('youtube-audio');
+  const cmd = a.slice(a.indexOf('--') + 1);
+  assert.equal(cmd[0], 'mpv');
+  for (const opt of ['--no-video', '--idle=yes', `--input-ipc-server=${sock}`, '--ytdl-format=bestaudio/best', '--stream-lavf-o=reconnect=1,reconnect_on_http_error=403,reconnect_delay_max=3', `--script-opts=ytdl_hook-ytdl_path=${dir}/yt-dlp`])
+    assert.ok(cmd.includes(opt), `${opt} in ${cmd.join(' ')}`);
+  assert.ok(!cmd.some((x) => x.startsWith('https://')), 'the App loads every item over the socket');
+});
+
+test('audio with the Queue running and its socket there starts nothing and names it', (t) => {
+  const { dir, run, ran } = rig(t, { ACTIVE: 'youtube-audio' });
+  mkdirSync(`${dir}/dots`);
+  spawnSync('python3', ['-c', 'import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])', `${dir}/dots/youtube-audio.sock`]);
+  const r = run('audio');
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(JSON.parse(r.stdout), { unit: 'youtube-audio', socket: `${dir}/dots/youtube-audio.sock` });
+  assert.equal(ran('youtube-audio'), false);
+});
+
+// mpv gone with its unit still up, or its socket removed, leaves nothing to talk to, so the Queue starts again.
+test('audio with the unit running but no socket stops it and starts a fresh Queue', (t) => {
+  const { run, ran, systemctl } = rig(t, { ACTIVE: 'youtube-audio' });
+  const r = run('audio');
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(systemctl(), /stop youtube-audio/);
+  assert.equal(ran('youtube-audio'), true);
+});
+
+test('a Queue whose socket never comes says so', (t) => {
+  const { run } = rig(t, { NO_SOCKET: '1' });
+  const r = run('audio');
+  assert.equal(r.status, 1);
+  assert.match(JSON.parse(r.stdout).error, /youtube-audio/);
+});
+
 test('anything but a video id is no video', (t) => {
   const { run } = rig(t);
   assert.equal(run('video', '--input-ipc-server=/tmp/x').status, 2);
   assert.equal(run('video').status, 2);
-  assert.equal(run('audio', 'fakeVid0001').status, 2);
+  assert.equal(run('audio', 'fakeVid0001').status, 2, 'the Queue takes its items over the socket');
 });
