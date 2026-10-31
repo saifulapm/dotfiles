@@ -39,7 +39,7 @@ for theme in paper artboard blueprint; do
     blueprint) width=420 pad=18 fill='#7FE3F0' head='.downloading.head[0] == "[ YOUTUBE ]" and (.downloading.head[1] | test("[0-9]:[0-9]{2}"))' ;;
   esac
   check "$theme: island state reports mode downloading and the line" state_is '.mode == "downloading" and .text == "↓ Focus 3 / 18 · Feather · 37%"'
-  check "$theme: the slot draws the line on one line at its board's $width px, the percent at the right edge" state_is ".downloading.line == \"↓ Focus 3 / 18 · Feather · 37%\" and .drawn == $width and .downloading.lines == 1 and (.downloading.right - (.drawn - $pad) | fabs) <= 1 and .downloading.failed == false"
+  check "$theme: the slot draws the line on one line at its board's $width px, from the left, with room to spare" state_is ".downloading.line == \"↓ Focus 3 / 18 · Feather · 37%\" and .drawn == $width and .downloading.lines == 1 and (.downloading.elided | not) and .downloading.right < (.drawn - $pad) and .downloading.failed == false"
   check "$theme: the head reads as its board draws it" state_is "$head"
   check "$theme: the bar is filled to 37% of its width" state_is '(.downloading.barWidth | type == "number") and .downloading.barFill >= (.downloading.barWidth * 0.35) and .downloading.barFill <= (.downloading.barWidth * 0.39)'
   area=$(island | jq '(.downloading.barFill * .downloading.barHeight * 0.8) | floor')
