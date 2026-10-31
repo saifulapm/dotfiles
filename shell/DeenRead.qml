@@ -5,7 +5,7 @@ import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-read.mjs" as R
 
-// Deen's Read: a surah word by word, right to left, each word's Bangla meaning under it and the ayah's under its words; the boxed word's meaning, transliteration and root show in the bar, and Enter or p plays it.
+// Deen's Read: a surah word by word, right to left, each word's Bangla pronunciation and meaning under it and the ayah's under its words; the boxed word's pronunciation, meaning and root show in the bar, and Enter or p plays it.
 FocusScope {
     id: page
 
@@ -177,12 +177,15 @@ FocusScope {
             arabicFamily: arabicName.fontInfo.family,
             meta: metaText.text,
             headingFont: headingText.font.family,
+            headingFamily: headingText.fontInfo.family,
             hints: hintList.drawn(),
             ayat: ayahList.count,
             ayah: ayah,
             box: boxed ? boxed.look : null,
             bar: {
                 word: barWord.text,
+                pron: barPron.text,
+                pronFamily: barPron.fontInfo.family,
                 bn: barBn.text,
                 bnFamily: barBn.fontInfo.family,
                 line: barLine.text,
@@ -267,7 +270,7 @@ FocusScope {
         anchors.fill: parent
         spacing: 0
 
-        // The surah's name in English and Arabic, its count, kind and juz, and the two keys that change what plays or shows.
+        // The surah's name in Bangla and Arabic, its count, kind and juz, and the two keys that change what plays or shows.
         RowLayout {
             Layout.fillWidth: true
             Layout.leftMargin: 18
@@ -282,7 +285,7 @@ FocusScope {
                 textFormat: Text.PlainText
                 text: page.surah ? D.oneLine(R.headingText(page.surah.surah)) : ""
                 color: page.c.ink ?? "black"
-                font.family: (page.caps ? page.fonts.display : page.bodyFont) ?? ""
+                font.family: page.deen.bengali
                 font.pixelSize: page.caps ? 25 : page.plain ? 20 : 18
                 font.weight: page.caps ? Font.Normal : Font.Bold
             }
@@ -403,12 +406,17 @@ FocusScope {
                         return {
                             number: ayahNumber.text,
                             words: words,
+                            pron: ayahPron.visible ? ayahPron.text : "",
+                            pronFamily: ayahPron.fontInfo.family,
+                            pronLines: ayahPron.lineCount,
+                            pronTruncated: ayahPron.truncated,
                             bn: ayahBn.visible ? ayahBn.text : "",
                             bnFamily: ayahBn.fontInfo.family,
                             bnLines: ayahBn.lineCount,
                             bnTruncated: ayahBn.truncated,
                             height: ayahRow.height,
                             wordsBottom: wordFlow.y + wordFlow.height,
+                            pronBottom: ayahPron.y + ayahPron.height,
                             inkTop: baseline + ink.y,
                             inkBottom: baseline + (ayahBn.lineCount - 1) * lineHeight + ink.y + ink.height,
                             ruleDashed: ayahDash.visible,
@@ -417,7 +425,7 @@ FocusScope {
                     }
 
                     width: ayahList.width
-                    height: Math.max(26, wordFlow.implicitHeight) + 9 + (ayahBn.visible ? ayahBn.anchors.topMargin + ayahBn.height : 0)
+                    height: Math.max(26, wordFlow.implicitHeight) + 9 + (ayahPron.visible ? ayahPron.anchors.topMargin + ayahPron.height : 0) + (ayahBn.visible ? ayahBn.anchors.topMargin + ayahBn.height : 0)
 
                     // Paper squares the number in grey, Artboard rounds it on a tile, Blueprint squares it in its rule colour.
                     Rectangle {
@@ -466,6 +474,10 @@ FocusScope {
                                 function drawn() {
                                     return {
                                         ar: wordArabic.text,
+                                        pron: wordPron.text,
+                                        pronFamily: wordPron.fontInfo.family,
+                                        pronLines: wordPron.lineCount,
+                                        pronTruncated: wordPron.truncated,
                                         bn: wordBn.text,
                                         x: wordBox.mapToItem(page, 0, 0).x,
                                         boxed: current,
@@ -483,7 +495,7 @@ FocusScope {
                                     };
                                 }
 
-                                width: Math.max(wordArabic.implicitWidth, wordBn.width) + 24
+                                width: Math.max(wordArabic.implicitWidth, wordPron.width, wordBn.width) + 24
                                 height: wordColumn.implicitHeight + 16
                                 radius: page.plain ? 10 : 0
                                 color: current ? page.boxFill : "transparent"
@@ -505,6 +517,19 @@ FocusScope {
                                         font.pixelSize: 34
                                     }
                                     Text {
+                                        id: wordPron
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        width: Math.min(implicitWidth, 220)
+                                        horizontalAlignment: Text.AlignHCenter
+                                        textFormat: Text.PlainText
+                                        text: D.oneLine(wordBox.modelData.bn_pron)
+                                        elide: Text.ElideRight
+                                        maximumLineCount: 1
+                                        color: (wordBox.current && page.plain ? page.look.cursor.text : page.c.muted) ?? "gray"
+                                        font.family: page.deen.bengali
+                                        font.pixelSize: 13
+                                    }
+                                    Text {
                                         id: wordBn
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         width: Math.min(implicitWidth, 220)
@@ -522,12 +547,26 @@ FocusScope {
                         }
                     }
 
-                    // The ayah's meaning, under its words, wrapping so the row grows with it.
+                    // The ayah's pronunciation, then its meaning, under its words, each wrapping so the row grows with it.
+                    Text {
+                        id: ayahPron
+                        anchors.left: wordFlow.left
+                        anchors.right: wordFlow.right
+                        anchors.top: wordFlow.bottom
+                        anchors.topMargin: 6
+                        visible: text !== ""
+                        textFormat: Text.PlainText
+                        text: D.oneLine(page.surah && page.surah.ayahs[ayahRow.index] ? page.surah.ayahs[ayahRow.index].bn_pron : "")
+                        wrapMode: Text.WordWrap
+                        color: page.c.muted ?? "gray"
+                        font.family: page.deen.bengali
+                        font.pixelSize: page.caps ? 16 : 15
+                    }
                     Text {
                         id: ayahBn
                         anchors.left: wordFlow.left
                         anchors.right: wordFlow.right
-                        anchors.top: wordFlow.bottom
+                        anchors.top: ayahPron.visible ? ayahPron.bottom : wordFlow.bottom
                         anchors.topMargin: 6
                         visible: text !== ""
                         textFormat: Text.PlainText
@@ -563,7 +602,7 @@ FocusScope {
             }
         }
 
-        // The boxed word, its meaning, and where it stands; Paper rules it in ink, Artboard fills it grey, Blueprint rules it in its accent.
+        // The boxed word, its pronunciation and meaning, and where it stands; Paper rules it in ink, Artboard fills it grey, Blueprint rules it in its accent.
         Rectangle {
             id: bar
             Layout.fillWidth: true
@@ -597,6 +636,17 @@ FocusScope {
                     Layout.fillWidth: true
                     spacing: 2
 
+                    Text {
+                        id: barPron
+                        Layout.fillWidth: true
+                        textFormat: Text.PlainText
+                        text: page.focused ? D.oneLine(page.focused.bn_pron) : ""
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        color: page.c.ink ?? "black"
+                        font.family: page.deen.bengali
+                        font.pixelSize: page.plain ? 15 : 14
+                    }
                     Text {
                         id: barBn
                         Layout.fillWidth: true
@@ -751,9 +801,9 @@ FocusScope {
                         Text {
                             id: pickName
                             textFormat: Text.PlainText
-                            text: page.look.title(D.oneLine(pickRow.modelData.en))
+                            text: page.look.title(D.oneLine(pickRow.modelData.bn))
                             color: (pickRow.current ? page.look.cursor.text : page.look.name.color) ?? "black"
-                            font.family: page.look.name.font
+                            font.family: page.deen.bengali
                             font.pixelSize: page.look.name.size
                             font.weight: pickRow.current ? page.look.cursor.weight : page.look.name.weight
                         }

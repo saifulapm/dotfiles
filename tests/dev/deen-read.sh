@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deen's Read draws a surah word by word right to left with each word's and each ayah's Bangla meaning, boxes the cursor's word with its meaning, transliteration and root in the bar, plays a word or the surah through mpv, and opens another surah from the picker.
+# Deen's Read draws a surah word by word right to left under its Bangla name, with each word's and each ayah's Bangla pronunciation and meaning, boxes the cursor's word with its pronunciation, meaning and root in the bar, plays a word or the surah through mpv, and opens another surah from the picker.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -53,23 +53,25 @@ until_ok 5000 deen_up
 check "Deen opens on Read ($(deen_state | jq -c .tab))" deen_is '.tab == "read"'
 until_ok 3000 read_is '.ayat == 7 and (.ayah.words | length) == 4'
 
-check "Read opens on Al-Fatihah with its 7 ayat drawn ($(read_show '[.heading, .ayat]'))" read_is '.heading == "Surah 1 · Al-Faatiha" and .ayat == 7 and .failed == ""'
+check "Read opens on Al-Fatihah with its 7 ayat drawn under its Bangla name ($(read_show '[.heading, .ayat]'))" read_is '.heading == "সূরা আল-ফাতিহা" and .ayat == 7 and .failed == ""'
 check "the heading names it in Arabic and reads its count, kind and juz ($(read_show '[.arabic, .meta]'))" \
   read_is '.arabic == "سُورَةُ ٱلْفَاتِحَةِ" and .meta == "7 ayat · Makki · juz 1"'
-check "1:1's first word is بِسْمِ over its Bangla meaning নামে, boxed ($(read_show '.ayah.words[0] | [.ar, .bn, .boxed]'))" \
-  read_is '.ayah.number == "1" and .ayah.words[0].ar == "بِسْمِ" and .ayah.words[0].bn == "নামে" and .ayah.words[0].boxed and ([.ayah.words[] | select(.boxed)] | length) == 1'
+check "1:1's first word is بِسْمِ over its pronunciation বিসমি and its Bangla meaning নামে, boxed ($(read_show '.ayah.words[0] | [.ar, .pron, .bn, .boxed]'))" \
+  read_is '.ayah.number == "1" and .ayah.words[0].ar == "بِسْمِ" and .ayah.words[0].pron == "বিসমি" and .ayah.words[0].bn == "নামে" and .ayah.words[0].boxed and ([.ayah.words[] | select(.boxed)] | length) == 1'
+check "each of 1:1's four words draws its pronunciation on one uncut line ($(read_show '[.ayah.words[] | [.pron, .pronLines, .pronTruncated]]'))" \
+  read_is '[.ayah.words[] | .pron] == ["বিসমি", "আল্লা-হি", "আররাহমা-নি", "আররাহী-মি"] and all(.ayah.words[]; .pronLines == 1 and (.pronTruncated | not))'
 # Zakaria's 1:1, with the zero-width non-joiner after আল্লাহ্'s hasanta that keeps it from joining র.
 bn11=$(printf 'রহমান, রহীম আল্লাহ্\u200cর নামে')
-check "1:1's Bangla meaning draws under its words ($(read_show '.ayah | [.bn, .bnLines]'))" \
-  deen_is --arg bn "$bn11" '.read.ayah.bn == $bn and .read.ayah.bnLines == 1'
-check "paper: the ayah's, the word's and the bar's Bangla draw in Noto Serif Bengali ($(read_show '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily]'))" \
-  read_is '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily] == ["Noto Serif Bengali", "Noto Serif Bengali", "Noto Serif Bengali"]'
+check "1:1's pronunciation, then its Bangla meaning, draw under its words ($(read_show '.ayah | [.pron, .pronLines, .bn, .bnLines]'))" \
+  deen_is --arg bn "$bn11" '.read.ayah | .pron == "বিসমিল্লা-হির রাহমা-নির রাহী-ম" and .pronLines == 1 and .bn == $bn and .bnLines == 1 and .inkTop >= .pronBottom'
+check "paper: the heading's, the ayah's, the word's and the bar's Bangla draw in Noto Serif Bengali ($(read_show '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique'))" \
+  read_is '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique == ["Noto Serif Bengali"]'
 check "Arabic reads right to left: word 1 is drawn right of word 2, and word 2 right of word 3 ($(read_show '[.ayah.words[] | .x]'))" \
   read_is '.ayah.words[0].x > .ayah.words[1].x and .ayah.words[1].x > .ayah.words[2].x'
 check "the words draw in Amiri or Noto Naskh Arabic ($(read_show '.ayah.words[0].family'))" \
   read_is '.ayah.words[0].family == "Amiri" or .ayah.words[0].family == "Noto Naskh Arabic"'
-check "the bar reads the boxed word's Bangla meaning, transliteration and root ($(read_show '.bar | [.word, .bn, .line, .hint]'))" \
-  read_is '.bar.word == "بِسْمِ" and .bar.bn == "নামে" and .bar.line == "bis'"'"'mi · ayah 1, word 1 · root س م و" and .bar.hint == "↵ hear this word"'
+check "the bar reads the boxed word's pronunciation, Bangla meaning, place and root ($(read_show '.bar | [.word, .pron, .bn, .line, .hint]'))" \
+  read_is '.bar.word == "بِسْمِ" and .bar.pron == "বিসমি" and .bar.bn == "নামে" and .bar.line == "ayah 1, word 1 · root س م و" and .bar.hint == "↵ hear this word"'
 check "the heading's hints and the key strip name Read's keys ($(read_show '[.hints, (.keys | map(.[0]))]'))" \
   read_is '.hints == ["S SURAH", "P PLAY SURAH"] and (.keys | map(.[0])) == ["H/L", "J/K", "↵", "P", "S", "/", "M", "TAB", "ESC"]'
 check "paper: the box is a 2 px red rule on cream, the bar a 1 px ink rule, the heading in its display face ($(read_show '[.box, .bar.border, .bar.borderColor, .headingFont]'))" \
@@ -81,7 +83,7 @@ wtype h
 word2=$(printf '\u0671\u0644\u0644\u0651\u064e\u0647\u0650')
 until_ok 2000 read_is '.ayah.words[1].boxed'
 check "h moves the box to word 2, ٱللَّهِ, left of word 1 ($(read_show '[.ayah.words[1] | .ar, .boxed, .x]'))" \
-  deen_is --arg w "$word2" '.read | .ayah.words[1].boxed and .ayah.words[1].ar == $w and .ayah.words[1].x < .ayah.words[0].x and (.ayah.words[0].boxed | not) and .bar.line == "l-lahi · ayah 1, word 2 · root أ ل ه"'
+  deen_is --arg w "$word2" '.read | .ayah.words[1].boxed and .ayah.words[1].ar == $w and .ayah.words[1].x < .ayah.words[0].x and (.ayah.words[0].boxed | not) and .bar.line == "ayah 1, word 2 · root أ ل ه"'
 
 wtype -k Return
 until_ok 3000 mpv_at_least 1
@@ -114,25 +116,25 @@ check "a 200-character meaning draws one line, elided ($(read_show '.ayah.words[
 wtype l
 until_ok 2000 read_is '.ayah.number == "6"'
 check "l before an ayah's first word goes to the previous ayah's last ($(read_show '[.ayah.number, .bar.line]'))" \
-  read_is '.ayah.number == "6" and .ayah.words[-1].boxed and .bar.line == "l-mus'"'"'taqīma · ayah 6, word 3 · root ق و م"'
+  read_is '.ayah.number == "6" and .ayah.words[-1].boxed and .bar.line == "ayah 6, word 3 · root ق و م"'
 
 wtype s
 until_ok 2000 read_is '.picker.open and .picker.focused'
 check "s opens the surah picker with the field focused, listing all 114 ($(read_show '.picker | [.open, .count]'))" read_is '.picker.open and .picker.count == 114'
 wtype 36
 until_ok 2000 read_is '.picker.text == "36"'
-check "typing 36 puts Yaseen first, cursored ($(read_show '.picker.rows'))" \
-  read_is '.picker.rows[0].n == "36" and .picker.rows[0].name == "Yaseen" and .picker.rows[0].current and .picker.rows[0].fill == "#1c1915"'
+check "typing 36 puts Ya-Sin first by its Bangla name, cursored ($(read_show '.picker.rows'))" \
+  read_is '.picker.rows[0].n == "36" and .picker.rows[0].name == "সূরা ইয়াসীন" and .picker.rows[0].current and .picker.rows[0].fill == "#1c1915"'
 wtype -k Return
 until_ok 3000 read_is '.ayat == 83'
 check "Enter opens Ya-Sin with its 83 ayat ($(read_show '[.heading, .ayat, .picker.open]'))" \
-  read_is '.heading == "Surah 36 · Yaseen" and .ayat == 83 and (.picker.open | not)'
+  read_is '.heading == "সূরা ইয়াসীন" and .ayat == 83 and (.picker.open | not)'
 check "its heading reads 83 ayat · Makki · juz 22 ($(read_show .meta))" read_is '.meta == "83 ayat · Makki · juz 22"'
-check "36:1's word has no root, so the bar names none ($(read_show .bar.line))" read_is '.bar.line == "ya-seen · ayah 1, word 1"'
+check "36:1's word has no root, so the bar names none ($(read_show .bar.line))" read_is '.bar.line == "ayah 1, word 1"'
 
 wtype j
 until_ok 2000 read_is '.ayah.number == "2"'
-check "j moves to 36:2 ($(read_show '[.ayah.number, .bar.line]'))" read_is '.ayah.number == "2" and .ayah.words[0].boxed and .bar.line == "wal-qur'"'"'āni · ayah 2, word 1 · root ق ر أ"'
+check "j moves to 36:2 ($(read_show '[.ayah.number, .bar.line]'))" read_is '.ayah.number == "2" and .ayah.words[0].boxed and .bar.line == "ayah 2, word 1 · root ق ر أ"'
 
 wtype m
 until_ok 3000 fake_called "hifz add 36"
@@ -146,30 +148,54 @@ check "/ opens the same picker ($(read_show '.picker.open'))" read_is '.picker.o
 wtype -k Escape
 until_ok 2000 read_is '.picker.open | not'
 check "Esc in the picker closes only the picker ($(deen_windows) window, picker $(read_show .picker.open))" deen_up
-check "and leaves Ya-Sin open" read_is '.heading == "Surah 36 · Yaseen" and (.picker.open | not)'
+check "and leaves Ya-Sin open" read_is '.heading == "সূরা ইয়াসীন" and (.picker.open | not)'
 
+# The picker finds 94 by its English name, by its Bangla name and by its number.
+wtype s
+until_ok 2000 read_is '.picker.open and .picker.focused'
+wtype sharh
+until_ok 2000 read_is '.picker.text == "sharh"'
+check "typing sharh lists Ash-Sharh alone, by its Bangla name ($(read_show '.picker | [.count, .rows]'))" \
+  read_is '.picker.count == 1 and .picker.rows[0].n == "94" and .picker.rows[0].name == "সূরা আশ-শারহ"'
+wtype -k Escape
+until_ok 2000 read_is '.picker.open | not'
+wtype s
+until_ok 2000 read_is '.picker.open and .picker.focused'
+wtype শারহ
+until_ok 2000 read_is '.picker.text == "শারহ"'
+check "typing শারহ lists Ash-Sharh alone ($(read_show '.picker | [.text, .count, .rows]'))" read_is '.picker.count == 1 and .picker.rows[0].n == "94"'
+wtype -k Escape
+until_ok 2000 read_is '.picker.open | not'
 wtype s
 until_ok 2000 read_is '.picker.open and .picker.focused'
 wtype 94
 until_ok 2000 read_is '.picker.text == "94"'
 wtype -k Return
 until_ok 3000 read_is '.ayat == 8'
-check "s, 94 and Enter open Ash-Sharh ($(read_show '[.heading, .ayat]'))" read_is '.heading == "Surah 94 · Ash-Sharh" and .ayat == 8'
+check "s, 94 and Enter open Ash-Sharh under its Bangla name, its meta in English ($(read_show '[.heading, .meta, .ayat]'))" \
+  read_is '.heading == "সূরা আশ-শারহ" and .meta == "8 ayat · Makki · juz 30" and .ayat == 8'
 wtype jjjjj
 until_ok 2000 read_is '.ayah.number == "6"'
 inna=$(printf '\u0625\u0650\u0646\u0651\u064e')
 usr=$(printf '\u0671\u0644\u0652\u0639\u064f\u0633\u0652\u0631\u0650')
-check "94:6 draws its Arabic words, then its Bangla meaning as a line of the row ($(read_show '.ayah | [[.words[].ar], .bn]'))" \
-  deen_is --arg inna "$inna" --arg usr "$usr" '.read.ayah | .words[0].ar == $inna and .words[2].ar == $usr and (.words | length) == 4 and .bn == "নিশ্চয় কষ্টের সাথেই স্বস্তি আছে।" and .inkTop >= .wordsBottom'
+check "94:6 draws three lines: its Arabic words, its pronunciation, then its Bangla meaning ($(read_show '.ayah | [[.words[].ar], .pron, .bn]'))" \
+  deen_is --arg inna "$inna" --arg usr "$usr" '.read.ayah | .words[0].ar == $inna and .words[2].ar == $usr and (.words | length) == 4 and .pron == "ইন্না মা‘আল ‘উসরি ইউসরা-" and .bn == "নিশ্চয় কষ্টের সাথেই স্বস্তি আছে।" and .pronBottom > .wordsBottom and .inkTop >= .pronBottom'
+check "94:6's pronunciation draws on one uncut line ($(read_show '.ayah | [.pronLines, .pronTruncated]'))" read_is '.ayah.pronLines == 1 and (.ayah.pronTruncated | not)'
+check "each of 94:6's words draws its pronunciation over its meaning ($(read_show '[.ayah.words[] | .pron]'))" \
+  read_is '[.ayah.words[] | .pron] == ["ইন্না", "মা‘আ", "আল‘উসরি", "ইউসরান"]'
 check "إِنَّ draws নিশ্চয়ই and ٱلْعُسْرِ draws কষ্টের under them ($(read_show '[.ayah.words[] | .bn]'))" \
   read_is '[.ayah.words[] | .bn] == ["নিশ্চয়ই", "সাথে", "কষ্টের", "স্বস্তি (আছে)"]'
 check "the bar's meaning line shows the boxed إِنَّ's Bangla ($(read_show .bar.bn))" read_is '.ayah.words[0].boxed and .bar.bn == "নিশ্চয়ই"'
 wtype hh
 until_ok 2000 read_is '.ayah.words[2].boxed'
-check "hh boxes ٱلْعُسْرِ and the bar shows কষ্টের ($(read_show '[.bar.word, .bar.bn, .bar.line]'))" \
-  deen_is --arg usr "$usr" '.read.bar.word == $usr and .read.bar.bn == "কষ্টের" and .read.bar.line == "l-ʿus'"'"'ri · ayah 6, word 3 · root ع س ر"'
+check "hh boxes ٱلْعُسْرِ and the bar shows আল‘উসরি over কষ্টের ($(read_show '[.bar.word, .bar.pron, .bar.bn, .bar.line]'))" \
+  deen_is --arg usr "$usr" '.read.bar.word == $usr and .read.bar.pron == "আল‘উসরি" and .read.bar.bn == "কষ্টের" and .read.bar.line == "ayah 6, word 3 · root ع س ر"'
+check "the boxed word draws আল‘উসরি above কষ্টের ($(read_show '.ayah.words[2] | [.boxed, .pron, .bn]'))" \
+  read_is '.ayah.words[2] | .boxed and .pron == "আল‘উসরি" and .bn == "কষ্টের"'
 no_english() { ! deen_state | jq -c .read | grep -q Indeed; }
 check "no drawn text in Read holds English: Indeed is nowhere in its state" no_english
+no_latin() { ! deen_state | jq -c .read | grep -qE "ʿus|Ash-Sharh"; }
+check "and no Latin transliteration: l-ʿus'ri and Ash-Sharh are nowhere in its state" no_latin
 check "and Read's chrome reads as before ($(read_show '[.bar.hint, .hints[0]]'))" read_is '.bar.hint == "↵ hear this word" and .hints[0] == "S SURAH"'
 
 # 36:18 holds যন্ত্রণাদায়ক, whose stacked ন্ত্র is the tallest glyph Read draws; its meaning wraps.
@@ -184,6 +210,8 @@ wtype jjjjjjjjjjjjjjjjj
 until_ok 2000 read_is '.ayah.number == "18"'
 check "paper: 36:18's meaning holds ন্ত্র in Noto Serif Bengali and wraps uncut ($(read_show '.ayah | [.bnFamily, .bnLines, .bnTruncated]'))" \
   read_is '(.ayah.bn | test("ন্ত্র")) and .ayah.bnFamily == "Noto Serif Bengali" and .ayah.bnLines >= 2 and (.ayah.bnTruncated | not)'
+check "and its long pronunciation draws uncut above the meaning ($(read_show '.ayah | [.pronLines, .pronTruncated, .pronBottom, .inkTop]'))" \
+  read_is '(.ayah.pron | startswith("কা-লূ")) and (.ayah.pronTruncated | not) and .ayah.inkTop >= .ayah.pronBottom'
 check "its ink sits inside the row, below the words and above the rule ($(read_show '.ayah | [.wordsBottom, .inkTop, .inkBottom, .height]'))" \
   read_is '.ayah.inkTop >= .ayah.wordsBottom and .ayah.inkBottom <= .ayah.height - 1'
 check "and the row grew with its lines, taller than 36:1's one-line row ($one_row, $(read_show .ayah.height))" \
@@ -195,8 +223,8 @@ in_theme artboard
 until_ok 3000 deen_is '.voice == "plain"'
 check "artboard: the box is a 1.5 px accent line on its tint at radius 10, its meaning in deep blue ($(read_show .box))" \
   read_is '.box.border == 1.5 and .box.borderColor == "#3d5afe" and .box.fill == "#eef1ff" and .box.radius == 10 and .box.bnColor == "#2638c9"'
-check "artboard: the Bangla draws in Noto Sans Bengali ($(read_show '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily]'))" \
-  read_is '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
+check "artboard: the Bangla draws in Noto Sans Bengali ($(read_show '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique'))" \
+  read_is '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique == ["Noto Sans Bengali"]'
 check "artboard: the tab still reads Read and the bar's hint ↵ hear this word ($(deen_state | jq -c '[.tabs[0].text, .read.bar.hint]'))" \
   deen_is '.tabs[0].text == "Read" and .read.bar.hint == "↵ hear this word"'
 check "artboard: the bar is filled grey at radius 12 with no rule, the keys in lower case ($(read_show '[.bar.fill, .bar.radius, .bar.border, .hints]'))" \
@@ -205,9 +233,9 @@ check "artboard: the bar is filled grey at radius 12 with no rule, the keys in l
 in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
 check "blueprint: the ayat are ruled dashed and the heading line and bar read in capitals ($(read_show '[.ayah.ruleDashed, .meta, .bar.line, .bar.hint]'))" \
-  read_is '.ayah.ruleDashed and .ayah.ruleColor == "#2e5a72" and .meta == "83 AYAT · MAKKI · JUZ 22" and .bar.line == "WAL-QUR'"'"'ĀNI · AYAH 2, WORD 1 · ROOT ق ر أ"'
-check "blueprint: the Bangla draws in Noto Sans Bengali ($(read_show '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily]'))" \
-  read_is '[.ayah.bnFamily, .ayah.words[0].bnFamily, .bar.bnFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
+  read_is '.ayah.ruleDashed and .ayah.ruleColor == "#2e5a72" and .meta == "83 AYAT · MAKKI · JUZ 22" and .bar.line == "AYAH 2, WORD 1 · ROOT ق ر أ"'
+check "blueprint: the Bangla draws in Noto Sans Bengali ($(read_show '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique'))" \
+  read_is '[.headingFamily, .ayah.pronFamily, .ayah.bnFamily, .ayah.words[0].pronFamily, .ayah.words[0].bnFamily, .bar.pronFamily, .bar.bnFamily] | unique == ["Noto Sans Bengali"]'
 check "blueprint: the box and the bar are 1 px accent lines on no fill, the keys bracketed ($(read_show '[.box, .bar.borderColor, .hints]'))" \
   read_is '.box.border == 1 and .box.borderColor == "#7fe3f0" and .box.fill == "" and .bar.border == 1 and .bar.borderColor == "#7fe3f0" and .hints == ["[S] SURAH", "[P] PLAY SURAH"]'
 

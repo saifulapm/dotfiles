@@ -15,7 +15,7 @@ export const typeName = (type) => (type === 'Medinan' ? 'Madani' : 'Makki');
 
 const say = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
 
-export const headingText = (surah) => `Surah ${surah.n} · ${surah.en}`;
+export const headingText = (surah) => surah.bn;
 
 export function metaText(voice, surah, juz) {
   const parts = [`${surah.count} ayat`, typeName(surah.type)];
@@ -25,7 +25,7 @@ export function metaText(voice, surah, juz) {
 
 // Arabic has no case, so Blueprint's capitals leave the root's letters as they are.
 export function wordLine(voice, word, a) {
-  const parts = [word.tr || '', `ayah ${a}, word ${word.i}`];
+  const parts = [`ayah ${a}, word ${word.i}`];
   if (word.root) parts.push(`root ${word.root}`);
   return say(voice, parts.join(' · '));
 }
@@ -43,7 +43,7 @@ export function surahsMatching(surahs, query) {
     const hits = surahs.filter((s) => String(s.n).indexOf(q) >= 0);
     return hits.filter((s) => String(s.n) === q).concat(hits.filter((s) => String(s.n) !== q));
   }
-  return surahs.filter((s) => [s.en, s.tr, s.ar].some((name) => bare(name).indexOf(q) >= 0));
+  return surahs.filter((s) => [s.en, s.tr, s.ar, s.bn].some((name) => bare(name).indexOf(q) >= 0));
 }
 
 export const readable = (answer) => !!answer && !answer.error && Array.isArray(answer.ayahs) && answer.ayahs.length > 0 && Array.isArray(answer.words);
