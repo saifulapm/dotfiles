@@ -10,6 +10,8 @@ const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio']
 const BRACKET_DOWNLOAD = { key: '[D/⇧D]', word: 'DOWNLOAD AUDIO / VIDEO' };
 // A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
 const PLAYLIST_KEYS = [['↵', 'play as video'], ['m', 'play in queue'], ['S', 'shuffle'], ['a', 'add to queue'], ['x', 'remove'], ['⇧J/⇧K', 'move'], ['d/D', 'download missing'], ['r', 'repeat'], ['esc', 'back']];
+// An opened playlist's s saves the whole of it as a Playlist.
+const OPENED_KEYS = [['j/k', 'move'], ['s', 'save as a playlist'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // With the sidebar focused the keys make, rename, delete and open a Playlist.
 const SIDEBAR_KEYS = [['n', 'new'], ['e', 'rename'], ['x', 'delete'], ['↵', 'open'], ['tab', 'list']];
 // Blueprint marks each shifted key.
@@ -43,6 +45,9 @@ export function youtubeLook(tokens) {
     noPlaylists: EMPTY.playlists,
     placeholder: 'Search YouTube',
     namePlaceholder: 'Playlist name',
+    toast: { saved: (n) => `Saved as a playlist · ${count(n)}` },
+    // A snapshot's new Playlist, marked in the sidebar: Paper sets it in caps as its board's CSS does.
+    fresh: plain ? 'new' : 'NEW',
     // p's picker: Paper and Artboard head it with the key, Blueprint with PLAYLISTS; Paper's badge is set in caps as its board's CSS sets it.
     pick: {
       title: (t) => `Add "${t}" to`,
@@ -59,8 +64,9 @@ export function youtubeLook(tokens) {
     // The now-playing line's right side, as the Queue's loop-playlist reads.
     repeat: (on) => (bracket ? (on ? 'REPEAT ON' : 'REPEAT OFF') : on ? 'repeat on' : 'repeat off'),
     // A failed search's list is its error block, so only try again and the moves away act on it.
-    legend(view, failed, focus) {
+    legend(view, failed, focus, opened) {
       if (focus === 'sidebar') return l.keys(SIDEBAR_KEYS);
+      if (view === 'search' && !failed && opened === 'playlist') return l.keys(OPENED_KEYS);
       if (view === 'playlist') {
         const keys = l.keys(PLAYLIST_KEYS);
         return bracket ? keys.map((k) => Object.assign({}, k, { key: BRACKET_SHIFTED[k.key] || k.key })) : keys;

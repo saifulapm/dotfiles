@@ -115,3 +115,29 @@ test('rows keeps an unavailable reason as one line and drops anything else', () 
   assert.equal(Y.rows({ rows: [row({ unavailable: 'made\nprivate' })] })[0].unavailable, 'made private');
   for (const unavailable of ['', 7, null, undefined]) assert.equal('unavailable' in Y.rows({ rows: [row({ unavailable })] })[0], false);
 });
+
+// dots-youtube-api snapshot prints {read, count} per 100 rows, then {title, channel, count, rows}, or an error line.
+test('a snapshot counts what it has read until its last line brings every row', () => {
+  let s = Y.snapshotting('PLfakeList0002', 'Lofi Archive', 300);
+  assert.equal(Y.readingText(s), 'reading 0 of 300');
+  s = Y.snapshotStep(s, '{"read":100,"count":300,"title":"Lofi Archive","channel":"lofi archive"}');
+  assert.equal(Y.readingText(s), 'reading 100 of 300');
+  assert.equal(s.done, false);
+  s = Y.snapshotStep(s, 'not json');
+  assert.equal(s.read, 100);
+  const rows = [{ id: 'fakeLof0001', kind: 'video', title: 'Lofi\n1', channel: 'lofi archive', duration: 61, thumb: 'fakeLof0001' }, { id: 'fakeGone001', kind: 'video', title: null, channel: null, duration: null, thumb: '', unavailable: 'made private' }];
+  s = Y.snapshotStep(s, JSON.stringify({ title: 'Lofi Archive', channel: 'lofi archive', count: 2, rows }));
+  assert.equal(s.done, true);
+  assert.equal(s.failed, null);
+  assert.deepEqual(s.rows.map((r) => [r.id, r.title, r.secs, r.unavailable]), [['fakeLof0001', 'Lofi 1', 61, undefined], ['fakeGone001', '', null, 'made private']]);
+});
+
+test('a snapshot with no count yet reads its rows alone, and an error line ends it failed', () => {
+  let s = Y.snapshotting('PLx', 'X', null);
+  assert.equal(Y.readingText(s), 'reading 0');
+  s = Y.snapshotStep(s, '{"read":100,"count":null,"title":"X","channel":null}');
+  assert.equal(Y.readingText(s), 'reading 100');
+  s = Y.snapshotStep(s, '{"error":"The playlist does not exist.","kind":"extraction","raw":"ERROR: x"}');
+  assert.equal(s.done, true);
+  assert.equal(s.failed.error, 'The playlist does not exist.');
+});

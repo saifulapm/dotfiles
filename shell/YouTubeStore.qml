@@ -29,9 +29,26 @@ Scope {
 
     // A video is in a Playlist at most once.
     function add(id, video) {
+        if (ready && !broken)
+            write(P.add(playlists, id, item(video), Date.now()));
+    }
+
+    // A snapshot's rows become a new Playlist in YouTube's order, in one write; its id, or "".
+    function snapshot(name, videos) {
         if (!ready || broken)
-            return;
-        const item = {
+            return "";
+        const id = newId();
+        const now = Date.now();
+        const made = P.create(playlists, id, name || "Playlist", now);
+        if (made === playlists)
+            return "";
+        write(P.addMany(made, id, videos.map(item), now));
+        return id;
+    }
+
+    // What the store keeps of a row as youtube.mjs rows() makes it.
+    function item(video) {
+        const it = {
             id: video.id,
             title: video.title,
             channel: video.channel,
@@ -39,8 +56,8 @@ Scope {
             thumb: video.thumb
         };
         if (video.unavailable)
-            item.unavailable = video.unavailable;
-        write(P.add(playlists, id, item, Date.now()));
+            it.unavailable = video.unavailable;
+        return it;
     }
 
     function holds(id, videoId) {
@@ -62,11 +79,15 @@ Scope {
         return moved;
     }
 
+    function newId() {
+        return "pl" + Date.now().toString(36) + Math.floor(Math.random() * 1679616).toString(36);
+    }
+
     // A new Playlist's id, or "" when the name is blank or the store cannot be written.
     function create(name) {
         if (!ready || broken)
             return "";
-        const id = "pl" + Date.now().toString(36) + Math.floor(Math.random() * 1679616).toString(36);
+        const id = newId();
         const next = P.create(playlists, id, name, Date.now());
         const made = next !== playlists;
         write(next);

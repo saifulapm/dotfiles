@@ -151,6 +151,13 @@ ShellRoot {
         focusPane(video ? "list" : "sidebar");
     }
 
+    // s on a playlist: the snapshot dots-youtube-api snapshot is reading, as youtube.mjs snapshotting() makes it, or null.
+    property var snapshot: null
+    // The Playlist the last snapshot made, marked new in the sidebar until it is opened.
+    property string freshId: ""
+    // The toast's line, shown for 3 s.
+    property string toast: ""
+
     // p on a video: the video and the picker's cursor, whose last place is new playlist; it starts on the first Playlist that lacks the video. null while the picker is closed.
     property var picking: null
     // A video p is adding to a Playlist n is naming from the picker.
@@ -211,8 +218,10 @@ ShellRoot {
         store.remove(id);
     }
 
-    // A sidebar key: a view's name, or pl:<id> for a Playlist.
+    // A sidebar key: a view's name, or pl:<id> for a Playlist; a new snapshot's mark goes once it is opened.
     function show(key) {
+        if (key === "pl:" + freshId)
+            freshId = "";
         if (key.startsWith("pl:")) {
             playlistId = key.slice(3);
             view = "playlist";
@@ -395,10 +404,49 @@ ShellRoot {
         });
     }
 
-    // s on a video row: Saved keeps it in the store, at most once; a playlist's snapshot is m70's.
+    // s: anywhere in an opened playlist, or on a playlist row, saves the playlist whole as a Playlist; on a video it goes to Saved, at most once.
     function save(row) {
-        if (row && row.kind === "video")
+        if (view === "search" && opened && opened.kind === "playlist" && failed === null)
+            snapshotOf(opened.id, opened.title, opened.count);
+        else if (row && row.kind === "playlist")
+            snapshotOf(row.id, row.title, row.count);
+        else if (row && row.kind === "video")
             store.save(row);
+    }
+
+    // One snapshot reads at a time.
+    function snapshotOf(id, title, count) {
+        if (snapshot !== null)
+            return;
+        snapshot = YT.snapshotting(id, title, count);
+        snapshotProc.command = [backend, "snapshot", id];
+        snapshotProc.running = true;
+    }
+
+    function snapshotLine(text) {
+        if (snapshot === null)
+            return;
+        snapshot = YT.snapshotStep(snapshot, text);
+        if (snapshot.done)
+            finishSnapshot();
+    }
+
+    // The new Playlist holds the items as they were read; it never follows the original.
+    function finishSnapshot() {
+        const s = snapshot;
+        snapshot = null;
+        if (s.failed)
+            return say(s.failed.error);
+        const id = store.snapshot(s.title, s.rows);
+        if (id === "")
+            return;
+        freshId = id;
+        say(look.toast.saved(s.rows.length));
+    }
+
+    function say(text) {
+        toast = text;
+        toastTick.restart();
     }
 
     // Each view's list starts at its top.
@@ -486,6 +534,26 @@ ShellRoot {
         }
     }
 
+    // A snapshot's answer comes a line at a time; one that ends with no last line failed without saying why, and the line it did print is read first.
+    Process {
+        id: snapshotProc
+        stdout: SplitParser {
+            onRead: text => app.snapshotLine(text)
+        }
+        onExited: Qt.callLater(() => {
+            if (app.snapshot !== null)
+                app.snapshotLine(JSON.stringify({
+                    error: "dots-youtube-api gave no answer"
+                }));
+        })
+    }
+
+    Tick {
+        id: toastTick
+        interval: 3000
+        onTriggered: app.toast = ""
+    }
+
     Process {
         id: ender
         // Its children first: qs dies on SIGTERM without ending them, which would leave a backend call running on.
@@ -528,6 +596,11 @@ ShellRoot {
                 playlistId: app.playlistId,
                 naming: app.naming,
                 picking: app.picking ? app.picking.cursor : null,
+                snapshot: app.snapshot ? {
+                    read: app.snapshot.read,
+                    count: app.snapshot.count
+                } : null,
+                freshId: app.freshId,
                 confirming: app.confirming,
                 playlists: store.lists,
                 focus: app.focusAt,

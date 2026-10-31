@@ -117,3 +117,13 @@ test('the picker names the video, marks a Playlist already holding it, and keeps
   assert.deepEqual([b.pick.chip, b.pick.already, b.pick.newKey], ['PLAYLISTS', 'ALREADY IN ✓', '[N]']);
   assert.deepEqual(keys(b), ['[J/K] MOVE', '[↵] ADD', '[N] NEW', '[ESC] CANCEL']);
 });
+
+// The snapshot boards: an opened playlist's s saves it whole, the toast counts what was saved, and the new Playlist is marked.
+test('an opened playlist names s save as a playlist, and a snapshot toasts its count and marks the new one', () => {
+  const opened = (l) => l.legend('search', false, 'list', 'playlist').map((k) => `${k.key} ${k.word}`);
+  assert.deepEqual(opened(look('artboard')), ['j/k move', 's save as a playlist', '↵ play video', 'm play audio', 'a add to queue', '/ search', 'tab sidebar', 'esc back']);
+  assert.deepEqual(opened(look('blueprint'))[1], '[S] SAVE AS A PLAYLIST');
+  assert.deepEqual(legend(look('artboard'), 'search'), look('artboard').legend('search', false, 'list', 'channel').map((k) => `${k.key} ${k.word}`));
+  assert.equal(look('artboard').toast.saved(300), 'Saved as a playlist · 300 videos');
+  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => look(n).fresh), ['NEW', 'new', 'NEW']);
+});

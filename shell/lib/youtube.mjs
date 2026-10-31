@@ -67,3 +67,27 @@ export const EMPTY = {
   playlists: 'n makes one',
   playlist: { key: 'p', rest: 'adds a video here' },
 };
+
+// s on a playlist: a snapshot read by dots-youtube-api snapshot, counting its rows until the last line brings them all; count is null until YouTube gives one.
+export const snapshotting = (id, title, count) => ({ id, title, read: 0, count: Number.isInteger(count) ? count : null, done: false, failed: null, rows: [] });
+
+// One line of the snapshot's answer: a progress line moves read and count on, the last carries every row, and an error line ends it failed.
+export function snapshotStep(state, text) {
+  let a;
+  try {
+    a = JSON.parse(text);
+  } catch (e) {
+    return state;
+  }
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return state;
+  const failed = failure(a);
+  if (failed) return Object.assign({}, state, { done: true, failed });
+  if (Array.isArray(a.rows)) {
+    const list = rows(a);
+    return Object.assign({}, state, { done: true, read: list.length, count: Number.isInteger(a.count) ? a.count : list.length, title: oneLine(a.title) || state.title, rows: list });
+  }
+  if (Number.isInteger(a.read)) return Object.assign({}, state, { read: a.read, count: Number.isInteger(a.count) ? a.count : state.count });
+  return state;
+}
+
+export const readingText = (s) => (s.count === null ? `reading ${s.read}` : `reading ${s.read} of ${s.count}`);

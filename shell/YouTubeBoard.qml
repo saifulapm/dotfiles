@@ -62,6 +62,7 @@ Rectangle {
             nameField: nameBox.visible ? nameInput.text : null,
             confirm: asked,
             dimmed: listColumn.opacity < 1,
+            toast: toastBox.visible ? toastText.text : "",
             picker: picker.visible ? {
                 title: [pickChip.text, pickTitle.text],
                 rows: Array.from({
@@ -398,7 +399,7 @@ Rectangle {
                             readonly property string countText: modelData.count
 
                             function drawn() {
-                                return [placeName.text, placeCount.text].filter(t => t).join(" ");
+                                return [placeName.text, freshMark.visible ? freshMark.text : "", placeCount.text].filter(t => t).join(" ");
                             }
 
                             // The question x asks under the row, or null while none is asked.
@@ -467,6 +468,28 @@ Rectangle {
                                     font.family: board.bodyFont
                                     font.pixelSize: 13
                                     font.weight: !place.chosen ? Font.Normal : bracket ? Font.Bold : Font.Medium
+                                }
+                                // The Playlist a snapshot just made, until it is opened.
+                                Rectangle {
+                                    visible: place.modelData.key === "pl:" + board.yt.freshId
+                                    implicitWidth: freshMark.implicitWidth + 8
+                                    implicitHeight: freshMark.implicitHeight + 2
+                                    radius: plain ? 4 : 0
+                                    color: plain ? look.tint.tint : "transparent"
+                                    border.width: plain ? 0 : 1
+                                    border.color: c.accent ?? "red"
+
+                                    Text {
+                                        id: freshMark
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: look.fresh
+                                        color: c.accent ?? "red"
+                                        font.family: board.bodyFont
+                                        font.pixelSize: plain ? 10 : 9
+                                        font.weight: bracket ? Font.Bold : Font.Medium
+                                        font.letterSpacing: plain ? 0 : 1.26
+                                    }
                                 }
                                 Text {
                                     id: placeCount
@@ -802,7 +825,7 @@ Rectangle {
                         Text {
                             id: resultsCount
                             textFormat: Text.PlainText
-                            text: board.failing ? "—" : board.yt.playlist ? YT.count(board.yt.playlist.count) + " · " + YT.span(board.yt.playlist.secs) : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
+                            text: board.failing ? "—" : board.yt.snapshot && board.yt.view === "search" ? YT.readingText(board.yt.snapshot) : board.yt.playlist ? YT.count(board.yt.playlist.count) + " · " + YT.span(board.yt.playlist.secs) : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: caps ? 10 : 11
@@ -1246,7 +1269,7 @@ Rectangle {
 
             Repeater {
                 id: legendList
-                model: look.legend(board.yt.view, board.failing, board.yt.focusAt)
+                model: look.legend(board.yt.view, board.failing, board.yt.focusAt, board.yt.opened ? board.yt.opened.kind : "")
 
                 Rectangle {
                     required property var modelData
@@ -1285,6 +1308,54 @@ Rectangle {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // A snapshot's toast above the now-playing line: Paper's ink box with its hard accent shadow, Artboard's white card, Blueprint's box in its accent.
+    Rectangle {
+        id: toastBox
+        visible: board.yt.toast !== ""
+        anchors.right: parent.right
+        anchors.rightMargin: 22
+        y: board.height - height - 104
+        width: toastRow.implicitWidth + 30
+        height: toastRow.implicitHeight + 20
+        radius: plain ? 12 : 0
+        color: (caps ? c.ink : c.surface) ?? "black"
+        border.width: bracket ? 1 : plain ? 1 : 0
+        border.color: (bracket ? c.accent : c.line) ?? "gray"
+
+        Rectangle {
+            visible: caps
+            z: -1
+            x: 3
+            y: 3
+            width: parent.width
+            height: parent.height
+            color: c.accent ?? "red"
+        }
+
+        Row {
+            id: toastRow
+            anchors.centerIn: parent
+            spacing: 10
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: caps ? "■" : "✓"
+                color: c.accent ?? "red"
+                font.family: board.bodyFont
+                font.pixelSize: caps ? 9 : 12
+            }
+            Text {
+                id: toastText
+                textFormat: Text.PlainText
+                text: board.yt.toast
+                color: (caps ? c.surface : c.ink) ?? "black"
+                font.family: board.bodyFont
+                font.pixelSize: plain ? 13 : 12
             }
         }
     }
