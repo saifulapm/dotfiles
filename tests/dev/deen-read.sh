@@ -198,6 +198,33 @@ no_latin() { ! deen_state | jq -c .read | grep -qE "ʿus|Ash-Sharh"; }
 check "and no Latin transliteration: l-ʿus'ri and Ash-Sharh are nowhere in its state" no_latin
 check "and Read's chrome reads as before ($(read_show '[.bar.hint, .hints[0]]'))" read_is '.bar.hint == "↵ hear this word" and .hints[0] == "S SURAH"'
 
+# A theme round trip changes every row's height; the cursor's ayah stays whole in the list.
+in_theme blueprint
+until_ok 3000 deen_is '.voice == "bracket"'
+in_theme paper
+until_ok 3000 deen_is '.voice == "caps"'
+until_ok 3000 read_is '.ayah.top >= 0 and .ayah.top + .ayah.height <= .listHeight'
+check "after blueprint and back to paper, 94:6 still sits whole in the list ($(read_show '[.ayah.number, .ayah.top, .ayah.height, .listHeight]'))" \
+  read_is '.ayah.number == "6" and .ayah.top >= 0 and .ayah.top + .ayah.height <= .listHeight'
+
+# 2:282 is taller than the list: the boxed word stays in sight as h walks through it.
+wtype s
+until_ok 2000 read_is '.picker.open and .picker.focused'
+wtype 2
+until_ok 2000 read_is '.picker.text == "2"'
+wtype -k Return
+until_ok 3000 read_is '.ayah.number == "281"'
+wtype j
+until_ok 2000 read_is '.ayah.number == "282"'
+check "2:282 draws taller than the list ($(read_show '[.ayah.height, .listHeight]'))" read_is '.ayah.height > .listHeight'
+check "its long pronunciation wraps inside the row, nothing past its edge ($(read_show '.ayah | [.pronLines, .pronOverflow]'))" \
+  read_is '.ayah.pronLines > 1 and (.ayah.pronOverflow | not)'
+wtype "$(printf 'h%.0s' $(seq 127))"
+until_ok 5000 read_is '.bar.line | startswith("ayah 282, word 128")'
+until_ok 3000 read_is '.listHeight as $lh | .ayah.words[] | select(.boxed) | .top >= 0 and .bottom <= $lh'
+check "h 127 times boxes word 128, and it is in sight ($(read_show '[(.ayah.words[] | select(.boxed) | [.top, .bottom]), .listHeight]'))" \
+  read_is '.listHeight as $lh | .ayah.words[] | select(.boxed) | .top >= 0 and .bottom <= $lh'
+
 # 36:18 holds যন্ত্রণাদায়ক, whose stacked ন্ত্র is the tallest glyph Read draws; its meaning wraps.
 wtype s
 until_ok 2000 read_is '.picker.open and .picker.focused'

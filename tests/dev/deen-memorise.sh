@@ -103,8 +103,8 @@ wtype -k space
 until_ok 2000 mem_is '.memorise.revealed == true'
 check "a 200 character meaning wraps and is not cut ($(mem '.card | [.meaningLines, .meaningTruncated]'))" \
   mem_is '(.memorise.card.meaning | length) == 200 and .memorise.card.meaningLines > 1 and .memorise.card.meaningTruncated == false'
-check "and its long pronunciation wraps and is not cut ($(mem '.card | [.pronLines, .pronTruncated]'))" \
-  mem_is '(.memorise.card.pron | startswith("ইহদিনাস")) and .memorise.card.pronLines > 1 and .memorise.card.pronTruncated == false'
+check "and its long pronunciation, a fused run with no space in it, wraps inside the card and is not cut ($(mem '.card | [.pronLines, .pronTruncated, .pronOverflow]'))" \
+  mem_is '(.memorise.card.pron | startswith("ইহদিনাস")) and .memorise.card.pronLines > 1 and .memorise.card.pronTruncated == false and .memorise.card.pronOverflow == false'
 
 check "paper: a square card with a 2px ink border and square rating tiles ($(mem '.card | [.radius, .border, .fill]'))" \
   mem_is '.memorise.card | .radius == 0 and .border == 2 and .fill == "#00000000" and (.ratings | all(.radius == 0))'

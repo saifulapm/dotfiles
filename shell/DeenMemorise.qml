@@ -111,6 +111,7 @@ FocusScope {
                 pronFamily: pronText.fontInfo.family,
                 pronLines: pronText.visible ? pronText.lineCount : 0,
                 pronTruncated: pronText.visible ? pronText.truncated : false,
+                pronOverflow: pronText.visible && pronText.contentWidth > pronText.width + 1,
                 meaning: meaningText.visible ? meaningText.text : "",
                 meaningFamily: meaningText.fontInfo.family,
                 meaningLines: meaningText.visible ? meaningText.lineCount : 0,

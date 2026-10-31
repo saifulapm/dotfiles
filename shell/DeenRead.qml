@@ -62,11 +62,12 @@ FocusScope {
                 return;
             }
             page.failed = false;
-            page.surah = answer;
+            // The cursor first: the boxed word is read from both, and the old cursor may point past the new surah's last ayah.
             page.cursor = {
                 a: 1,
                 i: 1
             };
+            page.surah = answer;
             page.note = "";
             ayahList.positionViewAtBeginning();
         });
@@ -77,7 +78,32 @@ FocusScope {
             return;
         cursor = at;
         note = "";
-        ayahList.positionViewAtIndex(at.a - 1, ListView.Contain);
+        keepInView();
+    }
+
+    // The cursor's ayah whole in the list, and in an ayah taller than the list (2:282) its boxed word in sight.
+    function keepInView() {
+        if (!surah)
+            return;
+        ayahList.positionViewAtIndex(cursor.a - 1, ListView.Contain);
+        const row = ayahList.itemAtIndex(cursor.a - 1);
+        const box = row ? row.boxAt(cursor.i) : null;
+        if (!box)
+            return;
+        const top = box.mapToItem(ayahList.contentItem, 0, 0).y;
+        if (top < ayahList.contentY)
+            ayahList.contentY = top;
+        else if (top + box.height > ayahList.contentY + ayahList.height)
+            ayahList.contentY = top + box.height - ayahList.height;
+    }
+
+    // A theme change gives every row a new height, which moves the cursor's ayah, so it is brought back once the rows have their new sizes.
+    onCChanged: keepTimer.restart()
+
+    Timer {
+        id: keepTimer
+        interval: 50
+        onTriggered: page.keepInView()
     }
 
     function stopPlaying() {
@@ -178,6 +204,7 @@ FocusScope {
             meta: metaText.text,
             headingFont: headingText.font.family,
             headingFamily: headingText.fontInfo.family,
+            listHeight: ayahList.height,
             hints: hintList.drawn(),
             ayat: ayahList.count,
             ayah: ayah,
@@ -395,6 +422,11 @@ FocusScope {
                     required property var modelData
                     required property int index
 
+                    // Word i's box, made on demand, never bound to (a binding does not track Repeater.itemAt).
+                    function boxAt(i) {
+                        return wordList.itemAt(i - 1);
+                    }
+
                     function drawn() {
                         const words = [];
                         for (let k = 0; k < wordList.count; k++)
@@ -410,11 +442,13 @@ FocusScope {
                             pronFamily: ayahPron.fontInfo.family,
                             pronLines: ayahPron.lineCount,
                             pronTruncated: ayahPron.truncated,
+                            pronOverflow: ayahPron.contentWidth > ayahPron.width + 1,
                             bn: ayahBn.visible ? ayahBn.text : "",
                             bnFamily: ayahBn.fontInfo.family,
                             bnLines: ayahBn.lineCount,
                             bnTruncated: ayahBn.truncated,
                             height: ayahRow.height,
+                            top: ayahRow.mapToItem(ayahList, 0, 0).y,
                             wordsBottom: wordFlow.y + wordFlow.height,
                             pronBottom: ayahPron.y + ayahPron.height,
                             inkTop: baseline + ink.y,
@@ -480,6 +514,8 @@ FocusScope {
                                         pronTruncated: wordPron.truncated,
                                         bn: wordBn.text,
                                         x: wordBox.mapToItem(page, 0, 0).x,
+                                        top: wordBox.mapToItem(ayahList, 0, 0).y,
+                                        bottom: wordBox.mapToItem(ayahList, 0, 0).y + wordBox.height,
                                         boxed: current,
                                         family: wordArabic.fontInfo.family,
                                         bnFamily: wordBn.fontInfo.family,
