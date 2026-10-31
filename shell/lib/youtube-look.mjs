@@ -95,6 +95,13 @@ export function youtubeLook(tokens) {
       question: (name, n) => `Delete ${name.length > 40 ? name.slice(0, 39) + '…' : name} and its ${count(n)}?`,
       keys: bracket ? l.keys([['y', 'delete'], ['esc', 'keep']]) : [{ key: 'y', word: 'delete' }, { key: 'esc', word: 'keep' }],
     },
+    // The download mark beside a row's duration: Paper's sits in its 16 px end, the others in the slot before the duration.
+    mark: plain
+      ? { at: 'before', size: 12, stroke: TINT.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: TINT.tile } }
+      : { at: bracket ? 'before' : 'end', size: 14, stroke: (tokens && (bracket ? tokens.color.accent : tokens.color.ink)) || '', width: bracket ? 1.5 : 1.3, tile: null },
+    // A row whose download failed says why in its channel line, and Enter tries again (ruling DS2ESKWX).
+    retry: (reason) => (bracket ? `DOWNLOAD FAILED · ${reason} · [↵] RETRY` : `download failed · ${reason} · ↵ retry`),
+    retryColor: plain ? TINT.errInk : bracket ? TINT.warn : (tokens && tokens.color.danger) || '',
     fieldRadius: plain ? 14 : 0,
     rowRadius: plain ? 10 : 0,
     ruleDashed: bracket,

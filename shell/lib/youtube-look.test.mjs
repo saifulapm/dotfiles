@@ -138,3 +138,15 @@ test('the delete question cuts a long name and keeps its count', () => {
   assert.equal(q, `Delete ${'H'.repeat(39)}… and its 14 videos?`);
   assert.equal(look('blueprint').confirm.question('H'.repeat(40), 1), `Delete ${'H'.repeat(40)} and its 1 video?`);
 });
+
+test("each board draws the download mark its own way: Paper's ink arrow at the row's end, Artboard's in a grey tile, Blueprint's in its accent", () => {
+  assert.deepEqual(look('paper').mark, { at: 'end', size: 14, stroke: '#1C1915', width: 1.3, tile: null });
+  assert.deepEqual(look('artboard').mark, { at: 'before', size: 12, stroke: '#2638C9', width: 2, tile: { width: 22, height: 20, radius: 6, color: '#F2F3F6' } });
+  assert.deepEqual(look('blueprint').mark, { at: 'before', size: 14, stroke: '#7FE3F0', width: 1.5, tile: null });
+});
+
+test('a failed download reads in the channel line with the key that retries it, in the error colour', () => {
+  assert.deepEqual([look('paper').retry('HTTP 403'), look('paper').retryColor], ['download failed · HTTP 403 · ↵ retry', '#C8381E']);
+  assert.deepEqual([look('artboard').retry('disk full'), look('artboard').retryColor], ['download failed · disk full · ↵ retry', '#B4380B']);
+  assert.deepEqual([look('blueprint').retry('HTTP 403'), look('blueprint').retryColor], ['DOWNLOAD FAILED · HTTP 403 · [↵] RETRY', '#FFB547']);
+});

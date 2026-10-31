@@ -275,3 +275,20 @@ test('S never loads a Playlist of two or more in its own order, whatever the see
   }
   assert.deepEqual(loads(Q.shuffledLines(Q.initial(), [row(1)], 3)).map((c) => c[1]), [watch('fakeVid0001')]);
 });
+
+test('a downloaded row loads its file in place of its URL, alone, in a Playlist and shuffled', () => {
+  const files = { fakeVid0001: '/m/YouTube/Aruarian Dance [fakeVid0001].opus' };
+  const target = (l) => JSON.parse(l).command[1];
+  assert.equal(target(Q.itemLines(playing(), ARUARIAN, 'play', files)[1]), files.fakeVid0001);
+  assert.equal(target(Q.itemLines(playing(), FEATHER, 'add', files)[1]), watch('fakeVid0002'));
+  const loads = (lines) => lines.filter((l) => JSON.parse(l).command[0] === 'loadfile').map(target);
+  assert.deepEqual(loads(Q.listLines(playing(), [ARUARIAN, FEATHER], 'play', files)), [files.fakeVid0001, watch('fakeVid0002')]);
+  assert.deepEqual(loads(Q.shuffledLines(playing(), [ARUARIAN, FEATHER], 7, files)).sort(), [files.fakeVid0001, watch('fakeVid0002')].sort());
+  assert.deepEqual(loads(Q.listLines(playing(), [ARUARIAN], 'play')), [watch('fakeVid0001')]);
+});
+
+test("a file playing keeps its row's channel and seconds, read from the id in its name", () => {
+  const items = { fakeVid0001: { title: 'Aruarian Dance', channel: 'Nujabes - Topic', secs: 267 } };
+  const s = feed(Q.initial(), [ev('user-data/youtube', items), ev('path', '/m/YouTube/Aruarian Dance [fakeVid0001].opus')]);
+  assert.deepEqual([s.channel, s.secs], ['Nujabes - Topic', 267]);
+});

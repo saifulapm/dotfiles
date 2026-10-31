@@ -9,6 +9,7 @@ import "lib/youtube.mjs" as YT
 import "lib/youtube-find.mjs" as F
 import "lib/youtube-queue.mjs" as Q
 import "lib/youtube-playlists.mjs" as P
+import "lib/youtube-get.mjs" as G
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
 ShellRoot {
@@ -67,6 +68,10 @@ ShellRoot {
     property var link: Q.link()
     // What the Queue plays, as the now-playing line writes it; empty while it is stopped.
     readonly property string nowPlaying: Q.nowLine(queue)
+    // The download index as dots-youtube-get keeps it, {files, failed}; read once its where has pruned the files gone since, and on every write after.
+    property var downloads: G.index("")
+    property string indexPath: ""
+    readonly property string getter: Quickshell.shellDir + "/../bin/dots-youtube-get"
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -320,18 +325,81 @@ ShellRoot {
         });
     }
 
+    // d and D: a row's audio or video, or every item of the Playlist shown, into the queue dots-youtube-get works through one at a time; what is already downloaded it skips.
+    function download(kind, list, name) {
+        const lines = G.stdinLines(list);
+        if (lines === "")
+            return;
+        const call = getCaller.createObject(app, {
+            command: [getter, kind].concat(name ? ["--playlist", name] : []),
+            lines: lines
+        });
+        call.running = true;
+    }
+
+    function downloadKey(kind) {
+        if (playlist)
+            download(kind, playlistRows, playlist.name);
+        else if (pane === "list" && rows[cursor])
+            download(kind, [rows[cursor]], "");
+    }
+
+    function hasFile(id) {
+        return G.downloaded(downloads, id);
+    }
+
+    function downloadFailed(id) {
+        return G.failedOf(downloads, id);
+    }
+
+    // Enter on a row whose download failed asks for that download again.
+    function retryDownload(row) {
+        const f = row ? downloadFailed(row.id) : null;
+        if (f)
+            download(f.kind, [row], "");
+    }
+
     // m plays a row in the Queue in place of what it holds, a appends it.
     function queueItem(row, how) {
         if (!row || row.kind !== "video" || row.unavailable)
             return;
         history.add(row);
-        sendQueue(Q.itemLines(queue, row, how));
+        withFiles([row], files => app.sendQueue(Q.itemLines(app.queue, row, how, files)));
     }
 
     // m, a and S on a Playlist: its items in order, appended, or shuffled, by DOTS_YOUTUBE_SEED when a check sets one; none of them goes to History.
     function queuePlaylist(how) {
         const rows = playlistRows;
-        sendQueue(how === "shuffle" ? Q.shuffledLines(queue, rows, parseInt(Quickshell.env("DOTS_YOUTUBE_SEED") || "", 10)) : Q.listLines(queue, rows, how));
+        withFiles(rows, files => app.sendQueue(how === "shuffle" ? Q.shuffledLines(app.queue, rows, parseInt(Quickshell.env("DOTS_YOUTUBE_SEED") || "", 10), files) : Q.listLines(app.queue, rows, how, files)));
+    }
+
+    // Rows with a downloaded file wait for dots-youtube-get where, which drops a file gone since so it streams; a press after one that waits waits behind it, so the Queue takes them in the order pressed.
+    property var queueWaits: []
+
+    function withFiles(list, then) {
+        const ids = list.filter(r => hasFile(r.id)).map(r => r.id);
+        if (ids.length === 0 && queueWaits.length === 0)
+            return then({});
+        queueWaits = queueWaits.concat([{
+                ids: ids,
+                then: then
+            }]);
+        if (queueWaits.length === 1)
+            nextWait();
+    }
+
+    function nextWait() {
+        const w = queueWaits[0];
+        const done = files => {
+            w.then(files);
+            app.queueWaits = app.queueWaits.slice(1);
+            if (app.queueWaits.length > 0)
+                app.nextWait();
+        };
+        if (w.ids.length === 0)
+            done({});
+        else
+            run([getter, "where"].concat(w.ids), answer => done(G.playFiles(answer)));
     }
 
     // The first ask with no Queue connected starts youtube-audio, and what follows waits for its socket.
@@ -558,6 +626,44 @@ ShellRoot {
         id: history
     }
 
+    // dots-youtube-get where makes the index when there is none, so the watch below starts on a file that exists.
+    Component.onCompleted: run([getter, "where"], () => {
+        app.indexPath = (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/youtube/downloads.json";
+    })
+
+    // dots-youtube-get renames each write over the index, and the watch follows the path.
+    FileView {
+        path: app.indexPath
+        watchChanges: true
+        printErrors: false
+        onFileChanged: reload()
+        onLoaded: app.downloads = G.index(text())
+        onLoadFailed: app.downloads = G.index("")
+    }
+
+    // A download's rows go in on stdin; a refusal, such as no yt-dlp, shows as the toast.
+    Component {
+        id: getCaller
+
+        Process {
+            property string lines: ""
+            stdinEnabled: true
+            stdout: StdioCollector {
+                id: getOut
+            }
+            onStarted: {
+                write(lines);
+                stdinEnabled = false;
+            }
+            onExited: {
+                const answer = YT.answer(getOut.text);
+                if (answer && typeof answer.error === "string")
+                    app.say(answer.error);
+                destroy();
+            }
+        }
+    }
+
     Component {
         id: caller
 
@@ -663,6 +769,7 @@ ShellRoot {
                 } : null,
                 searchSeq: app.searchSeq,
                 units: app.units,
+                downloads: app.downloads,
                 queue: app.queue,
                 error: app.failed,
                 firstFrameMs: app.firstFrameMs,

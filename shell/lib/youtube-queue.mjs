@@ -10,6 +10,8 @@ const SHUFFLED = 'user-data/youtube-shuffled';
 const line = (command) => JSON.stringify({ command });
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const watch = (id) => `https://www.youtube.com/watch?v=${id}`;
+// A downloaded row plays its file, by files {id: path} as youtube-get.mjs playFiles gives them; any other streams.
+const target = (id, files) => (files && typeof files[id] === 'string' ? files[id] : watch(id));
 
 // asked counts the items asked for while the Queue read stopped, until mpv reports one playing; items is mpv's user-data by video id.
 export const initial = () => ({ pos: -1, count: 0, paused: false, time: null, loop: false, idle: true, path: '', title: '', channel: '', secs: null, items: {}, asked: 0, shuffled: false });
@@ -20,9 +22,9 @@ export const connectLines = () => [
   JSON.stringify({ command: ['get_property', ITEMS], request_id: ITEMS_REQUEST }),
 ];
 
-// mpv knows only the URL that plays, so channel and seconds come from the item stored under its video id.
+// mpv knows only the URL or file that plays, so channel and seconds come from the item stored under its video id; a file names it in brackets before its extension.
 function current(state) {
-  const m = /[?&]v=([A-Za-z0-9_-]{11})/.exec(state.path);
+  const m = /[?&]v=([A-Za-z0-9_-]{11})/.exec(state.path) || /\[([A-Za-z0-9_-]{11})\]\.[A-Za-z0-9]+$/.exec(state.path);
   const item = m && isObject(state.items[m[1]]) ? state.items[m[1]] : {};
   return Object.assign(state, { channel: typeof item.channel === 'string' ? item.channel : '', secs: typeof item.secs === 'number' ? item.secs : null });
 }
@@ -72,11 +74,11 @@ export function nowLine(state) {
 const stopped = (state) => state.idle || state.count === 0;
 
 // a starts a stopped Queue afresh rather than adding to the entries of one that ended, but only the first ask does, or a fast second press would replace the first.
-export function itemLines(state, row, how) {
+export function itemLines(state, row, how, files) {
   const mode = how === 'play' || (stopped(state) && state.asked === 0) ? 'replace' : 'append-play';
   const lines = [
     line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]),
-    line(['loadfile', watch(row.id), mode, -1, { 'force-media-title': row.title }]),
+    line(['loadfile', target(row.id, files), mode, -1, { 'force-media-title': row.title }]),
   ];
   // mpv keeps pause from one file to the next, so a Queue a video paused would load the row paused and stay silent. A single row replacing the Queue is no longer a shuffled playlist.
   return mode === 'replace' ? lines.concat([shuffledLine(false), setPauseLine(false)]) : lines;
@@ -86,16 +88,16 @@ const shuffledLine = (on) => line(['set_property', SHUFFLED, on]);
 const loadable = (rows) => rows.filter((r) => !r.unavailable);
 
 // A whole playlist's rows in order: 'play' replaces the Queue, 'add' appends, and a stopped Queue with no ask yet starts afresh. A row YouTube marks unavailable stays out, since mpv would only skip it.
-export const listLines = (state, rows, how) => load(state, rows, how, false);
+export const listLines = (state, rows, how, files) => load(state, rows, how, false, files);
 
-function load(state, rows, how, shuffled) {
+function load(state, rows, how, shuffled, files) {
   const list = loadable(rows);
   if (list.length === 0) return [];
   const replace = how === 'play' || (stopped(state) && state.asked === 0);
   const lines = [];
   list.forEach((row, i) => {
     lines.push(line(['set_property', `${ITEMS}/${row.id}`, { title: row.title, channel: row.channel, secs: row.secs }]));
-    lines.push(line(['loadfile', watch(row.id), replace && i === 0 ? 'replace' : 'append-play', -1, { 'force-media-title': row.title }]));
+    lines.push(line(['loadfile', target(row.id, files), replace && i === 0 ? 'replace' : 'append-play', -1, { 'force-media-title': row.title }]));
   });
   // Whatever replaces the Queue says whether it is shuffled; an append leaves the flag alone.
   if (replace) lines.push(shuffledLine(shuffled));
@@ -126,11 +128,11 @@ export function shuffle(rows, seed) {
 }
 
 // S changes the order of what plays: a draw that leaves the loadable rows as they were turns them by one.
-export function shuffledLines(state, rows, seed) {
+export function shuffledLines(state, rows, seed, files) {
   const list = loadable(rows);
   const drawn = shuffle(list, seed);
   const same = drawn.every((r, i) => r === list[i]);
-  return load(state, same && list.length > 1 ? list.slice(1).concat(list.slice(0, 1)) : drawn, 'play', true);
+  return load(state, same && list.length > 1 ? list.slice(1).concat(list.slice(0, 1)) : drawn, 'play', true, files);
 }
 
 // The App calls this after each itemLines, since mpv reports nothing back before the next press can come.

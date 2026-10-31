@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Shapes
 import "lib/youtube-queue.mjs" as Q
 import "lib/youtube.mjs" as YT
 
@@ -24,6 +25,34 @@ Rectangle {
     readonly property var emptyText: yt.view !== "search" ? yt.look.empty(yt.view) : yt.opened && yt.opened.kind === "channel" && !yt.opened.list.loading && yt.failed === null ? yt.look.empty("channel") : null
     // A failed search's list is its error block.
     readonly property bool failing: yt.view === "search" && yt.failed !== null
+
+    // The boards' download arrow into a tray, on Artboard's grey tile; on a lit row Paper's and Blueprint's take the row's light colour.
+    component DownloadMark: Rectangle {
+        property bool lit: false
+        anchors.centerIn: parent
+        width: board.look.mark.tile ? board.look.mark.tile.width : board.look.mark.size
+        height: board.look.mark.tile ? board.look.mark.tile.height : board.look.mark.size
+        radius: board.look.mark.tile ? board.look.mark.tile.radius : 0
+        color: board.look.mark.tile ? board.look.mark.tile.color : "transparent"
+
+        Shape {
+            anchors.centerIn: parent
+            width: board.look.mark.size
+            height: board.look.mark.size
+            preferredRendererType: Shape.CurveRenderer
+            ShapePath {
+                strokeColor: parent.parent.lit && !board.plain ? board.c.surface ?? "white" : board.look.mark.stroke || (board.c.ink ?? "black")
+                strokeWidth: board.look.mark.width
+                fillColor: "transparent"
+                capStyle: ShapePath.RoundCap
+                joinStyle: ShapePath.RoundJoin
+                scale: Qt.size(board.look.mark.size / 16, board.look.mark.size / 16)
+                PathSvg {
+                    path: "M8 2.5v8M4.8 7.5L8 10.7l3.2-3.2M3 13.5h10"
+                }
+            }
+        }
+    }
 
     function focusField() {
         field.forceActiveFocus();
@@ -238,6 +267,8 @@ Rectangle {
                 board.yt.back();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
                 board.yt.retry();
+            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.yt.rows[board.yt.cursor] && board.yt.downloadFailed(board.yt.rows[board.yt.cursor].id))
+                board.yt.retryDownload(board.yt.rows[board.yt.cursor]);
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.yt.playlist)
                 board.yt.playPlaylist();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
@@ -252,6 +283,8 @@ Rectangle {
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "play");
             else if (t === "a" && board.yt.pane === "list")
                 board.yt.queueItem(board.yt.rows[board.yt.cursor], "add");
+            else if (t === "d" || t === "D")
+                board.yt.downloadKey(t === "d" ? "audio" : "video");
             else if (t === "p" && board.yt.pane === "list")
                 board.yt.pick(board.yt.rows[board.yt.cursor]);
             else if (t === "x" && board.yt.pane === "list" && board.yt.playlist)
@@ -969,6 +1002,9 @@ Rectangle {
                             readonly property bool lit: index === board.yt.cursor && board.yt.focusAt === "list"
                             // The channel and duration on the lit row: Paper's light ink, Blueprint's dark surface, Artboard's grey as on any row.
                             readonly property color litMuted: (caps ? look.tint.onInk : plain ? c.muted : c.surface) ?? "gray"
+                            // A file on disk for this video, and its last download's failure, from the App's download index.
+                            readonly property bool saved: rowItem.modelData.kind === "video" && board.yt.hasFile(rowItem.modelData.id)
+                            readonly property var failure: rowItem.modelData.kind === "video" ? board.yt.downloadFailed(rowItem.modelData.id) : null
 
                             function drawn() {
                                 return {
@@ -980,6 +1016,8 @@ Rectangle {
                                     dimmed: rowItem.opacity < 1,
                                     channel: channelText.text,
                                     channelElided: channelText.truncated,
+                                    channelColor: String(channelText.color),
+                                    mark: rowItem.saved,
                                     duration: durationText.text,
                                     thumb: picture.drawn()
                                 };
@@ -1052,10 +1090,10 @@ Rectangle {
                                         id: channelText
                                         Layout.fillWidth: true
                                         textFormat: Text.PlainText
-                                        text: rowItem.modelData.channel
+                                        text: rowItem.failure ? look.retry(rowItem.failure.reason) : rowItem.modelData.channel
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
+                                        color: rowItem.lit ? rowItem.litMuted : rowItem.failure ? look.retryColor : c.muted ?? "gray"
                                         font.family: board.bodyFont
                                         font.pixelSize: 11
                                         font.letterSpacing: bracket ? 0.66 : 0
@@ -1064,6 +1102,12 @@ Rectangle {
                                 Item {
                                     visible: !caps
                                     implicitWidth: plain ? 22 : 16
+                                    implicitHeight: 20
+
+                                    DownloadMark {
+                                        visible: rowItem.saved && look.mark.at === "before"
+                                        lit: rowItem.lit
+                                    }
                                 }
                                 Text {
                                     id: durationText
@@ -1083,6 +1127,12 @@ Rectangle {
                                 Item {
                                     visible: caps
                                     implicitWidth: 16
+                                    implicitHeight: 16
+
+                                    DownloadMark {
+                                        visible: rowItem.saved && look.mark.at === "end"
+                                        lit: rowItem.lit
+                                    }
                                 }
                             }
                         }
