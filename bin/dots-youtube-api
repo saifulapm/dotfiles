@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; channel <UC-id|@handle> <offset> prints 20 of a channel's uploads; playlist <id|url> prints every item of a playlist; resolve <url> says whether a pasted URL is a video (with its row), a playlist, a channel or none; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call prints one compact JSON object; a failed read prints {error, kind, raw} and exits 1.
+# dots-youtube-api: the YouTube App's only network reader. search <query> <type> <offset> prints 20 rows of a YouTube search from offset through yt-dlp; channel <UC-id|@handle> <offset> prints 20 of a channel's uploads; playlist <id|url> prints every item of a playlist; snapshot <id|url> reads every item too, printing {read, count, title, channel} after each 100 rows before its {title, channel, count, rows}; resolve <url> says whether a pasted URL is a video (with its row), a playlist, a channel or none; thumbs <id>... fetches mqdefault thumbnails into a cache capped at 200 MiB. Each call but snapshot prints one compact JSON object; a failed read prints {error, kind, raw} and exits 1.
 import ctypes
 import json
 import os
@@ -26,12 +26,12 @@ child = None
 
 
 def usage():
-    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | channel <UC-id|@handle> <offset> | playlist <id|url> | resolve <url> | thumbs <id>...", file=sys.stderr)
+    print("dots-youtube-api: usage: search <query> videos|playlists|channels <offset> | channel <UC-id|@handle> <offset> | playlist <id|url> | snapshot <id|url> | resolve <url> | thumbs <id>...", file=sys.stderr)
     sys.exit(2)
 
 
 def out(obj):
-    print(json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
+    print(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), flush=True)
 
 
 def fail(error, kind, raw=""):
@@ -69,8 +69,8 @@ def stop(signum, _frame):
     sys.exit(128 + signum)
 
 
-# Runs yt-dlp with the deno mise names, in cwd when given, and answers its JSON object (None when it failed or printed none) and its stderr.
-def ytdlp(args, cwd=None):
+# Starts yt-dlp with the deno mise names, in cwd when given, its stdout a pipe and its stderr where asked.
+def start(args, cwd=None, stderr=subprocess.PIPE):
     global child
     if shutil.which("yt-dlp") is None:
         fail("yt-dlp is missing: run dots update", "runtime")
@@ -82,9 +82,14 @@ def ytdlp(args, cwd=None):
     # A group of its own, so stop() also reaches whatever yt-dlp starts.
     child = subprocess.Popen(
         ["yt-dlp", *args[:-1], "--js-runtimes", "deno:" + runtime, args[-1]],
-        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, cwd=cwd, process_group=0, preexec_fn=die_with_parent,
+        stdout=subprocess.PIPE, stderr=stderr, text=True, cwd=cwd, process_group=0, preexec_fn=die_with_parent,
     )
-    stdout, stderr = child.communicate()
+    return child
+
+
+# Runs yt-dlp and answers its JSON object (None when it failed or printed none) and its stderr.
+def ytdlp(args, cwd=None):
+    stdout, stderr = start(args, cwd).communicate()
     try:
         data = json.loads(stdout)
     except ValueError:
@@ -113,9 +118,12 @@ def thumb_of(e, fallback):
     return next((m[1] for t in e.get("thumbnails") or [] if (m := re.search(r"/vi/([A-Za-z0-9_-]{11})/", t.get("url", "")))), fallback)
 
 
-# A video row; a video with no ytimg thumbnail falls back to its own id.
+# A video row; a video with no ytimg thumbnail falls back to its own id. A playlist's private or deleted video is a flat entry with no title and no duration, and only "private" in availability tells the two apart.
 def video_row(e, channel=None):
-    return {"id": e["id"], "kind": "video", "title": e.get("title"), "channel": e.get("channel") or e.get("uploader") or channel, "duration": e.get("duration"), "thumb": thumb_of(e, e["id"])}
+    row = {"id": e["id"], "kind": "video", "title": e.get("title"), "channel": e.get("channel") or e.get("uploader") or channel, "duration": e.get("duration"), "thumb": thumb_of(e, e["id"])}
+    if not e.get("title") and e.get("duration") is None:
+        row["unavailable"] = "made private" if e.get("availability") == "private" else "made private or deleted"
+    return row
 
 
 # The results page is HTML holding ytInitialData; the pages after it are JSON.
@@ -237,6 +245,34 @@ def playlist(list_id):
     out({"title": data.get("title"), "count": count if isinstance(count, int) else len(rows), "rows": rows})
 
 
+# Every item of a playlist, read as yt-dlp prints each page of 100, so a long one says how far it has read. Each line carries the playlist's count, title and channel.
+def snapshot(list_id):
+    # stderr goes to a file, so a yt-dlp warning a pipe left unread never stalls it.
+    with tempfile.TemporaryFile("w+", encoding="utf-8", errors="replace") as errors:
+        proc = start(["--flat-playlist", "--lazy-playlist", "-j", "https://www.youtube.com/playlist?list=" + list_id], stderr=errors)
+        rows = []
+        head = {}
+        for line in proc.stdout:
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(e, dict):
+                continue
+            head = e
+            if not ID.match(str(e.get("id"))):
+                continue
+            rows.append(video_row(e))
+            if len(rows) % 100 == 0:
+                count = e.get("playlist_count")
+                out({"read": len(rows), "count": count if isinstance(count, int) else None, "title": e.get("playlist_title"), "channel": e.get("playlist_channel") or e.get("playlist_uploader")})
+        if proc.wait() != 0:
+            errors.seek(0)
+            broke(errors.read())
+    count = head.get("playlist_count")
+    out({"title": head.get("playlist_title"), "channel": head.get("playlist_channel") or head.get("playlist_uploader"), "count": count if isinstance(count, int) else len(rows), "rows": rows})
+
+
 # A playlist argument is its id, or a URL whose list= names it.
 def list_id(arg):
     if "?" in arg:
@@ -326,6 +362,8 @@ def main(args):
         channel(args[1], int(args[2]))
     elif len(args) == 2 and args[0] == "playlist" and list_id(args[1]):
         playlist(list_id(args[1]))
+    elif len(args) == 2 and args[0] == "snapshot" and list_id(args[1]):
+        snapshot(list_id(args[1]))
     elif len(args) == 2 and args[0] == "resolve":
         resolve(args[1])
     elif len(args) >= 2 and args[0] == "thumbs":

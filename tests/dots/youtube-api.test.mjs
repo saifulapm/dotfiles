@@ -291,6 +291,82 @@ test('a failure YouTube explains prints YouTube\'s sentence as the error, with i
   assert.deepEqual(JSON.parse(r.stdout), { error: 'The playlist does not exist.', kind: 'extraction', raw: 'ERROR: [youtube:tab] PLmissingmissingmissing: YouTube said: The playlist does not exist.' });
 });
 
+// A flat entry as yt-dlp --lazy-playlist -j prints it, one line each, every one carrying the playlist's count, title and channel (probe 2026-11-01).
+const lazyEntry = (i) => ({ ...upload(`lof${String(i).padStart(8, '0')}`, `Lofi ${i}`, 60 + i, 'lofi archive'), playlist_count: 250, playlist_title: 'Lofi Archive', playlist_channel: 'lofi archive', playlist_uploader: 'lofi archive', playlist_id: 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO' });
+const lazyRow = (i) => ({ id: `lof${String(i).padStart(8, '0')}`, kind: 'video', title: `Lofi ${i}`, channel: 'lofi archive', duration: 60 + i, thumb: `lof${String(i).padStart(8, '0')}` });
+// Writes entries from..to-1 as yt-dlp's lines into the named file under dir.
+const lazyPage = (dir, name, from, to) => writeFileSync(join(dir, name), Array.from({ length: to - from }, (_, i) => JSON.stringify(lazyEntry(from + i)) + '\n').join(''));
+
+test('snapshot prints how far it has read at 100 and 200 rows as yt-dlp prints them, then every row with the playlist\'s title, channel and count', async (t) => {
+  const { dir, env, act } = rig(t);
+  lazyPage(dir, 'p1', 0, 100);
+  lazyPage(dir, 'p2', 100, 200);
+  lazyPage(dir, 'p3', 200, 250);
+  // yt-dlp prints a page of 100 at a time and touches `done` only once its last line is out.
+  act(`cat "${dir}/p1"; sleep 0.5; cat "${dir}/p2"; sleep 0.5; cat "${dir}/p3"; touch "${dir}/done"`);
+  const child = spawn(bin, ['snapshot', 'https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO'], { env });
+  let stdout = '';
+  let doneAtFirst = null;
+  child.stdout.on('data', (d) => {
+    if (doneAtFirst === null) doneAtFirst = existsSync(join(dir, 'done'));
+    stdout += d;
+  });
+  const status = await new Promise((r) => child.on('exit', r));
+  assert.equal(status, 0);
+  assert.equal(doneAtFirst, false, 'the first progress line came before yt-dlp finished');
+  const lines = stdout.trimEnd().split('\n').map((l) => JSON.parse(l));
+  assert.equal(lines.length, 3);
+  assert.deepEqual(lines[0], { read: 100, count: 250, title: 'Lofi Archive', channel: 'lofi archive' });
+  assert.deepEqual(lines[1], { read: 200, count: 250, title: 'Lofi Archive', channel: 'lofi archive' });
+  assert.deepEqual(Object.keys(lines[2]), ['title', 'channel', 'count', 'rows']);
+  assert.deepEqual([lines[2].title, lines[2].channel, lines[2].count], ['Lofi Archive', 'lofi archive', 250]);
+  assert.equal(lines[2].rows.length, 250);
+  assert.deepEqual(lines[2].rows[0], lazyRow(0));
+  assert.deepEqual(lines[2].rows[249], lazyRow(249));
+  assert.deepEqual(lines[2].rows.map((r) => r.id), Array.from({ length: 250 }, (_, i) => lazyRow(i).id));
+  const argv = readFileSync(join(dir, 'argv'), 'utf8').trimEnd().split('\n');
+  assert.ok(argv.includes('--flat-playlist') && argv.includes('--lazy-playlist') && argv.includes('-j'), argv.join(' '));
+  assert.ok(!argv.includes('-J'), argv.join(' '));
+  assert.equal(argv.at(-1), 'https://www.youtube.com/playlist?list=PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+});
+
+// An unavailable video as the probe saw it: only its id and url are set.
+const gone = (id, availability) => ({ _type: 'url', ie_key: 'Youtube', id, url: `https://www.youtube.com/watch?v=${id}`, title: null, duration: null, channel: null, uploader: null, availability, thumbnails: null });
+
+test('an entry with no title and no duration is an unavailable row, made private when yt-dlp says private, in snapshot and playlist alike', (t) => {
+  const { dir, act, run } = rig(t);
+  const entries = [upload('hQ5x8pHoIPA', 'Feather', 176, 'Nujabes'), gone('deletedVid1', null), gone('privateVid1', 'private')];
+  const want = [
+    { id: 'hQ5x8pHoIPA', kind: 'video', title: 'Feather', channel: 'Nujabes', duration: 176, thumb: 'hQ5x8pHoIPA' },
+    { id: 'deletedVid1', kind: 'video', title: null, channel: null, duration: null, thumb: 'deletedVid1', unavailable: 'made private or deleted' },
+    { id: 'privateVid1', kind: 'video', title: null, channel: null, duration: null, thumb: 'privateVid1', unavailable: 'made private' },
+  ];
+  writeFileSync(join(dir, 'lines'), entries.map((e) => JSON.stringify({ ...e, playlist_count: 3, playlist_title: 'Mixed', playlist_uploader: 'Nujabes' }) + '\n').join(''));
+  act(`cat "${dir}/lines"`);
+  const s = run('snapshot', 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+  assert.equal(s.status, 0, s.stderr);
+  assert.deepEqual(JSON.parse(s.stdout), { title: 'Mixed', channel: 'Nujabes', count: 3, rows: want });
+  writeFileSync(join(dir, 'playlist.json'), JSON.stringify({ ...playlist(3), entries }));
+  act(`cat "${dir}/playlist.json"`);
+  const p = run('playlist', 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+  assert.equal(p.status, 0, p.stderr);
+  assert.deepEqual(JSON.parse(p.stdout).rows, want);
+});
+
+test('a yt-dlp failure after a progress line still ends in the error line and exit 1', (t) => {
+  const { dir, act, run } = rig(t);
+  lazyPage(dir, 'p1', 0, 100);
+  const raw = 'ERROR: [youtube:tab] PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO: Unable to download API page: <urlopen error [Errno -3] Temporary failure in name resolution>';
+  act(`cat "${dir}/p1"\necho "${raw}" >&2\nexit 1`);
+  const r = run('snapshot', 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO');
+  assert.equal(r.status, 1);
+  const lines = r.stdout.trimEnd().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines, [
+    { read: 100, count: 250, title: 'Lofi Archive', channel: 'lofi archive' },
+    { error: 'No network. Check Wi-Fi, then ↵ to try again.', kind: 'network', raw },
+  ]);
+});
+
 // A video as yt-dlp -J gave it live for hQ5x8pHoIPA, cut to the fields a row reads and a few it must drop.
 const watched = { id: 'hQ5x8pHoIPA', title: 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', channel: 'Nujabes', uploader: 'Nujabes', uploader_id: '@Nujabes19740207', channel_id: 'UCO5XcuQe_fLJVI3sZ0LmGCA', duration: 175, _type: 'video', view_count: 6700000, formats: [], thumbnails: [{ url: 'https://i.ytimg.com/vi/hQ5x8pHoIPA/maxresdefault.jpg', preference: 0, id: '40' }] };
 const featherRow = { id: 'hQ5x8pHoIPA', kind: 'video', title: 'Nujabes - Feather (feat. Cise Starr & Akin from CYNE) [Official Audio]', channel: 'Nujabes', duration: 175, thumb: 'hQ5x8pHoIPA' };
@@ -459,11 +535,11 @@ const alive = (pid) => {
   }
 };
 
-// Starts a search whose yt-dlp sleeps 30 s, sends the CLI the signal once yt-dlp is up, and resolves with whether the stub still runs 2 s later.
-async function orphanAfter(t, signal) {
+// Starts a search (or args) whose yt-dlp prints first (if given) and then sleeps 30 s, sends the CLI the signal once yt-dlp is up, and resolves with whether the stub still runs 2 s later.
+async function orphanAfter(t, signal, args = ['search', 'nujabes', 'videos', '0'], first = '') {
   const { dir, env, act } = rig(t);
-  act(`echo $$ >"${dir}/pid"\nexec sleep 30`);
-  const child = spawn(bin, ['search', 'nujabes', 'videos', '0'], { env, stdio: 'ignore' });
+  act(`${first}echo $$ >"${dir}/pid"\nexec sleep 30`);
+  const child = spawn(bin, args, { env, stdio: 'ignore' });
   const pidFile = join(dir, 'pid');
   for (let i = 0; i < 100 && !(existsSync(pidFile) && readFileSync(pidFile, 'utf8').trim()); i++) await new Promise((r) => setTimeout(r, 50));
   const pid = Number(readFileSync(pidFile, 'utf8'));
@@ -481,4 +557,9 @@ test('SIGTERM to the CLI leaves no yt-dlp running', async (t) => {
 
 test('SIGKILL to the CLI leaves no yt-dlp running', async (t) => {
   assert.equal(await orphanAfter(t, 'SIGKILL'), false);
+});
+
+test('SIGTERM to a snapshot mid-read leaves no yt-dlp running', async (t) => {
+  const lines = Array.from({ length: 150 }, (_, i) => JSON.stringify(lazyEntry(i))).join('\n');
+  assert.equal(await orphanAfter(t, 'SIGTERM', ['snapshot', 'PLfFNYT1NiTNTj04xlfqK8zZUp8sC2ZOAO'], `cat <<'EOF'\n${lines}\nEOF\n`), false);
 });
