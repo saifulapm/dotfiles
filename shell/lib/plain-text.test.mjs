@@ -21,10 +21,15 @@ function textBlocks(src) {
   return blocks;
 }
 
-test('every Text in the shell sets textFormat: Text.PlainText', () => {
+// The island's question draws Q.linkify's html, which escapes the text before it adds links (questions.test.mjs), so that Text alone may be StyledText.
+const STYLED = ['Island.qml:askText'];
+
+test('every Text in the shell sets textFormat: Text.PlainText, but the escaped question links', () => {
   const found = [];
   for (const f of readdirSync(shell).filter((f) => f.endsWith('.qml'))) {
     for (const b of textBlocks(readFileSync(shell + f, 'utf8'))) {
+      const id = (b.body.match(/\bid:\s*(\w+)/) || [])[1];
+      if (STYLED.includes(`${f}:${id}`) && /textFormat:[^\n]*Text\.StyledText/.test(b.body)) continue;
       if (!/textFormat:\s*Text\.PlainText/.test(b.body)) found.push(`${f}:${b.at}`);
     }
   }

@@ -35,8 +35,7 @@ export function optionFor(question, key) {
   return i >= 0 && i < question.options.length ? question.options[i] : null;
 }
 
-// Question text and answers are untrusted, so they only ever travel as argv elements. Signed popup: the hub passes only a slack, popup or cli answer to the machine that asked.
-// Each attachment is a file on this machine; the hub copies it to the machine that asked. Qt's engine has no flatMap.
+// Question text and answers are untrusted, so they only ever travel as argv elements; signed popup: the hub passes only a slack, popup or cli answer, and copies each attachment, a file on this machine, to the machine that asked. Qt's engine has no flatMap.
 export const answerArgv = (id, text, files = []) => ['mem', 'answer', '--by', 'popup'].concat(...files.map((f) => ['--screenshot', f]), ['--', id, text]);
 
 export const baseName = (path) => path.split('/').pop();
@@ -50,8 +49,7 @@ export function summary(question) {
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-// A web address: http(s)://, or a bare host under a common top-level domain, so file names such as deploy.yml stay text.
-// The leading group stands in for a lookbehind: no word character, @, dot, slash, colon or dash just before it.
+// A web address: http(s)://, or a bare host under a common top-level domain, so file names such as deploy.yml stay text; the leading group stands in for a lookbehind: no word character, @, dot, slash, colon or dash just before it.
 const WEB = /(^|[^\w@./:-])(https?:\/\/[^\s<>"']+|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:com|org|net|io|dev|app|ai|co|gg|xyz|tv|uk|bd|info|site|cloud)(?::\d+)?(?![\w-])(?:\/[^\s<>"']*)?)/gi;
 
 // Question text as Text.StyledText with each web address a link whose href is its index in `urls`, so only an address found here is ever opened.
