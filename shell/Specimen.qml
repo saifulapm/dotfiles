@@ -23,8 +23,8 @@ Item {
     property real playT0: 0
     property real offset: 0
     property real reveal: 196
-    // How much of the preview's width the stage shows, left of Hi-Fi's pointer.
-    property real across: 306
+    // The share of the preview's width the stage shows, left of Hi-Fi's pointer; a card narrower than 306 px sweeps its own width.
+    property real across: 1
 
     // Plays the card's own theme switch in miniature: the specimen comes in over the current paper.
     function play(t0) {
@@ -96,9 +96,9 @@ Item {
             Item {
                 id: stage
                 y: specimen.offset
-                width: specimen.across
+                width: preview.width * specimen.across
                 height: specimen.reveal
-                clip: specimen.reveal < preview.height || specimen.across < preview.width
+                clip: specimen.reveal < preview.height || specimen.across < 1
 
                 Item {
                     width: preview.width
@@ -418,8 +418,8 @@ Item {
         NumberAnimation {
             target: specimen
             property: "across"
-            from: specimen.motion.kind === "sweep" ? 0 : 306
-            to: 306
+            from: specimen.motion.kind === "sweep" ? 0 : 1
+            to: 1
             duration: specimen.motion.ms
             easing.type: Easing.InOutQuad
         }
