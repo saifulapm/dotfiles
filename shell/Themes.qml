@@ -263,6 +263,8 @@ Item {
                                         lamp: tagLamp.visible ? { light: tagLamp.light, box: { x: l.x, y: l.y, w: tagLamp.width, h: tagLamp.height } } : null,
                                         baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y],
                                         nameRight: name.mapToItem(null, name.width, 0).x,
+                                        tagline: taglineText.text,
+                                        taglineElided: taglineText.truncated,
                                         nameLines: name.lineCount
                                     }, specimen.item ? specimen.item.drawn() : { paperReady: false });
                                 }
@@ -362,8 +364,9 @@ Item {
                                         height: 32
                                         readonly property var cardName: Lib.cardName(card.modelData)
                                         readonly property var tagline: Lib.tagline(card.modelData)
-                                        // What the tag and its lamp take from the line's right end.
-                                        readonly property real tagRoom: tagText.visible ? tagText.implicitWidth + 22 + (tagLamp.visible ? tagLamp.width + 6 : 0) : 0
+                                        // Hi-Fi's lamp and IN USE sit bare at the line's end, 4 px after the tagline, so the whole tagline fits beside them at 326 px; the other themes keep 6 px of chip padding each side and 10 px before it.
+                                        readonly property bool bare: switcher.theme.tokens?.type.engraved === true
+                                        readonly property real tagRoom: tagText.visible ? tagText.implicitWidth + (bare ? 4 : 22) + (tagLamp.visible ? tagLamp.width + 4 : 0) : 0
 
                                         Row {
                                             id: captionRow
@@ -393,6 +396,7 @@ Item {
                                                 font.letterSpacing: parent.parent.cardName.spacing
                                             }
                                             Text {
+                                                id: taglineText
                                                 textFormat: Text.PlainText
                                                 anchors.baseline: name.baseline
                                                 // The tag keeps its place; the line gives way before it.
@@ -423,7 +427,7 @@ Item {
                                             textFormat: Text.PlainText
                                             visible: card.tag !== null
                                             anchors.right: parent.right
-                                            anchors.rightMargin: 6
+                                            anchors.rightMargin: parent.bare ? 0 : 6
                                             // On the name's baseline; an anchor cannot reach into the name's Row.
                                             y: captionRow.y + name.y + name.baselineOffset - baselineOffset
                                             text: card.tag?.text ?? ""
@@ -438,7 +442,7 @@ Item {
                                             id: tagLamp
                                             visible: card.tag?.lamp !== undefined
                                             anchors.right: tagText.left
-                                            anchors.rightMargin: 6
+                                            anchors.rightMargin: 4
                                             anchors.verticalCenter: tagText.verticalCenter
                                             tokens: switcher.theme.tokens
                                             light: card.tag?.lamp ?? "unlit"

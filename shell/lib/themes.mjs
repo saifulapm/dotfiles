@@ -57,7 +57,7 @@ export function cardName(t) {
 export function tagline(t) {
   const p = t.primitive;
   // Hi-Fi's: its faceplate, its backlight and its dial; no token names a colour, so the backlight's word is its own.
-  if (t.type.engraved) return { text: [word('paper', p.paper), 'amber', p.motion].join(' · ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
+  if (t.type.engraved) return { text: [word('paper', p.paper), 'amber', p.motion].join(' · ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 0.9 };
   if (t.type.voice === 'bracket') {
     return { text: [word('paper', p.paper), word('frame', p.frame), p.corner].join(' // ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
   }

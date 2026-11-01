@@ -55,6 +55,8 @@ check "hi-fi: a grim of the cursor card's left border reads amber ($(box_rgb "$(
 tile_edge() { near "$(box_rgb "$(card_box paper)" 0 $(($(card_h paper) / 2)) 1 4)" '#3C3836' 8; }
 check "hi-fi: a grim of an unfocused card's left border reads #3C3836 ($(box_rgb "$(card_box paper)" 0 $(($(card_h paper) / 2)) 1 4))" tile_edge
 check "hi-fi: the Hi-fi card's tag reads IN USE after a green lamp" state_is '.cards[3].tag == "IN USE" and .cards[3].lamp.light == "green"'
+# The name, the tagline and IN USE share one line, as the board draws them; the tagline must not give way to the tag.
+check "hi-fi: the Hi-fi card's tagline reads BRUSHED · AMBER · DIAL whole beside IN USE ($(themes_state | jq -c '.cards[3] | [.tagline, .taglineElided, .box.w]'))" state_is '.cards[3].tagline == "BRUSHED · AMBER · DIAL" and .cards[3].taglineElided == false'
 lamp_rgb() { box_rgb '.cards[3].lamp.box' 2 2 2 2; }
 green_lamp() { near "$(lamp_rgb)" '#B8BB26' 12; }
 check "hi-fi: a grim of the in-use lamp reads #B8BB26 ($(lamp_rgb))" green_lamp
