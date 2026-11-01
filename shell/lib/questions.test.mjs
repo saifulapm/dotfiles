@@ -35,5 +35,5 @@ test('keys 1 to 9 pick an option, and other keys pick none', () => {
 });
 
 test('an answer travels as argv after --, so a leading dash stays text', () => {
-  assert.deepEqual(answerArgv('Q1', '-rf now'), ['mem', 'answer', '--by', 'island', '--', 'Q1', '-rf now']);
+  assert.deepEqual(answerArgv('Q1', '-rf now'), ['mem', 'answer', '--by', 'popup', '--', 'Q1', '-rf now']);
 });

@@ -34,5 +34,5 @@ export function optionFor(question, key) {
   return i >= 0 && i < question.options.length ? question.options[i] : null;
 }
 
-// Question text and answers are untrusted, so they only ever travel as argv elements.
-export const answerArgv = (id, text) => ['mem', 'answer', '--by', 'island', '--', id, text];
+// Question text and answers are untrusted, so they only ever travel as argv elements. Signed popup: the hub passes only a slack, popup or cli answer to the machine that asked.
+export const answerArgv = (id, text) => ['mem', 'answer', '--by', 'popup', '--', id, text];

@@ -45,8 +45,8 @@ mod_i
 until_ok 2000 island_focus Exclusive
 check "Mod+I gives the island the keyboard" island_focus Exclusive
 wtype -k 1
-until_ok 2000 answered "answer --by island -- Q1 Import now"
-check "1 calls mem answer with Import now" answered "answer --by island -- Q1 Import now"
+until_ok 2000 answered "answer --by popup -- Q1 Import now"
+check "1 calls mem answer with Import now" answered "answer --by popup -- Q1 Import now"
 # The hi above still has part of its 5 s, so the island may show it next; the question is what must go.
 not_question() { ! mode_is question; }
 until_ok 1000 not_question
@@ -61,8 +61,8 @@ wtype -k r
 sleep 0.2
 wtype 'next week'
 wtype -k Return
-until_ok 2000 answered "answer --by island -- Q2 next week"
-check "r, a typed reply and Enter answer with the reply" answered "answer --by island -- Q2 next week"
+until_ok 2000 answered "answer --by popup -- Q2 next week"
+check "r, a typed reply and Enter answer with the reply" answered "answer --by popup -- Q2 next week"
 
 ask Q3 "Later?"
 until_ok 2000 mode_is question
