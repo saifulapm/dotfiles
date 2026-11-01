@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hi-Fi's bar lights a pilot lamp before every workspace number, the shown one amber, draws a red lamp before the goal and an engraved groove under the bar.
+# Hi-Fi's bar lights one pilot lamp before the shown workspace's number, draws a red lamp before the goal and an engraved groove under the bar.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -43,17 +43,15 @@ until_ok 2000 focused_is ws2
 
 in_theme hi-fi
 lamps_are() { drawn "[.lamps[] | [.idx, .lit]] == $1"; }
-until_ok 2000 lamps_are '[[1,false],[2,true],[3,false],[4,false]]'
+until_ok 2000 lamps_are '[[2,true]]'
 echo "     drawn: $(margins | jq -c '.drawn | {left, numbers, right, lamps: [.lamps[] | [.idx, .light]], goalLamp}')"
-check "hi-fi: after focus-workspace 2, lamp 2 is lit and lamps 1, 3 and 4 are not" lamps_are '[[1,false],[2,true],[3,false],[4,false]]'
-check "hi-fi: the numbers read 1 2 3 4, with no leading zero" drawn '.numbers == "1 2 3 4" and (.left | . == "1 2 3 4  FOOT  WS2")'
+check "hi-fi: after focus-workspace 2, one lamp shows and it is workspace 2's, lit" lamps_are '[[2,true]]'
+check "hi-fi: the number reads 02 like the other themes, then the app and the title" drawn '.numbers == "02" and .left == "02  FOOT  WS2"'
 check "hi-fi: nothing the margins report holds a bracket ($(margins | marked | head -3 | paste -sd'|'))" eval '[ -z "$(margins | marked)" ]'
 
 read -r lx ly < <(centre '.lamps[] | select(.idx == 2)')
 until_ok 1000 near "$lx" "$ly" 250 189 47 12
 check "hi-fi: lamp 2's centre reads #FABD2F ($(pixel "$lx" "$ly"))" near "$lx" "$ly" 250 189 47 12
-read -r ux uy < <(centre '.lamps[] | select(.idx == 3)')
-check "hi-fi: unlit lamp 3's centre reads #3C3836 ($(pixel "$ux" "$uy"))" near "$ux" "$uy" 60 56 54 8
 
 until_ok 3000 drawn '.right | startswith("SHIP V2 · 3D")'
 check "hi-fi: the goal reads SHIP V2 · 3D after a red lamp" drawn '(.right | startswith("SHIP V2 · 3D ")) and .goalLamp.light == "red"'
@@ -63,17 +61,13 @@ check "hi-fi: the date reads $(LC_ALL=C date +'%a %-d %b' | tr a-z A-Z)" drawn "
 
 check "hi-fi: the row under the bar is the #0E0F10 groove ($(pixel 16 40))" near 16 40 14 15 16 3
 
-# Windows on 4 to 8 leave workspace 9 empty after them.
+# With 9 workspaces the bar still shows only the shown one.
 for n in 4 5 6 7 8; do
   niri msg action focus-workspace "$n"
   plain "ws$n"
 done
-nine() { drawn '(.lamps | length) == 9'; }
-until_ok 2000 nine
-echo "     nine: $(margins | jq -c '.drawn | {numbers, last: .lamps[-1].box, islandLeft}')"
-read -r nx ny < <(centre '.lamps[] | select(.idx == 8)')
-check "hi-fi: with 9 workspaces, lamp 8 is lit ($(pixel "$nx" "$ny"))" near "$nx" "$ny" 250 189 47 12
-check "hi-fi: the last lamp ends left of the island's left edge" drawn '(.lamps | length) == 9 and .lamps[-1].box.x + .lamps[-1].box.w < .islandLeft'
+until_ok 2000 lamps_are '[[8,true]]'
+check "hi-fi: on workspace 8 of 9 the one lamp is 8's and the number reads 08" eval 'lamps_are '"'"'[[8,true]]'"'"' && drawn '"'"'.numbers == "08"'"'"''
 
 exit $((fails > 0))
 }

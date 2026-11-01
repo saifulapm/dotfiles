@@ -202,9 +202,9 @@ test("Hi-Fi's palette strip is its surface, then its bright ANSI 9 to 15", () =>
   assert.deepEqual(swatches(hifi), ['#282828', '#FB4934', '#B8BB26', '#FABD2F', '#83A598', '#D3869B', '#8EC07C', '#EBDBB2']);
 });
 
-test("Hi-Fi's specimen bar lights the third of four lamps and puts a red lamp before the goal", () => {
+test("Hi-Fi's specimen bar lights one lamp before the shown workspace and puts a red lamp before the goal", () => {
   const m = specimenMargins(hifi);
-  assert.deepEqual(m.lamps.map((w) => w.light), ['unlit', 'unlit', 'lit', 'unlit']);
-  assert.deepEqual([m.number + m.tail, m.goalLamp], ['  FOOT', 'red']);
+  assert.deepEqual(m.lamps.map((w) => [w.text, w.light]), [['03', 'lit']]);
+  assert.deepEqual([m.number + m.tail, m.numberColor, m.goalLamp], ['03  FOOT', '#FABD2F', 'red']);
   assert.deepEqual([specimenMargins(paper).lamps, specimenMargins(paper).goalLamp], [[], '']);
 });

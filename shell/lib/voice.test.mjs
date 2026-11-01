@@ -355,17 +355,20 @@ test('unread mail reads MAIL 3, mail 3 and MAIL 3 between the goal and Wi-Fi, in
 // The shell reads Hi-Fi through checkTokens, as the bracket voice plus engraved.
 const hifiMargin = () => marginLook(checkTokens(validateTheme(theme('hi-fi'))));
 
-test("Hi-Fi's bar lights a lamp before every workspace number, 1 to 9 bare: the shown one amber, an urgent one red, the rest unlit", () => {
+test("Hi-Fi's bar lights one amber lamp before the shown workspace's number, 01 in amber, as the other themes show only the current one", () => {
   const ws = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((idx) => ({ idx, active: idx === 2, urgent: idx === 2 || idx === 5 }));
-  const lamps = hifiMargin().lamps(ws);
-  assert.deepEqual(lamps.map((l) => l.text), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
-  assert.deepEqual(lamps.slice(0, 5).map((l) => [l.idx, l.light, l.color]), [
-    [1, 'unlit', '#A89984'],
-    [2, 'lit', '#FABD2F'],
-    [3, 'unlit', '#A89984'],
-    [4, 'unlit', '#A89984'],
-    [5, 'red', '#A89984'],
+  assert.deepEqual(hifiMargin().lamps(ws), [{ idx: 2, text: '02', light: 'lit', color: '#FABD2F' }]);
+  assert.deepEqual(hifiMargin().lamps([]), []);
+});
+
+test("Hi-Fi marks an urgent workspace after the title as a red lamp and its muted number, at most 3, then a count", () => {
+  const h = hifiMargin();
+  assert.deepEqual(h.marks([5, 7]), [
+    { text: '05', color: '#A89984', lamp: 'red' },
+    { text: '07', color: '#A89984', lamp: 'red' },
   ]);
+  assert.deepEqual(h.marks([2, 3, 5, 7, 9]).map((m) => [m.text, m.lamp]), [['02', 'red'], ['03', 'red'], ['05', 'red'], ['+2', '']]);
+  assert.deepEqual(h.marks([]), []);
 });
 
 test("Hi-Fi's bar reads the app in ink and the path in muted caps, the goal in ink after a red lamp, and the date as SUN 1 NOV", () => {

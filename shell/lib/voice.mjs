@@ -733,10 +733,10 @@ export function marginLook(tokens) {
     numberColor: bracket ? c.accent : c.ink,
     numberWeight: plain ? 600 : bracket ? 400 : 700,
     engraved,
-    // Hi-Fi's lamp before each of the output's workspace numbers: the shown one amber, which wins over an urgent one's red; red is never text there, so the urgency marks give way to it.
-    lamps: (workspaces) => (engraved ? workspaces.map((w) => ({ idx: w.idx, text: String(w.idx), light: w.active ? 'lit' : w.urgent ? 'red' : 'unlit', color: w.active ? c.accent : c.muted })) : []),
-    // The focused column of its columns, after the number; a workspace of one column draws none.
-    column: (pos) => (!pos || pos.of < 2 ? '' : bracket ? ` ${mark(engraved, `${pos.at} / ${pos.of}`)}` : `  ${pos.at} / ${pos.of}`),
+    // Hi-Fi shows only the shown workspace, as the other themes do: a lit amber lamp before its number in amber.
+    lamps: (workspaces) => (engraved ? workspaces.filter((w) => w.active).map((w) => ({ idx: w.idx, text: pad2(w.idx), light: 'lit', color: c.accent })) : []),
+    // The focused column of its columns, after the number; a workspace of one column draws none. Hi-Fi's bare count stands two spaces off its number, as Paper's does.
+    column: (pos) => (!pos || pos.of < 2 ? '' : bracket && !engraved ? ` ${mark(engraved, `${pos.at} / ${pos.of}`)}` : `  ${pos.at} / ${pos.of}`),
     tail(view) {
       if (view.app === null && view.title === null) return '';
       const app = words(view.app);
@@ -770,10 +770,15 @@ export function marginLook(tokens) {
     // Hi-Fi's board spaces its right-hand words 18 px apart with no separator.
     sep: plain || engraved ? '' : bracket ? '·' : '—',
     spacing: engraved ? 18 : plain ? 16 : 14,
-    // The urgent workspaces after the title, three spaces on: at most 3, then a count of the rest; each segment is drawn in its own colour.
+    // The urgent workspaces after the title, three spaces on: at most 3, then a count of the rest; each segment is drawn in its own colour, Hi-Fi's after its own lamp.
     marks(idxs) {
       if (idxs.length === 0) return [];
       const rest = idxs.length - 3;
+      // Red is never text in Hi-Fi, so each urgent workspace is a red lamp before its muted number.
+      if (engraved) {
+        const shown = idxs.slice(0, 3).map((idx) => ({ text: pad2(idx), color: c.muted, lamp: 'red' }));
+        return rest > 0 ? shown.concat([{ text: `+${rest}`, color: c.muted, lamp: '' }]) : shown;
+      }
       if (plain) {
         const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
         return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;

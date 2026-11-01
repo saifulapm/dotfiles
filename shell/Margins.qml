@@ -108,7 +108,8 @@ PanelWindow {
             numbers: numbers,
             goalLamp: goalLamp.visible ? { light: goalLamp.light, box: box(goalLamp) } : null,
             islandLeft: width / 2 - islandWidth / 2,
-            marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join("").trim(),
+            marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join(voice.engraved ? " " : "").trim(),
+            markLamps: Array.from({ length: markList.count }, (_, i) => markList.itemAt(i)?.modelData.lamp ?? "").filter(l => l),
             markColors: Array.from(marks.children).filter(l => l.text !== undefined).map(l => String(l.color)),
             right: right,
             leftEnd: marks.mapToItem(null, marks.width, 0).x,
@@ -132,7 +133,7 @@ PanelWindow {
             font.weight: root.voice.numberWeight
         }
 
-        // Hi-Fi numbers every workspace of this output, each after its pilot lamp.
+        // Hi-Fi's shown workspace, its number after a lit pilot lamp.
         Row {
             id: lampRow
             spacing: 18
@@ -187,17 +188,35 @@ PanelWindow {
             elide: Text.ElideRight
         }
 
-        // The workspaces holding a window that asked for attention; the title gives up their room. Hi-Fi shows them as red lamps instead.
+        // The workspaces holding a window that asked for attention; the title gives up their room. Hi-Fi draws each after a red lamp, 18 px apart like its lamp row.
         Row {
             id: marks
+            leftPadding: root.voice.engraved && markList.count > 0 ? 18 : 0
+            spacing: root.voice.engraved ? 12 : 0
 
             Repeater {
-                model: root.voice.engraved ? [] : root.voice.marks(root.niri.urgent(root.screen.name))
+                id: markList
+                model: root.voice.marks(root.niri.urgent(root.screen.name))
 
-                Label {
+                Row {
                     required property var modelData
-                    text: modelData.text
-                    color: modelData.color ?? "black"
+                    readonly property alias text: markLabel.text
+                    readonly property alias color: markLabel.color
+                    spacing: 7
+
+                    Root.Lamp {
+                        visible: (parent.modelData.lamp ?? "") !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        tokens: root.theme.tokens
+                        light: parent.modelData.lamp || "unlit"
+                        warmth: Root.State.warmth
+                    }
+
+                    Label {
+                        id: markLabel
+                        text: parent.modelData.text
+                        color: parent.modelData.color ?? "black"
+                    }
                 }
             }
         }

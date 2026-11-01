@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The urgency marks in each theme's voice: !05 !07 in red, • 05  • 07 with accent dots, [!05][!07] in amber; with every mark drawn a long title still elides short of the island.
+# The urgency marks in each theme's voice: !05 !07 in red, • 05  • 07 with accent dots, [!05][!07] in amber, Hi-Fi's 05 07 in muted after red lamps; with every mark drawn a long title still elides short of the island.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -39,11 +39,16 @@ in_theme blueprint
 until_ok 2000 marks_are "[!05][!07]"
 check "blueprint: the marks read [!05][!07]" marks_are "[!05][!07]"
 check "blueprint: in amber #FFB547" colors_are '["#ffb547"]'
+lamps_are() { margins | jq -e --argjson want "$1" '.drawn.markLamps == $want' >/dev/null 2>&1; }
+in_theme hi-fi
+until_ok 2000 marks_are "05 07"
+check "hi-fi: the marks read 05 07" marks_are "05 07"
+check "hi-fi: in muted #A89984, each after a red lamp" eval 'colors_are '"'"'["#a89984"]'"'"' && lamps_are '"'"'["red","red"]'"'"''
 
 touch "$bells/ws2" "$bells/ws3"
 # A Text paints past its width unless it elides, so the check reads both its box and its elision.
 short_of_island() { margins | jq -e '.drawn.leftElided and .drawn.leftEnd <= .drawn.lineEnd and .drawn.leftEnd > .drawn.lineEnd - 40' >/dev/null 2>&1; }
-for t in paper:'!02 !03 !05 +1' artboard:'• 02  • 03  • 05  +1' blueprint:'[!02][!03][!05][+1]'; do
+for t in paper:'!02 !03 !05 +1' artboard:'• 02  • 03  • 05  +1' blueprint:'[!02][!03][!05][+1]' hi-fi:'02 03 05 +1'; do
   in_theme "${t%%:*}"
   until_ok 3000 marks_are "${t#*:}"
   until_ok 2000 short_of_island

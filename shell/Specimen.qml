@@ -117,11 +117,11 @@ Item {
                     Row {
                         x: specimen.inset
                         y: 7
-                        // Hi-Fi's pilot lamps, one per workspace, the shown one lit.
+                        // Hi-Fi's lit pilot lamp before the shown workspace's number.
                         Row {
                             id: lampRow
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 6
+                            rightPadding: lamps.count > 0 ? 4 : 0
                             Repeater {
                                 id: lamps
                                 model: specimen.margins.lamps

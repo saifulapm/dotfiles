@@ -88,7 +88,7 @@ for name in paper artboard blueprint hi-fi; do
 done
 check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~, [03] FOOT — ~ and Hi-Fi's FOOT" \
   state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~", "  FOOT"]'
-check "hi-fi: its card's bar lights the third of four lamps" state_is '.cards[3].lamps == ["unlit", "unlit", "lit", "unlit"]'
+check "hi-fi: its card's bar lights one lamp, the shown workspace's" state_is '.cards[3].lamps == ["lit"]'
 
 wtype -k Escape
 exit $((fails > 0))

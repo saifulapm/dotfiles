@@ -180,8 +180,8 @@ export function specimenMargins(tokens) {
   const look = marginLook(tokens);
   const style = marginStyle(tokens);
   return {
-    // Hi-Fi's bar shows a lamp per workspace in place of the shown one's number.
-    number: look.engraved ? '' : look.number(SCENE.view.idx),
+    // Hi-Fi's bar draws its number after the shown workspace's lit lamp.
+    number: look.number(SCENE.view.idx),
     lamps: look.lamps([1, 2, 3, 4].map((idx) => ({ idx, active: idx === SCENE.view.idx, urgent: false }))),
     goalLamp: look.goalLamp,
     numberColor: look.numberColor,

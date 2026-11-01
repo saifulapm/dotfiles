@@ -40,8 +40,8 @@ test('the Hi-Fi margins read Blueprint\'s words with no brackets; Blueprint keep
   const now = new Date(2026, 10, 1);
   const hifi = marginLook(shell('hi-fi'));
   assert.equal(hifi.number(3), '03');
-  assert.equal(hifi.column({ at: 1, of: 2 }), ' 1 / 2');
-  assert.deepEqual(hifi.marks([2, 5, 7, 9]).map((s) => s.text), ['   !02 !05 !07 +1']);
+  assert.equal(hifi.column({ at: 1, of: 2 }), '  1 / 2');
+  assert.deepEqual(hifi.marks([2, 5, 7, 9]).map((s) => s.text), ['02', '05', '07', '+1']);
   assert.doesNotMatch(JSON.stringify(hifi.drawn(view, now, right)), /[[\]]/);
   const blueprint = marginLook(shell('blueprint'));
   assert.equal(blueprint.number(3), '[03]');
