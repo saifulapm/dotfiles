@@ -661,6 +661,17 @@ Item {
                                             text: look.title(look.slot === "icon" && modelData.bare ? modelData.bare : modelData.title)
                                             elide: Text.ElideRight
                                             color: current ? look.cursor.text : look.name.color
+                                            // Hi-Fi's lit name glows like its lamp; the layer is made only on that row.
+                                            layer.enabled: current && !!look.cursor.glow
+                                            layer.effect: MultiEffect {
+                                                shadowEnabled: true
+                                                shadowColor: look.cursor.glow || "transparent"
+                                                shadowOpacity: 0.35
+                                                shadowBlur: 0.6
+                                                blurMax: 16
+                                                shadowHorizontalOffset: 0
+                                                shadowVerticalOffset: 0
+                                            }
                                             font.family: look.name.font
                                             font.pixelSize: look.name.size
                                             font.weight: current ? look.cursor.weight : look.name.weight

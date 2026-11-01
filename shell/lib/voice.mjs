@@ -111,7 +111,7 @@ export function launcherLook(tokens) {
       name: { font: t.mono, size: 15, weight: 400, spacing: 0.6, color: c.ink },
       detail: { font: t.mono, size: 11, italic: false, spacing: 1.3, color: c.muted },
       cursor: lamp
-        ? { fill: HIFI.lit, text: c.accent, detail: c.ink, marker: 'transparent', radius: 0, weight: 700, badge: '' }
+        ? { fill: HIFI.lit, text: c.accent, detail: c.ink, marker: 'transparent', radius: 0, weight: 700, badge: '', glow: c.accent }
         : { fill: c.accent, text: c.surface, detail: c.surface, marker: 'transparent', radius: 0, weight: 700, badge: '' },
       rule: { color: c.line, dashed: true },
       small: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },

@@ -171,6 +171,9 @@ check "hi-fi: the legend reads the five prefixes and J K · ↵ · ESC ($(launch
 name_amber=$(near "$(name_geo)" 250 189 47 12)
 name_fill=$(near "$(name_geo)" 50 48 47 3)
 check "hi-fi: the cursor row's name draws #FABD2F ($name_amber px) on #32302F ($name_fill px)" test "$name_amber" -gt 20 -a "$name_fill" -gt 500
+# The lit name glows like its lamp: a warm halo of amber over the row's fill rings each letter.
+halo=$(near "$(name_geo)" 95 80 46 22)
+check "hi-fi: the cursor row's name glows ($halo px of amber halo)" test "$halo" -gt 25
 lit=$(near "$(lamp_geo 0)" 250 189 47 12)
 check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
 check "hi-fi: the state lights the first row's lamp ($(launcher_state | jq -c .lampLit))" state_is '.lampLit == 0'
