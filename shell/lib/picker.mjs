@@ -74,11 +74,11 @@ export function dateText(voice, ms, now) {
   return voice === 'caps' && today ? `${day} ${time}` : day;
 }
 
-export function headingText(voice, app, mode, multiple) {
+export function headingText(voice, app, mode, multiple, engraved = false) {
   const word = mode === 'save' ? 'Save as' : mode === 'folder' ? 'Choose folder' : multiple ? 'Open files' : 'Open file';
   const head = voice === 'plain' ? word : word.toUpperCase();
   if (!app) return head;
-  return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' ? ' // ' : ' · '}${app.toUpperCase()}`;
+  return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' && !engraved ? ' // ' : ' · '}${app.toUpperCase()}`;
 }
 
 // Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣. Paper's several-files strip calls ctrl+space MARK.

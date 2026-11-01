@@ -287,6 +287,8 @@ test("a list surface writes an entry's age in whole units, floored: NOW, now or 
   assert.deepEqual(ages.map((ms) => list('paper').ageText(ms)), ['NOW', 'NOW', '1M', '5M', '59M', '1H', '3H', '23H', '1D', '2D']);
   assert.deepEqual(ages.map((ms) => list('artboard').ageText(ms)), ['now', 'now', '1m', '5m', '59m', '1h', '3h', '23h', '1d', '2d']);
   assert.deepEqual(ages.map((ms) => list('blueprint').ageText(ms)), ['T+0S', 'T+0S', 'T+1M', 'T+5M', 'T+59M', 'T+1H', 'T+3H', 'T+23H', 'T+1D', 'T+2D']);
+  // Hi-Fi says NOW, as its island does, with no mission clock.
+  assert.deepEqual(ages.map((ms) => listLook(checkTokens(validateTheme(theme('hi-fi')))).ageText(ms)), ['NOW', 'NOW', '1M', '5M', '59M', '1H', '3H', '23H', '1D', '2D']);
 });
 
 const margin = (name) => marginLook(theme(name));

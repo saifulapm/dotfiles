@@ -61,7 +61,6 @@ const checks = () => readdirSync(dir).filter((f) => /-(look|voice)\.sh$/.test(f)
 const OLD = [
   'cheatsheet-look.sh:hi-fi',
   'cheatsheet-look.sh:paper',
-  'control-look.sh:hi-fi',
   'file-picker-look.sh:hi-fi',
   'files-look.sh:paper',
   'island-voice.sh:paper',
@@ -73,7 +72,6 @@ const OLD = [
   'margins-voice.sh:blueprint',
   'margins-voice.sh:blueprint',
   'margins-voice.sh:paper',
-  'notifcentre-look.sh:hi-fi',
   'picker-look.sh:blueprint',
   'picker-look.sh:blueprint',
   'picker-look.sh:hi-fi',

@@ -684,7 +684,7 @@ Item {
                         // Under half the card, so a 200-character app name elides and the query and its chips stay inside.
                         width: Math.min(implicitWidth, Math.round(card.width * 0.45) - 16)
                         textFormat: Text.PlainText
-                        text: P.headingText(picker.voice, picker.appText, picker.mode, picker.multiple)
+                        text: P.headingText(picker.voice, picker.appText, picker.mode, picker.multiple, picker.look.engraved)
                         maximumLineCount: 1
                         elide: Text.ElideRight
                         color: look.label.kind === "header" ? look.small.color : look.label.color

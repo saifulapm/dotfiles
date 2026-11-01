@@ -79,6 +79,8 @@ test('the heading names the app in each voice, and stands alone without one', ()
   assert.equal(headingText('caps', 'Chromium'), 'OPEN FILE · CHROMIUM');
   assert.equal(headingText('plain', 'Chromium'), 'Open file · Chromium');
   assert.equal(headingText('bracket', 'Chromium'), 'OPEN FILE // CHROMIUM');
+  // Hi-Fi's engraved voice parts the words with its dot.
+  assert.equal(headingText('bracket', 'Chromium', 'open', false, true), 'OPEN FILE · CHROMIUM');
   assert.equal(headingText('caps', ''), 'OPEN FILE');
   assert.equal(headingText('plain', ''), 'Open file');
   assert.equal(headingText('bracket', ''), 'OPEN FILE');
