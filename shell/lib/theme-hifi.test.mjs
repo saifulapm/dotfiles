@@ -88,8 +88,8 @@ test('Hi-Fi times its camera like a tuning dial, in curves niri accepts', () => 
   assert.deepEqual(block(kdl, 'overview-open-close'), inOut(240));
   assert.deepEqual(block(kdl, 'window-movement'), ['duration-ms 200', 'curve "ease-out-cubic"']);
   assert.deepEqual(block(kdl, 'window-resize'), ['duration-ms 200', 'curve "ease-out-cubic"']);
-  assert.deepEqual(block(kdl, 'window-open'), ['duration-ms 220', 'curve "cubic-bezier" 0.32 0 0.67 0']);
-  assert.deepEqual(block(kdl, 'window-close'), ['duration-ms 140', 'curve "ease-out-cubic"']);
+  assert.deepEqual(block(kdl, 'window-open'), ['duration-ms 220', 'curve "linear"']);
+  assert.deepEqual(block(kdl, 'window-close'), ['duration-ms 140', 'curve "linear"']);
   for (const name of ['screenshot-ui-open', 'config-notification-open-close', 'exit-confirmation-open-close']) {
     assert.deepEqual(block(kdl, name), ['duration-ms 160', 'curve "ease-out-cubic"']);
   }
@@ -104,6 +104,10 @@ test('Hi-Fi warms its windows up in 220 ms and powers them off in 140 ms, its am
   assert.match(close, /vec4 close_color\(vec3 coords_geo, vec3 size_geo\)/);
   assert.match(close, /float w = dots_px\(\);/);
   assert.match(close, /vec4\(0\.980, 0\.741, 0\.184, 1\.0\)/);
+  // niri's progress is linear time, so the glow's 60 ms and 40 ms windows are those fractions of it, and the shaders ease the window.
+  assert.match(open, /clamp\(\(p - 160\.0 \/ 220\.0\) \/ \(60\.0 \/ 220\.0\), 0\.0, 1\.0\)/);
+  assert.match(open, /color \* p \* p \* p/);
+  assert.match(close, /clamp\(p \/ \(40\.0 \/ 140\.0\), 0\.0, 1\.0\)/);
 });
 
 test('niri accepts Hi-Fi\'s fragment', (t) => {
