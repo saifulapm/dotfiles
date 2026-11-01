@@ -101,6 +101,7 @@ Item {
     readonly property bool caps: voice === "caps"
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
+    readonly property bool engraved: look.engraved === true
     readonly property string appText: P.oneLine(P.appName(apps, seen?.app ?? ""))
     readonly property var places: [
         { path: home, label: "Home" },
@@ -941,7 +942,7 @@ Item {
                             readonly property bool isCurrent: index === picker.selected
                             readonly property bool isMarked: !modelData.dir && picker.marked.indexOf(modelData.name) >= 0
                             // Blueprint's several-files list draws an empty [ ] on each file not marked.
-                            readonly property bool boxed: bracket && picker.multiple && !modelData.dir && !isMarked
+                            readonly property bool boxed: bracket && !engraved && picker.multiple && !modelData.dir && !isMarked
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted
                             // The row as drawn, for the state function.
@@ -983,7 +984,7 @@ Item {
                                         visible: rowItem.isMarked
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
-                                        text: bracket ? "[x]" : "✓"
+                                        text: bracket && !engraved ? "[x]" : "✓"
                                         color: rowItem.isCurrent ? look.cursor.text : bracket ? c.muted : c.ink
                                         font.family: bracket ? fonts.mono : fonts.ui
                                         font.pixelSize: 14
@@ -1319,7 +1320,7 @@ Item {
                 Layout.rightMargin: 18
                 Layout.topMargin: 12
                 textFormat: Text.PlainText
-                text: P.oneLine(P.footText(picker.voice, picker.mode, picker.marked.length, picker.tilde(picker.folder)))
+                text: P.oneLine(P.footText(picker.voice, picker.mode, picker.marked.length, picker.tilde(picker.folder), picker.engraved))
                 maximumLineCount: 1
                 elide: Text.ElideMiddle
                 color: c.ink
@@ -1342,7 +1343,7 @@ Item {
                     id: noticeLabel
                     visible: picker.notice !== ""
                     textFormat: Text.PlainText
-                    text: P.oneLine(P.saveNotice(picker.voice, picker.notice, picker.saveName).say)
+                    text: P.oneLine(P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).say)
                     color: c.danger
                     font.family: look.small.font
                     font.pixelSize: look.small.size
@@ -1352,7 +1353,7 @@ Item {
 
                 Repeater {
                     id: keyRepeater
-                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName).keys : picker.typingPath ? P.pathKeys(picker.voice) : P.pickerKeys(picker.voice, picker.mode, picker.multiple)
+                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).keys : picker.typingPath ? P.pathKeys(picker.voice, picker.engraved) : P.pickerKeys(picker.voice, picker.mode, picker.multiple, picker.engraved)
 
                     Rectangle {
                         id: keyPair

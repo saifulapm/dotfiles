@@ -1,5 +1,5 @@
 // What bin/dots-portal and the shell's file picker say to each other, one JSON line each way, and how the picker writes its rows in each theme's voice.
-import { line } from './voice.mjs';
+import { line, mark } from './voice.mjs';
 import { pad2 } from './margins.mjs';
 
 const MODES = ['open', 'save', 'folder'];
@@ -82,12 +82,12 @@ export function headingText(voice, app, mode, multiple) {
 }
 
 // Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣. Paper's several-files strip calls ctrl+space MARK.
-export function pickerKeys(voice, mode, multiple) {
+export function pickerKeys(voice, mode, multiple, engraved = false) {
   const space = multiple && voice === 'caps' ? 'mark' : 'select';
   const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', space], ['esc', '']];
   if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
   const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
-  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${key(k)}]` : key(k), word: w.toUpperCase() }));
+  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, key(k)) : key(k), word: w.toUpperCase() }));
 }
 
 // Why a name cannot be saved as it is, or "exists" when saving it replaces a file; checked against every entry, as a hidden file is replaced all the same.
@@ -100,7 +100,7 @@ export function saveProblem(name, entries) {
 }
 
 // The line that takes the key strip's place: the replace question with its two keys, or why the name was refused.
-export function saveNotice(voice, tag, name) {
+export function saveNotice(voice, tag, name, engraved = false) {
   const SAY = { exists: `${name} exists`, empty: 'type a name to save as', slash: 'a name cannot hold /', dots: `${name} is not a file name`, folder: `${name} is a folder` };
   const say = SAY[tag] || '';
   const keys = tag === 'exists' ? [['↵', 'replace'], ['esc', 'keep']] : [];
@@ -108,7 +108,7 @@ export function saveNotice(voice, tag, name) {
   // Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
   const lead = tag === 'exists' || tag === 'dots' || tag === 'folder' ? name : '';
   const text = voice === 'bracket' ? '! ' + lead + say.slice(lead.length).toUpperCase() : say;
-  return { say: text, keys: keys.map(([k, w]) => ({ key: voice === 'bracket' ? `[${k.toUpperCase()}]` : k.toUpperCase(), word: w.toUpperCase() })) };
+  return { say: text, keys: keys.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, k.toUpperCase()) : k.toUpperCase(), word: w.toUpperCase() })) };
 }
 
 // A name as typed into the save field: controls and bidi marks dropped, spaces kept, so "notes " can grow into "notes 2".
@@ -181,11 +181,11 @@ export function markedPaths(entries, marked, folder) {
 }
 
 // The line above the key strip: how many files ctrl+Enter opens, or the folder it chooses, which is a path and keeps its case.
-export function footText(voice, mode, n, here) {
+export function footText(voice, mode, n, here, engraved = false) {
   if (mode === 'folder') return voice === 'plain' ? `ctrl+↵ chooses ${here}, the folder you are in` : `THIS FOLDER ${here}`;
   if (n === 0) return '';
   if (voice === 'plain') return `${n} selected · ctrl+↵ open all`;
-  return `${n} SELECTED · ${voice === 'bracket' ? '[⌃↵]' : '⌃↵'} OPEN ALL`;
+  return `${n} SELECTED · ${voice === 'bracket' ? mark(engraved, '⌃↵') : '⌃↵'} OPEN ALL`;
 }
 
 // "~/Codes/la" is the folder ~/Codes to list and "la" begun in it; a path without / or ~ starts at the folder shown.
@@ -233,10 +233,10 @@ export function completionHead(voice, n, parent, tail) {
 }
 
 // Artboard's strip leads with tab and calls the way back the filter; Paper and Blueprint lead with ↵.
-export function pathKeys(voice) {
+export function pathKeys(voice, engraved = false) {
   if (voice === 'plain') return [['tab', 'complete'], ['↵', 'go'], ['ctrl+l', 'filter'], ['esc', '']].map(([k, w]) => ({ key: k, word: w }));
   const pairs = [['↵', 'GO'], ['TAB', 'COMPLETE'], ['⌃L', 'BACK TO LIST'], ['ESC', '']];
-  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? `[${k}]` : k, word: w }));
+  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, k) : k, word: w }));
 }
 
 // Prints one JSON array of a folder's entries: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters. A name that is not UTF-8 would stop the print, so it shows with U+FFFD and is marked undecodable; a dangling link lists as itself, so a save over it still asks.

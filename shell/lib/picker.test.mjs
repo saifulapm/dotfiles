@@ -470,3 +470,18 @@ test('the lister keeps every entry when one name is not UTF-8 or a link is dangl
     ['report.pdf', false, false],
   ]);
 });
+
+test('Hi-Fi draws the picker keys and count without square marks', () => {
+  const keys = [...pickerKeys('bracket', 'open', true, true), ...pathKeys('bracket', true), ...saveNotice('bracket', 'exists', '[draft].md', true).keys].map((k) => k.key);
+  assert.deepEqual(keys.filter((s) => /[[\]]/.test(s)), []);
+  assert.equal(pickerKeys('bracket', 'open', false, true)[0].key, '↵');
+  assert.equal(footText('bracket', 'open', 2, '/h', true), '2 SELECTED · ⌃↵ OPEN ALL');
+  assert.equal(saveNotice('bracket', 'exists', '[draft].md', true).say, '! [draft].md EXISTS');
+});
+
+test('Blueprint keeps its square marks in the picker', () => {
+  assert.equal(pickerKeys('bracket', 'open', false)[0].key, '[↵]');
+  assert.equal(footText('bracket', 'open', 2, '/h'), '2 SELECTED · [⌃↵] OPEN ALL');
+  assert.equal(pathKeys('bracket')[0].key, '[↵]');
+  assert.equal(saveNotice('bracket', 'exists', 'a', false).keys[0].key, '[↵]');
+});
