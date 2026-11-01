@@ -303,10 +303,39 @@ hifi() {
   until_ok 8000 has_windows 0
 }
 
+# At output scale 1.25 the power-off's outline must still be one physical pixel: a pen measured in logical px would land on a fraction and blur into two rows.
+hifi_scaled() {
+  local name x y w h dir=$DOTS_DEV_DIR/hifi
+  mkdir -p "$dir"
+  name=$(niri msg -j outputs | jq -r 'first(.[]).name')
+  niri msg output "$name" scale 1.25
+  scaled() { niri msg -j outputs | jq -e 'first(.[]).logical.scale == 1.25' >/dev/null; }
+  check "hi-fi: the nested output $name takes scale 1.25" until_ok 3000 scaled
+  # rest_box grabs with no -s, so the box is in physical pixels.
+  check "hi-fi at 1.25: a resting magenta window is found" calibrate
+  [ -n "$box" ] || return
+  read -r x y w h <<<"$box"
+  open_magenta
+  sleep 6
+  close_window
+  wait_until 2240
+  grim -t ppm "$dir/scaled80.ppm"
+  # From four rows above the magenta's top to two rows into it (its content is all but gone by now), across its middle half: exactly one row is amber along its length, and none is half-lit, as a line blurred over two rows would be.
+  check "hi-fi at 1.25, 80% into its close: the outline above the window is one physical row" \
+    ppm_test "
+      const s = g[0]; const rows = [];
+      for (let r = 4; r >= -2; r--) { let n = 0; for (let i = $w >> 2; i < (3 * $w) >> 2; i++) if (amber(s.at($x + i, $y - r))) n++; rows.push(n / ($w >> 1)); }
+      console.error('     amber share of the rows from 4 above the window to 2 into it:', rows.map((v) => v.toFixed(2)).join(' '));
+      return rows.filter((v) => v >= 0.9).length === 1 && rows.every((v) => v >= 0.9 || v <= 0.1);" \
+    "$dir/scaled80.ppm"
+  until_ok 8000 has_windows 0
+}
+
 blueprint
 paper
 artboard
 hifi
+hifi_scaled
 
 # The broken fixture: a syntax error in an open shader must turn the check above red; it is an include of its own, since niri merges a second animations block only from one.
 broken() {
