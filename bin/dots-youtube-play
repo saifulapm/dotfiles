@@ -47,12 +47,13 @@ if [ "$1" = audio ]; then
   # mpv.conf resumes and saves positions for videos; a song in the Queue starts at its top.
   player+=(--no-video --idle=yes "--input-ipc-server=$sock" --ytdl-format=bestaudio/best --resume-playback=no --save-position-on-quit=no)
   systemd-run --user --collect --quiet --unit "$unit" "${pass[@]}" -- "${player[@]}" 2>/dev/null
-  # mpv binds and listens in one step as it starts, so the socket's file is the sign it answers.
-  for _ in $(seq 30); do
+  # mpv binds and listens in one step as it starts, so the socket's file is the sign it answers; it gets DOTS_YOUTUBE_SOCKET_WAIT whole seconds, 3 unless a check asks for less.
+  wait=${DOTS_YOUTUBE_SOCKET_WAIT:-3}
+  for _ in $(seq $((wait * 10))); do
     [ -S "$sock" ] && { answer; exit 0; }
     sleep 0.1
   done
-  jq -nc '{error: "the Queue did not start: youtube-audio made no socket in 3 s"}'
+  jq -nc --arg s "$wait" '{error: "the Queue did not start: youtube-audio made no socket in \($s) s"}'
   exit 1
 fi
 

@@ -108,11 +108,13 @@ test('audio with the unit running but no socket stops it and starts a fresh Queu
   assert.equal(ran('youtube-audio'), true);
 });
 
-test('a Queue whose socket never comes says so', (t) => {
-  const { run } = rig(t, { NO_SOCKET: '1' });
+test('a Queue whose socket never comes says so, after DOTS_YOUTUBE_SOCKET_WAIT seconds', (t) => {
+  const { run } = rig(t, { NO_SOCKET: '1', DOTS_YOUTUBE_SOCKET_WAIT: '0' });
+  const t0 = Date.now();
   const r = run('audio');
+  assert.ok(Date.now() - t0 < 1000, `the check took ${Date.now() - t0} ms`);
   assert.equal(r.status, 1);
-  assert.match(JSON.parse(r.stdout).error, /youtube-audio/);
+  assert.equal(JSON.parse(r.stdout).error, 'the Queue did not start: youtube-audio made no socket in 0 s');
 });
 
 test('anything but a video id is no video', (t) => {
