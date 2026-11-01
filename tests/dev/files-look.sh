@@ -58,6 +58,7 @@ for t in "paper|■|#1c1915|□|$folder_sharp|$file_sharp|Instrument Serif,true,
     json_is --arg d "$date" '([.dateFont.family, (.dateFont.italic | tostring), (.dateFont.size | tostring)] | join(",")) == $d' <<<"$plain_row"
   check "$name: the key strip starts '$key $word', the key at weight $weight ($(files_state | jq -c .strip))" \
     files_is --arg k "$key" --arg w "$word" --argjson n "$weight" '.strip.key == $k and .strip.word == $w and .strip.keyWeight == $n'
+  [ "$name" = blueprint ] && check "blueprint: Files' state still holds its [ ] marks ($(files_state | marked | head -3 | paste -sd'|'))" eval '[ -n "$(files_state | marked)" ]'
   check "$name: the path line is the folder icon, a muted ~/ and Downloads at weight 500 ($(files_state | jq -c .pathParts))" \
     files_is --arg i "$folder" --arg c "$lead" '.pathParts == {"icon": $i, "lead": "~/", "leadColor": $c, "name": "Downloads", "nameWeight": 500}'
   place_here=$(files_call place Downloads)
@@ -73,6 +74,42 @@ for t in "paper|■|#1c1915|□|$folder_sharp|$file_sharp|Instrument Serif,true,
   wtype -k Escape
   until_ok 3000 files_gone
 done
+
+# Hi-Fi draws Blueprint's layout with no marks around the words the shell writes; a file named [draft].md keeps its own brackets.
+read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
+# The pixels of the lit row's box within 12 per channel of amber #FABD2F and of charcoal #282828, as "amber charcoal".
+lit_counts() {
+  local cur bx by bw bh wx wy
+  cur=$(files_state | jq -r .cursor)
+  read -r bx by bw bh < <(files_call row "$cur" | jq -r '.box | "\(.x | round) \(.y | round) \(.w | round) \(.h | round)"')
+  read -r wx wy < <(niri msg -j windows | jq -r '.[] | select(.app_id == "files") | .layout | "\((.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]) | floor) \((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor)"')
+  grim -s 1 -t ppm -g "$((ox + wx + bx)),$((oy + wy + by)) ${bw}x${bh}" - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    const px = b.subarray(head[0].length);
+    const near = (r, g, bl) => {
+      let n = 0;
+      for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (Math.abs(px[i] - r) <= 12 && Math.abs(px[i + 1] - g) <= 12 && Math.abs(px[i + 2] - bl) <= 12) n++;
+      return n;
+    };
+    console.log(near(0xfa, 0xbd, 0x2f), near(0x28, 0x28, 0x28));
+  '
+}
+placed() { niri msg -j windows | jq -e '.[] | select(.app_id == "files") | .layout.tile_pos_in_workspace_view != null' >/dev/null; }
+: >"$h/[draft].md"
+in_theme hi-fi
+niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
+until_ok 5000 files_is '.listed and .firstFrameMs != null'
+until_ok 3000 files_focused
+until_ok 2000 placed
+check "hi-fi: Files lists [draft].md under its own name ($(files_state | jq -c .rows))" files_is '.rows | index("[draft].md") != null'
+check "hi-fi: its row draws [draft].md with its brackets" bash -c 'files_row=$1; jq -e ".name == \"[draft].md\"" <<<"$files_row" >/dev/null' _ "$(files_call row '[draft].md')"
+check "hi-fi: the key strip starts J/K MOVE ($(files_state | jq -c .strip))" files_is '.strip.key == "J/K" and .strip.word == "MOVE" and .head.chip == "MOD+Y"'
+check "hi-fi: nothing Files reports holds a bracket but a file name ($(files_state | marked | grep -vxF '[draft].md' | head -3 | paste -sd'|'))" eval '[ -z "$(files_state | marked | grep -vxF "[draft].md")" ]'
+read -r amber charcoal <<<"$(lit_counts)"
+check "hi-fi: the lit row draws amber #FABD2F and charcoal #282828 ($amber and $charcoal pixels)" test "${amber:-0}" -ge 10 -a "${charcoal:-0}" -ge 10
+wtype -k Escape
+until_ok 3000 files_gone
 in_theme paper
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")

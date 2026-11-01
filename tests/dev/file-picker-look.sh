@@ -20,6 +20,9 @@ for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do truncate -s 2800000 "$loo
 : >"$look/pick/notes.txt"
 : >"$look/save/notes.md"
 : >"$look/save/report.pdf"
+mkdir -p "$look/hifi"
+: >"$look/hifi/[draft].md"
+: >"$look/hifi/notes.txt"
 
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 state_is() { pk_state | jq -e "$@" >/dev/null 2>&1; }
@@ -128,6 +131,21 @@ for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MAR
   [ "$name" = artboard ] && check "artboard: a 200-character app elides the frame label inside the card ($(pk_state | jq -c '{frameLabel, cardBox}'))" state_is '.frameLabel.visible and .frameLabel.truncated and .frameLabel.box.x + .frameLabel.box.w <= .cardBox.x + .cardBox.w + 0.5'
   cancel "long-$name"
 done
+
+# Hi-Fi draws Blueprint's layout with no marks around the words the shell writes; a file named [draft].md keeps its own brackets.
+in_theme hi-fi
+ask "multi-hi-fi" "$(request open "$look/hifi" true)"
+shown
+cursor_to '[draft].md'
+mark
+check "hi-fi: the several-files strip keys ↵ OPEN ... ⌃␣ SELECT · ESC ($(pk_state | jq -c .hint))" state_is '.hint == "↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ESC"'
+check "hi-fi: a marked file draws ✓ and the file keeps its brackets ($(row_look '[draft].md'))" until_ok 1000 state_is '(.rows[] | select(.name == "[draft].md") | .mark) == "✓"'
+check "hi-fi: nothing the picker reports holds a bracket but a file name ($(pk_state | marked | grep -vxF '[draft].md' | head -3 | paste -sd'|'))" eval '[ -z "$(pk_state | marked | grep -vxF "[draft].md")" ]'
+cancel "multi-hi-fi"
+ask "folder-hi-fi" "$(request folder "$look/pick")"
+shown
+check "hi-fi: a folder request holds no bracket either ($(pk_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(pk_state | marked)" ]'
+cancel "folder-hi-fi"
 
 exit $((fails > 0))
 }
