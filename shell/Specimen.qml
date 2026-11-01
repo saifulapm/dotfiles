@@ -421,7 +421,7 @@ Item {
             from: specimen.motion.kind === "sweep" ? 0 : 1
             to: 1
             duration: specimen.motion.ms
-            easing.type: Easing.InOutQuad
+            easing.type: Easing.InOutCubic
         }
     }
 
