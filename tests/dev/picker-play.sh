@@ -34,30 +34,31 @@ check "blueprint mid-scan: the bottom is still Paper's paper ($bottom)" near "$b
 check "blueprint mid-scan: the top is already its navy ($top)" near "$top" "12 26 46" 20
 until_ok 4000 state_is '.played.ms >= 0'
 
-# Hi-Fi's sweep, 4.4 s slowed: halfway, its dark paper is left of the pointer, Paper's cream right of it, and red pixels sit at the stage's edge.
+# Hi-Fi's sweep, 4.4 s slowed: halfway, one grab of a preview row has its dark paper left of the pointer, Paper's cream right of it, and red where the stage ends. The pointer moves fastest mid-sweep, so the stage is read just before and just after that grab.
 wtype 4
 sleep 2.2
-mid=$(stage hi-fi)
-left=$(preview_mean hi-fi 20 90 40 8)
-right=$(preview_mean hi-fi 250 90 40 8)
-# The columns of row 100 of card $1's preview that read #FB4934, as a first and last x.
-red_span() {
-  local x y
-  read -r x y < <(themes_state | jq -r --arg n "$1" --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == $n) | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
-  grim -s 1 -t ppm -g "$x,$((y + 100)) 306x1" - | node -e '
+read -r px py < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "hi-fi") | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
+before=$(stage hi-fi)
+# From one grab of preview row 100: the mean of x 20 to 60, the mean of the 40 px from 30 px past the stage's edge, and the first and last red x.
+sweep_row() {
+  grim -s 1 -t ppm -g "$px,$((py + 100)) 306x1" - | node -e '
     const b = require("fs").readFileSync(0);
     const px = b.subarray(b.toString("latin1").match(/^P6\s+\d+\s+\d+\s+\d+\s/)[0].length);
+    const at = (i) => [px[i * 3], px[i * 3 + 1], px[i * 3 + 2]];
+    const mean = (a, z) => { const s = [0, 0, 0]; for (let i = a; i < z; i++) at(i).forEach((v, c) => (s[c] += v)); return s.map((v) => Math.round(v / (z - a))).join(" "); };
     const xs = [];
-    for (let i = 0; i < px.length / 3; i++) if (px[i * 3] > 200 && px[i * 3 + 1] < 110 && px[i * 3 + 2] < 110) xs.push(i);
-    console.log(xs.length ? `${xs[0]} ${xs[xs.length - 1]}` : "none");
-  '
+    for (let i = 0; i < 306; i++) if (px[i * 3] > 200 && px[i * 3 + 1] < 110 && px[i * 3 + 2] < 110) xs.push(i);
+    const r = Math.min(Math.round(+process.argv[1]) + 30, 266);
+    console.log(`${mean(20, 60)}|${mean(r, r + 40)}|${xs.length ? `${xs[0]} ${xs[xs.length - 1]}` : "none"}`);
+  ' "$1"
 }
-red=$(red_span hi-fi)
-w=$(stage hi-fi | jq .w)
-check "hi-fi mid-sweep has crossed part of its card: $mid" jq -e '.w > 40 and .w < 266' <<<"$mid"
+IFS='|' read -r left right red < <(sweep_row "$(jq .w <<<"$before")")
+after=$(stage hi-fi)
+w0=$(jq '.w | floor' <<<"$before") w1=$(jq '.w | ceil' <<<"$after")
+check "hi-fi mid-sweep has crossed part of its card: $before" jq -e '.w > 40 and .w < 236' <<<"$before"
 check "hi-fi mid-sweep: left of the pointer is its dark paper ($left)" near "$left" "29 32 33" 20
-check "hi-fi mid-sweep: right of the pointer is still Paper's paper ($right)" near "$right" "241 233 216" 12
-check "hi-fi mid-sweep: red pointer pixels lie at the stage's edge ($red, stage $w)" bash -c 'read -r a b <<<"$1"; [[ $a =~ ^[0-9]+$ && $a -ge $(($2 - 30)) && $b -le $(($2 + 30)) ]]' _ "$red" "${w%.*}"
+check "hi-fi mid-sweep: past the pointer is still Paper's paper ($right)" near "$right" "241 233 216" 12
+check "hi-fi mid-sweep: red pointer pixels lie between the stage's edge before and after the grab ($red, stage $w0 to $w1)" bash -c 'read -r a b <<<"$1"; [[ $a =~ ^[0-9]+$ && $a -ge $(($2 - 6)) && $b -le $(($3 + 6)) ]]' _ "$red" "$w0" "$w1"
 until_ok 4000 state_is '.played.ms >= 0'
 
 # Artboard's zoom fades its card in over 4.4 s.
