@@ -41,6 +41,7 @@ ShellRoot {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
+    readonly property var engraving: L.engraving(theme.tokens)
     readonly property string voice: look.voice
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.

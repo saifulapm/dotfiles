@@ -905,6 +905,8 @@ FocusScope {
 
     component Head: Text {
         textFormat: Text.PlainText
+        style: page.dekho.engraving.on ? Text.Raised : Text.Normal
+        styleColor: page.dekho.engraving.color
         color: page.c.muted ?? "gray"
         font.family: page.bodyFont
         font.pixelSize: page.caps ? 10 : 11

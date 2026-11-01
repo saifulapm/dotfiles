@@ -45,6 +45,25 @@ echo "     drawn: $(margins | jq -c .drawn)"
 check "hi-fi: the top-left reads Blueprint's 02 FOOT — ~ without its brackets" drawn_is left "02 FOOT — ~"
 check "hi-fi: the date reads $(date +%F)" date_ends "$(date +%F)"
 check "hi-fi: nothing the margins report holds a bracket ($(margins | marked | head -3 | paste -sd'|'))" eval '[ -z "$(margins | marked)" ]'
+check "hi-fi: the labels are engraved" eval 'margins | jq -e ".drawn.raised == true" >/dev/null'
+# The line sits under the letters: the row below the number's last amber row is lit; a row of bare faceplate further down is not.
+under_line() {
+  local g
+  g=$(margins | jq -r '.drawn.numberBox | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h + 6 | ceil)"')
+  grim -s 1 -t ppm -g "$g" - | node -e '
+    const b = require("fs").readFileSync(0), head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
+    const [w, h] = [+head[1], +head[2]], at = (x, y) => px.subarray((y * w + x) * 3, (y * w + x) * 3 + 3);
+    const amber = (p) => p[0] > 180 && p[2] < 120;
+    let last = -1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (amber(at(x, y))) last = y;
+    const lit = (y) => { let n = 0; for (let x = 0; x < w; x++) { const p = at(x, y); if (!amber(p) && p[0] >= 40) n++; } return n; };
+    console.log(last, lit(last + 1), lit(Math.min(h - 1, last + 4)));
+  '
+}
+read -r last below bare < <(under_line)
+check "hi-fi: under the number's last amber row ($last) $below pixels are lit, against $bare on bare faceplate" test "$below" -ge $((bare + 3))
+in_theme blueprint
+check "blueprint: its labels are not engraved" eval 'margins | jq -e ".drawn.raised == false" >/dev/null'
 
 # A title and a goal can be any length; each elides 8 px short of the island in every theme.
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"

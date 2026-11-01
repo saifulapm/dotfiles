@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
 import { cards, cardName, tagline, windowLook } from './themes.mjs';
-import { marginLook, mark, launcherLook, listLook, islandLook, leaseLook, sendingLook, downloadingLook, clockLook } from './voice.mjs';
+import { engraving, marginLook, mark, launcherLook, listLook, islandLook, leaseLook, sendingLook, downloadingLook, clockLook } from './voice.mjs';
 import { lockLook } from './lock-look.mjs';
 
 // shell.json as theme-render writes it, then as the shell reads it.
@@ -86,4 +86,10 @@ test('the shared looks draw Blueprint\'s keys and labels bare in Hi-Fi, and Blue
   for (const [k, v] of Object.entries(marked)) assert.match(v, /\[/, `${k}: ${v}`);
   assert.equal(marked.island, '[ CHROMIUM ]');
   assert.equal(islandLook(blueprint).brackets, true);
+});
+
+test('Hi-Fi engraves its labels with a 1 px line of ink at 8 % under each letter; the other voices draw none', () => {
+  assert.deepEqual(engraving(shell('hi-fi')), { on: true, color: '#14EBDBB2' });
+  for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual(engraving(shell(n)), { on: false, color: 'transparent' });
+  assert.deepEqual(engraving(null), { on: false, color: 'transparent' });
 });

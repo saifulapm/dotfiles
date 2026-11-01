@@ -27,6 +27,7 @@ PanelWindow {
     readonly property var marginState: M.marginState(view, clock.now, { awake: Idle.awakeWord(Root.State.awakeUntil), sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), mail: mail, wifi: network.wifi, battery: power.battery })
     readonly property var goal: G.marginGoalParts(goals.store, clock.now)
     readonly property var voice: V.marginLook(theme.tokens)
+    readonly property var engraving: V.engraving(theme.tokens)
     readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
@@ -77,6 +78,8 @@ PanelWindow {
         font.pixelSize: root.look.size
         font.letterSpacing: root.look.tracking
         font.capitalization: root.look.caps ? Font.AllUppercase : Font.MixedCase
+        style: root.engraving.on ? Text.Raised : Text.Normal
+        styleColor: root.engraving.color
     }
 
     // Paper's dash and Blueprint's dot between the right margin's words; Artboard has none.
@@ -91,6 +94,8 @@ PanelWindow {
         const right = [awakeLabel, syncLabel, goalLabel, mailLabel, wifiLabel, batteryLabel, dateLabel].filter(l => l.visible).map(l => l.text).join(voice.sep ? " " + voice.sep + " " : " ");
         return {
             left: number.text + column.text + tail.text,
+            raised: number.style === Text.Raised,
+            numberBox: (p => ({ x: p.x, y: p.y, w: number.width, h: number.height }))(number.mapToItem(null, 0, 0)),
             marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join("").trim(),
             markColors: Array.from(marks.children).filter(l => l.text !== undefined).map(l => String(l.color)),
             right: right,

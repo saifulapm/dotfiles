@@ -79,6 +79,7 @@ PanelWindow {
     property real leaseNow: Date.now()
     readonly property var lease: lock.leased ? { who: lock.heldBy, left: Math.max(0, lock.leaseUntil - leaseNow) } : null
     readonly property var leaseLook: V.leaseLook(theme.tokens)
+    readonly property var engraving: V.engraving(theme.tokens)
     // The last minute takes the theme's warning; a renew past it brings the normal look back.
     readonly property bool leaseWarning: lease !== null && lease.left <= 60000
     // Mod+I during a lease opens its card: who, when it unlocked and the time left; Enter locks, Esc closes.
@@ -243,6 +244,8 @@ PanelWindow {
     }
     component HeadText: Text {
         textFormat: Text.PlainText
+        style: island.engraving.on ? Text.Raised : Text.Normal
+        styleColor: island.engraving.color
         color: island.noteLook.head.color
         font.family: island.noteLook.head.font
         font.pixelSize: island.noteLook.head.size

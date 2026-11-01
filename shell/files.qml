@@ -122,6 +122,7 @@ ShellRoot {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
+    readonly property var engraving: L.engraving(theme.tokens)
     readonly property string voice: look.voice
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
@@ -1907,6 +1908,8 @@ ShellRoot {
 
     component Head: Text {
         textFormat: Text.PlainText
+        style: engraving.on ? Text.Raised : Text.Normal
+        styleColor: engraving.color
         color: look.small.color
         font.family: look.small.font
         font.pixelSize: look.small.size

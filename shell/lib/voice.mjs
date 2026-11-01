@@ -27,6 +27,8 @@ const upper = (s) => same(s).toUpperCase();
 export const line = (s) => same(s).replace(/\s+/g, ' ').trim();
 // Blueprint's square marks around a word the shell wrote; the engraved voice draws the word bare. Text a person wrote never goes through here.
 export const mark = (engraved, s, pad = '') => (engraved ? s : `[${pad}${s}${pad}]`);
+// Hi-Fi's engraved labels: Qt's raised style draws a 1 px line of ink at 8 % (Qt's #AARRGGBB) under each letter.
+export const engraving = (tokens) => (tokens?.type.engraved === true ? { on: true, color: `#14${tokens.color.ink.slice(1)}` } : { on: false, color: 'transparent' });
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
