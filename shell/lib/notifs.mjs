@@ -88,7 +88,11 @@ export function parseStore(text) {
   const seen = {};
   const unique = data.history
     .filter(isEntry)
-    .filter((e) => (seen[e.key] ? false : (seen[e.key] = true)))
+    .filter((e) => {
+      if (seen[e.key]) return false;
+      seen[e.key] = true;
+      return true;
+    })
     .map((e) => {
       if (!('files' in e) || validFiles(e.files)) return e;
       const kept = Object.assign({}, e);
