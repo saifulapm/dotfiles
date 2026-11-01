@@ -1,17 +1,17 @@
 // Validates a parsed theme.toml and renders its fragments; pure, so the shell can import it too.
 const MENUS = {
-  paper: ['flat', 'grain', 'dots', 'grid', 'gradient'],
+  paper: ['flat', 'grain', 'dots', 'grid', 'gradient', 'brushed'],
   frame: ['hairline', 'ink', 'double', 'none', 'glow'],
   shadow: ['soft', 'hard-offset', 'none'],
   corner: ['round', 'square', 'cut'],
-  motion: ['spring', 'snappy', 'ease', 'typewriter', 'linear'],
+  motion: ['spring', 'snappy', 'ease', 'typewriter', 'linear', 'dial'],
 };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
 const SYNTAX = ['keyword', 'function', 'string', 'type', 'value', 'variable', 'attribute', 'meta', 'builtin', 'comment'];
 const FONTS = ['Maple Mono', 'Instrument Serif'];
-const VOICES = ['plain', 'caps', 'bracket'];
+const VOICES = ['plain', 'caps', 'bracket', 'engraved'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
-const NIRI_COLORS = ['border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
+const NIRI_COLORS = ['border_active', 'border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
 const TAB_SIDES = ['left', 'right', 'top', 'bottom'];
 
 export function validateTheme(doc) {
@@ -21,6 +21,8 @@ export function validateTheme(doc) {
   if (meta.mode !== 'light' && meta.mode !== 'dark') fail(`meta.mode: "${meta.mode}" is not light or dark`);
   const color = doc.color ?? fail('missing [color]');
   for (const k of COLORS) if (!HEX.test(color[k] ?? '')) fail(`color.${k}: "${color[k]}" is not #RRGGBB`);
+  // Glass is the island's, OSDs' and fields' fill; a theme without one draws them on its surface.
+  if ('glass' in color && !HEX.test(color.glass)) fail(`color.glass: "${color.glass}" is not #RRGGBB`);
   if (!Array.isArray(color.ansi) || color.ansi.length !== 16 || !color.ansi.every((c) => HEX.test(c))) {
     fail('color.ansi must hold 16 #RRGGBB colours');
   }
@@ -41,7 +43,7 @@ export function validateTheme(doc) {
   return {
     name: meta.name,
     mode: meta.mode,
-    color: Object.assign({}, color, { ansi: [...color.ansi] }),
+    color: Object.assign({}, color, { glass: color.glass ?? color.surface, ansi: [...color.ansi] }),
     syntax: Object.assign({}, syntax),
     primitive: Object.assign({}, primitive),
     paper: Object.assign({}, doc.paper),
@@ -73,7 +75,10 @@ const CURVES = {
 
 const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
 const eased = (ms, curve) => `duration-ms ${ms}\n        curve "${curve}"`;
-// Every animation's timing for the three motions the Motion boards draw (agent #W2A0F2JH); another motion keeps CURVES for open and close only.
+// niri 26.04 names no ease-in or ease-in-out curve, so those are its cubic-bezier.
+const bezier = (ms, ...p) => `duration-ms ${ms}\n        curve "cubic-bezier" ${p.join(' ')}`;
+const inOutCubic = (ms) => bezier(ms, 0.65, 0, 0.35, 1);
+// Every animation's timing for the four motions the Motion boards draw; another motion keeps CURVES for open and close only.
 const MOTION = {
   snappy: {
     'window-open': eased(140, 'ease-out-expo'),
@@ -110,6 +115,19 @@ const MOTION = {
     'screenshot-ui-open': eased(150, 'linear'),
     'config-notification-open-close': eased(150, 'linear'),
     'exit-confirmation-open-close': eased(150, 'linear'),
+  },
+  // Hi-Fi's dial has a flywheel: what travels eases in and out; open and close are plain curves until their shaders come.
+  dial: {
+    'window-open': bezier(220, 0.32, 0, 0.67, 0),
+    'window-close': eased(140, 'ease-out-cubic'),
+    'workspace-switch': inOutCubic(260),
+    'horizontal-view-movement': inOutCubic(260),
+    'window-movement': eased(200, 'ease-out-cubic'),
+    'window-resize': eased(200, 'ease-out-cubic'),
+    'overview-open-close': inOutCubic(240),
+    'screenshot-ui-open': eased(160, 'ease-out-cubic'),
+    'config-notification-open-close': eased(160, 'ease-out-cubic'),
+    'exit-confirmation-open-close': eased(160, 'ease-out-cubic'),
   },
 };
 
@@ -226,7 +244,8 @@ const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).joi
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
-  const frameColor = t.primitive.frame === 'glow' ? c.accent : c.ink;
+  // A theme may light its focused frame apart from its ink, as Hi-Fi does in amber.
+  const frameColor = n.border_active ?? (t.primitive.frame === 'glow' ? c.accent : c.ink);
   const border = t.primitive.frame === 'none' || !n.border
     ? 'border {\n        off\n    }'
     : `border {\n        on\n        width ${n.border}\n        active-color "${frameColor}"\n        inactive-color "${n.border_inactive ?? c.muted}"\n    }`;

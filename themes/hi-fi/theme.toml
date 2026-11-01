@@ -1,0 +1,67 @@
+[meta]
+name = "hi-fi"
+mode = "dark"
+
+# Gruvbox Dark as a 70s receiver: a brushed faceplate, amber backlight, engraved labels.
+[color]
+paper = "#1D2021"
+surface = "#282828"
+glass = "#141617"
+ink = "#EBDBB2"
+muted = "#A89984"
+line = "#504945"
+accent = "#FABD2F"
+danger = "#FB4934"
+ok = "#B8BB26"
+ansi = [
+  "#282828", "#CC241D", "#98971A", "#D79921", "#458588", "#B16286", "#689D6A", "#A89984",
+  "#928374", "#FB4934", "#B8BB26", "#FABD2F", "#83A598", "#D3869B", "#8EC07C", "#EBDBB2",
+]
+
+# Code colours, from Helix's gruvbox theme.
+[syntax]
+keyword = "#FB4934"
+function = "#B8BB26"
+string = "#B8BB26"
+type = "#FABD2F"
+value = "#D3869B"
+variable = "#EBDBB2"
+attribute = "#8EC07C"
+meta = "#83A598"
+builtin = "#FE8019"
+comment = "#928374"
+
+[primitive]
+paper = "brushed"
+frame = "hairline"
+shadow = "none"
+corner = "square"
+motion = "dial"
+
+# Fine horizontal brush lines of ink, at most this alpha.
+[paper]
+streak_alpha = 0.07
+
+[type]
+display = "Maple Mono"
+ui = "Maple Mono"
+voice = "engraved"
+mono = "Maple Mono"
+scale = 1.0
+
+[niri]
+gaps = 24
+border = 1
+blur = false
+border_active = "#FABD2F"
+border_inactive = "#3C3836"
+shadow_softness = 24
+shadow_spread = 0
+shadow_offset = [0, 0]
+shadow_color = "#FABD2F38"
+shadow_inactive = "#00000000"
+tab_position = "top"
+tab_width = 4
+tab_gap = 6
+tab_length = 1.0
+tab_gaps = 6
