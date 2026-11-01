@@ -662,10 +662,10 @@ test("the marks are danger red in Paper, accent dots before ink in Artboard and 
 
 const hifiLaunch = () => launcherLook(checkTokens(validateTheme(theme('hi-fi'))));
 
-test("Hi-Fi's launcher lights its cursor row: LAUNCH · APPS, 3 MATCHES, a lamp slot, a #32302F row with amber name and ink category", () => {
+test("Hi-Fi's launcher lights its cursor row: LAUNCH · APPS, 3 MATCHES, a lamp slot, an amber-backlit #413A29 row with amber name and ink category", () => {
   const h = hifiLaunch();
   assert.deepEqual([h.label.text('apps'), h.count(3), h.slot], ['LAUNCH · APPS', '3 MATCHES', 'lamp']);
-  assert.deepEqual([h.cursor.fill, h.cursor.text, h.cursor.detail, h.cursor.glow], ['#32302F', '#FABD2F', '#EBDBB2', '#FABD2F']);
+  assert.deepEqual([h.cursor.fill, h.cursor.text, h.cursor.detail, h.cursor.glow], ['#413A29', '#FABD2F', '#EBDBB2', '#FABD2F']);
   assert.deepEqual([h.prompt.text, h.prompt.color, h.caret], ['›', '#FABD2F', 'block']);
   assert.equal(h.legendLine('apps'), 'W WINDOWS  V CLIPBOARD  : EMOJI  = CALC  > COMMANDS  J K · ↵ · ESC');
 });

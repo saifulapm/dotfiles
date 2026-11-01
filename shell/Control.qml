@@ -96,6 +96,7 @@ Item {
             ruleBox: box(topRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
+            cursorLamp: cur && cur.lamp.visible ? box(cur.lamp) : null,
             legend: legend.map(k => k.key + " " + k.word).join("  "),
             legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).label).join("  "),
             legendSpacing: look.small.spacing,
@@ -272,6 +273,7 @@ Item {
                         required property int index
                         readonly property bool on: index === control.section.selected
                         readonly property string drawnDetail: detailLabel.text
+                        readonly property Item lamp: rowLamp
                         width: list.width
                         implicitHeight: row.implicitHeight + 22
                         radius: look.cursor.radius
@@ -283,6 +285,18 @@ Item {
                             anchors.leftMargin: look.voice === "caps" ? 20 : 12
                             anchors.rightMargin: anchors.leftMargin
                             spacing: 14
+
+                            // Hi-Fi's row lamp, lit on the cursor row, as the launcher's.
+                            Root.Lamp {
+                                id: rowLamp
+                                visible: control.look.slot === "lamp"
+                                tokens: control.theme.tokens
+                                light: on ? "lit" : "unlit"
+                                size: 7
+                                Layout.alignment: Qt.AlignVCenter
+                                Layout.preferredWidth: size
+                                Layout.preferredHeight: size
+                            }
 
                             // Paper marks the cursor row with the accent's ▸.
                             Text {

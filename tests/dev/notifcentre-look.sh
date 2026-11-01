@@ -97,6 +97,12 @@ open_centre
 check "hi-fi: the header line reads NOTIFICATIONS ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "header" and .heading == "NOTIFICATIONS"'
 check "hi-fi: every legend key is bare ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["J/K", "↵", "D", "⇧D", "M", "I", "S", "1-3", "/", "ESC"]'
 check "hi-fi: nothing the centre reports holds a bracket ($(notifs | marked | head -3 | paste -sd'|'))" eval '[ -z "$(notifs | marked)" ]'
+check "hi-fi: the cursor row is backlit #413A29 ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#413a29"'
+# The 3 px square at the centre of the cursor row's 7 px lamp.
+lamp_geo() { notifs | jq -r '.cursorLamp | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
+until_ok 2000 state_is '.cursorLamp != null'
+lit=$(near "$(lamp_geo)" 250 189 47 12)
+check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
 until_ok 2000 state_is .keyboard
 wtype -M shift -k d -m shift
 until_ok 2000 state_is .hint

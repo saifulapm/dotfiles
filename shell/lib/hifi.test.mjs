@@ -20,7 +20,7 @@ test("Hi-Fi's own parts key on voice engraved, never on the theme's name", () =>
 });
 
 test('the board colours no token carries', () => {
-  assert.deepEqual(HIFI, { unlit: '#3C3836', lit: '#32302F', groove: '#0E0F10', walnut: '#3A2A1F' });
+  assert.deepEqual(HIFI, { unlit: '#3C3836', lit: '#413A29', groove: '#0E0F10', walnut: '#3A2A1F' });
 });
 
 test('a lamp is lit amber with a glow, unlit #3C3836 without one, and red or green for a deadline or the theme in use', () => {

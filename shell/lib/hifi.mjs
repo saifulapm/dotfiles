@@ -1,8 +1,8 @@
 // Hi-Fi's own parts as its boards draw them: pilot lamps, glass and the tuning scale. They key on voice engraved (ruling HYZ253HJ), so any engraved token set draws them.
 export const isHifi = (tokens) => tokens?.type.engraved === true;
 
-// The board colours no token carries (ruling E77FYW02): an unlit lamp, the launcher's lit row, the groove under the bar, the lock's walnut cheeks.
-export const HIFI = { unlit: '#3C3836', lit: '#32302F', groove: '#0E0F10', walnut: '#3A2A1F' };
+// The board colours no token carries (ruling E77FYW02): an unlit lamp, the lit cursor row (amber at 12 % over the surface, so it reads as backlit), the groove under the bar, the lock's walnut cheeks.
+export const HIFI = { unlit: '#3C3836', lit: '#413A29', groove: '#0E0F10', walnut: '#3A2A1F' };
 
 // A colour at an alpha, as Qt's #AARRGGBB.
 const alpha = (hex, a) => `#${Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase()}${hex.slice(1)}`;

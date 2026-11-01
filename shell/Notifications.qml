@@ -167,6 +167,7 @@ Item {
             ruleBox: box(headRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
+            cursorLamp: d && d.lamp.visible ? box(d.lamp) : null,
             legend: legendKeys.map(k => k.key + " " + k.word).join("  "),
             legendKeys: legendKeys.map(k => k.key),
             legendSpacing: look.small.spacing,
@@ -399,6 +400,7 @@ Item {
                         required property int index
                         readonly property bool current: index === centre.selected
                         readonly property Item box: rowBox
+                        readonly property Item lamp: rowLamp
                         readonly property string age: ageLabel.text
                         readonly property Item headItem: headLabel
                         readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
@@ -466,6 +468,19 @@ Item {
                                 anchors.topMargin: 10
                                 anchors.bottomMargin: 10
                                 spacing: 12
+
+                                // Hi-Fi's row lamp, lit on the cursor row and level with the summary, as the launcher's.
+                                Root.Lamp {
+                                    id: rowLamp
+                                    visible: centre.look.slot === "lamp"
+                                    tokens: centre.theme.tokens
+                                    light: item.current ? "lit" : "unlit"
+                                    size: 7
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.topMargin: Math.round((centre.look.name.size * 1.3 - size) / 2)
+                                    Layout.preferredWidth: size
+                                    Layout.preferredHeight: size
+                                }
 
                                 Text {
                                     visible: look.slot === "marker"

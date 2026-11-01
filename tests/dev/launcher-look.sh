@@ -157,7 +157,7 @@ until_ok 3000 state_is '.mode == "windows" and (.results | length) >= 1'
 check "artboard: a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
 close_launcher
 
-# Hi-Fi lights its cursor row like a lamp: the name amber on #32302F, and the lamp moves with j.
+# Hi-Fi lights its cursor row like a lamp: the name amber on the backlit #413A29, and the lamp moves with j.
 name_geo() { launcher_state | jq -r '.cursorNameBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"'; }
 # The 3 px square at the centre of row $1's 7 px lamp.
 lamp_geo() { launcher_state | jq -r --argjson i "$1" '.lampBoxes[$i] | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
@@ -169,8 +169,8 @@ until_ok 3000 state_is '.query == "fo" and .cursorName != null'
 check "hi-fi: the header reads LAUNCH · APPS, 4 MATCHES and the cursor row FOOT ($(launcher_state | jq -c '[.header, .countText, .cursorName]'))" state_is '.header == "LAUNCH · APPS" and .countText == "4 MATCHES" and .cursorName == "FOOT"'
 check "hi-fi: the legend reads the five prefixes and J K · ↵ · ESC ($(launcher_state | jq -c .legend))" state_is '.legend == "W WINDOWS  V CLIPBOARD  : EMOJI  = CALC  > COMMANDS  J K · ↵ · ESC"'
 name_amber=$(near "$(name_geo)" 250 189 47 12)
-name_fill=$(near "$(name_geo)" 50 48 47 3)
-check "hi-fi: the cursor row's name draws #FABD2F ($name_amber px) on #32302F ($name_fill px)" test "$name_amber" -gt 20 -a "$name_fill" -gt 500
+name_fill=$(near "$(name_geo)" 65 58 41 3)
+check "hi-fi: the cursor row's name draws #FABD2F ($name_amber px) on #413A29 ($name_fill px)" test "$name_amber" -gt 20 -a "$name_fill" -gt 500
 # The lit name glows like its lamp: a warm halo of amber over the row's fill rings each letter.
 halo=$(near "$(name_geo)" 95 80 46 22)
 check "hi-fi: the cursor row's name glows ($halo px of amber halo)" test "$halo" -gt 25
