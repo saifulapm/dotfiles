@@ -300,7 +300,7 @@ Item {
                         id: headRight
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: plain ? "Mod+U" : bracket ? "[MOD+U]" : "CX · " + (panel.activeAccount ? panel.activeAccount.label.toUpperCase() : "")
+                        text: plain ? "Mod+U" : bracket ? L.mark(look.engraved, "MOD+U") : "CX · " + (panel.activeAccount ? panel.activeAccount.label.toUpperCase() : "")
                         color: bracket ? c.accent : c.muted
                         font.family: fonts.ui
                         font.pixelSize: plain ? 11 : 10

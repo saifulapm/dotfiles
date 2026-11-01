@@ -52,6 +52,13 @@ echo "     note: $(island | jq -c '.note | {app, summaryLines, body, cardBottom,
 check "blueprint: a newline in the app or summary stays on one line each" state_is '.note.app == "[ TWO LINES ]" and .note.summaryLines == 1'
 check "blueprint: the body draws in its spelt order and inside the island" state_is '.note.body == "xyz" and .note.cardBottom <= .note.boxBottom'
 
+in_theme hi-fi
+notify-send "Tuned in" "report-october.pdf · 2.4 MB"
+shown '.note.summary == "TUNED IN"'
+echo "     note: $(island | jq -c .note)"
+check "hi-fi: the island reads NOTIFY-SEND and T+0S with no brackets drawn" state_is '.note.app == "NOTIFY-SEND" and .note.age == "T+0S" and .note.bracketsShown == false'
+check "hi-fi: nothing the island reports holds a bracket ($(island | marked | head -3 | paste -sd'|'))" eval '[ -z "$(island | marked)" ]'
+
 in_theme paper
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'

@@ -1,5 +1,5 @@
 // The theme picker's cursor, captions and specimens, from each theme's tokens alone, so a theme added later draws too; pure, so node tests what the shell imports.
-import { marginLook, listLook, line } from './voice.mjs';
+import { marginLook, listLook, line, mark } from './voice.mjs';
 import { checkTokens } from './theme.mjs';
 import { marginStyle } from './surface.mjs';
 import { pad2 } from './margins.mjs';
@@ -94,7 +94,7 @@ export function pickerLook(themed) {
   if (voice === 'bracket') {
     return Object.assign(base, {
       header: (n, current) => ({ title: 'THEMES', font: t.mono, size: 11, weight: 700, color: c.accent, sub: ` // ${n} SHEETS`, subFont: t.mono, subSize: 11, italic: false, right: `ACTIVE: ${current.toUpperCase()}` }),
-      tag: (current, cursor) => (current ? { text: '[ACTIVE]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : cursor ? { text: '[↵]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : null),
+      tag: (current, cursor) => (current ? { text: mark(t.engraved === true, 'ACTIVE'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : cursor ? { text: mark(t.engraved === true, '↵'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : null),
       number: (i) => pad2(i + 1),
       tile: { fill: 'transparent', border: { width: 1, color: c.line }, radius: 0, pad: 9 },
       cursor: { fill: c.surface, border: { width: 1, color: c.accent }, shadow: { kind: 'glow', x: 0, y: 0, blur: 14, spread: 0, color: c.accent, alpha: 0.3 }, ticks: true },

@@ -88,6 +88,12 @@ until_ok 2000 caret_on
 check "blueprint: the query shows its block caret while it has focus ($(caret_px) px)" caret_on
 wtype -k Tab
 check "blueprint: after Tab the block caret is gone" caret_off
+# Hi-Fi draws Blueprint's board in its own tokens, its keys and labels without brackets.
+in_theme hi-fi
+no_marks() { [ -n "$(launcher_state)" ] && [ -z "$(launcher_state | marked)" ]; }
+check "hi-fi: nothing the launcher reports holds a bracket ($(launcher_state | marked | head -3 | paste -sd'|'))" no_marks
+check "hi-fi: the header still reads Blueprint's LAUNCH // APPS ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH // APPS"'
+in_theme blueprint
 wtype /
 until_ok 2000 caret_on
 # The board restyles at once: the query and the keyboard stay while the cursor row turns Artboard's tint.

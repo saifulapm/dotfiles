@@ -1589,7 +1589,7 @@ PanelWindow {
 
                                     Text {
                                         textFormat: Text.PlainText
-                                        text: leaseColumn.layout === "print" ? "AGENT" : "[ AGENT ]"
+                                        text: leaseColumn.layout === "print" ? "AGENT" : V.mark(island.theme.tokens?.type.engraved === true, "AGENT", " ")
                                         color: leaseColumn.look.headColor || leaseColumn.muted
                                         font.family: leaseColumn.font
                                         font.pixelSize: 10

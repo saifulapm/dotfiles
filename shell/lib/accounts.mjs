@@ -1,5 +1,5 @@
 // Accounts' card from bin/dots-accounts' rows and the Claude account registry: one group of accounts with their limits, then balances, then usage, in the words the boards use.
-import { line } from './voice.mjs';
+import { line, mark } from './voice.mjs';
 
 // Labels come from a registry file and from provider names, so each is one line with no control characters, and elided.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
@@ -194,7 +194,7 @@ export function accountsLook(tokens) {
     active: plain
       ? { text: 'ACTIVE', color: MARKS.plain.on, fill: c.ink, border: 'transparent', radius: 8, dot: MARKS.plain.dot }
       : bracket
-        ? { text: '[ACTIVE]', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0, dot: '' }
+        ? { text: mark(tokens.type.engraved === true, 'ACTIVE'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0, dot: '' }
         : { text: 'ACTIVE', color: c.ink, fill: 'transparent', border: c.ink, radius: 0, dot: '' },
     // Paper's outlined box, Artboard's rounded 6 px bar, Blueprint's row of twenty blocks.
     bar: plain ? { kind: 'round', track: MARKS.plain.track, fill: c.accent } : bracket ? { kind: 'blocks', track: c.line, fill: c.accent } : { kind: 'box', track: c.ink, fill: c.ink },
