@@ -28,3 +28,28 @@ export function tuningScale(tokens, width, at) {
   const x = Math.max(0, Math.min(width - 2, Math.round(at * width) - 1));
   return { ticks, pointer: { x, width: 2, color: c.danger } };
 }
+
+// The paper switch: Hi-Fi's dial sweep whenever Hi-Fi is either side, so every other pair keeps the outgoing theme's own motion.
+export function switchKind(outgoing, incoming) {
+  if (outgoing.primitive.motion === 'dial' || incoming.primitive.motion === 'dial') return 'sweep';
+  return { snappy: 'slide', spring: 'zoom', linear: 'scan' }[outgoing.primitive.motion] ?? 'cut';
+}
+
+// The sweep at a fraction t of its 220 ms: the pointer eases in and out like a flywheel dial, and the lamps warm over the last 60 ms.
+export function sweepAt(t) {
+  const pointer = t < 0.5 ? 4 * t ** 3 : 1 - (-2 * t + 2) ** 3 / 2;
+  const warmth = Math.max(0, Math.min(1, (t * 220 - 160) / 60));
+  return { pointer, warmth };
+}
+
+const channels = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+
+// A lamp warming up: its colour blends from unlit by warmth, 0 to 1, so a lamp never pops on.
+export function warmLamp(tokens, state, size = 6, warmth = 1) {
+  const l = lamp(tokens, state, size);
+  if (warmth >= 1) return l;
+  const from = channels(HIFI.unlit);
+  const to = channels(l.color);
+  const color = `#${from.map((f, i) => Math.round(f + (to[i] - f) * warmth).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+  return { size, color, glow: l.glow };
+}
