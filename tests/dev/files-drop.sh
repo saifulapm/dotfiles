@@ -53,7 +53,7 @@ env -u QS_CONFIG_PATH DRAG_FILES="$(ls "$work"/chromium/many-*.txt)" qs -p "$rep
 source500=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e '[.[] | select(.title == \"drag-source\")] | length == 2' >/dev/null"
 many_source=$(niri msg -j windows | jq -r --argjson f "$first_source" '.[] | select(.title == "drag-source" and .id != $f) | .id')
-niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
+niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
 # Tiled windows report no position, so both float side by side where the drag can find them: the target left, Files right of it. Files opens floating.
 win_id() { niri msg -j windows | jq -r --arg t "$1" '.[] | select(.app_id == $t or .title == $t) | .id'; }

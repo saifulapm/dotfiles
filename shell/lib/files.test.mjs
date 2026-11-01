@@ -208,7 +208,17 @@ test('the key strip pairs each key with its word in the theme\'s idiom', () => {
   const paper = F.keyStrip('caps');
   assert.deepEqual(paper[0], { key: 'j/k', word: 'move' });
   assert.deepEqual(F.keyStrip('bracket')[0], { key: '[J/K]', word: 'MOVE' });
-  assert.deepEqual(paper.map((k) => k.key), ['j/k', 'h/l', 'space', 'y x p', 'r', 'a', 'd', 'o', 's', 'e', '/', 'tab', 'esc']);
+  assert.deepEqual(paper.map((k) => k.key), ['j/k', 'h/l', 'space', 'y x p', 'r', 'a', 'd', 'o', 's', 'e', '/', ',', 'tab', 'esc']);
+});
+
+test(', cycles the sort from date to name to size, and the strip names the one in use', () => {
+  assert.equal(F.SORT_FIRST, 'modified');
+  assert.equal(F.nextSort('modified'), 'name');
+  assert.equal(F.nextSort('name'), 'size');
+  assert.equal(F.nextSort('size'), 'modified');
+  assert.deepEqual(F.keyStrip('caps', 'modified').find((k) => k.key === ','), { key: ',', word: 'sort: date' });
+  assert.deepEqual(F.keyStrip('caps', 'size').find((k) => k.key === ','), { key: ',', word: 'sort: size' });
+  assert.deepEqual(F.keyStrip('bracket', 'name').find((k) => k.key === '[,]'), { key: '[,]', word: 'SORT: NAME' });
 });
 
 test('a drag offers the marked rows when it starts on one, else only the row it starts on', () => {

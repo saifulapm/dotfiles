@@ -19,6 +19,8 @@ ShellRoot {
     property var firstFrameMs: null
     property var entries: []
     property bool hidden: false
+    // , cycles date, name and size; a new window opens on date, newest first, or on DOTS_FILES_SORT's, which checks that walk rows by name set.
+    property string sort: Quickshell.env("DOTS_FILES_SORT") || F.SORT_FIRST
     // / starts a find: typed letters narrow the rows, or open the one place they start (#NYNGZ3NC).
     property bool finding: false
     property string query: ""
@@ -92,7 +94,8 @@ ShellRoot {
 
     readonly property var rows: P.shownRows(entries, {
         hidden: hidden,
-        query: query
+        query: query,
+        sort: sort
     })
     readonly property var cursorRow: rows[selected] ?? null
     readonly property string cursorPath: cursorRow && !cursorRow.dir ? pathOf(cursorRow) : ""
@@ -196,6 +199,13 @@ ShellRoot {
             enter(pathOf(cursorRow));
         else if (!cursorRow.undecodable)
             Quickshell.execDetached(["gio", "open", pathOf(cursorRow)]);
+    }
+
+    // The cursor stays on its file through the new order.
+    function cycleSort() {
+        const name = cursorRow ? cursorRow.name : "";
+        sort = F.nextSort(sort);
+        selected = Math.max(0, rows.findIndex(r => r.name === name));
     }
 
     function setQuery(q) {
@@ -622,6 +632,7 @@ ShellRoot {
                 side: app.side,
                 selected: app.selected,
                 cursor: app.cursorRow ? app.cursorRow.name : null,
+                sort: app.sort,
                 rows: app.rows.map(r => r.name),
                 dirs: app.rows.filter(r => r.dir).map(r => r.name),
                 marked: app.marked,
@@ -812,6 +823,8 @@ ShellRoot {
                 }
                 else if (t === ".")
                     app.hidden = !app.hidden;
+                else if (t === ",")
+                    app.cycleSort();
                 else if (k === Qt.Key_Escape)
                     app.quit();
                 else if (k === Qt.Key_Tab)
@@ -1578,7 +1591,7 @@ ShellRoot {
 
                 Repeater {
                     id: stripRepeater
-                    model: app.dropping ? F.dropKeys(app.voice) : app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice)
+                    model: app.dropping ? F.dropKeys(app.voice) : app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice, app.sort)
 
                     Rectangle {
                         required property var modelData

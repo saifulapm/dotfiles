@@ -266,11 +266,17 @@ export function appText(voice, app) {
 }
 
 
-const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], ['tab', 'places'], ['esc', 'close']];
+const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], [',', 'sort'], ['tab', 'places'], ['esc', 'close']];
+
+// , cycles the list's order; Files opens on date, newest first.
+const SORTS = ['modified', 'name', 'size'];
+const SORT_WORDS = { modified: 'date', name: 'name', size: 'size' };
+export const SORT_FIRST = SORTS[0];
+export const nextSort = (sort) => SORTS[(SORTS.indexOf(sort) + 1) % SORTS.length];
 
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
 const strip = (voice, pairs) => pairs.map(([k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w }));
-export const keyStrip = (voice) => strip(voice, KEYS);
+export const keyStrip = (voice, sort = SORT_FIRST) => strip(voice, KEYS.map(([k, w]) => (k === ',' ? [k, `sort: ${SORT_WORDS[sort]}`] : [k, w])));
 export const dragKeys = (voice) => strip(voice, DRAG_KEYS);
 export const dropKeys = (voice) => strip(voice, DROP_KEYS);
 

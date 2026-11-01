@@ -34,7 +34,7 @@ for t in "paper|■|#1c1915|□|$folder_sharp|$file_sharp|Instrument Serif,true,
   "blueprint|■|#7fe3f0|□|$folder_sharp|$file_sharp|Maple Mono,false,12|[J/K]|MOVE|700|#1a7fe3f0|#80a4c2"; do
   IFS='|' read -r name on onfill off folder file date key word weight here lead <<<"$t"
   in_theme "$name"
-  niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"
+  niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
   until_ok 5000 files_is '.listed and .firstFrameMs != null'
   until_ok 3000 files_focused
   wtype jj

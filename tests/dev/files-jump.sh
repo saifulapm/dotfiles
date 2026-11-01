@@ -15,7 +15,7 @@ zo add "$h/Codes/lareys" "$h/Documents/invoices"
 files_state() { timeout 0.5 qs ipc -p "$files_qml" call files state 2>/dev/null; }
 files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 
-niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' _ZO_DATA_DIR='$work/zoxide' exec dots-files >>'$log' 2>&1"
+niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' _ZO_DATA_DIR='$work/zoxide' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
 # Keys typed before niri focuses the new window go nowhere.
 until_ok 3000 bash -c "niri msg -j windows | jq -e 'any(.[]; .app_id == \"files\" and .is_focused)' >/dev/null"

@@ -202,6 +202,24 @@ const entries = [
 ];
 const names = (rows) => rows.map((r) => r.name);
 
+test('by date the newest comes first and by size the largest, folders still on top', () => {
+  const rows = [
+    { name: 'old.pdf', dir: false, mtime: 100, size: 900 },
+    { name: 'Archive', dir: true, mtime: 50, size: 4096 },
+    { name: 'new.pdf', dir: false, mtime: 300, size: 10 },
+    { name: 'Recent', dir: true, mtime: 400, size: 4096 },
+    { name: 'mid.pdf', dir: false, mtime: 200, size: 5000 },
+  ];
+  assert.deepEqual(sortRows(rows, 'modified').map((r) => r.name), ['Recent', 'Archive', 'new.pdf', 'mid.pdf', 'old.pdf']);
+  assert.deepEqual(sortRows(rows, 'size').map((r) => r.name), ['Archive', 'Recent', 'mid.pdf', 'old.pdf', 'new.pdf']);
+  assert.deepEqual(sortRows(rows, 'name').map((r) => r.name), ['Archive', 'Recent', 'mid.pdf', 'new.pdf', 'old.pdf']);
+});
+
+test('the rows shown follow the sort asked for', () => {
+  const dated = entries.map((e, i) => Object.assign({ mtime: i }, e));
+  assert.deepEqual(names(shownRows(dated, { hidden: false, filter: null, query: '', sort: 'modified' })), ['Taildrop', 'IMG_2041.HEIC', 'shot.PNG', 'report.pdf']);
+});
+
 test('the rows shown: dotfiles only when asked, then the query, folders first', () => {
   assert.deepEqual(names(shownRows(entries, { hidden: false, filter: null, query: '' })), ['Taildrop', 'IMG_2041.HEIC', 'report.pdf', 'shot.PNG']);
   assert.deepEqual(names(shownRows(entries, { hidden: true, filter: null, query: '' })), ['.config', 'Taildrop', '.hidden.txt', 'IMG_2041.HEIC', 'report.pdf', 'shot.PNG']);

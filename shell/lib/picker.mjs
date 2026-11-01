@@ -44,10 +44,12 @@ export function appName(apps, id) {
   return a ? a.name : id;
 }
 
-// Folders first, then files, each by name with case ignored, as every board lists them.
-export function sortRows(rows) {
+// Folders first, then files, each by name with case ignored, as every board lists them; by modified the newest leads, by size the largest file (folders by name, a folder's size says nothing).
+export function sortRows(rows, by = 'name') {
   const key = (r) => r.name.toLowerCase();
-  return rows.slice().sort((a, b) => (a.dir !== b.dir ? (a.dir ? -1 : 1) : key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.name < b.name ? -1 : 1));
+  const byName = (a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.name < b.name ? -1 : 1);
+  const first = (a, b) => (by === 'modified' ? b.mtime - a.mtime : by === 'size' && !a.dir ? b.size - a.size : 0);
+  return rows.slice().sort((a, b) => (a.dir !== b.dir ? (a.dir ? -1 : 1) : first(a, b) || byName(a, b)));
 }
 
 // Decimal units: whole kilobytes, and one decimal under 10 of a bigger unit.
@@ -160,10 +162,10 @@ function allows(filter, row) {
   return globs.some((g) => globRe(String(g)).test(row.name)) || mimes.some((m) => mimeHit(row.mime, String(m)));
 }
 
-// The folder's entries as the list draws them: dotfiles when shown, only folders when a folder is asked for, the app's filter, the typed query anywhere in a name.
+// The folder's entries as the list draws them: dotfiles when shown, only folders when a folder is asked for, the app's filter, the typed query anywhere in a name, in the sort asked for.
 export function shownRows(entries, opts) {
   const q = (opts.query || '').toLowerCase();
-  return sortRows(entries.filter((e) => (opts.hidden || e.name.charAt(0) !== '.') && (!opts.folders || e.dir) && allows(opts.filter, e) && (!q || e.name.toLowerCase().indexOf(q) >= 0)));
+  return sortRows(entries.filter((e) => (opts.hidden || e.name.charAt(0) !== '.') && (!opts.folders || e.dir) && allows(opts.filter, e) && (!q || e.name.toLowerCase().indexOf(q) >= 0)), opts.sort);
 }
 
 // ctrl+space marks the cursor file or unmarks it; a folder is walked into, never marked, and an undecodable name's path would name another file.

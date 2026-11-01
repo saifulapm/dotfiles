@@ -26,7 +26,7 @@ files_gone() { [ "$(files_windows)" = 0 ]; }
 files_pids() { session_qs_pids "-p $files_qml"; }
 no_files_process() { [ -z "$(files_pids)" ]; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command, dots-files, through niri.
-mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' exec dots-files >>'$log' 2>&1"; }
+mod_y() { niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"; }
 
 mod_y
 until_ok 5000 files_up
@@ -131,6 +131,32 @@ watch_left() { local p; for p in $(pgrep -x findmnt); do tr '\0' '\n' 2>/dev/nul
 no_watch_left() { ! watch_left; }
 until_ok 3000 no_watch_left
 check "and no findmnt watch of its own is left running" no_watch_left
+
+# A new window opens on date, newest first, with folders on top; , cycles name, size and back, the cursor staying on its file.
+h2=$work/home2
+mkdir -p "$h2/.config" "$h2/y-dir" "$h2/z-dir"
+printf 'x%.0s' {1..300} >"$h2/a-old.txt"; printf 'x%.0s' {1..10} >"$h2/b-new.txt"; printf 'x%.0s' {1..5000} >"$h2/c-mid.txt"
+touch -d 2026-01-01 "$h2/a-old.txt"; touch -d 2026-03-01 "$h2/b-new.txt"; touch -d 2026-02-01 "$h2/c-mid.txt"; touch -d 2026-01-15 "$h2/y-dir"; touch -d 2026-04-01 "$h2/z-dir"
+niri msg action spawn -- sh -c "HOME='$h2' XDG_CONFIG_HOME='$h2/.config' exec dots-files >>'$log' 2>&1"
+until_ok 5000 files_up
+until_ok 2000 files_is '.listed'
+check "a new window sorts by date, newest first, folders on top ($(files_state | jq -c '{sort, rows}'))" \
+  files_is '.sort == "modified" and .rows == ["z-dir", "y-dir", "b-new.txt", "c-mid.txt", "a-old.txt"]'
+wtype jjj
+until_ok 1000 files_is '.cursor == "c-mid.txt"'
+wtype ,
+until_ok 1000 files_is '.sort == "name"'
+check ", sorts by name and the cursor stays on c-mid.txt ($(files_state | jq -c '{rows, cursor}'))" \
+  files_is '.rows == ["y-dir", "z-dir", "a-old.txt", "b-new.txt", "c-mid.txt"] and .cursor == "c-mid.txt"'
+wtype ,
+until_ok 1000 files_is '.sort == "size"'
+check "a second , sorts files by size, largest first ($(files_state | jq -c '{rows, cursor}'))" \
+  files_is '.rows == ["y-dir", "z-dir", "c-mid.txt", "a-old.txt", "b-new.txt"] and .cursor == "c-mid.txt"'
+wtype ,
+until_ok 1000 files_is '.sort == "modified"'
+check "a third , comes back to date ($(files_state | jq -r .sort))" files_is '.sort == "modified" and .rows[2] == "b-new.txt"'
+wtype -k Escape
+until_ok 3000 no_files_process
 
 mod_y
 until_ok 5000 files_up
