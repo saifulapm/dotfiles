@@ -3,6 +3,7 @@ import { marginLook, listLook, line, mark } from './voice.mjs';
 import { checkTokens } from './theme.mjs';
 import { marginStyle } from './surface.mjs';
 import { pad2 } from './margins.mjs';
+import { isHifi, HIFI } from './hifi.mjs';
 
 export function step(names, name, by) {
   const i = Math.max(0, Math.min(names.length - 1, names.indexOf(name) + by));
@@ -46,7 +47,7 @@ const TILE = '#F6F7F9';
 // A card's name in its own theme's typeface and voice; the picker draws it in the current theme's ink, so it always reads.
 export function cardName(t) {
   const name = line(t.name);
-  if (t.type.engraved) return { text: cap(name), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
+  if (t.type.engraved) return { text: cap(name), font: t.type.ui, size: 26, weight: 400, spacing: 0 };
   if (t.type.voice === 'bracket') return { text: name.toUpperCase(), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
   if (t.type.voice === 'plain') return { text: cap(name), font: t.type.ui, size: 16, weight: 700, spacing: -0.16 };
   return { text: cap(name), font: t.type.display, size: 26, weight: 400, spacing: 0 };
@@ -89,6 +90,17 @@ export function pickerLook(themed) {
       tag: (current, cursor) => (current ? { text: 'Current', color: c.accent, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
       tile: { fill: TILE, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
       cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: c.accent, alpha: 0.45 }, radius: 12, ticks: false },
+    });
+  }
+  // Hi-Fi's receiver board: sources on a #3C3836 rack, the cursor's amber backlight, and red and green only as lamps.
+  if (t.engraved === true) {
+    return Object.assign(base, {
+      header: (n, current) => ({ title: 'THEMES', font: t.mono, size: 11, weight: 700, color: c.ink, sub: ` · ${n} SOURCES`, subFont: t.mono, subSize: 11, italic: false, right: `IN USE: ${current.toUpperCase()}` }),
+      legend: (n) => l.keys([['j k', 'choose'], [n > 1 ? `1–${Math.min(n, 9)}` : '1', 'jump'], ['↵', 'apply']]),
+      tag: (current, cursor) => (current ? { text: 'IN USE', lamp: 'green', color: c.ink, fill: 'transparent', border: 'transparent', radius: 0 } : cursor ? { text: '↵ APPLY', color: c.accent, fill: 'transparent', border: 'transparent', radius: 0 } : null),
+      number: (i) => String(i + 1),
+      tile: { fill: 'transparent', border: { width: 1, color: HIFI.unlit }, radius: 0, pad: 9 },
+      cursor: { fill: c.surface, border: { width: 1, color: c.accent }, shadow: { kind: 'glow', x: 0, y: 0, blur: 24, spread: 0, color: c.accent, alpha: 0.22 }, ticks: false },
     });
   }
   if (voice === 'bracket') {
@@ -160,15 +172,18 @@ export function cardWidth(n, screenWidth) {
   return (panelWidth(n, screenWidth) - 44 - (count - 1) * 16) / count;
 }
 
-// The palette strip: ink, ANSI 1 to 6, then the paper.
-export const swatches = (tokens) => [tokens.color.ink, ...tokens.color.ansi.slice(1, 7), tokens.color.paper];
+// The palette strip: ink, ANSI 1 to 6, then the paper; Hi-Fi's is its surface, then its bright ANSI 9 to 15, as its board shows it.
+export const swatches = (tokens) => (isHifi(tokens) ? [tokens.color.surface, ...tokens.color.ansi.slice(9, 16)] : [tokens.color.ink, ...tokens.color.ansi.slice(1, 7), tokens.color.paper]);
 
 // The specimen's margins as the theme's margins would read the scene, and its island's clock.
 export function specimenMargins(tokens) {
   const look = marginLook(tokens);
   const style = marginStyle(tokens);
   return {
-    number: look.number(SCENE.view.idx),
+    // Hi-Fi's bar shows a lamp per workspace in place of the shown one's number.
+    number: look.engraved ? '' : look.number(SCENE.view.idx),
+    lamps: look.lamps([1, 2, 3, 4].map((idx) => ({ idx, active: idx === SCENE.view.idx, urgent: false }))),
+    goalLamp: look.goalLamp,
     numberColor: look.numberColor,
     tail: look.tail(SCENE.view),
     goal: look.goal(SCENE.goal),

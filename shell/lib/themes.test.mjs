@@ -2,13 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { validateTheme } from './theme.mjs';
+import { validateTheme, checkTokens } from './theme.mjs';
 import { cards, step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins, panelWidth, cardWidth } from './themes.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
 const artboard = load('artboard');
 const blueprint = load('blueprint');
+// The shell reads Hi-Fi as the bracket voice plus engraved, as shell.json and themes.json reach it.
+const hifi = checkTokens(load('hi-fi'));
 
 const names = ['paper', 'artboard', 'blueprint'];
 
@@ -172,4 +174,35 @@ test('past four themes the cards shrink and the panel stays at its four-card wid
 test('on a narrow screen four cards shrink to fit inside a 24 px gutter', () => {
   assert.equal(panelWidth(4, 1200), 1152);
   assert.equal(cardWidth(4, 1200), 265);
+});
+
+test('Hi-Fi dresses the picker: THEMES · 4 SOURCES, IN USE: HI-FI, an amber cursor over #3C3836 tiles, a green lamp by IN USE', () => {
+  const l = pickerLook(hifi);
+  const h = l.header(4, 'hi-fi');
+  assert.deepEqual([h.title + h.sub, h.right], ['THEMES · 4 SOURCES', 'IN USE: HI-FI']);
+  assert.equal(l.header(5, 'hi-fi').sub, ' · 5 SOURCES');
+  assert.equal(l.legend(4).map((k) => `${k.key} ${k.word}`).concat([l.esc]).join('  '), 'J K CHOOSE  1–4 JUMP  ↵ APPLY  ESC');
+  assert.deepEqual([l.cursor.border, l.cursor.shadow.kind, l.cursor.shadow.color, l.cursor.ticks], [{ width: 1, color: '#FABD2F' }, 'glow', '#FABD2F', false]);
+  assert.deepEqual(l.tile.border, { width: 1, color: '#3C3836' });
+  const inUse = l.tag(true, false);
+  assert.deepEqual([inUse.text, inUse.lamp, inUse.color], ['IN USE', 'green', '#EBDBB2']);
+  assert.deepEqual([l.tag(false, true).text, l.tag(false, true).color, l.tag(false, true).lamp ?? ''], ['↵ APPLY', '#FABD2F', '']);
+  assert.equal(l.tag(false, false), null);
+});
+
+test('the Hi-fi card is named Hi-fi in Maple Mono 26 px over BRUSHED · AMBER · DIAL', () => {
+  const n = cardName(hifi);
+  assert.deepEqual([n.text, n.font, n.size, n.weight], ['Hi-fi', 'Maple Mono', 26, 400]);
+  assert.equal(tagline(hifi).text, 'BRUSHED · AMBER · DIAL');
+});
+
+test("Hi-Fi's palette strip is its surface, then its bright ANSI 9 to 15", () => {
+  assert.deepEqual(swatches(hifi), ['#282828', '#FB4934', '#B8BB26', '#FABD2F', '#83A598', '#D3869B', '#8EC07C', '#EBDBB2']);
+});
+
+test("Hi-Fi's specimen bar lights the third of four lamps and puts a red lamp before the goal", () => {
+  const m = specimenMargins(hifi);
+  assert.deepEqual(m.lamps.map((w) => w.light), ['unlit', 'unlit', 'lit', 'unlit']);
+  assert.deepEqual([m.number + m.tail, m.goalLamp], ['  FOOT', 'red']);
+  assert.deepEqual([specimenMargins(paper).lamps, specimenMargins(paper).goalLamp], [[], '']);
 });

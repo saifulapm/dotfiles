@@ -64,6 +64,7 @@ Item {
             preview: box(preview),
             swatches: swatches,
             left: leftNumber.text + leftTail.text,
+            lamps: Array.from({ length: lamps.count }, (_, i) => lamps.itemAt(i).light),
             right: rightGoal.text + rightDate.text,
             clock: clock.text,
             terminal: terminal.lines(),
@@ -114,6 +115,22 @@ Item {
                     Row {
                         x: specimen.inset
                         y: 7
+                        // Hi-Fi's pilot lamps, one per workspace, the shown one lit.
+                        Row {
+                            id: lampRow
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 6
+                            Repeater {
+                                id: lamps
+                                model: specimen.margins.lamps
+                                Root.Lamp {
+                                    required property var modelData
+                                    tokens: specimen.tokens
+                                    light: modelData.light
+                                    size: 3
+                                }
+                            }
+                        }
                         Text {
                             id: leftNumber
                             textFormat: Text.PlainText
@@ -137,6 +154,14 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: specimen.inset
                         y: 7
+                        spacing: specimen.margins.goalLamp ? 6 : 0
+                        Root.Lamp {
+                            visible: specimen.margins.goalLamp !== ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            tokens: specimen.tokens
+                            light: specimen.margins.goalLamp || "unlit"
+                            size: 3
+                        }
                         Text {
                             id: rightGoal
                             textFormat: Text.PlainText
@@ -170,23 +195,31 @@ Item {
 
                     Root.Surface {
                         id: chip
+                        visible: !specimen.tokens.type.engraved
                         x: 127
                         y: 5
                         width: 52
                         height: 16
                         tokens: specimen.tokens
                         role: "chip"
+                    }
 
-                        Text {
-                            id: clock
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: specimen.margins.clock
-                            color: chip.style.text
-                            font.family: specimen.tokens.type.mono
-                            font.pixelSize: 8
-                            font.weight: Font.Medium
-                        }
+                    // Hi-Fi's island is a glass display with its clock backlit amber.
+                    Root.Glass {
+                        visible: specimen.tokens.type.engraved === true
+                        anchors.fill: chip
+                        tokens: specimen.tokens.type.engraved ? specimen.tokens : null
+                    }
+
+                    Text {
+                        id: clock
+                        textFormat: Text.PlainText
+                        anchors.centerIn: chip
+                        text: specimen.margins.clock
+                        color: specimen.tokens.type.engraved ? specimen.c.accent : chip.style.text
+                        font.family: specimen.tokens.type.mono
+                        font.pixelSize: 8
+                        font.weight: specimen.tokens.type.engraved ? Font.Bold : Font.Medium
                     }
 
                     Frame {
@@ -308,8 +341,8 @@ Item {
                     height: 10
                     radius: specimen.tokens.primitive.corner === "round" ? 3 : 0
                     color: modelData
-                    // The paper swatch would vanish into a card of the same colour, so it keeps a hairline.
-                    border.width: index === 7 ? 1 : 0
+                    // The paper swatch would vanish into a card of the same colour, so it keeps a hairline; Hi-Fi's surface swatch comes first.
+                    border.width: index === (specimen.tokens.type.engraved ? 0 : 7) ? 1 : 0
                     border.color: specimen.c.line
                 }
             }

@@ -251,6 +251,7 @@ Item {
 
                                 function drawn() {
                                     const a = tile.mapToItem(null, 0, 0);
+                                    const l = tagLamp.mapToItem(null, 0, 0);
                                     return Object.assign({
                                         name: modelData.name,
                                         box: { x: a.x, y: a.y, w: tile.width, h: tile.height },
@@ -259,6 +260,7 @@ Item {
                                         number: number.text,
                                         title: name.text,
                                         tag: tagText.visible ? tagText.text : "",
+                                        lamp: tagLamp.visible ? { light: tagLamp.light, box: { x: l.x, y: l.y, w: tagLamp.width, h: tagLamp.height } } : null,
                                         baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y],
                                         nameRight: name.mapToItem(null, name.width, 0).x,
                                         nameLines: name.lineCount
@@ -360,6 +362,8 @@ Item {
                                         height: 32
                                         readonly property var cardName: Lib.cardName(card.modelData)
                                         readonly property var tagline: Lib.tagline(card.modelData)
+                                        // What the tag and its lamp take from the line's right end.
+                                        readonly property real tagRoom: tagText.visible ? tagText.implicitWidth + 22 + (tagLamp.visible ? tagLamp.width + 6 : 0) : 0
 
                                         Row {
                                             id: captionRow
@@ -379,7 +383,7 @@ Item {
                                                 id: name
                                                 textFormat: Text.PlainText
                                                 // A long name elides inside its card and leaves room for the tag.
-                                                width: Math.min(implicitWidth, parent.parent.width - x - (tagText.visible ? tagText.implicitWidth + 22 : 0))
+                                                width: Math.min(implicitWidth, parent.parent.width - x - parent.parent.tagRoom)
                                                 elide: Text.ElideRight
                                                 text: parent.parent.cardName.text
                                                 color: c.ink
@@ -392,7 +396,7 @@ Item {
                                                 textFormat: Text.PlainText
                                                 anchors.baseline: name.baseline
                                                 // The tag keeps its place; the line gives way before it.
-                                                width: Math.max(0, parent.parent.width - x - (tagText.visible ? tagText.implicitWidth + 22 : 0))
+                                                width: Math.max(0, parent.parent.width - x - parent.parent.tagRoom)
                                                 elide: Text.ElideRight
                                                 text: parent.parent.tagline.text
                                                 color: c.muted
@@ -428,6 +432,16 @@ Item {
                                             font.pixelSize: switcher.look.small.size
                                             font.letterSpacing: switcher.look.small.spacing
                                             font.weight: Font.Medium
+                                        }
+                                        // Hi-Fi marks the theme in use with a green lamp before IN USE, since green is never text there.
+                                        Root.Lamp {
+                                            id: tagLamp
+                                            visible: card.tag?.lamp !== undefined
+                                            anchors.right: tagText.left
+                                            anchors.rightMargin: 6
+                                            anchors.verticalCenter: tagText.verticalCenter
+                                            tokens: switcher.theme.tokens
+                                            light: card.tag?.lamp ?? "unlit"
                                         }
                                     }
                                 }

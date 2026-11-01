@@ -112,13 +112,13 @@ check "blueprint: ACTIVE: BLUEPRINT and [ACTIVE] sit on the header's and the nam
 check "blueprint: the keys are bracketed" state_is '.legend == "[J/K] CHOOSE  [1–4] JUMP  [↵] APPLY  [ESC]"'
 close_picker
 
-# Hi-Fi draws Blueprint's board in its own tokens, without the marks.
+# Hi-Fi draws its receiver's board in its own tokens, without the marks.
 switch hi-fi
 until_ok 3000 status_theme hi-fi
 open_picker
-check "hi-fi: the header reads THEMES // 4 SHEETS, ACTIVE: HI-FI" state_is '.header == ["THEMES // 4 SHEETS", "ACTIVE: HI-FI"]'
-check "hi-fi: the current card shows ACTIVE, bare" state_is '[.cards[].tag] == ["", "", "", "ACTIVE"]'
-check "hi-fi: the keys are bare ($(themes_state | jq -r .legend))" state_is '.legend == "J/K CHOOSE  1–4 JUMP  ↵ APPLY  ESC"'
+check "hi-fi: the header reads THEMES · 4 SOURCES, IN USE: HI-FI" state_is '.header == ["THEMES · 4 SOURCES", "IN USE: HI-FI"]'
+check "hi-fi: the current card shows IN USE after a green lamp" state_is '[.cards[].tag] == ["", "", "", "IN USE"] and .cards[3].lamp.light == "green"'
+check "hi-fi: the keys are bare ($(themes_state | jq -r .legend))" state_is '.legend == "J K CHOOSE  1–4 JUMP  ↵ APPLY  ESC"'
 # Each other card's specimen speaks in its own theme's voice, so only the panel's own words and Hi-Fi's card are read.
 own() { themes_state | jq '{header, legend, tags: [.cards[].tag], hifi: [.cards[] | select(.name == "hi-fi")]}'; }
 check "hi-fi: nothing the panel or Hi-Fi's card reports holds a bracket ($(own | marked | head -3 | paste -sd'|'))" eval '[ -z "$(own | marked)" ]'
