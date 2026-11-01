@@ -149,6 +149,17 @@ export function terminalLines(tokens) {
   ];
 }
 
+// The panel holds up to four cards at 326 px between 22 px sides and 16 px gaps; a fifth card shrinks them instead of widening it, and a screen too narrow for that leaves a 24 px gutter on each side.
+export function panelWidth(n, screenWidth) {
+  const held = Math.min(Math.max(1, n), 4);
+  return Math.min(44 + held * 326 + (held - 1) * 16, screenWidth - 48);
+}
+
+export function cardWidth(n, screenWidth) {
+  const count = Math.max(1, n);
+  return (panelWidth(n, screenWidth) - 44 - (count - 1) * 16) / count;
+}
+
 // The palette strip: ink, ANSI 1 to 6, then the paper.
 export const swatches = (tokens) => [tokens.color.ink, ...tokens.color.ansi.slice(1, 7), tokens.color.paper];
 

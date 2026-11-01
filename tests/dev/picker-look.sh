@@ -152,5 +152,27 @@ check "a 200-character name is cut in its card's terminal line" state_is '.cards
 check "a 200-character name elides inside its card" state_is 'all(.cards[]; (.nameRight | type) == "number" and .nameRight <= .box.x + .box.w)'
 close_picker
 
+# A card is 326 px wide, or the fit when the screen is too narrow; a fifth theme shrinks every card, and none leaves the screen.
+switch paper
+until_ok 3000 status_theme paper
+read -r sw < <(niri msg -j outputs | jq -r 'first(.[]).logical.width')
+open_picker
+equal_fit() {
+  themes_state | jq -e --argjson sw "$sw" '((([44 + 4 * 326 + 3 * 16, $sw - 48] | min) - 92) / 4 | [., 326] | min) as $fit
+    | (.cards | length == 4) and all(.cards[]; (.box.w - $fit | fabs) < 0.5)' >/dev/null
+}
+right_edge() { card_grab paper $(($(card_size paper | cut -d' ' -f1) - 2)) 20 2 4 | vermilion; }
+four_wide() { equal_fit && right_edge ; }
+check "four cards are each min(326, fit) wide, and the cursor card's right edge shows its border" four_wide
+close_picker
+
+jq '. + [.[0] | .name = "fifth"]' "$list" >"$list.new" && mv "$list.new" "$list"
+until_ok 2000 state_is '.themes | length == 5'
+open_picker
+inside() { themes_state | jq -e --argjson sw "$sw" '(.cards | length == 5) and all(.cards[]; .box.w < 326 and .box.x >= 0 and .box.x + .box.w <= $sw)' >/dev/null; }
+five_inside() { inside && right_edge ; }
+check "five cards are each under 326 px and inside the screen, the cursor card's right edge shows its border" five_inside
+close_picker
+
 exit $((fails > 0))
 }

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme } from './theme.mjs';
-import { cards, step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins } from './themes.mjs';
+import { cards, step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins, panelWidth, cardWidth } from './themes.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -157,4 +157,19 @@ test('a forged theme name draws on one line, in the order it is spelt', () => {
 test('a long theme name is cut in the terminal line, so the line fits its window', () => {
   assert.equal(terminalLines({ ...paper, name: 'n'.repeat(200) })[3][1].text, 'nnnnnnnn… on the shelf');
   assert.equal(terminalLines(blueprint)[3][1].text, 'blueprint on the shelf');
+});
+
+test('the picker gives every card 326 px up to four themes on a wide screen', () => {
+  assert.deepEqual([1, 2, 3, 4].map((n) => cardWidth(n, 2048)), [326, 326, 326, 326]);
+  assert.equal(panelWidth(4, 2048), 1396);
+});
+
+test('past four themes the cards shrink and the panel stays at its four-card width', () => {
+  assert.equal(panelWidth(5, 2048), 1396);
+  assert.equal(cardWidth(5, 2048), 257.6);
+});
+
+test('on a narrow screen four cards shrink to fit inside a 24 px gutter', () => {
+  assert.equal(panelWidth(4, 1200), 1152);
+  assert.equal(cardWidth(4, 1200), 265);
 });

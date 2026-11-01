@@ -140,7 +140,7 @@ Item {
             id: panel
             x: Math.round((parent.width - width) / 2)
             y: 140
-            width: 1056
+            width: Lib.panelWidth(switcher.themes.length, parent.width)
             height: column.implicitHeight
             tokens: switcher.theme.tokens
             label: "Themes"
@@ -209,8 +209,8 @@ Item {
                         x: 22
                         y: 18
                         spacing: 16
-                        // n cards share the panel's width; past three the specimens shrink to fit.
-                        readonly property real cardWidth: (column.width - 44 - (cardList.count - 1) * spacing) / Math.max(1, cardList.count)
+                        // n cards share the panel's width: 326 px each up to four, then smaller.
+                        readonly property real cardWidth: Lib.cardWidth(switcher.themes.length, panel.parent.width)
 
                         // Each card as drawn, in list order.
                         function drawn() {
