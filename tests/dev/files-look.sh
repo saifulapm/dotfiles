@@ -92,7 +92,7 @@ lit_counts() {
       for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (Math.abs(px[i] - r) <= 12 && Math.abs(px[i + 1] - g) <= 12 && Math.abs(px[i + 2] - bl) <= 12) n++;
       return n;
     };
-    console.log(near(0xfa, 0xbd, 0x2f), near(0x28, 0x28, 0x28));
+    console.log(near(0xfa, 0xbd, 0x2f), near(0x41, 0x3a, 0x29));
   '
 }
 placed() { niri msg -j windows | jq -e '.[] | select(.app_id == "files") | .layout.tile_pos_in_workspace_view != null' >/dev/null; }
@@ -106,8 +106,8 @@ check "hi-fi: Files lists [draft].md under its own name ($(files_state | jq -c .
 check "hi-fi: its row draws [draft].md with its brackets" bash -c 'files_row=$1; jq -e ".name == \"[draft].md\"" <<<"$files_row" >/dev/null' _ "$(files_call row '[draft].md')"
 check "hi-fi: the key strip starts J/K MOVE ($(files_state | jq -c .strip))" files_is '.strip.key == "J/K" and .strip.word == "MOVE" and .head.chip == "MOD+Y"'
 check "hi-fi: nothing Files reports holds a bracket but a file name ($(files_state | marked | grep -vxF '[draft].md' | head -3 | paste -sd'|'))" eval '[ -z "$(files_state | marked | grep -vxF "[draft].md")" ]'
-read -r amber charcoal <<<"$(lit_counts)"
-check "hi-fi: the lit row draws amber #FABD2F and charcoal #282828 ($amber and $charcoal pixels)" test "${amber:-0}" -ge 10 -a "${charcoal:-0}" -ge 10
+read -r amber backlit <<<"$(lit_counts)"
+check "hi-fi: the lit row draws amber #FABD2F on its backlit #413A29 ($amber and $backlit pixels)" test "${amber:-0}" -ge 10 -a "${backlit:-0}" -ge 10
 wtype -k Escape
 until_ok 3000 files_gone
 in_theme paper

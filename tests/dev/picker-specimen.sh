@@ -86,8 +86,8 @@ for name in paper artboard blueprint hi-fi; do
   check "$name: its eight swatches are its palette strip (${colours[*]})" test "$swatch_ok" = 0
   check "$name: its terminal draws four lines" test "$(jq '.terminal | length' <<<"$card")" = 4
 done
-check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~, [03] FOOT — ~ and Hi-Fi's FOOT" \
-  state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~", "  FOOT"]'
+check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~, [03] FOOT — ~ and Hi-Fi's 03  FOOT" \
+  state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~", "03  FOOT"]'
 check "hi-fi: its card's bar lights one lamp, the shown workspace's" state_is '.cards[3].lamps == ["lit"]'
 
 wtype -k Escape
