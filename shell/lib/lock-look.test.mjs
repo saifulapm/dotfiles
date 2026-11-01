@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { validateTheme } from './theme.mjs';
+import { validateTheme, checkTokens } from './theme.mjs';
 import { lockLook } from './lock-look.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
@@ -41,8 +41,21 @@ test('Blueprint: a hollow 200 px clock outlined in the accent, the date on a dim
   });
 });
 
+test('Hi-Fi: the receiver front, the machine named over a dial with a 160 px amber clock', () => {
+  assert.deepEqual(lockLook(checkTokens(load('hi-fi')), 'saiful', 'macbook-m2'), {
+    kind: 'receiver',
+    status: { text: 'LOCKED', color: '#EBDBB2' },
+    host: 'MACBOOK-M2 · STEREO RECEIVER',
+    clock: { family: 'Maple Mono', px: 160, bold: false, tracking: 3.2, fill: '#FABD2F', stroke: 'transparent', glow: '#FABD2F' },
+    date: { format: 'dddd · d MMMM', caps: true, family: 'Maple Mono', px: 12, italic: false, tracking: 3.6, color: '#EBDBB2' },
+    prompt: 'PASSWORD FOR SAIFUL',
+    hint: '↵ UNLOCK',
+    fieldMarks: [],
+  });
+});
+
 test('before the theme loads, the lock still draws a white clock on black', () => {
-  const look = lockLook(null, 'saiful');
+  const look = lockLook(null, 'saiful', 'macbook-m2');
   assert.equal(look.kind, 'print');
   assert.deepEqual([look.clock.fill, look.clock.px, look.prompt], ['white', 220, 'PASSWORD FOR SAIFUL']);
 });

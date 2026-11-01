@@ -49,9 +49,9 @@ test('the Hi-Fi margins read Blueprint\'s words with no brackets; Blueprint keep
   assert.deepEqual(blueprint.marks([2, 5, 7, 9]).map((s) => s.text), ['   [!02][!05][!07][+1]']);
 });
 
-test('the Hi-Fi lock draws Blueprint\'s sheet, its status and hint bare', () => {
+test('the Hi-Fi lock draws its own receiver, its status and hint bare', () => {
   const l = lockLook(shell('hi-fi'), 'saiful');
-  assert.equal(l.kind, 'sheet');
+  assert.equal(l.kind, 'receiver');
   assert.equal(l.status.text, 'LOCKED');
   assert.equal(l.hint, '↵ UNLOCK');
   const b = lockLook(shell('blueprint'), 'saiful');

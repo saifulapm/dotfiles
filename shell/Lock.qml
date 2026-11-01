@@ -2,11 +2,15 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.Pam
+import Quickshell.Services.UPower
 import QtQuick
+import QtQuick.Effects
 import "." as Root
 import "services" as Services
 import "lib/lock-look.mjs" as L
 import "lib/lease.mjs" as Lease
+import "lib/hifi.mjs" as H
+import "lib/margins.mjs" as M
 
 // The session lock: a WlSessionLock cannot live in the Overlay host, so it is the one surface outside it.
 Scope {
@@ -37,9 +41,13 @@ Scope {
     // A shell restarted while locked may start before the theme loads, and the lock must draw anyway.
     readonly property var c: theme.tokens ? theme.color : L.FALLBACK
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({ display: "", ui: "" })
-    readonly property var look: L.lockLook(theme.tokens, Quickshell.env("USER") || "")
+    // hostFile loads after start, and text() alone gives the binding nothing to follow, so loaded makes it read again.
+    readonly property var look: L.lockLook(theme.tokens, Quickshell.env("USER") || "", hostFile.loaded ? hostFile.text().trim() : "")
     // The clock a lock surface drew last, so state() reports what is on screen rather than the lookup.
     property Item clockItem: null
+    property Item dialItem: null
+    // Hi-Fi's top row reads the words the margins show; the desk's Power service is not made here, so its low-battery notice is not sent twice.
+    readonly property string meter: [network.wifi, UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && UPower.displayDevice.isPresent ? M.batteryText(UPower.displayDevice.percentage, UPower.displayDevice.state === UPowerDeviceState.Charging) : ""].filter(w => w !== "").join(" ").toUpperCase()
     // just dev points this at a fake, so no check messages the phone.
     readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/../bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
@@ -126,6 +134,8 @@ Scope {
     function stateText() {
         const t = clockItem;
         const p = t ? t.mapToItem(null, 0, 0) : null;
+        const d = dialItem && dialItem.visible ? dialItem : null;
+        const q = d ? d.mapToItem(null, 0, 0) : null;
         return JSON.stringify({
             locked: session.locked,
             secure: session.secure,
@@ -137,12 +147,14 @@ Scope {
             failures: failures,
             shaking: shake.running,
             look: look.kind,
+            host: look.host ?? "",
             fieldMarks: look.fieldMarks ?? [],
             clockFamily: t ? t.font.family : "",
             clockPx: t ? t.font.pixelSize : 0,
             clockFill: t ? String(t.color) : "",
             clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
-            clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null
+            clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null,
+            dialBox: d ? { x: q.x, y: q.y, w: d.width, h: d.height } : null
         });
     }
 
@@ -237,11 +249,15 @@ Scope {
         NumberAnimation { target: screenLock; property: "shakeX"; to: 0; duration: 60 }
     }
 
-    // Blueprint's sheet caption names the machine, like a drawing's title block.
+    // Blueprint's sheet caption names the machine, like a drawing's title block, and so does Hi-Fi's receiver front.
     FileView {
         id: hostFile
         path: "/etc/hostname"
         printErrors: false
+    }
+
+    Services.Network {
+        id: network
     }
 
     WlSessionLock {
@@ -262,9 +278,43 @@ Scope {
                 id: clock
             }
 
+            // Hi-Fi's walnut cheeks, a dark grain line every 9 px and a faint light one between.
+            Repeater {
+                model: surface.kind === "receiver" ? 2 : 0
+
+                Rectangle {
+                    required property int index
+                    x: index === 0 ? 0 : surface.width - 32
+                    width: 32
+                    height: surface.height
+                    color: H.HIFI.walnut
+
+                    Repeater {
+                        model: 7
+
+                        Rectangle {
+                            required property int index
+                            x: index % 2 === 0 ? index / 2 * 9 : (index - 1) / 2 * 9 + 5
+                            width: 1
+                            height: parent.height
+                            color: index % 2 === 0 ? Qt.alpha("black", 0.2) : Qt.alpha(screenLock.c.ink, 0.04)
+                        }
+                    }
+                }
+            }
+
+            Root.Lamp {
+                visible: surface.kind === "receiver"
+                tokens: screenLock.theme.tokens
+                light: "red"
+                x: 56
+                y: Math.round(statusText.y + (statusText.height - height) / 2)
+            }
+
             Text {
+                id: statusText
                 textFormat: Text.PlainText
-                x: 32
+                x: surface.kind === "receiver" ? 69 : 32
                 y: 16
                 text: surface.look.status.text
                 color: surface.look.status.color
@@ -272,6 +322,114 @@ Scope {
                 font.pixelSize: surface.kind === "card" ? 12 : 11
                 font.weight: surface.kind === "card" ? Font.DemiBold : Font.Normal
                 font.letterSpacing: surface.kind === "card" ? 0 : 1.32
+            }
+
+            Text {
+                visible: surface.kind === "receiver"
+                textFormat: Text.PlainText
+                anchors.right: parent.right
+                anchors.rightMargin: 56
+                y: 16
+                text: screenLock.meter
+                color: screenLock.c.muted
+                font.family: screenLock.fonts.ui
+                font.pixelSize: 11
+                font.letterSpacing: 1.32
+            }
+
+            // Hi-Fi's dial window: the machine's name over it, a tuning scale and the clock lit inside it.
+            Text {
+                visible: surface.kind === "receiver"
+                textFormat: Text.PlainText
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: dial.y - 38
+                text: surface.look.host ?? ""
+                color: screenLock.c.muted
+                font.family: screenLock.fonts.ui
+                font.pixelSize: 11
+                font.letterSpacing: 3.3
+            }
+
+            Root.Glass {
+                id: dial
+                visible: surface.kind === "receiver"
+                tokens: screenLock.theme.tokens
+                x: Math.round((surface.width - width) / 2)
+                y: Math.round(surface.height * 0.167)
+                width: 960
+                height: 320
+                Component.onCompleted: screenLock.dialItem = dial
+
+                Repeater {
+                    model: ["88", "92", "96", "100", "104", "108"]
+
+                    Text {
+                        required property string modelData
+                        required property int index
+                        textFormat: Text.PlainText
+                        x: 60 + index * (840 - width) / 5
+                        y: 24
+                        text: modelData
+                        color: screenLock.c.muted
+                        font.family: screenLock.fonts.ui
+                        font.pixelSize: 11
+                        font.letterSpacing: 1.32
+                    }
+                }
+
+                Root.TuningScale {
+                    tokens: screenLock.theme.tokens
+                    x: 60
+                    y: 48
+                    width: 840
+                    at: 0.64
+                }
+            }
+
+            // Hi-Fi's knobs either side of the password field.
+            Repeater {
+                model: surface.kind === "receiver" ? ["TUNING", "VOLUME"] : []
+
+                Column {
+                    required property string modelData
+                    required property int index
+                    x: Math.round(surface.width / 2 + (index === 0 ? -398 : 398) - width / 2)
+                    y: entry.y
+                    spacing: 12
+
+                    Rectangle {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 80
+                        height: 80
+                        radius: 40
+                        color: screenLock.c.surface ?? screenLock.c.paper
+                        border.width: 1
+                        border.color: screenLock.c.line ?? screenLock.c.muted
+
+                        Item {
+                            anchors.fill: parent
+                            rotation: index === 0 ? -50 : 18
+
+                            Rectangle {
+                                x: 39
+                                y: 8
+                                width: 2
+                                height: 16
+                                color: screenLock.c.ink
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: modelData
+                        color: screenLock.c.muted
+                        font.family: screenLock.fonts.ui
+                        font.pixelSize: 10
+                        font.letterSpacing: 2
+                    }
+                }
             }
 
             // Paper's running head: a ruled line under the status row.
@@ -328,7 +486,7 @@ Scope {
             Column {
                 id: face
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: surface.kind === "card" ? card.y + 36 : Math.round(surface.height * (surface.kind === "sheet" ? 0.22 : 0.167))
+                y: surface.kind === "card" ? card.y + 36 : surface.kind === "receiver" ? dial.y + 68 : Math.round(surface.height * (surface.kind === "sheet" ? 0.22 : 0.167))
                 spacing: surface.kind === "sheet" ? 18 : 4
 
                 Text {
@@ -356,11 +514,22 @@ Scope {
                     font.pixelSize: surface.look.clock.px
                     font.bold: surface.look.clock.bold
                     font.letterSpacing: surface.look.clock.tracking
+                    // Hi-Fi's clock glows like a lit display; the layer is made only for a look that asks for it.
+                    layer.enabled: (surface.look.clock.glow ?? "") !== ""
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: surface.look.clock.glow || "transparent"
+                        shadowOpacity: 0.45
+                        shadowBlur: 1
+                        blurMax: 18
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                     Component.onCompleted: screenLock.clockItem = clockText
                 }
 
                 Text {
-                    visible: surface.kind === "print"
+                    visible: surface.kind === "print" || surface.kind === "receiver"
                     textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: surface.date
@@ -368,6 +537,7 @@ Scope {
                     font.family: surface.look.date.family
                     font.italic: surface.look.date.italic
                     font.pixelSize: surface.look.date.px
+                    font.letterSpacing: surface.look.date.tracking
                 }
 
                 // Blueprint's dimension line: end ticks, a rule each side and the date in the middle.
@@ -421,9 +591,9 @@ Scope {
                 id: entry
                 readonly property bool centred: surface.kind !== "print"
                 x: Math.round((surface.width - width) / 2) + screenLock.shakeX
-                y: surface.kind === "card" ? face.y + face.height + 22 : Math.round(surface.height * (surface.kind === "sheet" ? 0.71 : 0.69))
+                y: surface.kind === "card" ? face.y + face.height + 22 : surface.kind === "receiver" ? dial.y + dial.height + 90 : Math.round(surface.height * (surface.kind === "sheet" ? 0.71 : 0.69))
                 width: surface.kind === "card" ? 380 : 400
-                spacing: surface.kind === "sheet" ? 12 : 10
+                spacing: surface.kind === "sheet" || surface.kind === "receiver" ? 12 : 10
 
                 Text {
                     visible: surface.look.prompt !== ""
@@ -434,12 +604,21 @@ Scope {
                     color: screenLock.c.muted
                     font.family: screenLock.fonts.ui
                     font.pixelSize: 10
-                    font.letterSpacing: surface.kind === "sheet" ? 2 : 1.6
+                    font.letterSpacing: surface.kind === "sheet" || surface.kind === "receiver" ? 2 : 1.6
                 }
 
                 Item {
                     width: parent.width
-                    height: surface.kind === "card" ? 46 : input.implicitHeight
+                    height: surface.kind === "card" ? 46 : surface.kind === "receiver" ? 48 : input.implicitHeight
+
+                    // Hi-Fi's field is a glass well.
+                    Root.Glass {
+                        visible: surface.kind === "receiver"
+                        tokens: screenLock.theme.tokens
+                        anchors.centerIn: parent
+                        width: 320
+                        height: 48
+                    }
 
                     // Artboard's field: a tinted rounded well with a 2 px accent ring.
                     Rectangle {
@@ -471,17 +650,17 @@ Scope {
                     TextInput {
                         id: input
                         anchors.centerIn: parent
-                        width: surface.kind === "sheet" ? 240 : surface.kind === "card" ? parent.width - 32 : parent.width
+                        width: surface.kind === "sheet" || surface.kind === "receiver" ? 240 : surface.kind === "card" ? parent.width - 32 : parent.width
                         horizontalAlignment: entry.centred ? TextInput.AlignHCenter : TextInput.AlignLeft
-                        color: surface.kind === "sheet" ? screenLock.c.accent : screenLock.c.ink
+                        color: surface.kind === "sheet" || surface.kind === "receiver" ? screenLock.c.accent : screenLock.c.ink
                         font.family: screenLock.fonts.ui
                         font.pixelSize: surface.kind === "card" ? 16 : 20
                         font.letterSpacing: surface.kind === "card" ? 4.8 : 7
                         echoMode: TextInput.Password
                         inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
-                        // Blueprint's cursor is a block, the others a 2 px bar.
+                        // Blueprint's and Hi-Fi's cursor is a block, the others a 2 px bar.
                         cursorDelegate: Rectangle {
-                            width: surface.kind === "sheet" ? 11 : 2
+                            width: surface.kind === "sheet" ? 11 : surface.kind === "receiver" ? 9 : 2
                             color: screenLock.c.accent
                         }
                         focus: true
@@ -521,7 +700,7 @@ Scope {
                     font.family: surface.kind === "print" ? screenLock.fonts.display : screenLock.fonts.ui
                     font.italic: surface.kind === "print"
                     font.pixelSize: surface.kind === "print" ? 16 : surface.kind === "card" ? 12 : 10
-                    font.letterSpacing: surface.kind === "sheet" ? 1.6 : 0
+                    font.letterSpacing: surface.kind === "sheet" ? 1.6 : surface.kind === "receiver" ? 2 : 0
                 }
             }
         }

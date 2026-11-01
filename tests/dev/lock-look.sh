@@ -79,7 +79,7 @@ unlock
 check "blueprint: the test password unlocks" unlocked
 
 lock_in hi-fi
-check "hi-fi: the lock draws Blueprint's sheet, not Paper's print ($(lock_state | jq -r .look))" state_is '.look == "sheet"'
+check "hi-fi: the lock draws its receiver front, not Blueprint's sheet ($(lock_state | jq -r .look))" state_is '.look == "receiver"'
 check "hi-fi: the password field has no brackets around it ($(lock_state | jq -c .fieldMarks))" state_is '.fieldMarks == []'
 unlock
 check "hi-fi: the test password unlocks" unlocked

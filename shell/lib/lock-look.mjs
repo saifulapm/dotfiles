@@ -1,11 +1,9 @@
-// How the lock screen draws under a token set, from its frame primitive, as the three lock designs do.
-
-import { mark } from './voice.mjs';
+// How the lock screen draws under a token set, from its frame primitive, as the four lock designs do.
 
 // Lock.qml draws before the theme loads after a crash, so it needs colours of its own.
 export const FALLBACK = { paper: 'black', ink: 'white', muted: 'gray', accent: 'white', danger: 'white' };
 
-export function lockLook(tokens, user) {
+export function lockLook(tokens, user, host = '') {
   const c = tokens ? tokens.color : FALLBACK;
   const t = tokens ? tokens.type : { display: '', ui: '' };
   const frame = tokens ? tokens.primitive.frame : 'ink';
@@ -21,17 +19,29 @@ export function lockLook(tokens, user) {
       hint: `Password for ${user} · ↵ to unlock`,
     };
   }
-  // Blueprint: a drawing sheet with a hollow clock and the date on a dimension line; Hi-Fi's engraved voice draws it too, without the marks.
-  const engraved = tokens ? tokens.type.engraved === true : false;
-  if (frame === 'glow' || engraved) {
+  // Hi-Fi: a stereo receiver's front panel named after the machine, the clock lit amber in its glass dial; red shows only as the lamp before LOCKED.
+  if (tokens && tokens.type.engraved === true) {
+    return {
+      kind: 'receiver',
+      status: { text: 'LOCKED', color: c.ink },
+      host: `${host.toUpperCase()} · STEREO RECEIVER`,
+      clock: { family: t.display, px: 160, bold: false, tracking: 3.2, fill: c.accent, stroke: 'transparent', glow: c.accent },
+      date: { format: 'dddd · d MMMM', caps: true, family: t.ui, px: 12, italic: false, tracking: 3.6, color: c.ink },
+      prompt,
+      hint: '↵ UNLOCK',
+      fieldMarks: [],
+    };
+  }
+  // Blueprint: a drawing sheet with a hollow clock and the date on a dimension line.
+  if (frame === 'glow') {
     return {
       kind: 'sheet',
-      status: { text: mark(engraved, 'LOCKED'), color: c.danger },
+      status: { text: '[LOCKED]', color: c.danger },
       clock: { family: t.display, px: 200, bold: true, tracking: -4, fill: 'transparent', stroke: c.accent },
       date: { format: 'yyyy-MM-dd · dddd', caps: true, family: t.ui, px: 11, italic: false, tracking: 2.2, color: c.accent },
       prompt,
-      hint: `${mark(engraved, '↵')} UNLOCK`,
-      fieldMarks: engraved ? [] : ['[', ']'],
+      hint: '[↵] UNLOCK',
+      fieldMarks: ['[', ']'],
     };
   }
   // Paper: a printed page, a large serif clock over an italic date.
