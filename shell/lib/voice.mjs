@@ -581,6 +581,9 @@ export function osdLook(tokens) {
 
 const MONDAY_FIRST = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+// The resting clock's text: Hi-Fi lights it amber with a glow, as its picker card draws it; empty keeps the island's own text colour.
+export const restLook = (tokens) => (tokens?.type.engraved === true ? { color: tokens.color.accent, glow: tokens.color.accent } : { color: '', glow: '' });
+
 // How the calendar card's city column reads, as each m24 board draws it beside the month: home first and large with its mark (Paper's boxed HOME), then a rule above each city. place puts the offset beside the city's name, under it or at the row's right; the day word always sits under the name. A colour left empty is the island's own text colour.
 export function clockLook(tokens) {
   const c = (tokens || UNTHEMED).color;

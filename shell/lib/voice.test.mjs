@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
+import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, restLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -369,6 +369,11 @@ test("Hi-Fi marks an urgent workspace after the title as a red lamp and its mute
   ]);
   assert.deepEqual(h.marks([2, 3, 5, 7, 9]).map((m) => [m.text, m.lamp]), [['02', 'red'], ['03', 'red'], ['05', 'red'], ['+2', '']]);
   assert.deepEqual(h.marks([]), []);
+});
+
+test("Hi-Fi's resting clock is lit amber with a glow on its glass; the other themes keep the island's own text colour", () => {
+  assert.deepEqual(restLook(checkTokens(validateTheme(theme('hi-fi')))), { color: '#FABD2F', glow: '#FABD2F' });
+  for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual(restLook(checkTokens(validateTheme(theme(n)))), { color: '', glow: '' }, n);
 });
 
 test("Hi-Fi's bar reads the app in ink and the path in muted caps, the goal in ink after a red lamp, and the date as SUN 1 NOV", () => {

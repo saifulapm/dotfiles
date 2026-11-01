@@ -38,6 +38,7 @@ PanelWindow {
     // Home first, then UTC, London and New York, each {city, time, offset, day, home}; empty until dots-zones answers.
     readonly property var cities: zones.answer ? W.cityRows(clock.now.getTime(), zones.answer) : []
     readonly property var clockLook: V.clockLook(theme.tokens)
+    readonly property var restLook: V.restLook(theme.tokens)
     readonly property var notification: notifs.current
     readonly property real recordingSince: Root.State.recordingSince
     // Bumped each second while a recording runs, so its counter moves.
@@ -1070,10 +1071,22 @@ PanelWindow {
                     width: Math.min(implicitWidth, parent.width - 28)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
-                    color: box.style.text
+                    // Hi-Fi's clock glows amber on its glass, like a lit dial.
+                    readonly property bool lit: island.mode === "rest" && island.restLook.color !== ""
+                    color: lit ? island.restLook.color : box.style.text
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
                     font.weight: Font.Medium
+                    layer.enabled: lit
+                    layer.effect: MultiEffect {
+                        shadowEnabled: true
+                        shadowColor: island.restLook.glow || "transparent"
+                        shadowOpacity: 0.35
+                        shadowBlur: 0.6
+                        blurMax: 16
+                        shadowHorizontalOffset: 0
+                        shadowVerticalOffset: 0
+                    }
                 }
             }
 
