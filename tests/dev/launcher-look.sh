@@ -92,7 +92,7 @@ check "blueprint: after Tab the block caret is gone" caret_off
 in_theme hi-fi
 no_marks() { [ -n "$(launcher_state)" ] && [ -z "$(launcher_state | marked)" ]; }
 check "hi-fi: nothing the launcher reports holds a bracket ($(launcher_state | marked | head -3 | paste -sd'|'))" no_marks
-check "hi-fi: the header still reads Blueprint's LAUNCH // APPS ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH // APPS"'
+check "hi-fi: the header reads LAUNCH · APPS ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH · APPS"'
 in_theme blueprint
 wtype /
 until_ok 2000 caret_on
@@ -155,6 +155,32 @@ open_launcher
 wtype "w "
 until_ok 3000 state_is '.mode == "windows" and (.results | length) >= 1'
 check "artboard: a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
+close_launcher
+
+# Hi-Fi lights its cursor row like a lamp: the name amber on #32302F, and the lamp moves with j.
+name_geo() { launcher_state | jq -r '.cursorNameBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"'; }
+# The 3 px square at the centre of row $1's 7 px lamp.
+lamp_geo() { launcher_state | jq -r --argjson i "$1" '.lampBoxes[$i] | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
+in_theme hi-fi
+open_launcher
+wtype fo
+until_ok 3000 state_is '.query == "fo" and .cursorName != null'
+# The nested session's app list has four apps matching fo, so the count reads 4, not the board's 3.
+check "hi-fi: the header reads LAUNCH · APPS, 4 MATCHES and the cursor row FOOT ($(launcher_state | jq -c '[.header, .countText, .cursorName]'))" state_is '.header == "LAUNCH · APPS" and .countText == "4 MATCHES" and .cursorName == "FOOT"'
+check "hi-fi: the legend reads the five prefixes and J K · ↵ · ESC ($(launcher_state | jq -c .legend))" state_is '.legend == "W WINDOWS  V CLIPBOARD  : EMOJI  = CALC  > COMMANDS  J K · ↵ · ESC"'
+name_amber=$(near "$(name_geo)" 250 189 47 12)
+name_fill=$(near "$(name_geo)" 50 48 47 3)
+check "hi-fi: the cursor row's name draws #FABD2F ($name_amber px) on #32302F ($name_fill px)" test "$name_amber" -gt 20 -a "$name_fill" -gt 500
+lit=$(near "$(lamp_geo 0)" 250 189 47 12)
+check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
+check "hi-fi: the state lights the first row's lamp ($(launcher_state | jq -c .lampLit))" state_is '.lampLit == 0'
+wtype -k Tab
+wtype j
+until_ok 2000 state_is '.selected == 1 and .lampLit == 1'
+check "hi-fi: j moves the lit lamp to the second row ($(launcher_state | jq -c '[.selected, .lampLit]'))" state_is '.selected == 1 and .lampLit == 1'
+second=$(near "$(lamp_geo 1)" 250 189 47 12)
+first=$(near "$(lamp_geo 0)" 60 56 54 6)
+check "hi-fi: the second row's lamp reads amber ($second of 9 px) and the first goes back to #3C3836 ($first of 9 px)" test "$second" -eq 9 -a "$first" -eq 9
 close_launcher
 
 in_theme paper

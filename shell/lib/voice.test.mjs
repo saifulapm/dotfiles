@@ -5,7 +5,6 @@ import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
 import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
-import { checkTokens, validateTheme } from './theme.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const look = (name) => launcherLook(theme(name));

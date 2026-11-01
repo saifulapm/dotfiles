@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
 import "." as Root
+import "lib/hifi.mjs" as H
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
@@ -170,7 +171,15 @@ Item {
         const box = cur ? cur.box : null;
         const p = box ? box.mapToItem(null, 0, 0) : null;
         const q = input.mapToItem(null, 0, 0);
+        const nameBox = cur ? cur.nameText : null;
+        const n = nameBox ? nameBox.mapToItem(null, 0, 0) : null;
+        const lampAt = i => {
+            const l = rowRepeater.itemAt(i)?.lampItem;
+            const m = l ? l.mapToItem(null, 0, 0) : null;
+            return m ? { x: m.x, y: m.y, w: l.width, h: l.height } : null;
+        };
         return JSON.stringify({
+            header: header.text,
             open: shown,
             mode: mode,
             query: query,
@@ -190,7 +199,11 @@ Item {
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
             countText: (look.label.kind === "header" ? headerCount : chipCount).text,
-            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : r.icon || r.glyph || "tile"),
+            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : look.slot === "lamp" ? "lamp" : r.icon || r.glyph || "tile"),
+            cursorName: nameBox ? nameBox.text : null,
+            cursorNameBox: n ? { x: n.x, y: n.y, w: nameBox.width, h: nameBox.height } : null,
+            lampLit: rows.findIndex((r, i) => rowRepeater.itemAt(i)?.lampLit),
+            lampBoxes: rows.map((r, i) => lampAt(i)),
             cursorFill: box ? String(box.color) : null,
             cursorBox: box ? { x: p.x, y: p.y, w: box.width, h: box.height } : null,
             cursorElided: cur ? cur.elided : null,
@@ -292,7 +305,8 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.alpha(c.paper, card.style.wash)
+            // Hi-Fi dims the desktop under its glass colour at 74 %.
+            color: look.slot === "lamp" ? Qt.alpha(launcher.theme.tokens.color.glass, 0.74) : Qt.alpha(c.paper, card.style.wash)
         }
 
         Root.Surface {
@@ -304,6 +318,26 @@ Item {
             tokens: launcher.theme.tokens
             label: "Launcher"
             motion: launcher.motion
+
+            // Hi-Fi's surface has a 1 px top highlight of ink under its frame.
+            Rectangle {
+                visible: look.slot === "lamp"
+                x: 1
+                y: 1
+                width: column.width - 2
+                height: 1
+                color: look.slot === "lamp" ? H.glass(launcher.theme.tokens).highlight : "transparent"
+            }
+
+            // Hi-Fi's field is a glass well around the prompt and the query.
+            Root.Glass {
+                visible: launcher.look.slot === "lamp"
+                tokens: launcher.look.slot === "lamp" ? launcher.theme.tokens : null
+                x: field.x - 10
+                y: field.y - 6
+                width: field.width + 20
+                height: field.height + 12
+            }
 
             ColumnLayout {
                 id: column
@@ -340,6 +374,7 @@ Item {
                 }
 
                 RowLayout {
+                    id: field
                     Layout.fillWidth: true
                     Layout.leftMargin: look.voice === "plain" ? 18 : look.voice === "bracket" ? 22 : 20
                     Layout.rightMargin: Layout.leftMargin
@@ -515,6 +550,9 @@ Item {
                                 readonly property string keyText: keyChip.visible ? keyLabel.text : ""
                                 readonly property string headText: modelData.head ? headLabel.text : ""
                                 readonly property Item box: rowBox
+                                readonly property Item nameText: title
+                                readonly property Item lampItem: rowLamp
+                                readonly property bool lampLit: rowLamp.visible && rowLamp.light === "lit"
                                 width: list.width
 
                                 RowLayout {
@@ -560,8 +598,20 @@ Item {
                                     anchors.rightMargin: anchors.leftMargin
                                     spacing: look.voice === "plain" ? 12 : 14
 
+                                    // Hi-Fi's row lamp, lit on the cursor row.
+                                    Root.Lamp {
+                                        id: rowLamp
+                                        visible: launcher.look.slot === "lamp"
+                                        tokens: launcher.theme.tokens
+                                        light: current ? "lit" : "unlit"
+                                        size: 7
+                                        Layout.alignment: Qt.AlignVCenter
+                                        Layout.preferredWidth: size
+                                        Layout.preferredHeight: size
+                                    }
+
                                     Text {
-                                        visible: look.slot !== "icon"
+                                        visible: look.slot === "number" || look.slot === "marker"
                                         textFormat: Text.PlainText
                                         text: look.slot === "number" ? look.number(index) : "▸"
                                         color: look.slot === "number" ? (current ? look.cursor.text : c.muted) : current ? look.cursor.marker : "transparent"
