@@ -520,6 +520,28 @@ export function osdLook(tokens) {
     litCount: (v) => Math.round(Math.max(0, Math.min(100, v)) / 5),
     word: (kind) => (kind === 'brightness' ? 'BRT' : 'VOL'),
     valueText: (v) => String(v),
+    kind: () => 'bar',
+    meter: null,
+  };
+  // Hi-Fi's VU meter as its launcher board draws it: a 100 px dial over a 26 px strip, the arc's pivot 170 px down the dial so only the top 90 degrees show. The needle points -45 degrees from upright at 0 and +45 at 100, and pins there above 100, which PipeWire allows up to 150.
+  const meter = {
+    width: 320,
+    height: 128,
+    dial: 100,
+    pivot: { x: 160, y: 170 },
+    radius: 120,
+    ticks: 11,
+    red: 90,
+    labels: [0, 50, 100],
+    angle: (v) => Math.round((-45 + 0.9 * Math.max(0, Math.min(100, v))) * 10) / 10,
+    word: 'VOLUME',
+    valueText: (v) => String(v),
+    scale: { color: c.muted, font: t.mono, size: 9 },
+    redColor: c.danger,
+    needle: { length: 112, width: 1.5, color: c.accent },
+    strip: { height: 26, fill: c.paper },
+    label: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
+    value: { font: t.mono, size: 12, weight: 700, spacing: 1, color: c.accent },
   };
   if (voice === 'plain') {
     return Object.assign(base, {
@@ -542,6 +564,8 @@ export function osdLook(tokens) {
       valueText: (v) => String(v).padStart(3, '0'),
       value: { font: t.mono, size: 12, weight: 700, color: c.accent },
       label: { font: t.mono, size: 12, spacing: 1.7, color: c.muted },
+      kind: (k) => (t.engraved === true && k === 'volume' ? 'meter' : 'bar'),
+      meter: t.engraved === true ? meter : null,
     });
   }
   return Object.assign(base, {

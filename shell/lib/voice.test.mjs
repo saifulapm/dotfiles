@@ -189,6 +189,20 @@ test("Paper's OSD reads VOL, 20 accent bars and the value in serif; Artboard's d
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => [osd(n).width, osd(n).height]), [[280, 34], [300, 40], [320, 34]]);
 });
 
+test("Hi-Fi's volume OSD is a 320 px VU meter whose needle swings from -45 at 0 to +45 at 100 and pins there; brightness keeps the bar", () => {
+  const h = osdLook(checkTokens(validateTheme(theme('hi-fi'))));
+  assert.deepEqual([h.kind('volume'), h.kind('brightness'), h.meter.width], ['meter', 'bar', 320]);
+  assert.deepEqual([62, 100, 120, 0, 95].map((v) => h.meter.angle(v)), [10.8, 45, 45, -45, 40.5]);
+  assert.deepEqual([h.meter.valueText(62), h.meter.valueText(120), h.meter.word], ['62', '120', 'VOLUME']);
+  // The red zone runs from the 90 mark to the end of the arc, and 95 sits inside it.
+  assert.deepEqual([h.meter.red, h.meter.angle(h.meter.red) <= h.meter.angle(95)], [90, true]);
+  assert.deepEqual([h.meter.needle.color, h.meter.redColor, h.meter.ticks], ['#FABD2F', '#FB4934', 11]);
+});
+
+test('the other themes keep their bar OSD for volume and brightness alike', () => {
+  for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual([osd(n).kind('volume'), osd(n).kind('brightness'), osd(n).meter], ['bar', 'bar', null], n);
+});
+
 const OCR = { kind: 'ocr', title: 'Text copied', detail: '214 characters', swatch: null };
 const COLOUR = { kind: 'colour', title: 'Copied', detail: '#C8381E', swatch: '#C8381E' };
 const QR = { kind: 'qr', title: 'QR code copied', detail: '', swatch: null };

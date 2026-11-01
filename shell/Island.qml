@@ -175,6 +175,8 @@ PanelWindow {
     readonly property bool noteHeld: mode === "notification" && (noteArea.containsMouse || focused || noteDragging)
     onNoteHeldChanged: notifs.pause(noteHeld)
     readonly property var osdLook: V.osdLook(theme.tokens)
+    // Hi-Fi draws volume as a VU meter and brightness as the bar; every other theme draws the bar.
+    readonly property bool osdMeter: osdLook.kind(heldOsd?.kind ?? "volume") === "meter"
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
@@ -188,7 +190,7 @@ PanelWindow {
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
-            osd: [osdLook.width, osdLook.height]
+            osd: osdMeter ? [osdLook.meter.width, osdLook.meter.height] : [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
     readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
@@ -493,14 +495,34 @@ PanelWindow {
     function osdState() {
         if (mode !== "osd")
             return null;
-        const p = osdValue.mapToItem(null, 0, 0);
+        const meter = osdMeterLoader.item;
+        const shift = (screen.width - width) / 2;
+        const at = item => {
+            const p = item.mapToItem(null, 0, 0);
+            return { x: p.x + shift, y: p.y, w: item.width, h: item.height };
+        };
+        const point = (deg, r) => {
+            const p = meter.inWindow(deg, r);
+            return { x: p.x + shift, y: p.y };
+        };
+        const word = meter ? meter.word : osdWord;
+        const value = meter ? meter.valueText : osdValue;
         return {
-            word: osdWord.text,
-            value: osdValue.text,
-            valueFont: [osdValue.font.family, osdValue.font.pixelSize],
-            bars: osdLook.bars,
-            lit: osdBars.drawn(),
-            valueBox: { x: p.x + (screen.width - width) / 2, y: p.y, w: osdValue.width, h: osdValue.height }
+            kind: meter ? "meter" : "bar",
+            word: word.text,
+            value: value.text,
+            valueFont: [value.font.family, value.font.pixelSize],
+            bars: meter ? null : osdLook.bars,
+            lit: meter ? null : osdBars.drawn(),
+            valueBox: at(value),
+            // The needle as drawn, and two points on the dial for pixel reads: inside the needle near its tip, and the middle of the red zone.
+            needleAngle: meter ? Math.round(meter.needle.rotation * 10) / 10 : null,
+            meter: meter ? {
+                box: at(meter),
+                needle: point(meter.needle.rotation, osdLook.meter.needle.length - 8),
+                red: point((osdLook.meter.angle(osdLook.meter.red) + osdLook.meter.angle(100)) / 2, osdLook.meter.radius)
+            } : null,
+            highlightBox: box.highlight.visible ? at(box.highlight) : null
         };
     }
 
@@ -2032,8 +2054,18 @@ PanelWindow {
                 width: island.sizes.osd[0]
                 height: island.sizes.osd[1]
 
+                Loader {
+                    id: osdMeterLoader
+                    active: island.osdMeter
+                    sourceComponent: OsdMeter {
+                        look: island.osdLook.meter
+                        value: island.heldOsd?.value ?? 0
+                    }
+                }
+
                 // The word or glyph, the bar and the value, as each theme's volume board draws them.
                 RowLayout {
+                    visible: !island.osdMeter
                     anchors.fill: parent
                     anchors.leftMargin: island.osdLook.voice === "caps" ? 14 : 16
                     anchors.rightMargin: anchors.leftMargin
