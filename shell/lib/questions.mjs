@@ -21,6 +21,7 @@ export function parseQuestions(text) {
       machine: shortMachine(str(q.machine)),
       text: str(q.text),
       options: Array.isArray(q.options) ? q.options.filter((o) => typeof o === 'string') : [],
+      recommend: str(q.recommend),
       popup: q.popup === true,
     }));
 }
@@ -35,4 +36,45 @@ export function optionFor(question, key) {
 }
 
 // Question text and answers are untrusted, so they only ever travel as argv elements. Signed popup: the hub passes only a slack, popup or cli answer to the machine that asked.
-export const answerArgv = (id, text) => ['mem', 'answer', '--by', 'popup', '--', id, text];
+// Each attachment is a file on this machine; the hub copies it to the machine that asked. Qt's engine has no flatMap.
+export const answerArgv = (id, text, files = []) => ['mem', 'answer', '--by', 'popup'].concat(...files.map((f) => ['--screenshot', f]), ['--', id, text]);
+
+export const baseName = (path) => path.split('/').pop();
+
+// The closed card's last line: how many options, and the one the agent recommends.
+export function summary(question) {
+  const n = question.options.length;
+  if (n === 0) return 'No options · r to reply';
+  return `${n} ${n === 1 ? 'option' : 'options'}` + (question.recommend ? ` · ★ ${question.recommend}` : '');
+}
+
+const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+// A web address: http(s)://, or a bare host under a common top-level domain, so file names such as deploy.yml stay text.
+// The leading group stands in for a lookbehind: no word character, @, dot, slash, colon or dash just before it.
+const WEB = /(^|[^\w@./:-])(https?:\/\/[^\s<>"']+|(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:com|org|net|io|dev|app|ai|co|gg|xyz|tv|uk|bd|info|site|cloud)(?::\d+)?(?![\w-])(?:\/[^\s<>"']*)?)/gi;
+
+// Question text as Text.StyledText with each web address a link whose href is its index in `urls`, so only an address found here is ever opened.
+export function linkify(text) {
+  const urls = [];
+  let html = '';
+  let at = 0;
+  WEB.lastIndex = 0;
+  for (let m = WEB.exec(text); m; m = WEB.exec(text)) {
+    let link = m[2];
+    // Sentence punctuation after an address, and a closing bracket it never opened, are not part of it.
+    for (;;) {
+      const trimmed = link.replace(/[.,;:!?'"]+$/, '');
+      const closes = trimmed.endsWith(')') && trimmed.split('(').length < trimmed.split(')').length;
+      const next = closes ? trimmed.slice(0, -1) : trimmed;
+      if (next === link) break;
+      link = next;
+    }
+    const start = m.index + m[1].length;
+    html += escape(text.slice(at, start)) + `<a href="${urls.length}">${escape(link)}</a>`;
+    urls.push(/^https?:\/\//i.test(link) ? link : `https://${link}`);
+    at = start + link.length;
+  }
+  html += escape(text.slice(at));
+  return { html: html.replace(/\n/g, '<br>'), urls };
+}

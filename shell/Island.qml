@@ -184,7 +184,8 @@ PanelWindow {
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
-            question: [I.MAX_WIDTH, ask.implicitHeight + 32],
+            // A long question scrolls inside a card that keeps a fifth of the screen clear.
+            question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             osd: [osdLook.width, osdLook.height]
         })
@@ -707,6 +708,71 @@ PanelWindow {
     // Mod+I gives the island the keyboard to act on what it shows; anything but a question gives it back.
     property bool focused: false
     property bool replying: false
+    // True while the file picker or slurp has the keyboard for an attachment, which the island takes back after.
+    property bool attaching: false
+    // Why the last attach found nothing, such as no image on the clipboard; the next key clears it.
+    property string askNote: ""
+    readonly property var askLinks: Q.linkify(heldQuestion?.pairing ? "" : heldQuestion?.text ?? "")
+    readonly property var askFiles: heldQuestion ? questions.attached[heldQuestion.id] ?? [] : []
+    readonly property string askFailed: heldQuestion ? questions.failed[heldQuestion.id] ?? "" : ""
+    // Where a screenshot or a pasted image is kept until mem has handed it to the hub.
+    readonly property string attachDir: Quickshell.env("XDG_RUNTIME_DIR") + "/dots-island-attach"
+
+    // Only an address linkify found is opened, by its index.
+    function openLink(index) {
+        const url = askLinks.urls[Number(index)];
+        if (url)
+            Quickshell.execDetached(["xdg-open", url]);
+    }
+
+    function pickFiles() {
+        attaching = true;
+        picker.forId = question.id;
+        picker.connected = true;
+    }
+
+    function shoot() {
+        attaching = true;
+        shooter.forId = question.id;
+        shooter.file = attachDir + "/" + question.id + "-" + Date.now() + ".png";
+        shooter.command = ["sh", "-c", 'mkdir -p "${1%/*}" && r=$(slurp) && grim -g "$r" "$1"', "sh", shooter.file];
+        shooter.running = true;
+    }
+
+    // An image on the clipboard only; grep reads every type, so wl-paste never dies of SIGPIPE.
+    function paste() {
+        paster.forId = question.id;
+        paster.file = attachDir + "/" + question.id + "-" + Date.now() + ".png";
+        paster.command = ["sh", "-c", 'wl-paste --list-types | grep -x image/png >/dev/null && mkdir -p "${1%/*}" && wl-paste -t image/png >"$1"', "sh", paster.file];
+        paster.running = true;
+    }
+
+    function attachDone() {
+        attaching = false;
+        if (focused)
+            keys.forceActiveFocus();
+    }
+
+    // The question card as drawn, for `island state`.
+    function askState() {
+        if (mode !== "question" || question.pairing)
+            return null;
+        return {
+            expanded: focused,
+            lines: askText.lineCount,
+            truncated: askText.truncated,
+            summary: askSummary.visible ? askSummary.text : null,
+            options: askOptions.visible ? Array.from({ length: askRows.count }, (_, i) => askRows.itemAt(i)?.drawn ?? null) : [],
+            links: askLinks.urls,
+            attached: askFiles.map(Q.baseName),
+            failed: askFailed,
+            note: askNote,
+            scrolls: askFlick.interactive,
+            // The text's top left in the window, which is centred at the top of its output.
+            textAt: (p => [Math.round(p.x), Math.round(p.y)])(askText.mapToItem(null, 0, 0)),
+            window: width
+        };
+    }
 
     function focusIsland() {
         if (mode === "lease")
@@ -764,6 +830,7 @@ PanelWindow {
         calendar = null;
         replying = false;
         reply.text = "";
+        askNote = "";
     }
 
     // The hub rewrites the file on any change, so only a different question takes the keyboard back.
@@ -775,7 +842,7 @@ PanelWindow {
     visible: !niri.edgeToEdge(niri.focusedOutput, screen.width)
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-island"
-    WlrLayershell.keyboardFocus: focused ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: focused && !attaching ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     anchors.top: true
     implicitWidth: I.MAX_WIDTH + 2 * padSide
@@ -843,6 +910,57 @@ PanelWindow {
 
     PwObjectTracker {
         objects: island.captures.concat(island.captureLinks)
+    }
+
+    // The shell's own file picker, asked over its socket as bin/dots-portal asks it: one request line, one answer line.
+    Socket {
+        id: picker
+        property string forId: ""
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/dots-picker-" + Quickshell.env("WAYLAND_DISPLAY") + ".sock"
+        onConnectedChanged: {
+            if (connected) {
+                write(JSON.stringify({ mode: "open", multiple: true, title: "Attach to the answer", app: "", folder: Quickshell.env("HOME"), name: "", filters: [], filter: 0, accept: "" }) + "\n");
+                flush();
+            } else {
+                island.attachDone();
+            }
+        }
+        onError: island.attachDone()
+        parser: SplitParser {
+            onRead: data => {
+                let r = null;
+                try {
+                    r = JSON.parse(data);
+                } catch (e) {}
+                if (r?.response === 0 && Array.isArray(r.paths) && r.paths.length)
+                    island.questions.attach(picker.forId, r.paths);
+                picker.connected = false;
+            }
+        }
+    }
+
+    Process {
+        id: shooter
+        property string forId: ""
+        property string file: ""
+        // slurp exits non-zero when Esc cancels it, which attaches nothing.
+        onExited: code => {
+            if (code === 0)
+                island.questions.attach(forId, [file]);
+            island.attachDone();
+        }
+    }
+
+    Process {
+        id: paster
+        property string forId: ""
+        property string file: ""
+        onExited: code => {
+            if (code === 0)
+                island.questions.attach(forId, [file]);
+            else
+                island.askNote = "No image on the clipboard";
+        }
     }
 
     Process {
@@ -2653,138 +2771,246 @@ PanelWindow {
                 width: island.sizes.question[0]
                 height: island.sizes.question[1]
 
-                Column {
-                    id: ask
-                    x: 20
-                    y: 16
-                    width: parent.width - 40
-                    spacing: 12
+                // A dropped file attaches to the answer, open or closed.
+                DropArea {
+                    anchors.fill: parent
+                    enabled: island.part === "question" && !island.question?.pairing
+                    keys: ["text/uri-list"]
+                    onDropped: drop => {
+                        const paths = drop.urls.map(u => decodeURIComponent(String(u).replace(/^file:\/\//, ""))).filter(p => p.startsWith("/"));
+                        if (paths.length && island.question)
+                            island.questions.attach(island.question.id, paths);
+                        drop.accept(Qt.CopyAction);
+                    }
+                }
 
-                    Item {
-                        width: parent.width
-                        height: where.implicitHeight
+                Flickable {
+                    id: askFlick
+                    anchors.fill: parent
+                    contentWidth: width
+                    contentHeight: ask.implicitHeight + 32
+                    interactive: contentHeight > height
+                    clip: interactive
+                    boundsBehavior: Flickable.StopAtBounds
+                    // A new question, or the card closing, starts at the top.
+                    readonly property string at: island.questionId + island.focused
+                    onAtChanged: contentY = 0
 
+                    Column {
+                        id: ask
+                        x: 20
+                        y: 16
+                        width: askFlick.width - 40
+                        spacing: 12
+
+                        Item {
+                            width: parent.width
+                            height: where.implicitHeight
+
+                            Text {
+                                id: where
+                                textFormat: Text.PlainText
+                                width: parent.width - hint.implicitWidth - 12
+                                elide: Text.ElideRight
+                                text: [island.heldQuestion?.project, island.heldQuestion?.machine].filter(p => p).join(" · ")
+                                color: Qt.alpha(box.style.text, 0.65)
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                id: hint
+                                textFormat: Text.PlainText
+                                anchors.right: parent.right
+                                text: island.heldQuestion?.pairing ? "" : island.focused ? "a file · s shot · ^V paste · Esc" : "Mod+I"
+                                color: Qt.alpha(box.style.text, 0.65)
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        // Two lines until Mod+I opens the card, then all of it; a pairing request is plain text, a question's web addresses are links.
                         Text {
-                            id: where
-                            textFormat: Text.PlainText
-                            width: parent.width - hint.implicitWidth - 12
+                            id: askText
+                            width: parent.width
+                            text: island.heldQuestion?.pairing ? island.heldQuestion.text : island.askLinks.html
+                            textFormat: island.heldQuestion?.pairing ? Text.PlainText : Text.StyledText
+                            wrapMode: Text.Wrap
+                            maximumLineCount: island.heldQuestion?.pairing ? 6 : island.focused ? 10000 : 2
                             elide: Text.ElideRight
-                            text: [island.heldQuestion?.project, island.heldQuestion?.machine].filter(p => p).join(" · ")
-                            color: Qt.alpha(box.style.text, 0.65)
-                            font.family: island.theme.tokens?.type.mono ?? ""
-                            font.pixelSize: 11
+                            lineHeight: 1.3
+                            color: box.style.text
+                            linkColor: box.style.text
+                            font.family: island.theme.tokens?.type.ui ?? ""
+                            font.pixelSize: 15
+                            onLinkActivated: link => island.openLink(link)
+
+                            HoverHandler {
+                                cursorShape: askText.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            }
                         }
 
                         Text {
-                            id: hint
+                            id: askSummary
+                            visible: !island.heldQuestion?.pairing && !island.focused
+                            width: parent.width
                             textFormat: Text.PlainText
-                            anchors.right: parent.right
-                            text: island.heldQuestion?.pairing ? "" : island.focused ? "1-9 pick · r reply · Esc" : "Mod+I to answer"
-                            color: Qt.alpha(box.style.text, 0.65)
-                            font.family: island.theme.tokens?.type.mono ?? ""
-                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                            text: island.heldQuestion ? Q.summary(island.heldQuestion) : ""
+                            color: Qt.alpha(box.style.text, 0.8)
+                            font.family: island.theme.tokens?.type.ui ?? ""
+                            font.pixelSize: 13
                         }
-                    }
 
-                    Text {
-                        width: parent.width
-                        text: island.heldQuestion?.text ?? ""
-                        textFormat: Text.PlainText
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 6
-                        elide: Text.ElideRight
-                        lineHeight: 1.3
-                        color: box.style.text
-                        font.family: island.theme.tokens?.type.ui ?? ""
-                        font.pixelSize: 15
-                    }
+                        // Every option in full, one to a row, the recommended one filled and starred.
+                        Column {
+                            id: askOptions
+                            visible: !island.heldQuestion?.pairing && island.focused && !island.replying
+                            width: parent.width
+                            spacing: 6
 
-                    Flow {
-                        width: parent.width
-                        spacing: 8
-                        visible: !island.replying
+                            Repeater {
+                                id: askRows
+                                model: (island.heldQuestion?.options ?? []).slice(0, 9).concat(["Reply…"])
 
-                        Repeater {
-                            // A pairing request names the keys that answer it in place of options.
-                            model: island.heldQuestion?.pairing ? island.heldQuestion.keys.map(k => k.join(" ")) : (island.heldQuestion?.options ?? []).slice(0, 9).concat(["Reply…"])
+                                Rectangle {
+                                    required property string modelData
+                                    required property int index
+                                    readonly property bool isReply: index === Math.min(island.heldQuestion?.options.length ?? 0, 9)
+                                    readonly property bool recommended: !isReply && modelData === island.heldQuestion?.recommend
+                                    readonly property var drawn: ({ text: optionText.text, recommended, lines: optionText.lineCount, elided: optionText.truncated })
+                                    width: parent.width
+                                    height: optionText.implicitHeight + 12
+                                    radius: 8
+                                    color: recommended ? box.style.text : "transparent"
+                                    border.width: recommended ? 0 : 1
+                                    border.color: Qt.alpha(box.style.text, 0.35)
 
-                            Rectangle {
-                                required property string modelData
-                                required property int index
-                                readonly property bool isReply: !island.heldQuestion?.pairing && index === Math.min(island.heldQuestion?.options.length ?? 0, 9)
-                                width: Math.min(chip.implicitWidth + 24, ask.width)
-                                height: chip.implicitHeight + 12
-                                radius: 8
-                                color: index === 0 && !isReply ? box.style.text : "transparent"
-                                border.width: index === 0 && !isReply ? 0 : 1
-                                border.color: Qt.alpha(box.style.text, 0.35)
-
-                                Text {
-                                    id: chip
-                                    textFormat: Text.PlainText
-                                    anchors.centerIn: parent
-                                    width: Math.min(implicitWidth, parent.width - 24)
-                                    elide: Text.ElideRight
-                                    text: island.heldQuestion?.pairing ? parent.modelData : (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData
-                                    color: parent.index === 0 && !parent.isReply ? box.style.fill : box.style.text
-                                    font.family: island.theme.tokens?.type.ui ?? ""
-                                    font.pixelSize: 13
+                                    Text {
+                                        id: optionText
+                                        x: 12
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width - 24
+                                        textFormat: Text.PlainText
+                                        wrapMode: Text.Wrap
+                                        text: (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData + (parent.recommended ? "  ★" : "")
+                                        color: parent.recommended ? box.style.fill : box.style.text
+                                        font.family: island.theme.tokens?.type.ui ?? ""
+                                        font.pixelSize: 13
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // The PIN or passkey as typed, for a request that asks one.
-                    Rectangle {
-                        visible: ["pin", "passkey"].indexOf(island.heldQuestion?.pairing) >= 0
-                        width: parent.width
-                        height: 32
-                        radius: 8
-                        color: "transparent"
-                        border.width: 1
-                        border.color: Qt.alpha(box.style.text, 0.5)
+                        // A pairing request names the keys that answer it in place of options.
+                        Flow {
+                            width: parent.width
+                            spacing: 8
+                            visible: !!island.heldQuestion?.pairing
+
+                            Repeater {
+                                model: island.heldQuestion?.pairing ? island.heldQuestion.keys.map(k => k.join(" ")) : []
+
+                                Rectangle {
+                                    required property string modelData
+                                    required property int index
+                                    width: Math.min(chip.implicitWidth + 24, ask.width)
+                                    height: chip.implicitHeight + 12
+                                    radius: 8
+                                    color: index === 0 ? box.style.text : "transparent"
+                                    border.width: index === 0 ? 0 : 1
+                                    border.color: Qt.alpha(box.style.text, 0.35)
+
+                                    Text {
+                                        id: chip
+                                        textFormat: Text.PlainText
+                                        anchors.centerIn: parent
+                                        width: Math.min(implicitWidth, parent.width - 24)
+                                        elide: Text.ElideRight
+                                        text: parent.modelData
+                                        color: parent.index === 0 ? box.style.fill : box.style.text
+                                        font.family: island.theme.tokens?.type.ui ?? ""
+                                        font.pixelSize: 13
+                                    }
+                                }
+                            }
+                        }
+
+                        // What goes with the answer, and why the last answer or attach did not go through.
+                        Text {
+                            visible: island.askFiles.length > 0
+                            width: parent.width
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            text: "Attached: " + island.askFiles.map(Q.baseName).join(", ") + (island.focused ? " · x removes" : "")
+                            color: Qt.alpha(box.style.text, 0.8)
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 11
+                        }
 
                         Text {
-                            id: pinText
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            verticalAlignment: Text.AlignVCenter
+                            visible: island.askFailed !== "" || island.askNote !== ""
+                            width: parent.width
                             textFormat: Text.PlainText
-                            text: Root.Pairing.pin
+                            wrapMode: Text.Wrap
+                            text: island.askNote || "Not sent: " + island.askFailed
                             color: box.style.text
                             font.family: island.theme.tokens?.type.mono ?? ""
-                            font.pixelSize: 13
+                            font.pixelSize: 11
                         }
-                    }
 
-                    Rectangle {
-                        visible: island.replying
-                        width: parent.width
-                        height: 32
-                        radius: 8
-                        color: "transparent"
-                        border.width: 1
-                        border.color: Qt.alpha(box.style.text, 0.5)
+                        // The PIN or passkey as typed, for a request that asks one.
+                        Rectangle {
+                            visible: ["pin", "passkey"].indexOf(island.heldQuestion?.pairing) >= 0
+                            width: parent.width
+                            height: 32
+                            radius: 8
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Qt.alpha(box.style.text, 0.5)
 
-                        TextInput {
-                            id: reply
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            verticalAlignment: TextInput.AlignVCenter
-                            clip: true
-                            color: box.style.text
-                            font.family: island.theme.tokens?.type.ui ?? ""
-                            font.pixelSize: 13
-                            Keys.onReturnPressed: {
-                                if (text.trim() !== "" && island.question)
-                                    island.questions.answer(island.question.id, text);
+                            Text {
+                                id: pinText
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: Text.AlignVCenter
+                                textFormat: Text.PlainText
+                                text: Root.Pairing.pin
+                                color: box.style.text
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 13
                             }
-                            Keys.onEscapePressed: {
-                                island.replying = false;
-                                text = "";
-                                keys.forceActiveFocus();
+                        }
+
+                        Rectangle {
+                            visible: island.replying
+                            width: parent.width
+                            height: 32
+                            radius: 8
+                            color: "transparent"
+                            border.width: 1
+                            border.color: Qt.alpha(box.style.text, 0.5)
+
+                            TextInput {
+                                id: reply
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: TextInput.AlignVCenter
+                                clip: true
+                                color: box.style.text
+                                font.family: island.theme.tokens?.type.ui ?? ""
+                                font.pixelSize: 13
+                                Keys.onReturnPressed: {
+                                    if (text.trim() !== "" && island.question)
+                                        island.questions.answer(island.question.id, text);
+                                }
+                                Keys.onEscapePressed: {
+                                    island.replying = false;
+                                    text = "";
+                                    keys.forceActiveFocus();
+                                }
                             }
                         }
                     }
@@ -2883,8 +3109,19 @@ PanelWindow {
                     Root.Pairing.key(event);
                     return;
                 }
+                island.askNote = "";
                 if (event.key === Qt.Key_Escape) {
                     island.questions.putAway(q.id);
+                } else if (event.key === Qt.Key_V && (event.modifiers & Qt.ControlModifier)) {
+                    island.paste();
+                } else if (event.key === Qt.Key_A) {
+                    island.pickFiles();
+                } else if (event.key === Qt.Key_S) {
+                    island.shoot();
+                } else if (event.key === Qt.Key_X) {
+                    island.questions.detachAll(q.id);
+                } else if (event.key === Qt.Key_J || event.key === Qt.Key_K) {
+                    askFlick.contentY = Math.max(0, Math.min(askFlick.contentHeight - askFlick.height, askFlick.contentY + (event.key === Qt.Key_J ? 80 : -80)));
                 } else if (event.key === Qt.Key_R) {
                     island.replying = true;
                     reply.forceActiveFocus();

@@ -195,7 +195,7 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks, cities: island.citiesDrawn(), grid: island.gridDrawn() } : null;
-            return JSON.stringify({ shown: island.visible, mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), downloading: island.downloadingState(), capture: island.captureState(), sharing: island.sharingState(), pairing: island.pairingState() });
+            return JSON.stringify({ shown: island.visible, mode: island.mode, text: island.text, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, note: island.noteState(), osd: island.osdState(), warning: island.leaseWarning, lease: island.leaseState(), sending: island.sendingState(), downloading: island.downloadingState(), capture: island.captureState(), sharing: island.sharingState(), pairing: island.pairingState(), ask: island.askState() });
         }
 
         function focus(): void {
