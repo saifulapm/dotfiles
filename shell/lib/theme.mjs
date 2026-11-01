@@ -119,7 +119,7 @@ const MOTION = {
     'config-notification-open-close': eased(150, 'linear'),
     'exit-confirmation-open-close': eased(150, 'linear'),
   },
-  // Hi-Fi's dial has a flywheel: what travels eases in and out; open and close are plain curves until their shaders come.
+  // Hi-Fi's dial has a flywheel: what travels eases in and out; open eases in and close eases out, under SHADERS.dial's warm-up and power-off.
   dial: {
     'window-open': bezier(220, 0.32, 0, 0.67, 0),
     'window-close': eased(140, 'ease-out-cubic'),
@@ -236,6 +236,41 @@ vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
     if (inside && p < 0.6 && px.y >= scan && px.y < scan + w) color = ${pen};
     if (d >= 0.0 && d <= clamp((1.0 - p) / 0.4, 0.0, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
+    return color;
+}`,
+    };
+  },
+  dial: (c) => {
+    const amber = glslColor(c.accent);
+    // The glow is what lies past the geometry, plus the 1 px border ring just inside it, which niri draws amber on the focused window.
+    const GLOW = `bool dots_glow(vec2 px, vec2 size) {
+    return px.x < 1.0 || px.y < 1.0 || px.x >= size.x - 1.0 || px.y >= size.y - 1.0;
+}`;
+    return {
+      // Warms up like a filament: opacity only, rising with the eased progress; the glow and the amber border come up over the last 60 of 220 ms.
+      open: `${TEX}
+${GLOW}
+vec4 open_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    vec2 px = coords_geo.xy * size_geo.xy;
+    vec4 color = dots_tex(coords_geo);
+    if (dots_glow(px, size_geo.xy)) return color * clamp((p - 160.0 / 220.0) / (60.0 / 220.0), 0.0, 1.0);
+    return color * p;
+}`,
+      // Powers off: the glow goes in the first 40 of 140 ms, then the window fades out, while a one-physical-pixel amber outline at 30% stays to the end.
+      close: `${TEX}
+${PX}
+${GLOW}
+vec4 close_color(vec3 coords_geo, vec3 size_geo) {
+    float p = niri_clamped_progress;
+    float w = dots_px();
+    vec2 px = coords_geo.xy * size_geo.xy;
+    vec4 color = dots_tex(coords_geo);
+    if (dots_glow(px, size_geo.xy)) color *= 1.0 - clamp(p / (40.0 / 140.0), 0.0, 1.0);
+    else color *= 1.0 - clamp((p - 40.0 / 140.0) / (100.0 / 140.0), 0.0, 1.0);
+    bool inside = px.x >= 0.0 && px.y >= 0.0 && px.x < size_geo.x && px.y < size_geo.y;
+    bool edge = px.x < w || px.y < w || px.x >= size_geo.x - w || px.y >= size_geo.y - w;
+    if (inside && edge && p < 1.0) color = 0.3 * ${amber} + 0.7 * color;
     return color;
 }`,
     };

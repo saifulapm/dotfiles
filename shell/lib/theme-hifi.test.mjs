@@ -79,7 +79,7 @@ test('Hi-Fi frames the focused window in a 1 px amber border with an amber glow,
 });
 
 test('Hi-Fi times its camera like a tuning dial, in curves niri accepts', () => {
-  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].trim().split(/\s*\n\s*/);
+  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].split('custom-shader')[0].trim().split(/\s*\n\s*/);
   const kdl = renderNiri(hifi());
   // niri 26.04 knows no ease-in-out-cubic or ease-in by name, so they are its cubic-bezier.
   const inOut = (ms) => [`duration-ms ${ms}`, 'curve "cubic-bezier" 0.65 0 0.35 1'];
@@ -93,6 +93,17 @@ test('Hi-Fi times its camera like a tuning dial, in curves niri accepts', () => 
   for (const name of ['screenshot-ui-open', 'config-notification-open-close', 'exit-confirmation-open-close']) {
     assert.deepEqual(block(kdl, name), ['duration-ms 160', 'curve "ease-out-cubic"']);
   }
+});
+
+test('Hi-Fi warms its windows up in 220 ms and powers them off in 140 ms, its amber baked in', () => {
+  const kdl = renderNiri(hifi());
+  const shader = (name, ms) => kdl.match(new RegExp(`${name} \\{\\s*duration-ms ${ms}[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  const open = shader('window-open', 220);
+  const close = shader('window-close', 140);
+  assert.match(open, /vec4 open_color\(vec3 coords_geo, vec3 size_geo\)/);
+  assert.match(close, /vec4 close_color\(vec3 coords_geo, vec3 size_geo\)/);
+  assert.match(close, /float w = dots_px\(\);/);
+  assert.match(close, /vec4\(0\.980, 0\.741, 0\.184, 1\.0\)/);
 });
 
 test('niri accepts Hi-Fi\'s fragment', (t) => {
