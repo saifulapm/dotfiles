@@ -3,6 +3,8 @@ set -uo pipefail
 
 repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 live_bus=${DBUS_SESSION_BUS_ADDRESS:-}
+# The live display, before the nested env replaces it, so a FAIL can ask the live shell why it draws slowly.
+live_wl=${WAYLAND_DISPLAY:-}
 fails=0
 
 check() {
@@ -124,6 +126,7 @@ grim_ms() { local t0; t0=$(now_ms); grim -s 0.1 -t ppm - >/dev/null 2>&1; echo $
 grim_ms >/dev/null
 if (($(grim_ms) > 500 && $(grim_ms) > 500)); then
   echo "FAIL the nested output draws about once a second: is the live session locked, or its output off?"
+  echo "     live lock state: $(env -u QS_CONFIG_PATH WAYLAND_DISPLAY="$live_wl" "$repo/bin/dots-call" lock state 2>&1 | jq -c '{locked, heldBy, monitorsOff, leaseUntil}' 2>&1)"
   exit 2
 fi
 # The shell makes its surfaces a second after its first frame, with its warm-up's Ticks running, so a check starts once the shell is at rest.

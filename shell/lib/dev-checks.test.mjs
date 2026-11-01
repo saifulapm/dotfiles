@@ -29,6 +29,15 @@ test('lib.sh takes the nested-check lock before it starts dots-dev, and dots-dev
   assert.ok(start > lock, 'dots-dev starts after the lock, with fd 9 closed');
 });
 
+// A locked live session and monitors an agent unlock turned off both slow the nested output; the FAIL names which, from the live shell's lock state.
+test('lib.sh\'s slow-drawing FAIL prints the live session\'s lock state', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const block = lib.slice(lib.indexOf('draws about once a second: '), lib.indexOf('exit 2', lib.indexOf('draws about once a second: ')));
+  assert.match(block, /WAYLAND_DISPLAY="\$live_wl"[^\n]*bin\/dots-call" lock state/, 'the FAIL reads the live shell\'s lock state');
+  assert.match(block, /locked[^\n]*heldBy[^\n]*monitorsOff/, 'and prints locked, heldBy and monitorsOff');
+  assert.ok(lib.indexOf('live_wl=') < lib.indexOf('source "$dev_out"'), 'live_wl is taken before the nested env replaces WAYLAND_DISPLAY');
+});
+
 // bin/ is on the live desktop's PATH, so a fake ddcutil there would hide the real one from the live shell.
 test('the fake ddcutil lives in dev/path, never in bin/', () => {
   assert.ok(existsSync(new URL('../../dev/path/ddcutil', import.meta.url)));
