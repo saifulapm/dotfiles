@@ -37,25 +37,30 @@ near() { (($1 - $4 <= $7 && $4 - $1 <= $7 && $2 - $5 <= $7 && $5 - $2 <= $7 && $
 declare -A rgb=([paper]="241 233 216" [blueprint]="12 26 46" [hi-fi]="29 32 33")
 status_at_rest() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
-# Switches to $1 in the background; polls status (and grabs the row while under 220 ms) until transition reads "" after a kind was seen.
+# Switches to $1 in the background and grabs the row until 250 ms, while a second loop polls status for 1 s, so a grab never delays the poll that reads "".
 kinds="" done_ms="" grabs=() final=""
+polls=$(mktemp)
+cleanup() { rm -f "$polls"; }
 switch_to() {
-  local start t pid k
+  local start t pid poller k
   start=$(now_ms)
   "$repo/bin/dots" theme "$1" >/dev/null &
   pid=$!
+  while (($(now_ms) - start < 1000)); do echo "$(($(now_ms) - start)) $(shell_status | jq -r '.transition')"; done >"$polls" &
+  poller=$!
   kinds="" done_ms="" grabs=()
-  while t=$(($(now_ms) - start)) && ((t < 1000)); do
-    k=$(shell_status | jq -r '.transition')
+  while t=$(($(now_ms) - start)) && ((t < 250)); do grabs+=("$t $(bands)"); done
+  wait "$pid"
+  wait "$poller"
+  # Each poll's time is when it started; the end is the first "" after a kind.
+  while read -r t k; do
     if [ -n "$k" ]; then
       [[ " $kinds " == *" $k "* ]] || kinds="$kinds $k"
     elif [ -n "$kinds" ]; then
       done_ms=$t
       break
     fi
-    ((t < 220)) && grabs+=("$t $(bands)")
-  done
-  wait "$pid"
+  done <"$polls"
   final=$(bands)
   kinds=${kinds# }
 }
