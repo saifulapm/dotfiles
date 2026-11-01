@@ -63,9 +63,12 @@ export function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// The shell's tokens come from shell.json, so they get the same check as theme.toml.
+// The shell's tokens come from shell.json, so they get the same check as theme.toml; the engraved voice draws Blueprint's layout without its [ ] marks, so the shell reads it as the bracket voice plus engraved, which only what draws a mark asks for.
 export function checkTokens(t) {
-  return validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }));
+  const engraved = t.type?.voice === 'engraved' || t.type?.engraved === true;
+  const checked = validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }, engraved ? { type: Object.assign({}, t.type, { voice: 'engraved' }) } : {}));
+  if (engraved) Object.assign(checked.type, { voice: 'bracket', engraved: true });
+  return checked;
 }
 
 const CURVES = {

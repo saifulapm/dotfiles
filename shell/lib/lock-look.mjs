@@ -1,5 +1,7 @@
 // How the lock screen draws under a token set, from its frame primitive, as the three lock designs do.
 
+import { mark } from './voice.mjs';
+
 // Lock.qml draws before the theme loads after a crash, so it needs colours of its own.
 export const FALLBACK = { paper: 'black', ink: 'white', muted: 'gray', accent: 'white', danger: 'white' };
 
@@ -19,15 +21,16 @@ export function lockLook(tokens, user) {
       hint: `Password for ${user} · ↵ to unlock`,
     };
   }
-  // Blueprint: a drawing sheet with a hollow clock and the date on a dimension line.
-  if (frame === 'glow') {
+  // Blueprint: a drawing sheet with a hollow clock and the date on a dimension line; Hi-Fi's engraved voice draws it too, without the marks.
+  const engraved = tokens ? tokens.type.engraved === true : false;
+  if (frame === 'glow' || engraved) {
     return {
       kind: 'sheet',
-      status: { text: '[LOCKED]', color: c.danger },
+      status: { text: mark(engraved, 'LOCKED'), color: c.danger },
       clock: { family: t.display, px: 200, bold: true, tracking: -4, fill: 'transparent', stroke: c.accent },
       date: { format: 'yyyy-MM-dd · dddd', caps: true, family: t.ui, px: 11, italic: false, tracking: 2.2, color: c.accent },
       prompt,
-      hint: '[↵] UNLOCK',
+      hint: `${mark(engraved, '↵')} UNLOCK`,
     };
   }
   // Paper: a printed page, a large serif clock over an italic date.

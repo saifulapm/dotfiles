@@ -25,6 +25,8 @@ export const inOrder = same;
 const upper = (s) => same(s).toUpperCase();
 // A one-line label: newlines and tabs become single spaces, so a sender cannot stack lines.
 export const line = (s) => same(s).replace(/\s+/g, ' ').trim();
+// Blueprint's square marks around a word the shell wrote; the engraved voice draws the word bare. Text a person wrote never goes through here.
+export const mark = (engraved, s, pad = '') => (engraved ? s : `[${pad}${s}${pad}]`);
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -684,13 +686,14 @@ export function marginLook(tokens) {
   const say = voice === 'plain' ? same : upper;
   const plain = voice === 'plain';
   const bracket = voice === 'bracket';
+  const engraved = (tokens || UNTHEMED).type.engraved === true;
   const look = {
     voice,
-    number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? `[${pad2(idx)}]` : pad2(idx)),
+    number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? mark(engraved, pad2(idx)) : pad2(idx)),
     numberColor: bracket ? c.accent : c.ink,
     numberWeight: plain ? 600 : bracket ? 400 : 700,
     // The focused column of its columns, after the number; a workspace of one column draws none.
-    column: (pos) => (!pos || pos.of < 2 ? '' : bracket ? ` [${pos.at} / ${pos.of}]` : `  ${pos.at} / ${pos.of}`),
+    column: (pos) => (!pos || pos.of < 2 ? '' : bracket ? ` ${mark(engraved, `${pos.at} / ${pos.of}`)}` : `  ${pos.at} / ${pos.of}`),
     tail(view) {
       if (view.app === null && view.title === null) return '';
       // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
@@ -727,9 +730,9 @@ export function marginLook(tokens) {
         const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
         return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;
       }
-      const words = idxs.slice(0, 3).map((idx) => (bracket ? `[!${pad2(idx)}]` : `!${pad2(idx)}`));
-      if (rest > 0) words.push(bracket ? `[+${rest}]` : `+${rest}`);
-      return [{ text: `   ${words.join(bracket ? '' : ' ')}`, color: c.danger }];
+      const words = idxs.slice(0, 3).map((idx) => (bracket ? mark(engraved, `!${pad2(idx)}`) : `!${pad2(idx)}`));
+      if (rest > 0) words.push(bracket ? mark(engraved, `+${rest}`) : `+${rest}`);
+      return [{ text: `   ${words.join(bracket && !engraved ? '' : ' ')}`, color: c.danger }];
     },
   };
   // The words on screen, in order, for `qs ipc call margins state`.

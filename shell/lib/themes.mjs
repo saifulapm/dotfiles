@@ -46,6 +46,7 @@ const TILE = '#F6F7F9';
 // A card's name in its own theme's typeface and voice; the picker draws it in the current theme's ink, so it always reads.
 export function cardName(t) {
   const name = line(t.name);
+  if (t.type.engraved) return { text: cap(name), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
   if (t.type.voice === 'bracket') return { text: name.toUpperCase(), font: t.type.ui, size: 14, weight: 700, spacing: 1.12 };
   if (t.type.voice === 'plain') return { text: cap(name), font: t.type.ui, size: 16, weight: 700, spacing: -0.16 };
   return { text: cap(name), font: t.type.display, size: 26, weight: 400, spacing: 0 };
@@ -54,6 +55,8 @@ export function cardName(t) {
 // Its primitives in a line, in its own voice: grain, ink, a hard shadow; Dots · soft shadow · round; GRID // GLOW // CUT.
 export function tagline(t) {
   const p = t.primitive;
+  // Hi-Fi's: its faceplate, its backlight and its dial; no token names a colour, so the backlight's word is its own.
+  if (t.type.engraved) return { text: [word('paper', p.paper), 'amber', p.motion].join(' · ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
   if (t.type.voice === 'bracket') {
     return { text: [word('paper', p.paper), word('frame', p.frame), p.corner].join(' // ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
   }
@@ -121,7 +124,7 @@ export function windowLook(tokens, focused) {
   const n = tokens.niri;
   const border = tokens.primitive.frame !== 'none' && n.border > 0;
   const frame = border
-    ? { width: 1, color: focused ? (tokens.primitive.frame === 'glow' ? c.accent : c.ink) : qtColor(n.border_inactive ?? c.muted) }
+    ? { width: 1, color: focused ? n.border_active ?? (tokens.primitive.frame === 'glow' ? c.accent : c.ink) : qtColor(n.border_inactive ?? c.muted) }
     : focused && n.ring_width ? { width: n.ring_width * 0.75, color: qtColor(n.ring_color ?? c.accent) } : { width: 0, color: 'transparent' };
   // An unfocused window without its own shadow colour gets niri's default, the focused colour at 0.75.
   const color = !n.shadow_color ? null : focused ? qtColor(n.shadow_color) : n.shadow_inactive ? qtColor(n.shadow_inactive) : qtColor(n.shadow_color, 0.75);
