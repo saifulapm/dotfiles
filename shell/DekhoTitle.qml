@@ -20,7 +20,7 @@ FocusScope {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: T.titleText(voice)
+    readonly property var words: T.titleText(voice, look.engraved)
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
 
     // What Home opened, drawn at once; the backend's answer fills the rest in.

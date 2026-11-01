@@ -1,5 +1,6 @@
 // The release list and Starting: releases best first, and the steps, progress and rates read from dekho play's events.
 import { title } from './dekho.mjs';
+import { mark } from './voice.mjs';
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
 const MB = 1024 * 1024;
@@ -84,7 +85,7 @@ export function starting(events) {
 }
 
 // The words each board writes on the release list, Starting and no releases.
-export function releasesText(voice) {
+export function releasesText(voice, engraved = false) {
   const caps = voice !== 'plain';
   const up = (s) => (voice === 'bracket' ? s.toUpperCase() : s);
   return {
@@ -92,7 +93,7 @@ export function releasesText(voice) {
     starting: caps ? 'STARTING' : 'Starting',
     count: (n) => up(`${n} release${n === 1 ? '' : 's'}`),
     columns: (caps ? ['QUALITY', 'SIZE', 'SEEDERS', 'AUDIO'] : ['Quality', 'Size', 'Seeders', 'Audio']),
-    best: voice === 'bracket' ? '[BEST]' : caps ? 'BEST' : 'best',
+    best: voice === 'bracket' ? mark(engraved, 'BEST') : caps ? 'BEST' : 'best',
     auto: 'Auto: let dekho decide',
     up,
     noMatch: (t) => up(`No release matches ${t}`),

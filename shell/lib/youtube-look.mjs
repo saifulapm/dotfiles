@@ -1,21 +1,17 @@
 // How the YouTube App reads under a token set, as the three themes' YouTube boards draw it: the title strip, the sidebar, the field and chips, the legend, the empty views and the error block.
-import { listLook } from './voice.mjs';
+import { listLook, mark } from './voice.mjs';
 import { EMPTY, count } from './youtube.mjs';
 
 // The boards' tints, which no token carries: Paper's chosen place, row rule and light ink on a lit row, Artboard's accent tint, field, tiles, thumbnail and error block, Blueprint's warning amber; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
 const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', errFill: '#FFF1E8', errInk: '#B4380B', errText: '#2B2F36', warn: '#FFB547' };
 
 const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['s', 'save'], ['p', 'add to playlist'], ['d/D', 'download audio/video'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
-// Blueprint marks the shifted key and spaces the slash in its download pair.
-const BRACKET_DOWNLOAD = { key: '[D/⇧D]', word: 'DOWNLOAD AUDIO / VIDEO' };
 // A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
 const PLAYLIST_KEYS = [['↵', 'play as video'], ['m', 'play in queue'], ['S', 'shuffle'], ['a', 'add to queue'], ['x', 'remove'], ['⇧J/⇧K', 'move'], ['d/D', 'download missing'], ['r', 'repeat'], ['esc', 'back']];
 // An opened playlist's s saves the whole of it as a Playlist.
 const OPENED_KEYS = [['j/k', 'move'], ['s', 'save as a playlist'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // With the sidebar focused the keys make, rename, delete and open a Playlist.
 const SIDEBAR_KEYS = [['n', 'new'], ['e', 'rename'], ['x', 'delete'], ['↵', 'open'], ['tab', 'list']];
-// Blueprint marks each shifted key.
-const BRACKET_SHIFTED = { '[S]': '[⇧S]', '[D/D]': '[D/⇧D]' };
 const EMPTY_KEYS = [['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 const FAILED_KEYS = [['↵', 'try again']].concat(EMPTY_KEYS);
 
@@ -30,6 +26,10 @@ export function youtubeLook(tokens) {
   const voice = l.voice;
   const plain = voice === 'plain';
   const bracket = voice === 'bracket';
+  const m = (s) => mark(l.engraved, s);
+  // Blueprint marks each shifted key and spaces the slash in its download pair.
+  const SHIFTED = { [m('S')]: m('⇧S'), [m('D/D')]: m('D/⇧D') };
+  const DOWNLOAD = { key: m('D/⇧D'), word: 'DOWNLOAD AUDIO / VIDEO' };
   const fonts = (tokens && tokens.type) || { display: '', ui: '' };
   return Object.assign(l, {
     title: {
@@ -54,11 +54,11 @@ export function youtubeLook(tokens) {
       title: (t) => `Add "${t}" to`,
       chip: bracket ? 'PLAYLISTS' : voice === 'caps' ? 'P' : 'p',
       already: bracket ? 'ALREADY IN ✓' : voice === 'caps' ? 'ALREADY IN' : 'already in',
-      newKey: bracket ? '[N]' : 'n',
+      newKey: bracket ? m('N') : 'n',
       newWord: 'new playlist',
       keys: l.keys([['j/k', 'move'], ['↵', 'add'], ['n', 'new'], ['esc', 'cancel']]),
     },
-    hint: bracket ? '[/]' : '/',
+    hint: bracket ? m('/') : '/',
     typeLabel: plain ? '' : 'TYPE',
     chips: ['Videos', 'Playlists', 'Channels'].map((w) => (bracket ? w.toUpperCase() : w)),
     results: plain ? 'Results' : 'RESULTS',
@@ -70,10 +70,10 @@ export function youtubeLook(tokens) {
       if (view === 'search' && !failed && opened === 'playlist') return l.keys(OPENED_KEYS);
       if (view === 'playlist') {
         const keys = l.keys(PLAYLIST_KEYS);
-        return bracket ? keys.map((k) => Object.assign({}, k, { key: BRACKET_SHIFTED[k.key] || k.key })) : keys;
+        return bracket ? keys.map((k) => Object.assign({}, k, { key: SHIFTED[k.key] || k.key })) : keys;
       }
       const keys = l.keys(view !== 'search' ? EMPTY_KEYS : failed ? FAILED_KEYS : SEARCH_KEYS);
-      return bracket ? keys.map((k) => (k.word === 'DOWNLOAD AUDIO/VIDEO' ? BRACKET_DOWNLOAD : k)) : keys;
+      return bracket ? keys.map((k) => (k.word === 'DOWNLOAD AUDIO/VIDEO' ? DOWNLOAD : k)) : keys;
     },
     empty(view) {
       if (view === 'saved') return { head: EMPTY.saved.head, key: EMPTY.saved.key, rest: EMPTY.saved.rest };
@@ -84,7 +84,7 @@ export function youtubeLook(tokens) {
     },
     failed: {
       head: "YouTube didn't give results",
-      key: bracket ? '[↵]' : '↵',
+      key: bracket ? m('↵') : '↵',
       word: 'try again',
       // Paper's board heads a stale yt-dlp's block YOUTUBE CHANGED; the other kinds' boards draw no such line.
       kicker: (f) => (voice === 'caps' && f.kind === 'extraction' && f.error.startsWith('yt-dlp ') ? 'YOUTUBE CHANGED' : ''),
@@ -100,7 +100,7 @@ export function youtubeLook(tokens) {
       ? { at: 'before', size: 12, stroke: TINT.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: TINT.tile } }
       : { at: bracket ? 'before' : 'end', size: 14, stroke: (tokens && (bracket ? tokens.color.accent : tokens.color.ink)) || '', width: bracket ? 1.5 : 1.3, tile: null },
     // A row whose download failed says why in its channel line, and Enter tries again (ruling DS2ESKWX).
-    retry: (reason) => (bracket ? `DOWNLOAD FAILED · ${reason} · [↵] RETRY` : `download failed · ${reason} · ↵ retry`),
+    retry: (reason) => (bracket ? `DOWNLOAD FAILED · ${reason} · ${m('↵')} RETRY` : `download failed · ${reason} · ↵ retry`),
     retryColor: plain ? TINT.errInk : bracket ? TINT.warn : (tokens && tokens.color.danger) || '',
     fieldRadius: plain ? 14 : 0,
     rowRadius: plain ? 10 : 0,

@@ -1,4 +1,5 @@
 // Deen's Memorise page: today's due cards one at a time, what each theme says over them, and the list as it shrinks while Saiful rates himself.
+import { mark } from './voice.mjs';
 
 const upper = (s) => s.toUpperCase();
 
@@ -67,12 +68,12 @@ export function rate(s, graded) {
 export const skip = (s) => Object.assign({}, s, { cards: s.cards.slice(1).concat(s.cards.slice(0, 1)) });
 
 // What each theme's board says: Paper keeps its caps for the labels, Artboard is all sentence case, Blueprint is all capitals.
-export function words(voice) {
+export function words(voice, engraved = false) {
   const t = voice === 'bracket' ? upper : (s) => s;
   const label = voice === 'plain' ? (s) => s : upper;
   const badge = (revealed) => {
     const text = label(revealed ? '2 · revealed' : '1 · recall');
-    return voice === 'bracket' ? `[${text}]` : text;
+    return voice === 'bracket' ? mark(engraved, text) : text;
   };
   return {
     due: (n) => t(`${n} due today`),
@@ -81,7 +82,7 @@ export function words(voice) {
     badge,
     heading: (name, s, a) => `${name} ${bnDigits(s)}:${bnDigits(a)}`,
     recite: t('Recite the rest aloud. No microphone: you judge yourself.'),
-    hintKey: voice === 'bracket' ? '[SPACE]' : 'space',
+    hintKey: voice === 'bracket' ? mark(engraved, 'SPACE') : 'space',
     hintWord: t('reveal the rest'),
     ask: label('How did it go · next review'),
     grades: ['again', 'hard', 'good', 'easy'].map(t),

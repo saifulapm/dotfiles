@@ -108,6 +108,13 @@ check "blueprint: square corners, dashed rules, caps chips and REPEAT OFF ($(yt_
 check "blueprint: the sidebar opens with LIBRARY over Search ($(yt_state | jq -c '.look.sidebar[0:2]'))" \
   yt_is '.look.sidebar[0:2] == ["LIBRARY", "Search"]'
 
+no_marks() { [ -z "$(yt_state | marked)" ]; }
+in_theme hi-fi
+until_ok 3000 no_marks
+check "hi-fi: the legend reads Blueprint's keys without their brackets ($(yt_state | jq -c '.look.legend[0:3]'))" \
+  yt_is '.look.legend == ["J/K MOVE", "↵ PLAY VIDEO", "M PLAY AUDIO", "A ADD TO QUEUE", "S SAVE", "P ADD TO PLAYLIST", "D/⇧D DOWNLOAD AUDIO / VIDEO", "/ SEARCH", "TAB SIDEBAR", "ESC BACK"] and .look.hint == "/"'
+check "hi-fi: nothing in the state holds a bracket ($(yt_state | marked | head -3 | paste -sd'|'))" no_marks
+
 check "it is still on Search with the list focused before Esc ($(yt_state | jq -c '{view, focus}'))" yt_is '.view == "search" and .focus == "list"'
 wtype -k Escape
 until_ok 3000 yt_gone

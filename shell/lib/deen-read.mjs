@@ -1,4 +1,5 @@
 // Deen's Read: the cursor's moves over a surah's words, the heading and bar lines, and the surah picker's filter.
+import { mark } from './voice.mjs';
 
 // The cursor is { a, i }, ayah and word from 1; lengths[k] is ayah k + 1's word count. By 1 is h, the next word to the left.
 export function stepWord(lengths, at, by) {
@@ -30,7 +31,7 @@ export function wordLine(voice, word, a) {
   return say(voice, parts.join(' · '));
 }
 
-export const hearHint = (voice) => (voice === 'bracket' ? '[↵] HEAR THIS WORD' : '↵ hear this word');
+export const hearHint = (voice, engraved = false) => (voice === 'bracket' ? `${mark(engraved, '↵')} HEAR THIS WORD` : '↵ hear this word');
 
 // Harakat and Quranic marks, so a name typed bare finds the voweled one; spaces and hyphens, so ফাতিহা finds আল-ফা-তিহাহ; and য় typed as one code point is the table's য plus nukta.
 const MARKS = /[ً-ٰٟۖ-ۭ\s-]/g;

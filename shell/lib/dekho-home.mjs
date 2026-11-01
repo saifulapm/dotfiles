@@ -1,6 +1,7 @@
 // Home's words: a continued title's episode or length and the time left, a trending title's year and rating, in each theme's voice.
 import { stars } from './dekho.mjs';
 import { pad2 } from './margins.mjs';
+import { mark } from './voice.mjs';
 
 const clock = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${pad2(min % 60)}`);
 
@@ -44,7 +45,7 @@ export function kindOfAnswer(answer) {
 }
 
 // The words each board writes on Home: Paper's caps with a lower-case week, Artboard's sentence case, Blueprint's capitals and bracketed slash.
-export function homeText(voice) {
+export function homeText(voice, engraved = false) {
   const caps = voice !== 'plain';
   const say = (s) => (caps ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1));
   return {
@@ -57,12 +58,12 @@ export function homeText(voice) {
     results: say('results'),
     week: voice === 'bracket' ? 'THIS WEEK' : 'this week',
     search: 'Search films and series',
-    hint: voice === 'bracket' ? '[/]' : '/',
+    hint: voice === 'bracket' ? mark(engraved, '/') : '/',
     machine: voice === 'bracket' ? 'FROM THIS MACHINE' : 'from this machine',
     saved: (d) => (voice === 'bracket' ? `SAVED ${savedDay(d).toUpperCase()}` : `saved ${savedDay(d)}`),
     unreachable: 'TMDB is unreachable.',
     showing: (d) => (d ? `Showing saved rows from ${savedStamp(d)}.` : ''),
-    retry: voice === 'bracket' ? ['[R]', 'RETRY'] : ['r', 'retry'],
+    retry: voice === 'bracket' ? [mark(engraved, 'R'), 'RETRY'] : ['r', 'retry'],
     searchOff: 'Search needs TMDB',
     offlineKeys: [['r', 'retry'], ['h/j/k/l', 'move'], ['↵', 'open'], ['esc', 'close']],
     keys: [['h/j/k/l', 'move'], ['↵', 'open'], ['/', 'search'], ['f', 'filters: genre, language, person…'], ['tab', 'next row'], ['esc', 'close']],

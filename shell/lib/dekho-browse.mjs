@@ -1,5 +1,6 @@
 // Browse's filters: what each key chooses, the chips they draw, and the dekho api discover calls they make.
 import { oneLine } from './picker.mjs';
+import { mark } from './voice.mjs';
 
 export const KINDS = ['all', 'movie', 'tv'];
 export const SORTS = ['popular', 'top-rated', 'newest', 'oldest', 'box-office'];
@@ -158,20 +159,20 @@ export function summary(f) {
 }
 
 // The words each board writes on Browse: Paper's tracked caps, Artboard's sentence case, Blueprint's capitals and brackets.
-export function browseText(voice) {
+export function browseText(voice, engraved = false) {
   const caps = voice !== 'plain';
   const up = (s) => (voice === 'bracket' ? s.toUpperCase() : s);
   return {
     label: voice === 'caps' ? 'DEKHO' : 'Dekho',
     page: 'Browse',
     from: (name) => up(`from ${name}`),
-    prefilled: (name) => (voice === 'bracket' ? `[PREFILLED FROM ${name.toUpperCase()}]` : `prefilled from ${name}`),
+    prefilled: (name) => (voice === 'bracket' ? mark(engraved, `PREFILLED FROM ${name.toUpperCase()}`) : `prefilled from ${name}`),
     kind: (kind) => up(KIND_NAMES[kind]),
     count: (n) => up(`${n} title${n === 1 ? '' : 's'}`),
     active: caps ? 'ACTIVE' : 'Active',
     clear: up('x clear all'),
     typing: 'typing…',
-    person: voice === 'bracket' ? '[PERSON]' : 'Person',
+    person: voice === 'bracket' ? mark(engraved, 'PERSON') : 'Person',
     columns: caps ? ['TITLE', 'YEAR', 'RATING', 'LANGUAGE', 'GENRES'] : ['Title', 'Year', 'Rating', 'Language', 'Genres'],
     hitCells: (hit) => [up(oneLine(hit.language || '')), up((hit.genres || []).map((g) => oneLine(g)).join(' · '))],
     pick: [['↵', 'add as a filter'], ['esc', 'close']],

@@ -66,6 +66,24 @@ in_theme blueprint
 until_ok 3000 deen_is '.voice == "bracket"'
 check "blueprint: the tabs read in capitals ($(deen_state | jq -c '[.tabs[].text]'))" deen_is '[.tabs[].text] == ["READ","MEMORISE","DUAS","HADITH","PRAYER"]'
 
+# Every tab's state, walked once with Tab, for the strings that hold a bracket.
+tab_marks() {
+  local i prev
+  for i in 1 2 3 4 5; do
+    deen_state | marked
+    prev=$(deen_state | jq -r .tab)
+    wtype -k Tab
+    until_ok 1000 deen_is --arg t "$prev" '.tab != $t'
+  done
+}
+no_marks() { [ -z "$(tab_marks)" ]; }
+blueprint_marks=$(tab_marks)
+check "blueprint: the tabs still draw their marks ($(head -3 <<<"$blueprint_marks" | paste -sd'|'))" test -n "$blueprint_marks"
+
+in_theme hi-fi
+until_ok 3000 no_marks
+check "hi-fi: no tab's state holds a bracket ($(tab_marks | head -3 | paste -sd'|'))" no_marks
+
 wtype -k Escape
 until_ok 3000 deen_gone
 check "Esc closes the window" deen_gone

@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import "lib/deen-prayer.mjs" as P
+import "lib/voice.mjs" as V
 
 // Deen's Prayer: a day's five prayers on the left, the next one's countdown, the city and the method on the right.
 FocusScope {
@@ -223,7 +224,7 @@ FocusScope {
                                     id: tagText
                                     anchors.centerIn: parent
                                     textFormat: Text.PlainText
-                                    text: bracket && row.dark ? "[" + look.tabText(row.modelData.tag) + "]" : row.modelData.tag
+                                    text: bracket && row.dark ? V.mark(look.engraved, look.tabText(row.modelData.tag)) : row.modelData.tag
                                     color: (row.dark ? (bracket ? c.surface : c.ink) : c.muted) ?? "gray"
                                     font.family: page.bodyFont
                                     font.pixelSize: plain ? 11 : 10

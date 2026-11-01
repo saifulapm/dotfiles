@@ -1,5 +1,6 @@
 // What a film or episode playing in its unit is, read from dekho play's events, for the now-playing bar.
 import { title as line } from './dekho.mjs';
+import { mark } from './voice.mjs';
 
 // dekho labels a series' playing event "Show — S01E03  Name" and a film's "Title (year)"; the bar writes a series' episode as S1 · E3. Either name can hold that same tag, so the show's own name, when known, says where dekho joined them; without it the first tag is taken. show keeps the show's name as dekho wrote it, title the line the bar draws.
 export function nowPlaying(e, show = '') {
@@ -28,9 +29,9 @@ export function fromWindow(now, text, pids) {
 }
 
 // The bar's words: its tag in each board's voice, and its key as the keys strip names keys.
-export function barText(voice) {
+export function barText(voice, engraved = false) {
   return {
-    tag: voice === 'bracket' ? '[NOW PLAYING]' : voice === 'caps' ? 'NOW PLAYING' : 'Now playing',
+    tag: voice === 'bracket' ? mark(engraved, 'NOW PLAYING') : voice === 'caps' ? 'NOW PLAYING' : 'Now playing',
     keys: [['⇧S', 'stop']],
   };
 }

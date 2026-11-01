@@ -93,6 +93,10 @@ check "Blueprint draws 94:6 under [AYAH], its Bangla lines in $bengali, no Latin
   drawn_is '.label == "[AYAH]" and .ref == "সূরা আশ-শারহ ৯৪:৬" and .family.ar == $arabic and '"$in_bangla"
 shot blueprint-ayah
 
+switched hi-fi '.label == "AYAH"'
+check "Hi-Fi labels 94:6 AYAH in Blueprint's layout without its brackets, and nothing the passage reports holds one ($(passage | jq -c '[.label, .ref]'))" \
+  eval 'passage_is ".label == \"AYAH\" and .ref == \"সূরা আশ-শারহ ৯৪:৬\"" && [ -z "$(passage | marked)" ]'
+
 switched artboard '.label == "Ayah"'
 check "Artboard labels it Ayah over the card, its Bangla lines in $bengali, no Latin ($(drawn '[.label, .ref, .family]'))" \
   drawn_is '.label == "Ayah" and .ref == "সূরা আশ-শারহ ৯৪:৬" and '"$in_bangla"

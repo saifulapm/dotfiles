@@ -1,6 +1,7 @@
 // The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name, in each theme's voice.
 import { stars } from './dekho.mjs';
 import { resumeLine } from './dekho-home.mjs';
+import { mark } from './voice.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
@@ -95,7 +96,7 @@ export function links(voice, title) {
 export const similar = (title) => (Array.isArray(title.similar) ? title.similar.slice(0, 10) : []);
 
 // The words each board writes on the Title page.
-export function titleText(voice) {
+export function titleText(voice, engraved = false) {
   const caps = voice !== 'plain';
   const head = (s) => (caps ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1));
   return {
@@ -104,7 +105,7 @@ export function titleText(voice) {
     crew: head('crew'),
     cast: head('cast'),
     similar: head('more like this'),
-    nextUp: voice === 'bracket' ? '[NEXT UP]' : caps ? 'NEXT UP' : 'next up',
+    nextUp: voice === 'bracket' ? mark(engraved, 'NEXT UP') : caps ? 'NEXT UP' : 'next up',
     filters: upper(voice, 'f filters by these'),
     more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
     keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, links, seasons, episodes, crew, cast, more like this'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],

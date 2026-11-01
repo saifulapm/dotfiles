@@ -713,7 +713,7 @@ FocusScope {
                 Text {
                     id: barHint
                     textFormat: Text.PlainText
-                    text: page.note ? D.oneLine(page.note) : R.hearHint(page.voice)
+                    text: page.note ? D.oneLine(page.note) : R.hearHint(page.voice, look.engraved)
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
                     font.pixelSize: page.bracket ? 10 : 11

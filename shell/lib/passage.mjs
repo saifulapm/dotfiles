@@ -2,6 +2,7 @@
 import { answer, bengaliFamily, oneLine } from './deen.mjs';
 import { bnDigits, reference } from './deen-hadith.mjs';
 import { pad2 } from './margins.mjs';
+import { mark } from './voice.mjs';
 
 export const KINDS = ['ayah', 'hadith', 'dua', 'quote'];
 
@@ -111,9 +112,9 @@ export function overLimit(d) {
 export const within = (d) => d !== null && overLimit(d) === null;
 
 // Paper's tracked capitals, Artboard's frame label, Blueprint's brackets and capitals.
-export function voiced(voice, kind, ref) {
+export function voiced(voice, kind, ref, engraved = false) {
   if (voice === 'plain') return { label: kind.charAt(0).toUpperCase() + kind.slice(1), ref };
-  if (voice === 'bracket') return { label: `[${kind.toUpperCase()}]`, ref: ref.toUpperCase() };
+  if (voice === 'bracket') return { label: mark(engraved, kind.toUpperCase()), ref: ref.toUpperCase() };
   return { label: kind.toUpperCase(), ref };
 }
 

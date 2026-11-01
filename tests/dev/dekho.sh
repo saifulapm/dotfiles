@@ -127,6 +127,15 @@ check "blueprint: the header rule is dashed and the time left reads MIN LEFT, as
 check "blueprint: the poster fills its crossed box square, and a null one keeps the cross ($(dekho_state | jq -c '[.rows.continue[0].poster, .rows.continue[2].poster.shown]'))" \
   dekho_is '(.rows.continue[0].poster | .shown and .radius == 0) and .rows.continue[2].poster.shown == false'
 
+# Blueprint's home draws its marks; Hi-Fi draws the same words bare. The only brackets left are the fixture titles that carried an ANSI colour code, whose ESC the window drops and whose [31m stays.
+words_marked() { dekho_state | marked | grep -v '\[31m'; }
+no_marks() { [ -z "$(words_marked)" ]; }
+blueprint_marks=$(words_marked)
+check "blueprint: the home still draws its marks ($(head -3 <<<"$blueprint_marks" | paste -sd'|'))" test -n "$blueprint_marks"
+in_theme hi-fi
+until_ok 3000 no_marks
+check "hi-fi: nothing in the state holds a bracket but the [31m fixture titles ($(words_marked | head -3 | paste -sd'|'))" no_marks
+
 wtype -k Escape
 until_ok 3000 dekho_gone
 check "Esc closes the window" dekho_gone

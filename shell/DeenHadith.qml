@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-hadith.mjs" as H
+import "lib/voice.mjs" as V
 
 // Deen's Hadith: the corpus saved on this machine browsed by collection, book and narration, or searched, a list on the left and the open narration on the right; until the corpus is here, the download Deen started when it opened.
 FocusScope {
@@ -460,7 +461,7 @@ FocusScope {
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 readonly property string words: card.failed ? "2 · if it fails" : "1 · downloading"
-                                text: page.bracket ? "[" + words.toUpperCase() + "]" : page.caps ? words.toUpperCase() : words
+                                text: page.bracket ? V.mark(page.look.engraved, words.toUpperCase()) : page.caps ? words.toUpperCase() : words
                                 color: (page.plain || page.bracket ? page.c.accent : page.c.surface) ?? "white"
                                 font.family: page.bodyFont
                                 font.pixelSize: page.plain ? 12 : 10
@@ -680,7 +681,7 @@ FocusScope {
                                     Text {
                                         id: keyName
                                         textFormat: Text.PlainText
-                                        text: page.bracket ? "[" + modelData[0].toUpperCase() + "]" : modelData[0]
+                                        text: page.bracket ? V.mark(page.look.engraved, modelData[0].toUpperCase()) : modelData[0]
                                         color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
                                         font.family: page.bodyFont
                                         font.pixelSize: 12
@@ -1150,7 +1151,7 @@ FocusScope {
             anchors.centerIn: parent
             width: Math.min(implicitWidth, grade.width - (grade.host.bracket ? 0 : grade.host.plain ? 16 : 12))
             textFormat: Text.PlainText
-            text: grade.host.bracket ? "[" + grade.words.toUpperCase() + "]" : grade.host.caps && !grade.on ? grade.words.toUpperCase() : grade.words
+            text: grade.host.bracket ? V.mark(grade.host.look.engraved, grade.words.toUpperCase()) : grade.host.caps && !grade.on ? grade.words.toUpperCase() : grade.words
             color: (grade.host.plain ? (grade.on ? grade.host.deep : grade.host.c.ink) : grade.on ? grade.host.c.surface : grade.host.bracket ? grade.host.c.accent : grade.host.c.ink) ?? "black"
             font.family: grade.host.bodyFont
             font.pixelSize: grade.host.plain || grade.on && grade.host.caps ? 11 : 10
