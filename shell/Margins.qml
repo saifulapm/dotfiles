@@ -152,6 +152,7 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         tokens: root.theme.tokens
                         light: parent.modelData.light
+                        warmth: Root.State.warmth
                     }
 
                     Label {
@@ -253,6 +254,7 @@ PanelWindow {
                 anchors.verticalCenter: parent.verticalCenter
                 tokens: root.theme.tokens
                 light: root.voice.goalLamp || "unlit"
+                warmth: Root.State.warmth
             }
 
             Label {

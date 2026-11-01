@@ -20,6 +20,8 @@ Singleton {
     property real awakeUntil: 0
     // How many times slower surfaces move, read once at start; only bin/dots-dev sets it.
     readonly property real slowdown: M.slowdownOf(Quickshell.env("DOTS_MOTION_SLOWDOWN"))
+    // How warm the bar's lamps are, 0 to 1; the paper's sweep sets it and leaves it at 1.
+    property real warmth: 1
 
     // A function, not a binding: a binding over ticks would miss a Tick starting or stopping.
     function timers(): int {

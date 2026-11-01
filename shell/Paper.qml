@@ -1,7 +1,9 @@
 import Quickshell
 import Quickshell.Wayland
 import QtQuick
+import QtQuick.Effects
 import "." as Root
+import "lib/hifi.mjs" as H
 
 // The shader has no time uniform, so the paper never redraws unless the theme or the output changes.
 PanelWindow {
@@ -15,9 +17,19 @@ PanelWindow {
     // The back sheet takes each new theme, so the sheet on screen never rebuilds its shader.
     property Item front: sheetA
     readonly property Item back: front === sheetA ? sheetB : sheetA
-    // The outgoing theme's motion picks the transition; "" while none runs.
+    // The outgoing theme's motion picks the transition, or Hi-Fi's sweep when Hi-Fi is either side; "" while none runs.
     property string kind: ""
     property bool waiting: false
+    // How far through its 220 ms the sweep is, 0 to 1; the pointer and the lamps' warmth follow from it.
+    property real sweepTime: 0
+    readonly property var swept: H.sweepAt(sweepTime)
+    // The sweep pointer's x as a fraction of the width; null while no sweep runs.
+    readonly property var pointer: kind === "sweep" ? swept.pointer : null
+
+    onSweptChanged: {
+        if (kind === "sweep")
+            Root.State.warmth = swept.warmth;
+    }
 
     // Emitted once, when this window's first frame reaches the compositor.
     signal firstFrame
@@ -54,6 +66,7 @@ PanelWindow {
             slide.stop();
             zoom.stop();
             scan.stop();
+            sweep.stop();
             finish();
         }
         // The first tokens, or the same theme again, replace the paper with no transition.
@@ -61,7 +74,12 @@ PanelWindow {
             front.tokens = t;
             return;
         }
-        kind = ({ snappy: "slide", spring: "zoom", linear: "scan" })[front.tokens.primitive.motion] ?? "cut";
+        kind = H.switchKind(front.tokens, t);
+        // The bar takes the new tokens in this same event, so its lamps draw unlit before the first frame of the sweep.
+        if (kind === "sweep") {
+            sweepTime = 0;
+            Root.State.warmth = 0;
+        }
         // The back sheet waits off screen or under the front one, so its shader rebuild never shows.
         back.offset = kind === "slide" ? height : 0;
         back.z = kind === "slide" ? 1 : 0;
@@ -81,7 +99,7 @@ PanelWindow {
         if (kind === "cut")
             finish();
         else
-            ({ slide: slide, zoom: zoom, scan: scan })[kind].start();
+            ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep })[kind].start();
     }
 
     // What each sheet that shows a passage draws, the one on screen first.
@@ -101,6 +119,7 @@ PanelWindow {
         outgoing.tokens = null;
         canvas.scale = 1;
         kind = "";
+        Root.State.warmth = 1;
     }
 
     WlrLayershell.layer: WlrLayer.Background
@@ -148,6 +167,28 @@ PanelWindow {
             width: paper.width
             height: 2
             color: paper.front.tokens?.color.accent ?? "transparent"
+        }
+
+        // Hi-Fi's tuning pointer, in Hi-Fi's danger red whichever side of the switch Hi-Fi is on.
+        Item {
+            readonly property color red: [paper.front.tokens, paper.back.tokens].find(t => t?.primitive.motion === "dial")?.color.danger ?? "transparent"
+
+            visible: paper.kind === "sweep"
+            z: 2
+            x: paper.front.cutLeft - 1
+            width: 2
+            height: paper.height
+
+            RectangularShadow {
+                anchors.fill: parent
+                blur: 8
+                color: Qt.alpha(parent.red, 0.7)
+            }
+
+            Rectangle {
+                anchors.fill: parent
+                color: parent.red
+            }
         }
     }
 
@@ -216,23 +257,37 @@ PanelWindow {
         onFinished: paper.finish()
     }
 
-    // One theme's paper. cut hides its top rows, for the scan line.
+    // Hi-Fi: a red tuning pointer crosses left to right, easing in and out, and the new sheet shows left of it.
+    NumberAnimation {
+        id: sweep
+        target: paper
+        property: "sweepTime"
+        from: 0
+        to: 1
+        duration: 220 * Root.State.slowdown
+        onFinished: paper.finish()
+    }
+
+    // One theme's paper. cut hides its top rows, for the scan line; cutLeft hides its left columns, for the sweep.
     component Sheet: Item {
         id: sheet
 
         property var tokens: null
         property real offset: 0
         property real cut: 0
+        readonly property real cutLeft: paper.kind === "sweep" && sheet === paper.front ? paper.swept.pointer * paper.width : 0
         readonly property bool ready: fill.ready
         readonly property Item words: passageLoader.item
 
+        x: cutLeft
         y: offset + cut
-        width: paper.width
+        width: paper.width - cutLeft
         height: paper.height - cut
-        clip: cut > 0
+        clip: cut > 0 || cutLeft > 0
 
         PaperFill {
             id: fill
+            x: -sheet.cutLeft
             y: -sheet.cut
             width: paper.width
             height: paper.height
@@ -242,9 +297,10 @@ PanelWindow {
             blending: sheet.opacity < 1
         }
 
-        // Inside the sheet, so a theme switch carries the passage with the slide, zoom or scan; a sheet with no tokens draws none.
+        // Inside the sheet, so a theme switch carries the passage with the slide, zoom, scan or sweep; a sheet with no tokens draws none.
         Loader {
             id: passageLoader
+            x: -sheet.cutLeft
             y: -sheet.cut
             width: paper.width
             height: paper.height

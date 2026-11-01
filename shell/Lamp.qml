@@ -10,7 +10,9 @@ Item {
     // lit, unlit, red or green; Item already owns state.
     property string light: "unlit"
     property int size: 6
-    readonly property var look: tokens ? H.lamp(tokens, light, size) : ({ size: size, color: "transparent", glow: "transparent" })
+    // 0 to 1: a lamp warming up draws nearer unlit and glows fainter; the bar's lamps follow the theme switch's sweep.
+    property real warmth: 1
+    readonly property var look: tokens ? H.warmLamp(tokens, light, size, warmth) : ({ size: size, color: "transparent", glow: "transparent" })
 
     width: size
     height: size
@@ -18,6 +20,7 @@ Item {
     Loader {
         active: lamp.look.glow !== "transparent"
         anchors.fill: parent
+        opacity: lamp.warmth
         sourceComponent: RectangularShadow {
             blur: lamp.size * 1.2
             radius: lamp.size / 2
