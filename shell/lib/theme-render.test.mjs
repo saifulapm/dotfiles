@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync, cpSync, mkdirSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync, cpSync, mkdirSync, existsSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -133,4 +133,34 @@ test('dots.kak defines the kak-mail faces and key strip in each theme\'s colours
     got.keys = keys?.slice("set-option global mail_keys '".length, -1);
     assert.deepEqual(got, want, name);
   }
+});
+
+// A render run from a worktree once rewrote the live desktop's niri.kdl and foot.ini; the default state dir belongs to the checkout the live shell runs from.
+test('with no XDG_STATE_HOME it refuses to render unless its repo is the live shell checkout', (t) => {
+  const root = mkdtempSync(join(tmpdir(), 'dots-live-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const repo = new URL('../..', import.meta.url).pathname;
+  for (const d of ['shell/lib', 'shell/newtab', 'themes']) cpSync(join(repo, d), join(root, 'copy', d), { recursive: true });
+  const home = join(root, 'home');
+  const config = join(home, '.config');
+  mkdirSync(config, { recursive: true });
+  const env = { ...process.env, HOME: home, XDG_STATE_HOME: '', XDG_CONFIG_HOME: '' };
+  const render = () => spawnSync('node', [join(root, 'copy/shell/lib/theme-render.mjs'), 'paper'], { env, encoding: 'utf8' });
+  const out = join(home, '.local/state/dots/theme-out/shell.json');
+
+  symlinkSync(join(repo, 'shell'), join(config, 'quickshell'));
+  const refused = render();
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /live shell runs from .*; set XDG_STATE_HOME/);
+  assert.equal(existsSync(out), false);
+
+  rmSync(join(config, 'quickshell'));
+  symlinkSync(join(root, 'copy/shell'), join(config, 'quickshell'));
+  assert.equal(render().status, 0);
+  rmSync(out);
+
+  // A machine whose shell is not linked yet runs no live shell to rewrite.
+  rmSync(join(config, 'quickshell'));
+  assert.equal(render().status, 0);
+  assert.equal(existsSync(out), true);
 });

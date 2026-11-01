@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // node shell/lib/theme-render.mjs <name>: renders themes/<name>/theme.toml into $XDG_STATE_HOME/dots/theme-out/.
-import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, renameSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
@@ -59,6 +59,16 @@ for (const d of readdirSync(dir).sort()) {
 themes.sort((a, b) => (b.name === 'paper') - (a.name === 'paper'));
 // The apps that speak in the shell's voice read the tokens as the shell does, so Hi-Fi's engraved voice draws Blueprint's words bare.
 const spoken = checkTokens(theme);
+// The default state dir is the live desktop's: only the checkout its shell runs from may write there, so a worktree's render cannot rewrite it.
+if (!process.env.XDG_STATE_HOME) {
+  const link = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'quickshell');
+  const live = existsSync(link) ? realpathSync(link) : null;
+  const own = realpathSync(new URL('..', import.meta.url).pathname);
+  if (live && live !== own) {
+    console.error(`theme ${name}: the live shell runs from ${live}, not ${own}; set XDG_STATE_HOME to render elsewhere`);
+    process.exit(1);
+  }
+}
 const out = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots/theme-out');
 mkdirSync(out, { recursive: true });
 const files = {
