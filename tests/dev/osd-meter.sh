@@ -51,6 +51,11 @@ glass=$(near .osd.meter.glass 20 22 23 3)
 check "the panel is glass #141617 ($glass of 400 px)" test "$glass" -gt 380
 red=$(near .osd.meter.red 251 73 52 12)
 check "the red zone reads #FB4934 ($red px)" test "$red" -gt 6
+# Red is a zone or a lamp in Hi-Fi, never text: the 100 label is muted like 0 and 50.
+check "the labels read 0, 50 and 100, none red ($(jq -c '[.osd.meter.labels[] | [.text, .color]]' <<<"$state"))" state_has '[.osd.meter.labels[].text] == ["0", "50", "100"] and all(.osd.meter.labels[]; (.color | ascii_downcase) != "#fb4934")'
+state=$(jq '.osd.meter.top = .osd.meter.labels[2].box' <<<"$state")
+top_red=$(near .osd.meter.top 251 73 52 30)
+check "the 100 label holds no red pixel ($top_red px)" test "$top_red" -eq 0
 # The 1.5 px needle covers no pixel whole, so its pixels are #FABD2F blended into the glass: bright, with amber's green to red ratio of 0.76 and little blue.
 amber=$(grim -s 1 -t ppm -g "$(jq -r '.osd.meter.needle | "\(.x - 3 | floor),\(.y - 3 | floor) 7x7"' <<<"$state")" - | node -e '
   const b = require("fs").readFileSync(0), head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);

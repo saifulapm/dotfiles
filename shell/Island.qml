@@ -520,7 +520,8 @@ PanelWindow {
             meter: meter ? {
                 box: at(meter),
                 needle: point(meter.needle.rotation, osdLook.meter.needle.length - 8),
-                red: point((osdLook.meter.angle(osdLook.meter.red) + osdLook.meter.angle(100)) / 2, osdLook.meter.radius)
+                red: point((osdLook.meter.angle(osdLook.meter.red) + osdLook.meter.angle(100)) / 2, osdLook.meter.radius),
+                labels: meter.labels().map(l => ({ text: l.text, color: l.color, box: { x: l.box.x + shift, y: l.box.y, w: l.box.w, h: l.box.h } }))
             } : null,
             highlightBox: box.highlight.visible ? at(box.highlight) : null
         };

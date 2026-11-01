@@ -24,6 +24,17 @@ Item {
         return { x: look.pivot.x + r * Math.sin(a), y: look.pivot.y - r * Math.cos(a) };
     }
 
+    // The scale's labels as drawn, each with its colour and its box in the window's pixels.
+    function labels() {
+        const out = [];
+        for (let i = 0; i < labelList.count; i++) {
+            const t = labelList.itemAt(i);
+            const p = t.mapToItem(null, 0, 0);
+            out.push({ text: t.text, color: t.color.toString(), box: { x: p.x, y: p.y, w: t.width, h: t.height } });
+        }
+        return out;
+    }
+
     // The same point in the window's pixels, for the state's pixel reads.
     function inWindow(deg, r) {
         const p = onDial(deg, r);
@@ -95,7 +106,9 @@ Item {
             }
         }
 
+        // Red is only ever a lamp or the zone in Hi-Fi, never text, so every label is muted.
         Repeater {
+            id: labelList
             model: meter.look.labels
 
             Text {
@@ -105,7 +118,7 @@ Item {
                 x: at.x - width / 2
                 y: at.y - height / 2
                 text: String(modelData)
-                color: modelData >= meter.look.red ? meter.look.redColor : meter.look.scale.color
+                color: meter.look.scale.color
                 font.family: meter.look.scale.font
                 font.pixelSize: meter.look.scale.size
             }
