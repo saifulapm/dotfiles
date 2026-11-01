@@ -175,9 +175,127 @@ artboard() {
   until_ok 8000 has_windows 0
 }
 
+# Runs a pixel test on PPM grabs saved to files: node gets them as g[0], g[1] and on, each with w, h and at(x, y).
+ppm_test() {
+  node -e '
+    const g = process.argv.slice(1).map((f) => {
+      const b = require("fs").readFileSync(f);
+      const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+      const w = +head[1], h = +head[2], px = b.subarray(head[0].length);
+      return { w, h, at: (x, y) => [...px.subarray((y * w + x) * 3, (y * w + x) * 3 + 3)] };
+    });
+    const near = (c, t, d = 16) => c.every((v, i) => Math.abs(v - t[i]) <= d);
+    const magenta = (c) => c[0] - c[1] > 60 && c[2] - c[1] > 60;
+    const amber = (c) => c[0] - c[2] >= 15;
+    const ok = (function () { '"$1"' }());
+    process.exit(ok ? 0 : 1);
+  ' "${@:2}"
+}
+
+# Each magenta window's box on screen, one "x y w h" a line, left to right.
+magenta_boxes() {
+  grim -t ppm - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    const w = +head[1], h = +head[2], px = b.subarray(head[0].length);
+    const boxes = [];
+    let cur = null;
+    for (let x = 0; x < w; x++) {
+      let y0 = -1, y1 = -1;
+      for (let y = 0; y < h; y++) {
+        const i = (y * w + x) * 3;
+        if (px[i] - px[i + 1] > 60 && px[i + 2] - px[i + 1] > 60) { if (y0 < 0) y0 = y; y1 = y; }
+      }
+      if (y0 < 0) { cur = null; continue; }
+      if (!cur) { cur = { x0: x, x1: x, y0, y1 }; boxes.push(cur); }
+      cur.x1 = x;
+      cur.y0 = Math.min(cur.y0, y0);
+      cur.y1 = Math.max(cur.y1, y1);
+    }
+    for (const c of boxes) console.log(`${c.x0} ${c.y0} ${c.x1 - c.x0 + 1} ${c.y1 - c.y0 + 1}`);
+  '
+}
+
+hifi() {
+  local x y w h t g m=30 dir=$DOTS_DEV_DIR/hifi
+  theme hi-fi
+  check "hi-fi: a resting magenta window is found" calibrate
+  [ -n "$box" ] || return
+  read -r x y w h <<<"$box"
+  mkdir -p "$dir"
+  # The grabs take the window and 30 px round it, past the glow's 24 px, so the magenta starts at (30, 30) in each.
+  g="$((x - m)),$((y - m)) $((w + 2 * m))x$((h + 2 * m))"
+  grim -t ppm -g "$g" "$dir/before.ppm"
+  open_magenta
+  wait_until 1320
+  grim -t ppm -g "$g" "$dir/open30.ppm"
+  wait_until 3080
+  t=$(($(now_ms) - t0))
+  grim -t ppm -g "$g" "$dir/open70.ppm"
+  # Against the dark paper, a dimmer magenta has less red and blue.
+  check "hi-fi 30% into its open is darker than at 70% ($t ms of 4400)" \
+    ppm_test "const a = g[0].at($m + $w / 2 | 0, $m + $h / 2 | 0), b = g[1].at($m + $w / 2 | 0, $m + $h / 2 | 0); return a[0] + a[2] < b[0] + b[2];" \
+    "$dir/open30.ppm" "$dir/open70.ppm"
+  check "hi-fi 70% into its open: the magenta sits in its rest box, unscaled and unmoved" \
+    ppm_test "
+      const o = g[0]; let x0 = o.w, y0 = o.h, x1 = -1, y1 = -1;
+      for (let y = 0; y < o.h; y++) for (let x = 0; x < o.w; x++) if (magenta(o.at(x, y))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      return [x0 - $m, y0 - $m, x1 - $m - $w + 1, y1 - $m - $h + 1].every((d) => Math.abs(d) <= 1);" \
+    "$dir/open70.ppm"
+  sleep 3
+  close_window
+  wait_until 2240
+  t=$(($(now_ms) - t0))
+  grim -t ppm -g "$g" "$dir/close80.ppm"
+  # niri's 1 px border sits just outside foot's surface, so the geometry's edge, and the outline, is one row above the magenta.
+  check "hi-fi 80% into its close ($t ms of 2800): an amber outline round paper" \
+    ppm_test "
+      const c = g[0], p = g[1];
+      let n = 0; for (let i = 0; i < $w; i++) if (amber(c.at($m + i, $m - 1))) n++;
+      if (n < $w * 0.9) return false;
+      const cx = $m + $w / 2 | 0, cy = $m + $h / 2 | 0;
+      return near(c.at(cx, cy), p.at(cx, cy), 6);" \
+    "$dir/close80.ppm" "$dir/before.ppm"
+  until_ok 8000 has_windows 0
+  sleep 1
+  grim -t ppm -g "$g" "$dir/after.ppm"
+  check "hi-fi after its close: only the paper where it was" \
+    ppm_test "for (let y = 0; y < g[0].h; y++) for (let x = 0; x < g[0].w; x++) if (!near(g[0].at(x, y), g[1].at(x, y), 6)) return false; return true;" \
+    "$dir/after.ppm" "$dir/before.ppm"
+  # Each window warms up on its own progress, so two opened 50 ms apart both end whole, and the focused one glows.
+  niri msg action spawn -- foot -c /dev/null -o colors-dark.background=ff00ff -o colors-light.background=ff00ff \
+    sh -c 'printf "\033[?25l"; exec sleep 600' >/dev/null
+  sleep 0.05
+  niri msg action spawn -- foot -c /dev/null -o colors-dark.background=ff00ff -o colors-light.background=ff00ff \
+    sh -c 'printf "\033[?25l"; exec sleep 600' >/dev/null
+  until_ok 5000 has_windows 2
+  sleep 6
+  magenta_boxes >"$dir/boxes"
+  grim -t ppm "$dir/two.ppm"
+  # The focused one has the amber border a row above its top, and its glow a few rows above that; the other's border is #3C3836 and its shadow transparent.
+  check "hi-fi: two windows opened 50 ms apart both end opaque, the focused one with its glow" \
+    ppm_test "
+      const boxes = require('fs').readFileSync('$dir/boxes', 'utf8').trim().split('\n').filter(Boolean).map((l) => l.split(' ').map(Number));
+      if (boxes.length !== 2) return false;
+      const s = g[0]; let lit = 0;
+      for (const [bx, by, bw, bh] of boxes) {
+        if (!near(s.at(bx + (bw >> 1), by + (bh >> 1)), [255, 0, 255], 4)) return false;
+        if (!amber(s.at(bx + (bw >> 1), by - 1))) continue;
+        let n = 0; for (let i = bw >> 2; i < (3 * bw) >> 2; i++) if (amber(s.at(bx + i, by - 3))) n++;
+        if (n >= (bw >> 1) * 0.9) lit++;
+      }
+      return lit === 1;" \
+    "$dir/two.ppm"
+  niri msg action close-window
+  niri msg action focus-column-left
+  niri msg action close-window
+  until_ok 8000 has_windows 0
+}
+
 blueprint
 paper
 artboard
+hifi
 
 # The broken fixture: a syntax error in an open shader must turn the check above red; it is an include of its own, since niri merges a second animations block only from one.
 broken() {
