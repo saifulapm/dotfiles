@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, columnPosition, edgeToEdge, configNotifies, reconnected } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, outputWorkspaces, columnPosition, edgeToEdge, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -160,6 +160,16 @@ test('a window keeps the urgency niri last reported for it', () => {
 
 test('before any event no workspace is urgent', () => {
   assert.deepEqual(urgentWorkspaces(initial, 'eDP-1'), []);
+});
+
+test("an output's workspaces list in number order, each saying whether it is shown and urgent", () => {
+  const s = run([workspaces(ws(3, 3, 'eDP-1'), ws(1, 1, 'eDP-1'), ws(5, 1, 'HDMI-A-1', false, true), ws(2, 2, 'eDP-1', false, true)), wsUrgency(3, true)]);
+  assert.deepEqual(outputWorkspaces(s, 'eDP-1'), [
+    { idx: 1, active: false, urgent: false },
+    { idx: 2, active: true, urgent: false },
+    { idx: 3, active: false, urgent: true },
+  ]);
+  assert.deepEqual(outputWorkspaces(initial, 'eDP-1'), []);
 });
 
 // niri 26.04 numbers each tiled window's column from 1 in pos_in_scrolling_layout and gives a floating window none.

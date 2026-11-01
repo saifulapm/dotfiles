@@ -91,6 +91,14 @@ export function urgentWorkspaces(state, output) {
     .sort((a, b) => a - b);
 }
 
+// The output's workspaces in number order, each saying whether it is the one shown there and whether it holds an urgent window.
+export function outputWorkspaces(state, output) {
+  return state.workspaces
+    .filter((w) => w.output === output)
+    .sort((a, b) => a.idx - b.idx)
+    .map((w) => ({ idx: w.idx, active: w.is_active, urgent: w.is_urgent }));
+}
+
 // The focused column of the output's shown workspace, of its tiled columns; null while a floating window or none is focused there.
 export function columnPosition(state, output) {
   const ws = state.workspaces.find((w) => w.output === output && w.is_active);
