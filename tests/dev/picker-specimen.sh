@@ -54,8 +54,8 @@ near6() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2;
 until_ok 5000 shell_status >/dev/null
 until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"paper\"' >/dev/null"
 niri msg action spawn -- dots-call themes toggle
-until_ok 3000 state_is '.open and .settled and (.cards | length == 3) and all(.cards[]; .paperReady)'
-check "the picker shows three cards, each paper settled" state_is '.open and (.cards | length == 3) and all(.cards[]; .paperReady)'
+until_ok 3000 state_is '.open and .settled and (.cards | length == 4) and all(.cards[]; .paperReady)'
+check "the picker shows four cards, each paper settled" state_is '.open and (.cards | length == 4) and all(.cards[]; .paperReady)'
 # Below the windows and their shadows, the bottom rows of a preview are bare paper.
 paper_shades() { (($(grab paper 60 186 40 10 | shades) >= 20)); }
 check "paper: a 40x10 sample of its card paper holds 20 or more shades ($(grab paper 60 186 40 10 | shades))" paper_shades
@@ -67,14 +67,14 @@ check "artboard: its card shows a #B4BAC4 dot" dot_colour
 blueprint_grid() { grab blueprint 16 190 81 1 | every8 bright 12; }
 check "blueprint: every 8th pixel along its card's bottom row is a brighter grid line" blueprint_grid
 
-for name in paper artboard blueprint; do
+for name in paper artboard blueprint hi-fi; do
   card=$(themes_state | jq -c --arg n "$name" '.cards[] | select(.name == $n)')
   want=$(node --input-type=module -e "
     import { readFileSync } from 'node:fs';
     import { parseToml } from '$repo/shell/lib/toml.mjs';
-    import { validateTheme } from '$repo/shell/lib/theme.mjs';
+    import { validateTheme, checkTokens } from '$repo/shell/lib/theme.mjs';
     import { swatches } from '$repo/shell/lib/themes.mjs';
-    console.log(swatches(validateTheme(parseToml(readFileSync('$repo/themes/$name/theme.toml', 'utf8')))).join(' '));
+    console.log(swatches(checkTokens(validateTheme(parseToml(readFileSync('$repo/themes/$name/theme.toml', 'utf8'))))).join(' '));
   ")
   read -r -a colours <<<"$want"
   swatch_ok=0
@@ -83,11 +83,12 @@ for name in paper artboard blueprint; do
     got=$(grim -s 1 -t ppm -g "$sx,$sy 4x4" - | mean_rgb)
     near6 "$got" "$(hex_rgb "${colours[i]}")" || { echo "     $name swatch $i is $got, not ${colours[i]}"; swatch_ok=1; }
   done
-  check "$name: its eight swatches are ink, ANSI 1 to 6 and the paper" test "$swatch_ok" = 0
+  check "$name: its eight swatches are its palette strip (${colours[*]})" test "$swatch_ok" = 0
   check "$name: its terminal draws four lines" test "$(jq '.terminal | length' <<<"$card")" = 4
 done
-check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~ and [03] FOOT — ~" \
-  state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~"]'
+check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~, [03] FOOT — ~ and Hi-Fi's FOOT" \
+  state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~", "  FOOT"]'
+check "hi-fi: its card's bar lights the third of four lamps" state_is '.cards[3].lamps == ["unlit", "unlit", "lit", "unlit"]'
 
 wtype -k Escape
 exit $((fails > 0))
