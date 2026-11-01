@@ -69,9 +69,9 @@ test('glass is optional and checked like any colour; a theme without it gets its
   assert.throws(() => validateTheme(border), /niri\.border_active: "amber"/);
 });
 
-test('Hi-Fi frames the focused window in a 1 px amber border with an amber glow, the rest in #3C3836', () => {
+test('Hi-Fi frames the focused window in a 1 px amber border with an amber glow, the rest in the line colour #504945 so they keep an edge on the faceplate', () => {
   const kdl = renderNiri(hifi());
-  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#FABD2F"\s*inactive-color "#3C3836"/);
+  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#FABD2F"\s*inactive-color "#504945"/);
   assert.match(kdl, /shadow \{\s*on\s*softness 24\s*spread 0\s*offset x=0 y=0\s*color "#FABD2F38"\s*inactive-color "#00000000"/);
   assert.match(kdl, /gaps 24/);
   assert.match(kdl, /geometry-corner-radius 0/);
