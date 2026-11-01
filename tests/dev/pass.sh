@@ -209,12 +209,14 @@ until_ok 3000 state_is '.drawing == false'
 # Each theme draws the board's key strip; the list unloads 30 s after it closes.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "artboard|↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc" "blueprint|[↵] COPY · [O] OTP · [S] SHOW · [N] NEW · [E] EDIT · [D] DELETE · [Q] QR · [ESC]" "paper|↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC"; do
+for t in "artboard|↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc" "blueprint|[↵] COPY · [O] OTP · [S] SHOW · [N] NEW · [E] EDIT · [D] DELETE · [Q] QR · [ESC]" "paper|↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC" "hi-fi|↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC"; do
   IFS='|' read -r name hint <<<"$t"
   in_theme "$name"
   niri msg action spawn -- dots-call pass toggle
   until_ok 3000 state_is '.open and .settled'
   check "$name: the key strip reads $hint ($(pass_state | jq -c .hint))" state_is ".hint == \"$hint\""
+  # Hi-Fi draws Blueprint's strip without its marks; the entries are the store's own names, none with a bracket.
+  [ "$name" = hi-fi ] && check "hi-fi: nothing Pass reports holds a bracket ($(pass_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(pass_state | marked)" ]'
   wtype -k Escape
   until_ok 3000 state_is '.drawing == false'
 done

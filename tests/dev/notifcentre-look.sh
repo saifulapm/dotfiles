@@ -90,6 +90,20 @@ until_ok 2000 state_is .hint
 check "blueprint: the empty list's hint brackets its keys ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["[/]", "[ESC]"]'
 close_centre
 
+# Hi-Fi draws Blueprint's header and keys without the brackets; the rows are notifications this check sent, none with a bracket.
+in_theme hi-fi
+send_fresh hi-fi
+open_centre
+check "hi-fi: the header line reads NOTIFICATIONS ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "header" and .heading == "NOTIFICATIONS"'
+check "hi-fi: every legend key is bare ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["J/K", "↵", "D", "⇧D", "M", "I", "S", "1-3", "/", "ESC"]'
+check "hi-fi: nothing the centre reports holds a bracket ($(notifs | marked | head -3 | paste -sd'|'))" eval '[ -z "$(notifs | marked)" ]'
+until_ok 2000 state_is .keyboard
+wtype -M shift -k d -m shift
+until_ok 2000 state_is .hint
+check "hi-fi: the empty list's hint is bare ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["/", "ESC"]'
+check "hi-fi: and the empty centre holds no bracket either" eval '[ -z "$(notifs | marked)" ]'
+close_centre
+
 # An app name is whatever the sender says: a long one elides inside the card, a newline stays on one line, and none at all leaves just the count.
 notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "" '[]' '{}' 5000 >/dev/null; }
 notify_as "App $(printf 'long%.0s' {1..50})" "long"

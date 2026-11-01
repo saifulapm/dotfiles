@@ -39,6 +39,15 @@ dash=$(near "$(sheet_state | jq -r '.ruleBox | "\(.x + 40 | floor),\(.y | floor)
 check "blueprint: the rule under the heading is dashed in #2E5A72 ($dash of 300 px)" test "$dash" -gt 100 -a "$dash" -lt 250
 close_sheet
 
+# Hi-Fi draws Blueprint's header line and rule with the keys bare.
+in_theme hi-fi
+open_sheet
+check "hi-fi: every row key is bare ($(sheet_state | jq -c '.rowKeys[0:3]'))" state_is '(.rowKeys | length) == .rows and .rows > 0 and all(.rowKeys[]; test("[\\[\\]]") | not)'
+check "hi-fi: every legend key is bare ($(sheet_state | jq -c .legendKeys))" state_is '(.legendKeys | length) == 5 and all(.legendKeys[]; test("[\\[\\]]") | not)'
+check "hi-fi: the heading reads KEYS on the header line ($(sheet_state | jq -c '[.heading, .headingKind]'))" state_is '.heading == "KEYS" and .headingKind == "header"'
+check "hi-fi: nothing the sheet reports holds a bracket ($(sheet_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(sheet_state | marked)" ]'
+close_sheet
+
 in_theme paper
 exit $((fails > 0))
 }

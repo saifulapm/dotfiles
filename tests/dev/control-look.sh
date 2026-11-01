@@ -67,6 +67,19 @@ check "blueprint: inside the cursor row reads the accent ($cyan of 64 px)" test 
 check "blueprint: the legend's keys are bracketed ($(control_state | jq -c .legend))" state_is '.legend == "[TAB] SECTION  [J/K] MOVE  [ESC] CLOSE"'
 close_control
 
+# Hi-Fi draws Blueprint's header and keys without the brackets, in every section.
+in_theme hi-fi
+open_control
+at_section() { control_state | jq -e --arg s "$1" '.section == $s' >/dev/null && return 0; wtype -k Tab; sleep 0.3; return 1; }
+check "hi-fi: the header reads CONTROL // AUDIO ($(control_state | jq -c .heading))" state_is '.heading == "CONTROL // AUDIO"'
+check "hi-fi: the legend's keys are bare ($(control_state | jq -c .legend))" state_is '.legend == "TAB SECTION  J/K MOVE  ESC CLOSE" and .legendDrawn == .legend'
+for s in $(control_state | jq -r '.sections[]'); do
+  until_ok 4000 at_section "$s"
+  # A device, network or port name is the system's own text, so a bracket in one stays; the fixture has none.
+  check "hi-fi: the $s section holds no bracket anywhere in its state ($(control_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(control_state | marked)" ]'
+done
+close_control
+
 in_theme paper
 exit $((fails > 0))
 }
