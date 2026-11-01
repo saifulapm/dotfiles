@@ -71,6 +71,12 @@ export function surfaceStyle(tokens, role) {
   };
   // The glass catches light along its top edge in every island mode; only glass has the key, so Surface draws no line for the other themes.
   if (glass) style.highlight = hifiGlass(tokens).highlight;
+  // A Hi-Fi panel is lit like the focused window, whose niri border and shadow are the same amber hairline and #FABD2F38 glow over 24 px.
+  if (tokens.type.engraved === true && role === 'card') {
+    style.frame = { width: 1, color: c.accent };
+    style.shadow = { kind: 'glow', x: 0, y: 0, blur: 24, spread: 0, color: c.accent, alpha: 0.22 };
+    style.highlight = hifiGlass(tokens).highlight;
+  }
   return style;
 }
 

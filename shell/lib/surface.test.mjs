@@ -110,8 +110,15 @@ test('a specimen card draws its island as a chip at half size: the island look w
 
 test("Hi-Fi's island and chip are glass under a 1 px highlight of ink at 6 %; the other themes draw no highlight", () => {
   const hifi = checkTokens(validateTheme(parseToml(readFileSync(new URL('../../themes/hi-fi/theme.toml', import.meta.url), 'utf8'))));
-  assert.deepEqual(['island', 'chip', 'card'].map((r) => surfaceStyle(hifi, r).highlight), ['#0FEBDBB2', '#0FEBDBB2', undefined]);
+  assert.deepEqual(['island', 'chip', 'card'].map((r) => surfaceStyle(hifi, r).highlight), ['#0FEBDBB2', '#0FEBDBB2', '#0FEBDBB2']);
   assert.deepEqual([paper, artboard, blueprint].map((t) => surfaceStyle(t, 'island').highlight), [undefined, undefined, undefined]);
+});
+
+test("Hi-Fi's panels are lit like the focused window: a 1 px amber frame and its soft amber glow; the island stays glass in a line frame", () => {
+  const hifi = checkTokens(validateTheme(parseToml(readFileSync(new URL('../../themes/hi-fi/theme.toml', import.meta.url), 'utf8'))));
+  const card = surfaceStyle(hifi, 'card');
+  assert.deepEqual([card.fill, card.frame, card.shadow], ['#282828', { width: 1, color: '#FABD2F' }, { kind: 'glow', x: 0, y: 0, blur: 24, spread: 0, color: '#FABD2F', alpha: 0.22 }]);
+  assert.deepEqual([surfaceStyle(hifi, 'island').frame, surfaceStyle(hifi, 'island').shadow.kind], [{ width: 1, color: '#504945' }, 'none']);
 });
 
 test('the look follows the primitives, not the name', () => {
