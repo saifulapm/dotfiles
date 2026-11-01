@@ -37,7 +37,7 @@ near() { (($1 - $4 <= $7 && $4 - $1 <= $7 && $2 - $5 <= $7 && $5 - $2 <= $7 && $
 declare -A rgb=([paper]="241 233 216" [blueprint]="12 26 46" [hi-fi]="29 32 33")
 status_at_rest() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
-# Switches to $1 in the background; a second loop polls status for the transition's kind, one row grab at 170 ms catches the sweep mid-way, and the end is the shell's own transitionEndedAt, so neither a 40 ms poll nor a grab loop's load skews the time.
+# Switches to $1 in the background; a second loop polls status for the transition's kind, one row grab at 200 ms catches the sweep mid-way, and the end is the shell's own transitionEndedAt, so neither a 40 ms poll nor a grab loop's load skews the time.
 kinds="" done_ms="" grabs=() final=""
 polls=$(mktemp)
 cleanup() { rm -f "$polls"; }
@@ -49,7 +49,7 @@ switch_to() {
   while (($(now_ms) - start < 1000)); do shell_status | jq -r '.transition'; done >"$polls" &
   poller=$!
   kinds="" done_ms="" grabs=()
-  while (($(now_ms) - start < 170)); do sleep 0.002; done
+  while (($(now_ms) - start < 200)); do sleep 0.002; done
   grabs+=("$(($(now_ms) - start)) $(bands)")
   wait "$pid"
   wait "$poller"

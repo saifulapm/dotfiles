@@ -108,6 +108,8 @@ test('Hi-Fi warms its windows up in 220 ms and powers them off in 140 ms, its am
   assert.match(open, /clamp\(\(p - 160\.0 \/ 220\.0\) \/ \(60\.0 \/ 220\.0\), 0\.0, 1\.0\)/);
   assert.match(open, /color \* p \* p \* p/);
   assert.match(close, /clamp\(p \/ \(40\.0 \/ 140\.0\), 0\.0, 1\.0\)/);
+  // The outline fades over the last 10%, so niri's last frame is the paper alone.
+  assert.match(close, /0\.3 \* \(1\.0 - smoothstep\(0\.9, 1\.0, p\)\)/);
 });
 
 test('niri accepts Hi-Fi\'s fragment', (t) => {

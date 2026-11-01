@@ -30,7 +30,7 @@ PanelWindow {
 
     onSweptChanged: {
         if (kind === "sweep")
-            Root.State.warmth = swept.warmth;
+            Root.State.warmth = Math.max(Root.State.warmth, swept.warmth);
     }
 
     // Emitted once, when this window's first frame reaches the compositor.

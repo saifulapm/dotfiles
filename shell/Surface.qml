@@ -76,7 +76,8 @@ Item {
         radius: surface.style.corner.radius
         color: surface.faded(surface.style.fill)
         border.width: surface.style.frame.width
-        border.color: surface.style.frame.color
+        // A warm open lights the frame with its glass, so the hairline never shows before it.
+        border.color: surface.motion?.curves?.kind === "warm" ? surface.faded(surface.style.frame.color) : surface.style.frame.color
     }
 
     // Hi-Fi's glass catches light in a 1 px line of ink under the top border, whatever the island shows.

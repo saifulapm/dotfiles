@@ -267,6 +267,13 @@ hifi() {
       const cx = $m + $w / 2 | 0, cy = $m + $h / 2 | 0;
       return near(c.at(cx, cy), p.at(cx, cy), 6);" \
     "$dir/close80.ppm" "$dir/before.ppm"
+  # niri's last frame of the close comes just before its 2800 ms end, so a grab at 2770 ms (99%) is that frame: the outline has faded out, and only the paper is left.
+  wait_until 2770
+  t=$(($(now_ms) - t0))
+  grim -t ppm -g "$g" "$dir/last.ppm"
+  check "hi-fi's last frame of its close ($t ms of 2800): only the paper where it was" \
+    ppm_test "for (let y = 0; y < g[0].h; y++) for (let x = 0; x < g[0].w; x++) if (!near(g[0].at(x, y), g[1].at(x, y), 6)) return false; return true;" \
+    "$dir/last.ppm" "$dir/before.ppm"
   until_ok 8000 has_windows 0
   sleep 1
   grim -t ppm -g "$g" "$dir/after.ppm"
@@ -303,7 +310,7 @@ hifi() {
   until_ok 8000 has_windows 0
 }
 
-# At output scale 1.25 the power-off's outline must still be one physical pixel: a pen measured in logical px would land on a fraction and blur into two rows.
+# At output scale 1.25 the power-off's outline must still be one physical pixel: a pen wider than that, such as 1.5 logical px, lands on two rows.
 hifi_scaled() {
   local name x y w h dir=$DOTS_DEV_DIR/hifi
   mkdir -p "$dir"
