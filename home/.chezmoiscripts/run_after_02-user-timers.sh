@@ -6,7 +6,7 @@
 # apply (enable --now on an enabled unit is a cheap no-op); no sudo needed
 # (user manager). Was run_onchange, but a run that skipped — no user session,
 # or the old degraded-state bug below — was recorded as done and never retried.
-# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer update-all.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
+# unit-list: vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer qshell.service mempressure.service clipboard-sync.service imapnotify@icloud.service
 # Also DISABLES voxtype.service — see the block near the end of this file —
 # and stops the retired emacs.service and qmd-refresh.timer on machines that
 # still run them.
@@ -49,10 +49,7 @@ set -euo pipefail
 # and exits when there is none, so a machine that has never unblocked a
 # category — or has no family DNS profile at all — arms a timer that does
 # nothing. See the unit for why the transient restore timer needs a backstop.
-# update-all.timer runs bin/update-all --unattended once a day, so every
-# machine picks up pushed dotfiles and tools (workflow's three binaries among
-# them) with nobody typing a command; dnf stays a run by hand.
-units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer update-all.timer)
+units=(vicinae.service qshell-updates.timer taildrop-receive.service qshell-sync.timer qshell-sync-notes.path qshell-sync-goals.path bt-agent.service foot-server.socket ssh-agent.socket udiskie.service voxtype-idle-stop.timer clipboard-serve.socket librepods.service crash-watch.service mail-sync.timer homepod-sink.service havit-guard.service battery-health-log.timer dns-filter-reconcile.timer)
 
 # is-system-running exits nonzero for "degraded" (= any ONE user unit has
 # failed), which is not "no user session" — treating it that way silently
@@ -116,6 +113,19 @@ if [ "$state" = "running" ] || [ "$state" = "degraded" ]; then
     # keep the user manager degraded until the next login.
     systemctl --user reset-failed qmd-refresh.timer qmd-refresh.service 2>/dev/null || true
     echo "user units: qmd-refresh.timer stopped and disabled (retired)"
+  fi
+  # update-all.timer is retired (2026-11-02). Its unattended run drops the amx
+  # and workflow binaries before the apply rebuilds them, and that apply sat
+  # for minutes on polkit prompts nobody could answer, so amx was missing
+  # from under the agents running on it. update-all is a run by hand again.
+  # Same teardown as qmd-refresh above; a no-op where it is already gone.
+  if [ -e "$HOME/.config/systemd/user/timers.target.wants/update-all.timer" ] \
+    || [ -L "$HOME/.config/systemd/user/timers.target.wants/update-all.timer" ]; then
+    systemctl --user disable --now update-all.timer >/dev/null 2>&1 || true
+    rm -f "$HOME/.config/systemd/user/timers.target.wants/update-all.timer"
+    systemctl --user daemon-reload 2>/dev/null || true
+    systemctl --user reset-failed update-all.timer 2>/dev/null || true
+    echo "user units: update-all.timer stopped and disabled (retired)"
   fi
   # voxtype.service is the one unit here that must be OFF. Its daemon PRELOADS
   # the whisper model rather than loading it per utterance — 486 MB resident

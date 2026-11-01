@@ -21,7 +21,7 @@
 #     decision with conflicts to review (NIRI.md in the fork), not an update.
 #     The source-build check below rebuilds only when the FORK's main moved.
 #
-# --unattended is update-all.timer's run: it skips dnf, whose sudo needs a
+# --unattended was the retired update-all.timer's run: it skips dnf, whose sudo needs a
 # password nobody is there to type, and never prompts. A target edited since
 # chezmoi last wrote it is skipped with an error instead of overwritten, and
 # waits for a run by hand.
