@@ -48,6 +48,9 @@ session_qs_pids() {
   return 0
 }
 
+# The strings of a state's JSON on stdin that hold a [ or ], one a line: Hi-Fi's engraved voice draws Blueprint's words without their marks.
+marked() { jq -r '[.. | strings | select(test("[\\[\\]]"))] | .[]'; }
+
 # Mean colour of a binary PPM on stdin, as "r g b".
 mean_rgb() {
   node -e '

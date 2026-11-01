@@ -77,6 +77,11 @@ check "blueprint: the clock's strokes are thin outlines, not fills (longest acce
 unlock
 check "blueprint: the test password unlocks" unlocked
 
+lock_in hi-fi
+check "hi-fi: the lock draws Blueprint's sheet, not Paper's print ($(lock_state | jq -r .look))" state_is '.look == "sheet"'
+unlock
+check "hi-fi: the test password unlocks" unlocked
+
 "$repo/bin/dots" theme paper >/dev/null
 exit $((fails > 0))
 }

@@ -39,6 +39,13 @@ echo "     drawn: $(margins | jq -c .drawn)"
 check "blueprint: the top-left reads [02] FOOT — ~" drawn_is left "[02] FOOT — ~"
 check "blueprint: the date reads $(date +%F)" date_ends "$(date +%F)"
 
+in_theme hi-fi
+until_ok 2000 drawn_is left "02 FOOT — ~"
+echo "     drawn: $(margins | jq -c .drawn)"
+check "hi-fi: the top-left reads Blueprint's 02 FOOT — ~ without its brackets" drawn_is left "02 FOOT — ~"
+check "hi-fi: the date reads $(date +%F)" date_ends "$(date +%F)"
+check "hi-fi: nothing the margins report holds a bracket ($(margins | marked | head -3 | paste -sd'|'))" eval '[ -z "$(margins | marked)" ]'
+
 # A title and a goal can be any length; each elides 8 px short of the island in every theme.
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 mkdir -p "$(dirname "$store")"
