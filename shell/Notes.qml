@@ -268,6 +268,8 @@ FloatingWindow {
             // What the tab row, the composer's placeholder and the cards' meta lines really draw.
             drawnTabs: Array.from({ length: tabRepeater.count }, (_, i) => ({ text: tabRepeater.itemAt(i).drawn, current: tabRepeater.itemAt(i).modelData.current, pinned: tabRepeater.itemAt(i).modelData.pinned })),
             placeholder: placeholder.visible ? placeholder.text : null,
+            keyHint: keyHint.text,
+            checkbox: look ? look.checkbox : null,
             metas: cards.map((_, i) => list.itemAtIndex(i)?.metaText ?? null),
             selected: current ? current.id : null,
             cards: cards.map(n => n.id),
@@ -375,7 +377,7 @@ FloatingWindow {
                 id: keyHint
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: win.look && win.look.voice === "bracket" ? "[⌃K]" : "⌃K"
+                text: win.look ? win.look.keyHint : "⌃K"
                 color: win.c.muted ?? "gray"
                 font.family: win.fonts.mono ?? ""
                 font.pixelSize: 10

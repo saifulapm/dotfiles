@@ -1,6 +1,7 @@
 // How the Notes window draws under a token set, from its primitives and type, as the three Notes designs do.
 
 import { SHELF, displayText } from './notes.mjs';
+import { mark } from './voice.mjs';
 
 const TAG_ANSI = { red: 1, orange: 3, yellow: 11, green: 2, blue: 4, purple: 5 };
 
@@ -40,7 +41,7 @@ export function cardMeta(note, voice) {
 export function keyPairs(tokens, keys) {
   const voice = tokens.type.voice;
   return keys.map(([k, what]) => {
-    const key = voice === 'bracket' ? `[${k.toUpperCase()}]` : voice === 'caps' ? k.toUpperCase() : k;
+    const key = voice === 'bracket' ? mark(tokens.type.engraved === true, k.toUpperCase()) : voice === 'caps' ? k.toUpperCase() : k;
     const word = voice === 'plain' ? what : what.toUpperCase();
     return word ? `${key} ${word}` : key;
   });
@@ -62,8 +63,11 @@ export function notesLook(tokens) {
   const voice = t.voice;
   const round = p.corner === 'round';
   const tint = mix(c.surface, c.paper, 0.3);
+  const engraved = t.engraved === true;
   return {
     voice,
+    engraved,
+    keyHint: voice === 'bracket' ? mark(engraved, '⌃K') : '⌃K',
     title:
       voice === 'bracket'
         ? { text: 'NOTES', font: t.mono, size: 11, bold: true, color: c.accent, spacing: 1.5 }
@@ -79,7 +83,7 @@ export function notesLook(tokens) {
     small: { font: t.mono, size: voice === 'plain' ? 11 : 10, color: c.muted, spacing: voice === 'plain' ? 0 : 1.2 },
     body: { font: voice === 'plain' ? t.ui : t.mono, size: voice === 'plain' ? 14 : 13, color: c.ink, done: c.muted },
     composer: { font: voice === 'caps' ? t.display : voice === 'plain' ? t.ui : t.mono, size: voice === 'caps' ? 20 : 14, italic: voice === 'caps', prompt: voice === 'bracket' ? '>' : '', placeholder: voice === 'bracket' ? 'add a note or a prompt' : 'Add a note or a prompt…', fill: round ? tint : 'transparent', radius: round ? 12 : 0 },
-    checkbox: voice === 'bracket' ? 'brackets' : 'circle',
+    checkbox: voice === 'bracket' && !engraved ? 'brackets' : 'circle',
     radius: round ? 12 : 0,
     // The selected card is outlined in the accent in every theme; the rest follow the frame primitive.
     card(selected, done) {

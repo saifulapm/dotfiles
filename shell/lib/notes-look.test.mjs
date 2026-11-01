@@ -90,3 +90,23 @@ test('a card says its time and kind: text, image, or the file type', () => {
 test('the Shelf composer says how to paste and drop', () => {
   assert.equal(SHELF_PLACEHOLDER, '⌃V paste · drop files or images here · ↵ save text');
 });
+
+const hifi = () => {
+  const t = theme('blueprint');
+  return Object.assign({}, t, { type: Object.assign({}, t.type, { engraved: true }) });
+};
+
+test("Hi-Fi draws Blueprint's key strip, hint and checkbox without the square marks", () => {
+  assert.deepEqual(keyPairs(hifi(), [['m', 'merge'], ['⇧M', 'move']]), ['M MERGE', '⇧M MOVE']);
+  assert.equal(keyLine(hifi(), [['␣', 'done'], ['/', 'search']]), '␣ DONE  / SEARCH');
+  assert.equal(notesLook(hifi()).keyHint, '⌃K');
+  assert.equal(notesLook(hifi()).checkbox, 'circle');
+  assert.equal(notesLook(hifi()).engraved, true);
+  assert.match(keyLine(hifi(), KEYS), /^[^\[\]]*$/);
+});
+
+test('Blueprint keeps its marks on the hint and the checkbox', () => {
+  assert.equal(notesLook(theme('blueprint')).keyHint, '[⌃K]');
+  assert.equal(notesLook(theme('blueprint')).checkbox, 'brackets');
+  assert.equal(notesLook(theme('paper')).keyHint, '⌃K');
+});
