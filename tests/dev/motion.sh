@@ -229,9 +229,20 @@ hifi() {
   open_magenta
   wait_until 1320
   grim -t ppm -g "$g" "$dir/open30.ppm"
+  wait_until 2200
+  grim -t ppm -g "$g" "$dir/open50.ppm"
   wait_until 3080
   t=$(($(now_ms) - t0))
   grim -t ppm -g "$g" "$dir/open70.ppm"
+  wait_until 3960
+  grim -t ppm -g "$g" "$dir/open90.ppm"
+  # The border ring, a row above the magenta, is held back with the glow until the open's last 60 of 220 ms (3200 ms here).
+  check "hi-fi's border and glow come up late in its open: not amber at 50%, amber at 90%" \
+    ppm_test "
+      let mid = 0, late = 0;
+      for (let i = 0; i < $w; i++) { if (amber(g[0].at($m + i, $m - 1))) mid++; if (amber(g[1].at($m + i, $m - 1))) late++; }
+      return mid < $w * 0.1 && late >= $w * 0.9;" \
+    "$dir/open50.ppm" "$dir/open90.ppm"
   # Against the dark paper, a dimmer magenta has less red and blue.
   check "hi-fi 30% into its open is darker than at 70% ($t ms of 4400)" \
     ppm_test "const a = g[0].at($m + $w / 2 | 0, $m + $h / 2 | 0), b = g[1].at($m + $w / 2 | 0, $m + $h / 2 | 0); return a[0] + a[2] < b[0] + b[2];" \
