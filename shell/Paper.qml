@@ -20,6 +20,8 @@ PanelWindow {
     // The outgoing theme's motion picks the transition, or Hi-Fi's sweep when Hi-Fi is either side; "" while none runs.
     property string kind: ""
     property bool waiting: false
+    // When the last transition ended, in ms since the epoch, so a check can time a switch from its command without polling.
+    property real endedAt: 0
     // How far through its 220 ms the sweep is, 0 to 1; the pointer and the lamps' warmth follow from it.
     property real sweepTime: 0
     readonly property var swept: H.sweepAt(sweepTime)
@@ -119,6 +121,7 @@ PanelWindow {
         outgoing.tokens = null;
         canvas.scale = 1;
         kind = "";
+        endedAt = Date.now();
         Root.State.warmth = 1;
     }
 

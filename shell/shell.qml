@@ -162,6 +162,8 @@ ShellRoot {
                 firstFrameMs: root.firstFrameMs,
                 // The first running transition of any output's paper; "" when none runs.
                 transition: papers.instances.map(p => p.kind).find(k => k) ?? "",
+                // When the last output's transition ended, in ms since the epoch.
+                transitionEndedAt: Math.max(0, ...papers.instances.map(p => p.endedAt)),
                 // The first running sweep's pointer, as a fraction of its output's width; null when none runs.
                 pointer: papers.instances.map(p => p.pointer).find(x => x !== null) ?? null
             });

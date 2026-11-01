@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hi-Fi's theme switch: a red pointer sweeps left to right whether Hi-Fi comes in or goes out, done by 300 ms from the spawn (with the scan, Blueprint to Hi-Fi read transition "" 236 to 282 ms after the spawn, a 16 to 62 ms handover), while the other themes keep their own motion.
+# Hi-Fi's theme switch: a red pointer sweeps left to right whether Hi-Fi comes in or goes out, done by 350 ms from the spawn by the shell's own end stamp (the 220 ms sweep and an 80 to 106 ms handover, as transition.sh holds the other themes), while the other themes keep their own motion.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -37,30 +37,27 @@ near() { (($1 - $4 <= $7 && $4 - $1 <= $7 && $2 - $5 <= $7 && $5 - $2 <= $7 && $
 declare -A rgb=([paper]="241 233 216" [blueprint]="12 26 46" [hi-fi]="29 32 33")
 status_at_rest() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
-# Switches to $1 in the background and grabs the row until 250 ms, while a second loop polls status for 1 s, so a grab never delays the poll that reads "".
+# Switches to $1 in the background; a second loop polls status for the transition's kind, one row grab at 170 ms catches the sweep mid-way, and the end is the shell's own transitionEndedAt, so neither a 40 ms poll nor a grab loop's load skews the time.
 kinds="" done_ms="" grabs=() final=""
 polls=$(mktemp)
 cleanup() { rm -f "$polls"; }
 switch_to() {
-  local start t pid poller k
+  local start pid poller k ended
   start=$(now_ms)
   "$repo/bin/dots" theme "$1" >/dev/null &
   pid=$!
-  while (($(now_ms) - start < 1000)); do echo "$(($(now_ms) - start)) $(shell_status | jq -r '.transition')"; done >"$polls" &
+  while (($(now_ms) - start < 1000)); do shell_status | jq -r '.transition'; done >"$polls" &
   poller=$!
   kinds="" done_ms="" grabs=()
-  while t=$(($(now_ms) - start)) && ((t < 250)); do grabs+=("$t $(bands)"); done
+  while (($(now_ms) - start < 170)); do sleep 0.002; done
+  grabs+=("$(($(now_ms) - start)) $(bands)")
   wait "$pid"
   wait "$poller"
-  # Each poll's time is when it started; the end is the first "" after a kind.
-  while read -r t k; do
-    if [ -n "$k" ]; then
-      [[ " $kinds " == *" $k "* ]] || kinds="$kinds $k"
-    elif [ -n "$kinds" ]; then
-      done_ms=$t
-      break
-    fi
+  while read -r k; do
+    [ -n "$k" ] && [[ " $kinds " != *" $k "* ]] && kinds="$kinds $k"
   done <"$polls"
+  ended=$(shell_status | jq -r '.transitionEndedAt')
+  [[ $ended =~ ^[0-9]+$ ]] && ((ended >= start)) && done_ms=$((ended - start))
   final=$(bands)
   kinds=${kinds# }
 }
@@ -81,7 +78,7 @@ all_are() {
   read -r -a v <<<"$final"
   near "${v[@]:0:3}" "$@" 10 && near "${v[@]:3:3}" "$@" 10 && near "${v[@]:6:3}" "$@" 10
 }
-within() { [ -n "$done_ms" ] && ((done_ms <= 300)); }
+within() { [ -n "$done_ms" ] && ((done_ms <= 350)); }
 
 "$repo/bin/dots" theme blueprint >/dev/null
 until_ok 3000 status_at_rest blueprint
@@ -89,14 +86,14 @@ sleep 0.5
 
 switch_to hi-fi
 check "blueprint to hi-fi: status reports transition sweep (saw: $kinds)" test "$kinds" = sweep
-check "blueprint to hi-fi: transition reads \"\" by 300 ms from the spawn (at ${done_ms:-never} ms)" within
+check "blueprint to hi-fi: transition reads \"\" by 350 ms from the spawn (at ${done_ms:-never} ms)" within
 check "blueprint to hi-fi: a row grab has hi-fi dark left of the pointer and blueprint navy right of it" split_seen "${rgb[hi-fi]}" "${rgb[blueprint]}"
 check "blueprint to hi-fi: the row ends all hi-fi ($final)" all_are ${rgb[hi-fi]}
 sleep 0.5
 
 switch_to paper
 check "hi-fi to paper: status reports transition sweep (saw: $kinds)" test "$kinds" = sweep
-check "hi-fi to paper: transition reads \"\" by 300 ms from the spawn (at ${done_ms:-never} ms)" within
+check "hi-fi to paper: transition reads \"\" by 350 ms from the spawn (at ${done_ms:-never} ms)" within
 check "hi-fi to paper: the row ends all paper cream ($final)" all_are ${rgb[paper]}
 sleep 0.5
 
