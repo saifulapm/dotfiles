@@ -5,6 +5,7 @@ import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
 import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
+import { checkTokens, validateTheme } from './theme.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const look = (name) => launcherLook(theme(name));
@@ -607,4 +608,19 @@ test("the marks are danger red in Paper, accent dots before ink in Artboard and 
   const colors = (n) => [...new Set(margin(n).marks([5, 7]).map((s) => s.color))];
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map(colors), [['#C8381E'], ['#3D5AFE', '#15171B'], ['#FFB547']]);
   assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => margin(n).marks([5])[0].text.slice(0, 4)), ['   !', '   •', '   [']);
+});
+
+const hifiLaunch = () => launcherLook(checkTokens(validateTheme(theme('hi-fi'))));
+
+test("Hi-Fi's launcher lights its cursor row: LAUNCH · APPS, 3 MATCHES, a lamp slot, a #32302F row with amber name and ink category", () => {
+  const h = hifiLaunch();
+  assert.deepEqual([h.label.text('apps'), h.count(3), h.slot], ['LAUNCH · APPS', '3 MATCHES', 'lamp']);
+  assert.deepEqual([h.cursor.fill, h.cursor.text, h.cursor.detail], ['#32302F', '#FABD2F', '#EBDBB2']);
+  assert.deepEqual([h.prompt.text, h.prompt.color, h.caret], ['›', '#FABD2F', 'block']);
+  assert.equal(h.legendLine('apps'), 'W WINDOWS  V CLIPBOARD  : EMOJI  = CALC  > COMMANDS  J K · ↵ · ESC');
+});
+
+test("Blueprint's launcher keeps its slashes, numbers, cyan cursor and J/K tail beside Hi-Fi's", () => {
+  const b = look('blueprint');
+  assert.deepEqual([b.label.text('apps'), b.slot, b.cursor.fill, b.legend('apps').tail, b.prompt.text], ['LAUNCH // APPS', 'number', '#7FE3F0', 'J/K · ↵ · ESC', '>']);
 });

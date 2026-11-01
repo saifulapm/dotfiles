@@ -3,6 +3,7 @@
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
 import { captureText } from './island.mjs';
+import { HIFI } from './hifi.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
 
@@ -48,7 +49,7 @@ export function launcherLook(tokens) {
         : mode === 'reminder' || mode === 'clipboard'
           ? (mode === 'reminder' ? REMINDER_KEYS : CLIP_KEYS).map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : w }))
           : [],
-    tail: caps ? 'J/K · ↵ · ESC' : 'j/k · ↵ · esc',
+    tail: engraved ? 'J K · ↵ · ESC' : caps ? 'J/K · ↵ · ESC' : 'j/k · ↵ · esc',
     chips: voice === 'plain',
   });
   const base = {
@@ -96,18 +97,22 @@ export function launcherLook(tokens) {
     });
   }
   if (voice === 'bracket') {
+    // Hi-Fi lights the cursor row like a lamp: a #32302F row with an amber name and an ink category, its own lamp in place of Blueprint's number.
+    const lamp = engraved;
     return Object.assign(base, {
       query: { font: t.mono, size: 22, italic: false },
-      prompt: { text: '>', color: c.accent, search: false },
+      prompt: { text: lamp ? '›' : '>', color: c.accent, search: false },
       caret: 'block',
-      label: { kind: 'header', text: (m) => `LAUNCH // ${upper(m)}`, fill: 'transparent', color: c.muted },
+      label: { kind: 'header', text: (m) => `LAUNCH ${lamp ? '·' : '//'} ${upper(m)}`, fill: 'transparent', color: c.muted },
       count: (n) => `${n} MATCHES`,
-      slot: 'number',
+      slot: lamp ? 'lamp' : 'number',
       title: upper,
       detailText: upper,
       name: { font: t.mono, size: 15, weight: 400, spacing: 0.6, color: c.ink },
       detail: { font: t.mono, size: 11, italic: false, spacing: 1.3, color: c.muted },
-      cursor: { fill: c.accent, text: c.surface, detail: c.surface, marker: 'transparent', radius: 0, weight: 700, badge: '' },
+      cursor: lamp
+        ? { fill: HIFI.lit, text: c.accent, detail: c.ink, marker: 'transparent', radius: 0, weight: 700, badge: '' }
+        : { fill: c.accent, text: c.surface, detail: c.surface, marker: 'transparent', radius: 0, weight: 700, badge: '' },
       rule: { color: c.line, dashed: true },
       small: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
       chip: { fill: 'transparent', key: c.accent },
