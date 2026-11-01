@@ -8,6 +8,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import "." as Root
 import "lib/island.mjs" as I
+import "lib/hifi.mjs" as H
 import "lib/questions.mjs" as Q
 import "lib/voice.mjs" as V
 import "lib/notifs.mjs" as N
@@ -672,6 +673,9 @@ PanelWindow {
             boxBottom: box.mapToItem(null, 0, box.height).y,
             summaryFont: [summary.font.family, summary.font.pixelSize],
             summaryBox: at(summary),
+            islandBox: at(box),
+            highlightBox: noteHighlight.visible ? at(noteHighlight) : null,
+            scale: noteScale.visible ? { box: at(noteScale), ticks: noteScale.marks.ticks.length } : null,
             bracketsShown: openBracket.visible,
             appElided: appName.truncated,
             bracketEnd: bracketEnd,
@@ -2194,6 +2198,17 @@ PanelWindow {
                             font.pixelSize: island.noteLook.summary.size
                             font.weight: island.noteLook.summary.weight
                             font.letterSpacing: island.noteLook.summary.spacing
+                            // Hi-Fi's amber summary glows; the layer is made only for a theme that asks for it.
+                            layer.enabled: !!island.noteLook.summary.glow
+                            layer.effect: MultiEffect {
+                                shadowEnabled: true
+                                shadowColor: island.noteLook.summary.glow || "transparent"
+                                shadowOpacity: 0.35
+                                shadowBlur: 0.6
+                                blurMax: 16
+                                shadowHorizontalOffset: 0
+                                shadowVerticalOffset: 0
+                            }
 
                             // With no tile, Blueprint's board draws a picked colour 10 px after the summary.
                             Rectangle {
@@ -2339,6 +2354,27 @@ PanelWindow {
                             layer.enabled: true
                         }
                     }
+                }
+
+                // Hi-Fi's glass catches light in a 1 px line of ink at 6 % under the top border.
+                Rectangle {
+                    id: noteHighlight
+                    visible: island.noteLook.glass
+                    x: 1
+                    y: 1
+                    width: parent.width - 2
+                    height: 1
+                    color: island.noteLook.glass ? H.glass(island.theme.tokens).highlight : "transparent"
+                }
+
+                // Hi-Fi's tuning scale keeps to the bottom edge, below however tall the card grows.
+                Root.TuningScale {
+                    id: noteScale
+                    visible: island.noteLook.glass
+                    tokens: island.theme.tokens
+                    x: island.noteLook.pad.x
+                    y: parent.height - height - 8
+                    width: parent.width - 2 * x
                 }
 
                 // Out of sight: the drag image is grabbed from here.

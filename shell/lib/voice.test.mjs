@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
+import { validateTheme, checkTokens } from './theme.mjs';
 import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
@@ -132,7 +133,15 @@ test("Blueprint's notification reads [ APP ] and T+0S over its summary, uppercas
   assert.deepEqual([b.appLabel('notify-send'), b.age, b.brackets], ['[ NOTIFY-SEND ]', 'T+0S', true]);
   assert.equal(b.summaryText('Download complete'), 'DOWNLOAD COMPLETE');
   assert.deepEqual([b.summary.font, b.summary.size, b.summary.weight, b.summary.color], ['Maple Mono', 15, 700, '#7FE3F0']);
-  assert.equal(b.tile, null);
+  assert.deepEqual([b.tile, b.summary.glow, b.glass, b.pad.bottom], [null, '', false, 14]);
+});
+
+test("Hi-Fi's notification is a glass display: the app and NOW muted, the summary in bold amber caps with a glow, the body in ink", () => {
+  const h = islandLook(checkTokens(validateTheme(theme('hi-fi'))));
+  assert.deepEqual([h.appLabel('Chromium'), h.age, h.brackets, h.head.color], ['CHROMIUM', 'NOW', false, '#A89984']);
+  assert.equal(h.summaryText('Download complete'), 'DOWNLOAD COMPLETE');
+  assert.deepEqual([h.summary.weight, h.summary.color, h.summary.glow, h.body.color], [700, '#FABD2F', '#FABD2F', '#EBDBB2']);
+  assert.deepEqual([h.glass, h.pad.bottom], [true, 30]);
 });
 
 test("Paper's notification puts the app and NOW in tracked caps over a 24 px serif summary and a 12 px mono body", () => {

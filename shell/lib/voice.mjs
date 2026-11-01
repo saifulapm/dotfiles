@@ -152,6 +152,8 @@ export function islandLook(tokens) {
     bodyText: same,
     glyph: (app) => upper(app).charAt(0) || '•',
     tile: null,
+    // Hi-Fi's glass display: a highlight under the top border and a tuning scale along the bottom.
+    glass: false,
   };
   if (voice === 'plain') {
     return Object.assign(base, {
@@ -167,10 +169,12 @@ export function islandLook(tokens) {
   if (voice === 'bracket') {
     return Object.assign(base, {
       width: 420,
-      age: 'T+0S',
-      pad: { x: 18, top: 12, bottom: 14 },
+      age: engraved ? 'NOW' : 'T+0S',
+      // Hi-Fi's 10 px tuning scale sits under the body, 8 px above the bottom border.
+      pad: { x: 18, top: 12, bottom: engraved ? 30 : 14 },
       head: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
-      summary: { font: t.mono, size: 15, weight: 700, spacing: 0.6, color: c.accent },
+      summary: { font: t.mono, size: 15, weight: 700, spacing: 0.6, color: c.accent, glow: engraved ? c.accent : '' },
+      glass: engraved,
       summaryText: (x) => line(x).toUpperCase(),
       body: { font: t.mono, size: 12, color: c.ink },
     });

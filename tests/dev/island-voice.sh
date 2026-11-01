@@ -53,16 +53,33 @@ check "blueprint: a newline in the app or summary stays on one line each" state_
 check "blueprint: the body draws in its spelt order and inside the island" state_is '.note.body == "xyz" and .note.cardBottom <= .note.boxBottom'
 
 in_theme hi-fi
-notify-send "Tuned in" "report-october.pdf · 2.4 MB"
-shown '.note.summary == "TUNED IN"'
+notify-send -a Chromium "Download complete" "report-october.pdf · 2.4 MB"
+shown '.note.summary == "DOWNLOAD COMPLETE"'
 echo "     note: $(island | jq -c .note)"
-check "hi-fi: the island reads NOTIFY-SEND and T+0S with no brackets drawn" state_is '.note.app == "NOTIFY-SEND" and .note.age == "T+0S" and .note.bracketsShown == false'
+check "hi-fi: the island reads CHROMIUM and NOW over DOWNLOAD COMPLETE, with no brackets drawn" state_is '.note.app == "CHROMIUM" and .note.age == "NOW" and .note.bracketsShown == false'
 check "hi-fi: nothing the island reports holds a bracket ($(island | marked | head -3 | paste -sd'|'))" eval '[ -z "$(island | marked)" ]'
 # The text must read on what is drawn behind it: amber summary on the dark glass #141617, not on an ink slab.
 glass=$(near "$(geo summaryBox)" 20 22 23 6)
 amber=$(near "$(geo summaryBox)" 250 189 47 12)
 cream=$(near "$(geo summaryBox)" 235 219 178 10)
-check "hi-fi: the summary is amber ($amber px) on dark glass ($glass px), with no cream fill ($cream px)" test "$amber" -gt 100 -a "$glass" -gt 200 -a "$cream" -lt 20
+check "hi-fi: the summary is amber #FABD2F ($amber px) on dark glass #141617 ($glass px), with no cream fill ($cream px)" test "$amber" -gt 100 -a "$glass" -gt 200 -a "$cream" -lt 20
+# Ink at 6 % over the glass blends to about #212220 in the row under the top border.
+lit=$(near "$(geo highlightBox)" 33 34 32 4)
+dark=$(near "$(geo highlightBox)" 20 22 23 3)
+check "hi-fi: the row under the top border is the highlight ($lit px), not bare glass ($dark px)" test "$lit" -gt 300 -a "$dark" -lt 20
+check "hi-fi: the tuning scale is drawn along the bottom edge ($(island | jq -c .note.scale))" state_is '.note.scale.ticks > 40 and .note.scale.box.y + .note.scale.box.h <= .note.boxBottom'
+# The ticks are amber at 50 % and 28 % over the glass, and the pointer is red #FB4934.
+ticks=$(( $(near "$(geo scale.box)" 135 106 35 12) + $(near "$(geo scale.box)" 84 69 30 12) ))
+red=$(near "$(geo scale.box)" 251 73 52 8)
+check "hi-fi: the scale reads amber ticks ($ticks px) and a red pointer ($red px)" test "$ticks" -gt 100 -a "$red" -gt 12
+
+notify_as Chromium "$(printf 'Tuned %.0s' {1..34})end"
+shown '(.note.summary | startswith("TUNED TUNED"))'
+echo "     note: $(island | jq -c '.note | {summaryBox, scale, islandBox, boxBottom}')"
+check "hi-fi: a 200-character summary stays inside the island, above the scale" state_is '.note.summaryBox.y + .note.summaryBox.h <= .note.scale.box.y and .note.summaryBox.x + .note.summaryBox.w <= .note.islandBox.x + .note.islandBox.w and .note.scale.box.y + .note.scale.box.h <= .note.boxBottom'
+ticks=$(( $(near "$(geo scale.box)" 135 106 35 12) + $(near "$(geo scale.box)" 84 69 30 12) ))
+red=$(near "$(geo scale.box)" 251 73 52 8)
+check "hi-fi: under a long summary the scale still reads its ticks ($ticks px) and red pointer ($red px)" test "$ticks" -gt 100 -a "$red" -gt 12
 
 in_theme paper
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
