@@ -1,4 +1,6 @@
 // How a surface looks under a token set, from its primitives only, so any mix of the menus draws.
+import { glass as hifiGlass } from './hifi.mjs';
+
 const SOFT = {
   island: { y: 12, blur: 32, spread: -6, alpha: 0.45 },
   card: { y: 32, blur: 64, spread: -12, alpha: 0.28 },
@@ -56,7 +58,7 @@ export function surfaceStyle(tokens, role) {
   // Hi-Fi's island is a dark glass display in a 1 px line frame, so Blueprint's layout reads on it as on Blueprint's dark island.
   const glass = islandish(role) && tokens.type.engraved === true;
   const inkIsland = islandish(role) && p.frame !== 'glow' && !glass;
-  return {
+  const style = {
     fill: glass ? c.glass : inkIsland ? c.ink : c.surface,
     text: inkIsland ? c.paper : c.ink,
     frame: glass ? { width: 1, color: c.line } : frameOf(p, c, role),
@@ -67,6 +69,9 @@ export function surfaceStyle(tokens, role) {
     handles: role === 'card' && p.frame === 'none',
     ticks: role === 'card' && p.corner === 'cut',
   };
+  // The glass catches light along its top edge in every island mode; only glass has the key, so Surface draws no line for the other themes.
+  if (glass) style.highlight = hifiGlass(tokens).highlight;
+  return style;
 }
 
 // Monospace labels read as drafting captions, so they go uppercase and tracked like the designs.

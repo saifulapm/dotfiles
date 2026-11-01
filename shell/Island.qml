@@ -8,7 +8,6 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import "." as Root
 import "lib/island.mjs" as I
-import "lib/hifi.mjs" as H
 import "lib/questions.mjs" as Q
 import "lib/voice.mjs" as V
 import "lib/notifs.mjs" as N
@@ -674,7 +673,7 @@ PanelWindow {
             summaryFont: [summary.font.family, summary.font.pixelSize],
             summaryBox: at(summary),
             islandBox: at(box),
-            highlightBox: noteHighlight.visible ? at(noteHighlight) : null,
+            highlightBox: box.highlight.visible ? at(box.highlight) : null,
             scale: noteScale.visible ? { box: at(noteScale), ticks: noteScale.marks.ticks.length } : null,
             bracketsShown: openBracket.visible,
             appElided: appName.truncated,
@@ -2354,17 +2353,6 @@ PanelWindow {
                             layer.enabled: true
                         }
                     }
-                }
-
-                // Hi-Fi's glass catches light in a 1 px line of ink at 6 % under the top border.
-                Rectangle {
-                    id: noteHighlight
-                    visible: island.noteLook.glass
-                    x: 1
-                    y: 1
-                    width: parent.width - 2
-                    height: 1
-                    color: island.noteLook.glass ? H.glass(island.theme.tokens).highlight : "transparent"
                 }
 
                 // Hi-Fi's tuning scale keeps to the bottom edge, below however tall the card grows.

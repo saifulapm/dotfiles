@@ -23,6 +23,8 @@ Item {
     readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1 })
     // What a surface puts in its card fades in with the fill, after a plot's outline.
     default property alias content: inner.data
+    // The glass highlight line, so a state function can report where it is drawn.
+    readonly property alias highlight: highlightLine
 
     scale: pose.scale
 
@@ -75,6 +77,18 @@ Item {
         color: surface.faded(surface.style.fill)
         border.width: surface.style.frame.width
         border.color: surface.style.frame.color
+    }
+
+    // Hi-Fi's glass catches light in a 1 px line of ink under the top border, whatever the island shows.
+    Rectangle {
+        id: highlightLine
+        visible: !!surface.style.highlight
+        opacity: surface.pose.fill
+        x: surface.style.frame.width
+        y: surface.style.frame.width
+        width: surface.width - 2 * surface.style.frame.width
+        height: 1
+        color: surface.style.highlight || "transparent"
     }
 
     // A cut corner bevels the top-left and bottom-right, like the designs' clip-path polygons.
