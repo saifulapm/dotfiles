@@ -40,10 +40,10 @@ check "blueprint: the top-left reads [02] FOOT — ~" drawn_is left "[02] FOOT �
 check "blueprint: the date reads $(date +%F)" date_ends "$(date +%F)"
 
 in_theme hi-fi
-until_ok 2000 drawn_is left "02 FOOT — ~"
+until_ok 2000 drawn_is left "1 2 3  FOOT  ~"
 echo "     drawn: $(margins | jq -c .drawn)"
-check "hi-fi: the top-left reads Blueprint's 02 FOOT — ~ without its brackets" drawn_is left "02 FOOT — ~"
-check "hi-fi: the date reads $(date +%F)" date_ends "$(date +%F)"
+check "hi-fi: the top-left reads 1 2 3  FOOT  ~, a number for each workspace" drawn_is left "1 2 3  FOOT  ~"
+check "hi-fi: the date reads $(LC_ALL=C date +'%a %-d %b' | tr a-z A-Z)" date_ends "$(LC_ALL=C date +'%a %-d %b' | tr a-z A-Z)"
 check "hi-fi: nothing the margins report holds a bracket ($(margins | marked | head -3 | paste -sd'|'))" eval '[ -z "$(margins | marked)" ]'
 check "hi-fi: the labels are engraved" eval 'margins | jq -e ".drawn.raised == true" >/dev/null'
 # The line sits under the letters: the row below the number's last amber row is lit; a row of bare faceplate further down is not.

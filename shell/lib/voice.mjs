@@ -701,30 +701,38 @@ export function marginLook(tokens) {
   const plain = voice === 'plain';
   const bracket = voice === 'bracket';
   const engraved = (tokens || UNTHEMED).type.engraved === true;
+  // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
+  const words = (s) => say(line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')));
   const look = {
     voice,
     number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? mark(engraved, pad2(idx)) : pad2(idx)),
     numberColor: bracket ? c.accent : c.ink,
     numberWeight: plain ? 600 : bracket ? 400 : 700,
+    engraved,
+    // Hi-Fi's lamp before each of the output's workspace numbers: the shown one amber, which wins over an urgent one's red; red is never text there, so the urgency marks give way to it.
+    lamps: (workspaces) => (engraved ? workspaces.map((w) => ({ idx: w.idx, text: String(w.idx), light: w.active ? 'lit' : w.urgent ? 'red' : 'unlit', color: w.active ? c.accent : c.muted })) : []),
     // The focused column of its columns, after the number; a workspace of one column draws none.
     column: (pos) => (!pos || pos.of < 2 ? '' : bracket ? ` ${mark(engraved, `${pos.at} / ${pos.of}`)}` : `  ${pos.at} / ${pos.of}`),
     tail(view) {
       if (view.app === null && view.title === null) return '';
-      // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
-      const words = (s) => say(line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')));
       const app = words(view.app);
       const title = words(view.title);
+      if (engraved) return `  ${app}`;
       return plain ? ` / ${app} — ${title}` : bracket ? ` ${app} — ${title}` : ` — ${app} · ${title}`;
     },
+    // Hi-Fi draws the app in ink and the path after it in muted, so the path is a word of its own there.
+    tailColor: engraved ? c.ink : c.muted,
+    path: (view) => (engraved && view.title !== null ? `  ${words(view.title)}` : ''),
     goal(g) {
       if (!g) return '';
       const title = say(g.title);
       if (g.left === null) return title;
-      if (bracket) return g.left === 'late' ? `${title} LATE` : `${title} T−${upper(g.left)}`;
+      if (bracket && !engraved) return g.left === 'late' ? `${title} LATE` : `${title} T−${upper(g.left)}`;
       return `${title} · ${say(g.left)}`;
     },
-    // Paper's accent bold, Artboard's ink medium after an accent dot, Blueprint's amber (its danger token).
-    goalColor: bracket ? c.danger : plain ? c.ink : c.accent,
+    // Paper's accent bold, Artboard's ink medium after an accent dot, Blueprint's amber (its danger token), Hi-Fi's ink after a red lamp.
+    goalColor: engraved ? c.ink : bracket ? c.danger : plain ? c.ink : c.accent,
+    goalLamp: engraved ? 'red' : '',
     goalWeight: bracket ? 400 : plain ? 500 : 700,
     dot: plain,
     dotColor: c.accent,
@@ -733,9 +741,11 @@ export function marginLook(tokens) {
     mailColor: bracket ? c.accent : c.ink,
     mailWeight: bracket ? 400 : plain ? 500 : 700,
     word: (w) => (plain ? same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi') : upper(w)),
-    date: (d) => (bracket ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
-    sep: plain ? '' : bracket ? '·' : '—',
-    spacing: plain ? 16 : 14,
+    date: (d) => (bracket && !engraved ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
+    dateColor: engraved ? c.ink : c.muted,
+    // Hi-Fi's board spaces its right-hand words 18 px apart with no separator.
+    sep: plain || engraved ? '' : bracket ? '·' : '—',
+    spacing: engraved ? 18 : plain ? 16 : 14,
     // The urgent workspaces after the title, three spaces on: at most 3, then a count of the rest; each segment is drawn in its own colour.
     marks(idxs) {
       if (idxs.length === 0) return [];
@@ -751,7 +761,7 @@ export function marginLook(tokens) {
   };
   // The words on screen, in order, for `qs ipc call margins state`.
   look.drawn = (view, now, right) => ({
-    left: look.number(view.idx) + look.tail(view),
+    left: look.number(view.idx) + look.tail(view) + look.path(view),
     right: [right.sync && look.word(right.sync), look.goal(right.goal), look.mail(right.mail), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
       .filter((p) => p)
       .join(look.sep ? ` ${look.sep} ` : ' '),

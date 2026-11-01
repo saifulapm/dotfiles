@@ -338,6 +338,35 @@ test('unread mail reads MAIL 3, mail 3 and MAIL 3 between the goal and Wi-Fi, in
   assert.equal(margin('paper').drawn(foot, SUN, { ...right, mail: 0 }).right, 'SHIP V2 · 3D — WIFI — 82% — SUN 18 OCT');
 });
 
+// The shell reads Hi-Fi through checkTokens, as the bracket voice plus engraved.
+const hifiMargin = () => marginLook(checkTokens(validateTheme(theme('hi-fi'))));
+
+test("Hi-Fi's bar lights a lamp before every workspace number, 1 to 9 bare: the shown one amber, an urgent one red, the rest unlit", () => {
+  const ws = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((idx) => ({ idx, active: idx === 2, urgent: idx === 2 || idx === 5 }));
+  const lamps = hifiMargin().lamps(ws);
+  assert.deepEqual(lamps.map((l) => l.text), ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+  assert.deepEqual(lamps.slice(0, 5).map((l) => [l.idx, l.light, l.color]), [
+    [1, 'unlit', '#A89984'],
+    [2, 'lit', '#FABD2F'],
+    [3, 'unlit', '#A89984'],
+    [4, 'unlit', '#A89984'],
+    [5, 'red', '#A89984'],
+  ]);
+});
+
+test("Hi-Fi's bar reads the app in ink and the path in muted caps, the goal in ink after a red lamp, and the date as SUN 1 NOV", () => {
+  const h = hifiMargin();
+  assert.deepEqual([h.tail(foot), h.tailColor, h.path(foot), h.path({ idx: 4, app: null, title: null })], ['  FOOT', '#EBDBB2', '  ~', '']);
+  assert.deepEqual([h.goal(right.goal), h.goalColor, h.goalLamp], ['SHIP V2 · 3D', '#EBDBB2', 'red']);
+  assert.deepEqual([h.date(new Date(2026, 10, 1)), h.dateColor], ['SUN 1 NOV', '#EBDBB2']);
+});
+
+test("Blueprint's margins draw no lamps, path or goal lamp and keep the muted date", () => {
+  const b = margin('blueprint');
+  assert.deepEqual(b.lamps([{ idx: 1, active: true, urgent: false }]), []);
+  assert.deepEqual([b.path(foot), b.goalLamp, b.dateColor, b.tailColor, b.drawn(foot, SUN, right).left], ['', '', '#80A4C2', '#80A4C2', '[02] FOOT — ~']);
+});
+
 test('a bidi control in a window title cannot reorder the margin', () => {
   assert.equal(margin('blueprint').drawn({ idx: 1, app: 'foot', title: 'a‮b' }, SUN, right).left, '[01] FOOT — AB');
 });
