@@ -257,7 +257,7 @@ vec4 open_color(vec3 coords_geo, vec3 size_geo) {
     if (dots_glow(px, size_geo.xy)) return color * clamp((p - 160.0 / 220.0) / (60.0 / 220.0), 0.0, 1.0);
     return color * p * p * p;
 }`,
-      // Powers off: the glow goes in the first 40 of 140 ms, then the window fades out on a cubic ease-out, while a one-physical-pixel amber outline at 30% stays to the end.
+      // Powers off: the glow goes in the first 40 of 140 ms, then the window fades out on a quartic ease-out, nearly gone by 80%, while a one-physical-pixel amber outline at 30% stays to the end.
       close: `${TEX}
 ${PX}
 ${GLOW}
@@ -267,7 +267,7 @@ vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     vec2 px = coords_geo.xy * size_geo.xy;
     vec4 color = dots_tex(coords_geo);
     if (dots_glow(px, size_geo.xy)) color *= 1.0 - clamp(p / (40.0 / 140.0), 0.0, 1.0);
-    else color *= pow(1.0 - clamp((p - 40.0 / 140.0) / (100.0 / 140.0), 0.0, 1.0), 3.0);
+    else color *= pow(1.0 - clamp((p - 40.0 / 140.0) / (100.0 / 140.0), 0.0, 1.0), 4.0);
     bool inside = px.x >= 0.0 && px.y >= 0.0 && px.x < size_geo.x && px.y < size_geo.y;
     bool edge = px.x < w || px.y < w || px.x >= size_geo.x - w || px.y >= size_geo.y - w;
     if (inside && edge && p < 1.0) color = 0.3 * ${amber} + 0.7 * color;
