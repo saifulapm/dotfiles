@@ -20,8 +20,8 @@ Item {
     readonly property color accent: tokens ? tokens.color.accent : "transparent"
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
-    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1 })
-    // What a surface puts in its card fades in with the fill, after a plot's outline.
+    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1 })
+    // What a surface puts in its card fades in with pose.text: with the fill after a plot's outline, after the glass in Hi-Fi.
     default property alias content: inner.data
     // The glass highlight line, so a state function can report where it is drawn.
     readonly property alias highlight: highlightLine
@@ -221,6 +221,6 @@ Item {
     Item {
         id: inner
         anchors.fill: parent
-        opacity: surface.pose.fill
+        opacity: surface.pose.text
     }
 }

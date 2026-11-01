@@ -14,7 +14,7 @@ Item {
     readonly property var curves: M.surfaceMotion(tokens?.primitive.motion, Root.State.slowdown)
     // How far through its open the card is drawn: 0 draws nothing, 1 is at rest.
     property real progress: 0
-    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1, outline: 1, fill: 1 })
+    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1 })
     // A closing surface still draws, though it gave the keyboard back when its close began.
     readonly property bool drawing: shown || progress > 0
     readonly property bool settled: open && progress === 1

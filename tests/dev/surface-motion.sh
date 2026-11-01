@@ -186,6 +186,23 @@ check "blueprint to paper mid-open: the state says drop, timed at Paper's pace r
 wtype -k Escape
 until_ok 4000 state_is '.drawing == false'
 
+theme hi-fi
+# A looser match than near's 24, since the glass is lit over the backdrop at 0.87.
+glass_near() { tol=40 near "$@"; }
+before=$(rgb $((cx + 320)) $((cy + 60)))
+press
+# 60 ms into the 200 ms open the glass is lit to 0.87 and the text, which waits for the last 80 ms, is dark.
+wait_until 1200
+mid=$(rgb $((cx + 320)) $((cy + 60)))
+check "hi-fi: 60 ms into a 20x open the glass is drawn, neither the backdrop ($before) nor missing ($mid)" test "$mid" != "$before"
+check "hi-fi: and the glass reads the glass colour #141617" glass_near $((cx + 320)) $((cy + 60)) 20 22 23
+check "hi-fi: and the header's text is not drawn yet ($(bright $((cx + 10)) $((cy + 10)) 620 60) bright px)" test "$(bright $((cx + 10)) $((cy + 10)) 620 60)" = 0
+until_ok 7000 state_is .settled
+check "hi-fi: the launcher reports a warm open of 20 times 200 ms and a close of 20 times 160 ms ($(launcher_state | jq -c '[.motion, .motionMs]'))" state_is '.motion == "warm" and .motionMs.open == 4000 and .motionMs.close == 3200'
+check "hi-fi: at rest the header's text is drawn ($(bright $((cx + 10)) $((cy + 10)) 620 60) bright px)" test "$(bright $((cx + 10)) $((cy + 10)) 620 60)" -gt 50
+wtype -k Escape
+until_ok 7000 state_is '.drawing == false'
+
 theme paper
 exit $((fails > 0))
 }

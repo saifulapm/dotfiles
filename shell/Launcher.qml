@@ -191,6 +191,7 @@ Item {
             opens: opens,
             motion: motion.curves?.kind ?? null,
             settleMs: motion.settleMs,
+            motionMs: motion.curves ? { open: motion.curves.openMs, close: motion.curves.closeMs } : null,
             settled: motion.settled,
             drawing: launcher.visible,
             frameLabel: card.frameLabel(),
