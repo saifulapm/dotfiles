@@ -517,6 +517,8 @@ PanelWindow {
             valueBox: at(value),
             // The needle as drawn, and two points on the dial for pixel reads: inside the needle near its tip, and the middle of the red zone.
             needleAngle: meter ? Math.round(meter.needle.rotation * 10) / 10 : null,
+            // The needle's swing in volume units: peak is the furthest value drawn past `to`, settleMs the ms to rest or -1 while it moves.
+            swing: meter ? Object.assign({}, meter.swing, { peak: Math.round(meter.swing.peak * 100) / 100 }) : null,
             meter: meter ? {
                 box: at(meter),
                 needle: point(meter.needle.rotation, osdLook.meter.needle.length - 8),
@@ -2058,9 +2060,29 @@ PanelWindow {
                 Loader {
                     id: osdMeterLoader
                     active: island.osdMeter
+                    // The last two volumes the OSD showed, for a meter built after the change; brightness never moves them.
+                    property real now: -1
+                    property real prev: -1
+                    // Whichever of this and the island's own handler runs first, the meter reads the volume before the change.
+                    function volumeBefore() {
+                        const v = island.heldOsd?.value ?? 0;
+                        if (now === v && prev >= 0)
+                            return prev;
+                        return now >= 0 ? now : v;
+                    }
+                    Connections {
+                        target: island
+                        function onOsdChanged() {
+                            if (island.osd?.kind !== "volume" || island.osd.value === osdMeterLoader.now)
+                                return;
+                            osdMeterLoader.prev = osdMeterLoader.now;
+                            osdMeterLoader.now = island.osd.value;
+                        }
+                    }
                     sourceComponent: OsdMeter {
                         look: island.osdLook.meter
                         value: island.heldOsd?.value ?? 0
+                        before: osdMeterLoader.volumeBefore()
                     }
                 }
 

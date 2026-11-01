@@ -17,7 +17,7 @@ mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 state_has() { jq -e "$1" <<<"$state" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-osd_is() { island | jq -e --arg v "$1" '.mode == "osd" and .animating == false and .osd.value == $v' >/dev/null 2>&1; }
+osd_is() { island | jq -e --arg v "$1" '.mode == "osd" and .animating == false and .osd.value == $v and .osd.swing.settleMs >= 0' >/dev/null 2>&1; }
 # Sets the nested sink's volume and waits for the settled OSD to read it.
 volume() {
   until_ok 3000 mode_is rest
@@ -25,6 +25,12 @@ volume() {
   until_ok 2000 osd_is "$2"
   state=$(island)
   echo "     osd: $(jq -c .osd <<<"$state")"
+}
+angles_are() { jq -se "$1" <<<"$angles" >/dev/null; }
+# The needle's drawn angle over the next 1.2 s, one a line, as fast as the state answers.
+trace() {
+  local end=$(($(now_ms) + 1200))
+  while (($(now_ms) < end)); do island | jq -r '.osd.needleAngle // empty'; done
 }
 # Pixels within $5 of r g b in a 7 x 7 box centred on the state's point $1, or in the box at jq path $1 when it has w and h.
 near() {
@@ -42,7 +48,10 @@ near() {
 until_ok 5000 shell_status >/dev/null
 in_theme hi-fi
 
+volume 0.30 30
+volume 0.40 40
 volume 0.62 62
+check "the needle swung from 40 to 62, past it by at least 6 % of the travel, and rested within one frame of 300 ms ($(jq -c .osd.swing <<<"$state"))" state_has '.osd.swing.from == 40 and .osd.swing.to == 62 and .osd.swing.peak >= 63.3 and .osd.swing.settleMs >= 300 and .osd.swing.settleMs <= 317'
 check "at volume 62 the OSD is a meter reading 62 with the needle at 10.8 degrees" state_has '.osd.kind == "meter" and .osd.value == "62" and .osd.needleAngle == 10.8 and .osd.word == "VOLUME"'
 check "the meter is 320 px wide ($(jq -c .osd.meter.box <<<"$state"))" state_has '.osd.meter.box.w == 320'
 # A 20 px square at the dial's top left holds no scale, label or needle, only the glass #141617.
@@ -67,10 +76,27 @@ check "the needle near its tip reads amber #FABD2F over the glass ($amber px)" t
 lit=$(near .osd.highlightBox 33 34 32 4)
 check "the row under the top border is the highlight ($lit px)" test "$lit" -gt 280
 
+# A second step 50 ms after the first carries on from the drawn needle: it never goes back below where the second step found it.
+volume 0.40 40
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.50
+sleep 0.05
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.56
+angles=$(trace)
+echo "     angles after the second step: $(tr '\n' ' ' <<<"$angles")"
+check "the needle never turned back after the second step and ended on 56 (5.4 degrees)" angles_are '(min >= .[0] - 0.1) and .[-1] == 5.4'
+
 volume 0.95 95
 check "at volume 95 the value reads 95 and the needle is in the red zone, past the 90 mark's 36 degrees" state_has '.osd.value == "95" and .osd.needleAngle >= 36'
 
-volume 1.20 120
+volume 0.98 98
+until_ok 3000 mode_is rest
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.20
+angles=$(trace)
+echo "     angles during the swing to 120: $(tr '\n' ' ' <<<"$angles")"
+check "the needle never drew past +45 degrees going from 98 to 120" angles_are 'max <= 45 and .[-1] == 45'
+until_ok 2000 osd_is 120
+state=$(island)
+echo "     osd: $(jq -c .osd <<<"$state")"
 check "the nested sink took 1.20 ($(wpctl get-volume @DEFAULT_AUDIO_SINK@))" test "$(wpctl get-volume @DEFAULT_AUDIO_SINK@)" = "Volume: 1.20"
 check "at volume 120 the needle pins at 45 degrees and the value reads 120" state_has '.osd.needleAngle == 45 and .osd.value == "120"'
 

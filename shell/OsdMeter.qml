@@ -1,7 +1,9 @@
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Shapes
+import "." as Root
 import "lib/hifi.mjs" as H
+import "lib/needle.mjs" as N
 
 // Hi-Fi's volume OSD as a VU meter: an arc from 0 to 100 with a red zone at the top end, an amber needle, and a strip reading VOLUME and the value.
 Item {
@@ -10,13 +12,55 @@ Item {
     // osdLook's meter: the dial's geometry, colours and the value's angle.
     required property var look
     property real value: 0
-    readonly property real angle: look.angle(value)
+    // Where a new meter's needle starts its first swing, the volume before this one.
+    property real before: value
+    // The value the needle draws now; it swings to `value`, off the wall clock.
+    property real drawn: 0
+    // The swing as `island state` reports it, in volume units: peak is the furthest value drawn past `to`, settleMs the ms from the start to rest, -1 while moving.
+    property var swing: ({ from: 0, to: 0, peak: 0, settleMs: -1 })
+    property real startedAt: 0
+    property bool ready: false
+    readonly property real angle: look.angle(drawn)
     readonly property alias needle: needleLine
     readonly property alias word: wordText
     readonly property alias valueText: valueLabel
 
     implicitWidth: look.width
     implicitHeight: look.height
+
+    Component.onCompleted: {
+        drawn = before;
+        ready = true;
+        swingTo(value);
+    }
+    onValueChanged: if (ready)
+        swingTo(value)
+
+    // A new value swings on from wherever the needle is drawn now.
+    function swingTo(target) {
+        const rest = drawn === target;
+        swing = { from: drawn, to: target, peak: target, settleMs: rest ? 0 : -1 };
+        startedAt = Date.now();
+        if (rest)
+            clock.stop();
+        else
+            clock.start();
+    }
+
+    // Each frame draws the needle from the wall clock, so a stalled frame neither eats nor stretches the swing.
+    FrameAnimation {
+        id: clock
+        onTriggered: {
+            const ms = Date.now() - meter.startedAt;
+            const total = Math.round(N.SWING_MS * Root.State.slowdown);
+            const s = meter.swing;
+            meter.drawn = N.needleAt(s.from, s.to, ms, total);
+            const past = s.to > s.from ? Math.max(s.peak, meter.drawn) : Math.min(s.peak, meter.drawn);
+            meter.swing = { from: s.from, to: s.to, peak: past, settleMs: ms >= total ? ms : -1 };
+            if (ms >= total)
+                stop();
+        }
+    }
 
     // A point r px from the pivot at deg from upright, in the dial's pixels.
     function onDial(deg, r) {
@@ -124,7 +168,7 @@ Item {
             }
         }
 
-        // The needle jumps to its angle; it turns about its foot at the pivot.
+        // The needle turns about its foot at the pivot to the angle of the value drawn.
         Rectangle {
             id: needleLine
             x: meter.look.pivot.x - width / 2
