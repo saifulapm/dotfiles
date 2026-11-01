@@ -69,7 +69,7 @@ ShellRoot {
             to: ops.to,
             items: ops.items,
             failed: ops.failed
-        }) : null
+        }, engraved) : null
     // What a drag out carries: the rows, their paths, and the chip's image grabbed as it starts.
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
@@ -125,7 +125,8 @@ ShellRoot {
     readonly property string voice: look.voice
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
-    readonly property var head: F.headText(voice, home, folder)
+    readonly property bool engraved: look.engraved === true
+    readonly property var head: F.headText(voice, home, folder, engraved)
     readonly property var boardLook: F.filesLook(voice)
     readonly property int markWidth: boardLook.mark === "bracket" ? 22 : boardLook.mark === "circle" ? 16 : 14
     // Paper tints the current place and the marked rows a shade off its surface; its paper token is that shade.
@@ -1125,6 +1126,12 @@ ShellRoot {
                                     mark: markDrawn(),
                                     markFill: markBox.visible ? String(markBox.color) : "",
                                     icon: rowIcon.path,
+                                    box: {
+                                        x: rowItem.mapToItem(null, 0, 0).x,
+                                        y: rowItem.mapToItem(null, 0, 0).y,
+                                        w: rowItem.width,
+                                        h: rowItem.height
+                                    },
                                     dateFont: {
                                         family: dateLabel.font.family,
                                         italic: dateLabel.font.italic,
@@ -1259,7 +1266,7 @@ ShellRoot {
                                                 id: renameHint
                                                 anchors.verticalCenter: parent.verticalCenter
                                                 textFormat: Text.PlainText
-                                                text: F.promptText(app.voice, [["↵", "save"], ["esc", "cancel"]])
+                                                text: F.promptText(app.voice, [["↵", "save"], ["esc", "cancel"]], app.engraved)
                                                 color: c.muted ?? "gray"
                                                 font.family: look.small.font
                                                 font.pixelSize: 11
@@ -1272,7 +1279,7 @@ ShellRoot {
                                     Layout.preferredWidth: 90
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
-                                    text: rowItem.dropHere ? F.dropHere(app.voice) : F.sizeText(app.voice, rowItem.modelData)
+                                    text: rowItem.dropHere ? F.dropHere(app.voice, app.engraved) : F.sizeText(app.voice, rowItem.modelData)
                                     color: rowItem.dropHere ? c.accent ?? "red" : rowItem.dim
                                     font.family: fonts.mono ?? ""
                                     font.pixelSize: 12
@@ -1416,7 +1423,7 @@ ShellRoot {
                     id: opSay
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).say : ""
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops, app.engraved).say : ""
                     maximumLineCount: 1
                     elide: Text.ElideMiddle
                     color: c.ink ?? "black"
@@ -1426,7 +1433,7 @@ ShellRoot {
                 Text {
                     id: opProgress
                     textFormat: Text.PlainText
-                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).progress : ""
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops, app.engraved).progress : ""
                     color: c.accent ?? "red"
                     font.family: fonts.mono ?? ""
                     font.pixelSize: 12
@@ -1434,7 +1441,7 @@ ShellRoot {
                 Text {
                     id: opKeys
                     textFormat: Text.PlainText
-                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops).keys : ""
+                    text: app.ops.running ? F.opLine(app.voice, app.home, app.ops, app.engraved).keys : ""
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: 11
@@ -1520,7 +1527,7 @@ ShellRoot {
                     visible: app.asking === "trash"
                     textFormat: Text.PlainText
                     text: {
-                        const a = F.trashAsk(app.voice, app.trashPaths.length);
+                        const a = F.trashAsk(app.voice, app.trashPaths.length, app.engraved);
                         return [a.say].concat(a.keys.map(k => k.key + " " + k.word)).join(" ");
                     }
                     color: c.danger ?? "red"
@@ -1568,7 +1575,7 @@ ShellRoot {
                 Text {
                     visible: app.asking === "mkdir"
                     textFormat: Text.PlainText
-                    text: F.promptText(app.voice, [["↵", "make"], ["esc", "cancel"]])
+                    text: F.promptText(app.voice, [["↵", "make"], ["esc", "cancel"]], app.engraved)
                     color: c.muted ?? "gray"
                     font.family: look.small.font
                     font.pixelSize: 11
@@ -1591,7 +1598,7 @@ ShellRoot {
 
                 Repeater {
                     id: stripRepeater
-                    model: app.dropping ? F.dropKeys(app.voice) : app.dragging ? F.dragKeys(app.voice) : F.keyStrip(app.voice, app.sort)
+                    model: app.dropping ? F.dropKeys(app.voice, app.engraved) : app.dragging ? F.dragKeys(app.voice, app.engraved) : F.keyStrip(app.voice, app.sort, app.engraved)
 
                     Rectangle {
                         required property var modelData

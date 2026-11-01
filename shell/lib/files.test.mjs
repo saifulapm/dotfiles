@@ -350,3 +350,34 @@ test('each theme\'s listing as its board draws it: marks, row height, the date\'
   const bracket = F.filesLook('bracket');
   assert.deepEqual([bracket.mark, bracket.date.face, bracket.strip.keyWeight, bracket.head], ['bracket', 'mono', 700, { face: 'mono', size: 12, weight: 700 }]);
 });
+
+const FILES_APP = { name: 'Image Viewer', exec: 'imv', generic: 'Image viewer', default: true };
+const FILES_OP = { mode: 'copy', items: [{ name: 'a' }], from: '/h/x', total: 0, done: 0, rate: 0, to: '/h/y', failed: { error: 'boom', index: 0, copied: [], file: '' } };
+
+test('Hi-Fi draws every word Files writes without square marks', () => {
+  const strings = [
+    F.headText('bracket', '/h', '/h/x', true).chip,
+    F.promptText('bracket', [['↵', 'save'], ['esc', 'cancel']], true),
+    F.dropHere('bracket', true),
+    F.opLine('bracket', '/h', FILES_OP, true).keys,
+    F.appText('bracket', FILES_APP, true).badge,
+    F.trashAsk('bracket', 2, true).keys.map((k) => k.key).join(' '),
+    F.failText('bracket', FILES_OP, true).keys,
+    ...F.keyStrip('bracket', 'modified', true).map((k) => k.key),
+    ...F.dragKeys('bracket', true).map((k) => k.key),
+    ...F.dropKeys('bracket', true).map((k) => k.key),
+  ];
+  assert.deepEqual(strings.filter((s) => /[[\]]/.test(s)), []);
+  assert.equal(F.headText('bracket', '/h', '/h/x', true).chip, 'MOD+Y');
+  assert.equal(F.dropHere('bracket', true), 'DROP HERE');
+  assert.equal(F.keyStrip('bracket', 'modified', true)[0].key, 'J/K');
+});
+
+test('Blueprint keeps its square marks in Files', () => {
+  assert.equal(F.headText('bracket', '/h', '/h/x').chip, '[MOD+Y]');
+  assert.equal(F.dropHere('bracket'), '[DROP HERE]');
+  assert.equal(F.opLine('bracket', '/h', FILES_OP).keys, '[CTRL+C] CANCELS');
+  assert.equal(F.appText('bracket', FILES_APP).badge, '[DEFAULT]');
+  assert.equal(F.keyStrip('bracket')[0].key, '[J/K]');
+  assert.equal(F.promptText('bracket', [['↵', 'save']]), '[↵] SAVE');
+});

@@ -1,6 +1,7 @@
 // What Files writes, in each theme's voice; its listing, sizes and preview come from picker.mjs.
 import { oneLine, sizeText as pickerSize, sortRows } from './picker.mjs';
 import { pad2 } from './margins.mjs';
+import { mark } from './voice.mjs';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -15,10 +16,10 @@ export function folderName(home, folder) {
 }
 
 // Paper's caps label and ink chip, Artboard's Files and Mod+Y, Blueprint's bracketed key.
-export function headText(voice, home, folder) {
+export function headText(voice, home, folder, engraved = false) {
   const folderText = folderName(home, folder);
   if (voice === 'caps') return { label: 'FILES', folder: folderText, chip: 'MOD Y' };
-  return { label: 'Files', folder: folderText, chip: voice === 'bracket' ? '[MOD+Y]' : 'Mod+Y' };
+  return { label: 'Files', folder: folderText, chip: voice === 'bracket' ? mark(engraved, 'MOD+Y') : 'Mod+Y' };
 }
 
 export const places = (home) => ['Home', 'Downloads', 'Codes', 'Pictures', 'Documents'].map((label) => ({ label, path: label === 'Home' ? home : `${home}/${label}` }));
@@ -146,12 +147,12 @@ export function noticeText(voice, tag, name) {
   return voice === 'bracket' ? `! ${lead}${rest.toUpperCase()}` : lead + rest;
 }
 
-const keyPair = (voice, [k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w });
+const keyPair = (voice, [k, w], engraved) => (voice === 'bracket' ? { key: mark(engraved, k.toUpperCase()), word: w.toUpperCase() } : { key: k, word: w });
 
-export const promptText = (voice, pairs) => pairs.map((p) => keyPair(voice, p)).map((p) => `${p.key} ${p.word}`).join(' · ');
+export const promptText = (voice, pairs, engraved = false) => pairs.map((p) => keyPair(voice, p, engraved)).map((p) => `${p.key} ${p.word}`).join(' · ');
 
 // d asks first, in the bar above the keys.
-export const trashAsk = (voice, n) => ({ say: say(voice, `trash ${counted(n, 'file', 'files')} ·`), keys: [keyPair(voice, ['↵', 'trash ·']), keyPair(voice, ['esc', 'keep'])] });
+export const trashAsk = (voice, n, engraved = false) => ({ say: say(voice, `trash ${counted(n, 'file', 'files')} ·`), keys: [keyPair(voice, ['↵', 'trash ·'], engraved), keyPair(voice, ['esc', 'keep'], engraved)] });
 
 // Renames argv[1] to argv[2] with RENAME_NOREPLACE, so a name taken since it was checked is never overwritten; prints why it failed.
 export const RENAME_SCRIPT = [
@@ -203,7 +204,7 @@ export function dropText(voice, paths, folder) {
   return { counts: what, at: paths.length === 1 ? oneLine(paths[0].slice(paths[0].lastIndexOf('/') + 1)) : say(voice, counted(paths.length, 'file', 'files')) };
 }
 
-export const dropHere = (voice) => (voice === 'bracket' ? '[DROP HERE]' : 'drop here');
+export const dropHere = (voice, engraved = false) => (voice === 'bracket' ? mark(engraved, 'DROP HERE') : 'drop here');
 
 const DROP_KEYS = [['drop', 'copy into the folder under the pointer'], ['esc', 'cancel the drag']];
 
@@ -215,7 +216,7 @@ function inUnitOf(n, total) {
 }
 
 // The line above the status line while a copy or move runs; the folder it comes from is a path and keeps its case.
-export function opLine(voice, home, op) {
+export function opLine(voice, home, op, engraved = false) {
   const verb = op.mode === 'move' ? 'moving' : 'copying';
   const pct = op.total > 0 ? (op.done >= op.total ? 100 : Math.min(99, Math.round((op.done * 100) / op.total))) : 0;
   const parts = [`${pct}%`, `${inUnitOf(op.done, op.total)} of ${pickerSize({ size: op.total })}`].concat(op.rate > 0 ? [`${pickerSize({ size: op.rate })}/s`] : []);
@@ -223,12 +224,12 @@ export function opLine(voice, home, op) {
     say: say(voice, `${verb} ${counted(op.items.length, 'file', 'files')} from `) + oneLine(tilde(home, op.from)),
     // Until the op has summed its sources there is no size to give.
     progress: op.total > 0 ? say(voice, parts.join(' · ')) : '',
-    keys: voice === 'bracket' ? '[CTRL+C] CANCELS' : 'ctrl+c cancels',
+    keys: voice === 'bracket' ? `${mark(engraved, 'CTRL+C')} CANCELS` : 'ctrl+c cancels',
   };
 }
 
 // The copy-failure card: the error, then each source as copied, stopped (its partial copy removed) or not started.
-export function failText(voice, op) {
+export function failText(voice, op, engraved = false) {
   const f = op.failed;
   const full = f.error === 'No space left on device';
   const names = op.items.map((i) => oneLine(i.name));
@@ -247,7 +248,7 @@ export function failText(voice, op) {
     why,
     rows,
     foot: say(voice, 'Nothing half-written is left: the partial ') + (f.file ? oneLine(f.file.slice(f.file.lastIndexOf('/') + 1)) : names[f.index]) + say(voice, ` was deleted, and the ${f.copied.length} copied ${f.copied.length === 1 ? 'file is' : 'files are'} whole.`),
-    keys: promptText(voice, [['r', 'retry'], ['s', 'skip this file'], ['esc', 'cancel the rest']]),
+    keys: promptText(voice, [['r', 'retry'], ['s', 'skip this file'], ['esc', 'cancel the rest']], engraved),
   };
 }
 
@@ -260,9 +261,9 @@ export function openWithHead(voice, n, description, apps) {
 }
 
 // An app's row: its name, then its kind and command, which keeps its case as a name does; a desktop entry may hold any text.
-export function appText(voice, app) {
+export function appText(voice, app, engraved = false) {
   const kind = app.generic ? say(voice, oneLine(app.generic)) + ' · ' : '';
-  return { name: oneLine(app.name), sub: kind + oneLine(app.exec), badge: app.default ? (voice === 'bracket' ? '[DEFAULT]' : 'default') : '' };
+  return { name: oneLine(app.name), sub: kind + oneLine(app.exec), badge: app.default ? (voice === 'bracket' ? mark(engraved, 'DEFAULT') : 'default') : '' };
 }
 
 
@@ -275,10 +276,10 @@ export const SORT_FIRST = SORTS[0];
 export const nextSort = (sort) => SORTS[(SORTS.indexOf(sort) + 1) % SORTS.length];
 
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
-const strip = (voice, pairs) => pairs.map(([k, w]) => (voice === 'bracket' ? { key: `[${k.toUpperCase()}]`, word: w.toUpperCase() } : { key: k, word: w }));
-export const keyStrip = (voice, sort = SORT_FIRST) => strip(voice, KEYS.map(([k, w]) => (k === ',' ? [k, `sort: ${SORT_WORDS[sort]}`] : [k, w])));
-export const dragKeys = (voice) => strip(voice, DRAG_KEYS);
-export const dropKeys = (voice) => strip(voice, DROP_KEYS);
+const strip = (voice, pairs, engraved) => pairs.map((p) => keyPair(voice, p, engraved));
+export const keyStrip = (voice, sort = SORT_FIRST, engraved = false) => strip(voice, KEYS.map(([k, w]) => (k === ',' ? [k, `sort: ${SORT_WORDS[sort]}`] : [k, w])), engraved);
+export const dragKeys = (voice, engraved = false) => strip(voice, DRAG_KEYS, engraved);
+export const dropKeys = (voice, engraved = false) => strip(voice, DROP_KEYS, engraved);
 
 // Every board draws a file row with the page icon, an image too; only a folder differs.
 export const rowIcon = (row) => (row.dir ? 'folder' : 'file');

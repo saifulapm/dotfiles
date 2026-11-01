@@ -236,7 +236,7 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool isCurrent: index === root.at
-                        readonly property var words: F.appText(root.voice, modelData)
+                        readonly property var words: F.appText(root.voice, modelData, root.look.engraved === true)
                         function drawn() {
                             return {
                                 app: modelData.id,
