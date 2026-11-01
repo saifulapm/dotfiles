@@ -19,12 +19,13 @@ export function renderTmux(t) {
   const say = (mods, name) => `#{${[mods, voice === 'plain' ? '' : CAPS].filter((m) => m).join(';')}:${name}}`;
   const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
   const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
+  const shown = t.type.engraved ? number : `[${number}]`;
   const current = {
     caps: `#[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
-    bracket: `#[fg=${accent}][${number}]#[fg=${ink}] ${name}#[default]`,
+    bracket: `#[fg=${accent}]${shown}#[fg=${ink}] ${name}#[default]`,
     plain: `#[fg=${accent}]● #[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
   }[voice];
-  const other = voice === 'bracket' ? `#[fg=${muted}][${number}] ${name}#[default]` : `#[fg=${muted}]${number} ${name}#[default]`;
+  const other = voice === 'bracket' ? `#[fg=${muted}]${shown} ${name}#[default]` : `#[fg=${muted}]${number} ${name}#[default]`;
   const sep = { caps: ' — ', bracket: ' · ', plain: '    ' }[voice];
   // Paper and Artboard raise an alert in the accent; Blueprint in amber, its danger token, as the margins' goal does.
   const alert = voice === 'bracket' ? danger : accent;
@@ -305,7 +306,7 @@ export function renderNewtabManifest() {
 export function renderNewtabHtml(t) {
   const voice = t.type.voice;
   return `<!doctype html>
-<html lang="en" data-voice="${voice}" data-theme="${t.name}">
+<html lang="en" data-voice="${voice}"${t.type.engraved ? ' data-engraved="true"' : ''} data-theme="${t.name}">
 <head>
 <meta charset="utf-8">
 <title>New Tab</title>

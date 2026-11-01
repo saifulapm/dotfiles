@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rename
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
-import { validateTheme, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
+import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
@@ -57,6 +57,8 @@ for (const d of readdirSync(dir).sort()) {
   }
 }
 themes.sort((a, b) => (b.name === 'paper') - (a.name === 'paper'));
+// The apps that speak in the shell's voice read the tokens as the shell does, so Hi-Fi's engraved voice draws Blueprint's words bare.
+const spoken = checkTokens(theme);
 const out = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots/theme-out');
 mkdirSync(out, { recursive: true });
 const files = {
@@ -65,8 +67,8 @@ const files = {
   'foot.ini': renderFoot(theme),
   'foot.args': renderFootArgs(theme),
   'foot.osc': renderFootOsc(theme),
-  'tmux.conf': renderTmux(theme),
-  'dots.kak': renderKak(theme) + renderMailKak(theme),
+  'tmux.conf': renderTmux(spoken),
+  'dots.kak': renderKak(theme) + renderMailKak(spoken),
   'helix.toml': renderHelix(theme),
   'yazi-theme.toml': renderYazi(theme),
   'colors.fish': renderFish(theme),
@@ -74,7 +76,7 @@ const files = {
   'gtk-settings.ini': renderGtkSettings(theme),
   'chromium-theme/manifest.json': renderChromiumTheme(theme),
   'chromium-newtab/manifest.json': renderNewtabManifest(),
-  'chromium-newtab/newtab.html': renderNewtabHtml(theme),
+  'chromium-newtab/newtab.html': renderNewtabHtml(spoken),
   'chromium-newtab/theme.css': renderNewtabCss(theme),
   'chromium-newtab/newtab.css': readFileSync(new URL('../newtab/newtab.css', import.meta.url), 'utf8'),
   'chromium-newtab/newtab.js': readFileSync(new URL('../newtab/newtab.js', import.meta.url), 'utf8'),

@@ -20,7 +20,7 @@ function swap(tab, tries) {
 
 function draw() {
   const voice = document.documentElement.dataset.voice;
-  const w = words(voice);
+  const w = words(voice, document.documentElement.dataset.engraved === 'true');
   const q = document.getElementById('q');
   const sites = document.getElementById('sites');
   const { day, date } = dateLines(voice, new Date());

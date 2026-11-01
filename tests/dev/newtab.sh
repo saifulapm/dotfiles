@@ -47,7 +47,7 @@ tile_contrast='(() => {
 date_line() {
   case $1 in
     paper) LC_ALL=C date '+%A %-d %B %Y' | sed 's/^[A-Za-z]*/\U&/' ;;
-    blueprint) LC_ALL=C date '+%A %Y-%m-%d' | sed 's/^[A-Za-z]*/\U&/' ;;
+    blueprint | hi-fi) LC_ALL=C date '+%A %Y-%m-%d' | sed 's/^[A-Za-z]*/\U&/' ;;
     artboard) LC_ALL=C date '+%A %-d %B %Y' ;;
   esac
 }
@@ -147,7 +147,7 @@ echo "     top sites after seeding: $(cdp eval newtab.html 'new Promise((r) => c
 sleep 12
 quit_chromium
 
-for theme in paper blueprint artboard; do
+for theme in paper blueprint artboard hi-fi; do
   "$repo/bin/dots" theme "$theme"
   chromium seeded
   # The keys typed after Ctrl+T must reach the page's field, not the address bar.
@@ -164,6 +164,11 @@ for theme in paper blueprint artboard; do
   # A focused row turns its colours over, and its tile's letter must still read: at least 3:1 against what is behind it.
   check "$theme: the focused row's tile letter reads ($(page "$tile_contrast" | cut -c1-5):1)" is "$tile_contrast >= 3"
   check "$theme: no text on the page names the goal" is '!/goal|ship the new tab/i.test(document.body.innerText)'
+  # Hi-Fi says Blueprint's keys without their marks; Blueprint keeps them.
+  case $theme in
+    blueprint) check "blueprint: the keys read in brackets ($(page 'document.querySelector(".keys").innerText'))" is '/\[↵\]/.test(document.querySelector(".keys").innerText)' ;;
+    hi-fi) check "hi-fi: no text on the page holds a bracket ($(page 'document.querySelector(".keys").innerText'))" is '!/[[\]]/.test(document.body.innerText)' ;;
+  esac
   wtype -k Return
   until_ok 10000 searched
   check "$theme: Enter searches the default engine for fedora ($(cdp urls | grep -m1 'q=fedora' | cut -c1-60))" until_ok 3000 searched

@@ -53,10 +53,12 @@ export function digitSite(key, field, count) {
   return !field && n > 0 && n <= count ? n - 1 : -1;
 }
 
-export function words(voice) {
+// The engraved voice says Blueprint's words without their marks; the page copies this file alone, so it marks its own.
+export function words(voice, engraved = false) {
+  const mark = (s) => (engraved ? s : `[${s}]`);
   const keys = [['type', 'search'], ['↓ / tab', 'most visited'], ['1–6', 'open'], ['↵', 'go']];
   const base = { placeholder: 'Search the web or type a URL', head: 'MOST VISITED', empty: 'NOTHING VISITED YET' };
-  if (voice === 'bracket') return Object.assign(base, { go: '[↵] GO', keys: keys.map(([k, w]) => [`[${k.toUpperCase()}]`, w.toUpperCase()]) });
+  if (voice === 'bracket') return Object.assign(base, { go: `${mark('↵')} GO`, keys: keys.map(([k, w]) => [mark(k.toUpperCase()), w.toUpperCase()]) });
   if (voice === 'plain') return Object.assign(base, { go: '↵ go', head: 'Most visited', empty: 'Nothing visited yet', keys });
   return Object.assign(base, { go: '↵ go', keys });
 }
