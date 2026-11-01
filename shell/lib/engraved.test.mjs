@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
 import { cards, cardName, tagline, windowLook } from './themes.mjs';
-import { marginLook, mark } from './voice.mjs';
+import { marginLook, mark, launcherLook, listLook, islandLook, leaseLook, sendingLook, downloadingLook, clockLook } from './voice.mjs';
 import { lockLook } from './lock-look.mjs';
 
 // shell.json as theme-render writes it, then as the shell reads it.
@@ -64,4 +64,26 @@ test('the Hi-Fi card reads Hi-fi, BRUSHED · AMBER · DIAL, and frames its focus
   assert.equal(tagline(t).text, 'BRUSHED · AMBER · DIAL');
   assert.equal(tagline(shell('blueprint')).text, 'GRID // GLOW // CUT');
   assert.equal(windowLook(t, true).frame.color, '#FABD2F');
+});
+
+test('the shared looks draw Blueprint\'s keys and labels bare in Hi-Fi, and Blueprint keeps its marks', () => {
+  const hifi = shell('hi-fi');
+  const blueprint = shell('blueprint');
+  const at = (t) => ({
+    launcher: launcherLook(t).legend('apps').keys.map((k) => k.key).join(' '),
+    list: listLook(t).keys([['j/k', 'move'], ['esc', '']]).map((k) => k.key).join(' '),
+    island: islandLook(t).appLabel('Chromium'),
+    lease: [leaseLook(t).slot.label.text, ...leaseLook(t).card.keys.map((k) => k[0])].join(' '),
+    sending: sendingLook(t).parts[0].text(),
+    downloading: downloadingLook(t).head.left,
+    calendar: clockLook(t).grid.header,
+  });
+  const bare = at(hifi);
+  for (const [k, v] of Object.entries(bare)) assert.doesNotMatch(v, /[[\]]/, `${k}: ${v}`);
+  assert.equal(bare.island, 'CHROMIUM');
+  assert.equal(islandLook(hifi).brackets, false);
+  const marked = at(blueprint);
+  for (const [k, v] of Object.entries(marked)) assert.match(v, /\[/, `${k}: ${v}`);
+  assert.equal(marked.island, '[ CHROMIUM ]');
+  assert.equal(islandLook(blueprint).brackets, true);
 });

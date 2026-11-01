@@ -32,8 +32,9 @@ export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
+  const engraved = t.engraved === true;
   const caps = voice !== 'plain';
-  const key = (k) => (voice === 'bracket' ? `[${upper(k)}]` : caps ? upper(k) : k);
+  const key = (k) => (voice === 'bracket' ? mark(engraved, upper(k)) : caps ? upper(k) : k);
   // Reminder mode names the keys its rows take; Paper also names Enter's, as its board does.
   const REMINDER_KEYS = voice === 'caps' ? [['↵', 'set'], ['d', 'delete']] : [['d', 'delete']];
   // Clipboard mode names Shift+Enter, which copies a clip without pasting it.
@@ -50,6 +51,7 @@ export function launcherLook(tokens) {
   });
   const base = {
     voice,
+    engraved,
     legend,
     legendLine(mode) {
       const l = legend(mode);
@@ -134,14 +136,15 @@ export function islandLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
+  const engraved = t.engraved === true;
   const appText = (app) => (voice === 'plain' ? line(app) : line(app).toUpperCase());
   const base = {
     voice,
     appText,
-    brackets: voice === 'bracket',
+    brackets: voice === 'bracket' && !engraved,
     appLabel(app) {
       const a = appText(app);
-      return a && voice === 'bracket' ? `[ ${a} ]` : a;
+      return a && voice === 'bracket' ? mark(engraved, a, ' ') : a;
     },
     summaryText: line,
     bodyText: same,
@@ -273,7 +276,7 @@ export function leaseLook(tokens) {
         pad: 16,
         gap: 10,
         mark: null,
-        label: Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: '[ AGENT ]' }),
+        label: Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: mark(t.engraved === true, 'AGENT', ' ') }),
         who: Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6 }), { text: (who) => upper(line(who)) }),
         time: text(12, c.accent, { font: t.mono, weight: 700, spacing: 0.6 }),
       },
@@ -287,7 +290,7 @@ export function leaseLook(tokens) {
         who: (who) => upper(line(who)),
         unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
         bar: 'blocks',
-        keys: [['[↵]', 'LOCK NOW'], ['[ESC]', 'CLOSE']],
+        keys: [[mark(t.engraved === true, '↵'), 'LOCK NOW'], [mark(t.engraved === true, 'ESC'), 'CLOSE']],
       },
     };
   }
@@ -348,7 +351,7 @@ export function sendingLook(tokens) {
       gap: 10,
       mark: null,
       parts: [
-        Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: () => '[ TAILDROP ]' }),
+        Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: () => mark(t.engraved === true, 'TAILDROP', ' ') }),
         Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6, name: true }), { text: (count, to) => `→ ${upper(line(to))}` }),
         Object.assign(text(10, c.muted, { font: t.mono, spacing: 1 }), { text: (count) => upper(files(count)) }),
       ],
@@ -396,7 +399,7 @@ export function downloadingLook(tokens) {
       pad: 18,
       gap: 6,
       tile: null,
-      head: Object.assign(text(t.mono, 10, c.muted, { spacing: 1.6 }), { left: '[ YOUTUBE ]', right: (kind, clock) => clock }),
+      head: Object.assign(text(t.mono, 10, c.muted, { spacing: 1.6 }), { left: mark(t.engraved === true, 'YOUTUBE', ' '), right: (kind, clock) => clock }),
       line: text(t.mono, 14, c.accent, { weight: 700 }),
       bar: { height: 3, radius: 0, track: c.line, fill: c.accent },
       chip: null,
@@ -604,7 +607,7 @@ export function clockLook(tokens) {
       rule: { color: c.line, dashed: true },
       grid: {
         head: '',
-        header: '[ CALENDAR ]',
+        header: mark(t.engraved === true, 'CALENDAR', ' '),
         weekStart: 1,
         weekdays: MONDAY_FIRST,
         cell: 32,
@@ -657,7 +660,7 @@ export function clockLook(tokens) {
 export function listLook(tokens) {
   const l = launcherLook(tokens);
   const voice = l.voice;
-  const keyText = (k) => (voice === 'bracket' ? `[${upper(k)}]` : voice === 'caps' ? upper(k) : same(k));
+  const keyText = (k) => (voice === 'bracket' ? mark(l.engraved, upper(k)) : voice === 'caps' ? upper(k) : same(k));
   const wordText = (w) => (voice === 'plain' ? same(w) : upper(w));
   const label = l.label;
   return Object.assign(l, {
