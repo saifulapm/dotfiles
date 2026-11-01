@@ -7,6 +7,7 @@ import { surfaceStyle } from './surface.mjs';
 import { cards, cardName, tagline, windowLook } from './themes.mjs';
 import { engraving, marginLook, mark, launcherLook, listLook, islandLook, leaseLook, sendingLook, downloadingLook, clockLook } from './voice.mjs';
 import { lockLook } from './lock-look.mjs';
+import { notesLook } from './notes-look.mjs';
 
 // shell.json as theme-render writes it, then as the shell reads it.
 const rendered = (n) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${n}/theme.toml`, import.meta.url), 'utf8')));
@@ -47,6 +48,13 @@ test('the Hi-Fi margins read Blueprint\'s words with no brackets; Blueprint keep
   assert.equal(blueprint.number(3), '[03]');
   assert.equal(blueprint.column({ at: 1, of: 2 }), ' [1 / 2]');
   assert.deepEqual(blueprint.marks([2, 5, 7, 9]).map((s) => s.text), ['   [!02][!05][!07][+1]']);
+});
+
+test("Hi-Fi's list headings and Notes header part their words with Hi-Fi's dot, not Blueprint's slashes", () => {
+  assert.equal(listLook(shell('hi-fi')).heading('Control', 'audio'), 'CONTROL · AUDIO');
+  assert.equal(listLook(shell('blueprint')).heading('Control', 'audio'), 'CONTROL // AUDIO');
+  assert.equal(notesLook(shell('hi-fi')).separator, '·');
+  assert.equal(notesLook(shell('blueprint')).separator, '//');
 });
 
 test('the Hi-Fi lock draws its own receiver, its status and hint bare', () => {

@@ -703,7 +703,7 @@ export function listLook(tokens) {
   const label = l.label;
   return Object.assign(l, {
     heading(name, section) {
-      if (label.kind === 'header') return section ? `${upper(name)} // ${upper(section)}` : upper(name);
+      if (label.kind === 'header') return section ? `${upper(name)} ${l.engraved ? '·' : '//'} ${upper(section)}` : upper(name);
       return label.kind === 'pill' ? name.charAt(0).toUpperCase() + same(name.slice(1)) : upper(name);
     },
     tab: { fill: label.kind === 'header' ? l.cursor.fill : label.fill, text: label.kind === 'header' ? l.cursor.text : label.color, radius: label.kind === 'pill' ? 8 : 0 },

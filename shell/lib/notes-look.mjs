@@ -79,7 +79,7 @@ export function notesLook(tokens) {
     pinned: { text: voice === 'plain' ? 'Pinned' : 'PINNED', color: voice === 'bracket' ? c.danger : c.accent, fill: round ? mix(c.surface, c.accent, 0.1) : 'transparent', border: round ? 0 : 1 },
     rule: { color: voice === 'bracket' ? c.line : c.ink, width: p.frame === 'none' ? 0 : 1, dashed: voice === 'bracket' },
     strip: { color: voice === 'caps' ? c.ink : c.line, width: 1 },
-    separator: voice === 'bracket' ? '//' : '',
+    separator: voice === 'bracket' ? (engraved ? '·' : '//') : '',
     small: { font: t.mono, size: voice === 'plain' ? 11 : 10, color: c.muted, spacing: voice === 'plain' ? 0 : 1.2 },
     body: { font: voice === 'plain' ? t.ui : t.mono, size: voice === 'plain' ? 14 : 13, color: c.ink, done: c.muted },
     composer: { font: voice === 'caps' ? t.display : voice === 'plain' ? t.ui : t.mono, size: voice === 'caps' ? 20 : 14, italic: voice === 'caps', prompt: voice === 'bracket' ? '>' : '', placeholder: voice === 'bracket' ? 'add a note or a prompt' : 'Add a note or a prompt…', fill: round ? tint : 'transparent', radius: round ? 12 : 0 },

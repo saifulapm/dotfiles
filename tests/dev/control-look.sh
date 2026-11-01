@@ -71,8 +71,14 @@ close_control
 in_theme hi-fi
 open_control
 at_section() { control_state | jq -e --arg s "$1" '.section == $s' >/dev/null && return 0; wtype -k Tab; sleep 0.3; return 1; }
-check "hi-fi: the header reads CONTROL // AUDIO ($(control_state | jq -c .heading))" state_is '.heading == "CONTROL // AUDIO"'
+check "hi-fi: the header reads CONTROL · AUDIO ($(control_state | jq -c .heading))" state_is '.heading == "CONTROL · AUDIO"'
 check "hi-fi: the legend's keys are bare ($(control_state | jq -c .legend))" state_is '.legend == "TAB SECTION  J/K MOVE  ESC CLOSE" and .legendDrawn == .legend'
+check "hi-fi: the cursor row is backlit #413A29 ($(control_state | jq -c .cursorFill))" state_is '.cursorFill == "#413a29"'
+# The 3 px square at the centre of the cursor row's 7 px lamp.
+lamp_geo() { control_state | jq -r '.cursorLamp | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
+until_ok 2000 state_is '.cursorLamp != null'
+lit=$(near "$(lamp_geo)" 250 189 47 12)
+check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
 for s in $(control_state | jq -r '.sections[]'); do
   until_ok 4000 at_section "$s"
   # A device, network or port name is the system's own text, so a bracket in one stays; the fixture has none.
