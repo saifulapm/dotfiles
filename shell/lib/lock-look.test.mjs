@@ -37,6 +37,7 @@ test('Blueprint: a hollow 200 px clock outlined in the accent, the date on a dim
     date: { format: 'yyyy-MM-dd · dddd', caps: true, family: 'Maple Mono', px: 11, italic: false, tracking: 2.2, color: '#7FE3F0' },
     prompt: 'PASSWORD FOR SAIFUL',
     hint: '[↵] UNLOCK',
+    fieldMarks: ['[', ']'],
   });
 });
 

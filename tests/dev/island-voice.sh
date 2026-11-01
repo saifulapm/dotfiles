@@ -58,6 +58,11 @@ shown '.note.summary == "TUNED IN"'
 echo "     note: $(island | jq -c .note)"
 check "hi-fi: the island reads NOTIFY-SEND and T+0S with no brackets drawn" state_is '.note.app == "NOTIFY-SEND" and .note.age == "T+0S" and .note.bracketsShown == false'
 check "hi-fi: nothing the island reports holds a bracket ($(island | marked | head -3 | paste -sd'|'))" eval '[ -z "$(island | marked)" ]'
+# The text must read on what is drawn behind it: amber summary on the dark glass #141617, not on an ink slab.
+glass=$(near "$(geo summaryBox)" 20 22 23 6)
+amber=$(near "$(geo summaryBox)" 250 189 47 12)
+cream=$(near "$(geo summaryBox)" 235 219 178 10)
+check "hi-fi: the summary is amber ($amber px) on dark glass ($glass px), with no cream fill ($cream px)" test "$amber" -gt 100 -a "$glass" -gt 200 -a "$cream" -lt 20
 
 in_theme paper
 notify-send "Download complete" "report-october.pdf · 2.4 MB"

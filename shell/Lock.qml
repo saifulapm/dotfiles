@@ -137,6 +137,7 @@ Scope {
             failures: failures,
             shaking: shake.running,
             look: look.kind,
+            fieldMarks: look.fieldMarks ?? [],
             clockFamily: t ? t.font.family : "",
             clockPx: t ? t.font.pixelSize : 0,
             clockFill: t ? String(t.color) : "",
@@ -452,7 +453,7 @@ Scope {
 
                     // Blueprint brackets the field.
                     Repeater {
-                        model: surface.kind === "sheet" ? ["[", "]"] : []
+                        model: surface.kind === "sheet" ? surface.look.fieldMarks : []
 
                         Text {
                             required property string modelData

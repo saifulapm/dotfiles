@@ -53,11 +53,13 @@ export function surfaceStyle(tokens, role) {
   }
   const p = tokens.primitive;
   const c = tokens.color;
-  const inkIsland = islandish(role) && p.frame !== 'glow';
+  // Hi-Fi's island is a dark glass display in a 1 px line frame, so Blueprint's layout reads on it as on Blueprint's dark island.
+  const glass = islandish(role) && tokens.type.engraved === true;
+  const inkIsland = islandish(role) && p.frame !== 'glow' && !glass;
   return {
-    fill: inkIsland ? c.ink : c.surface,
+    fill: glass ? c.glass : inkIsland ? c.ink : c.surface,
     text: inkIsland ? c.paper : c.ink,
-    frame: frameOf(p, c, role),
+    frame: glass ? { width: 1, color: c.line } : frameOf(p, c, role),
     corner: { radius: p.corner === 'round' ? ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
     shadow: shadowOf(p, c, role),
     wash: p.frame === 'none' ? 0.62 : 0.72,

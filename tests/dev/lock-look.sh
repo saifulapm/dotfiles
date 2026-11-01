@@ -69,6 +69,7 @@ unlock
 
 lock_in blueprint
 check "blueprint: the clock's fill is transparent and its outline #7FE3F0 ($(lock_state | jq -c '[.clockFill, .clockStroke]'))" state_is '.look == "sheet" and .clockFill == "#00000000" and (.clockStroke | ascii_downcase) == "#7fe3f0"'
+check "blueprint: the password field keeps its brackets" state_is '.fieldMarks == ["[", "]"]'
 read -r cyan cyan_run < <(rows_runs 127 227 240)
 read -r ground _ < <(rows_runs 12 26 46)
 check "blueprint: rows across the clock have accent ($cyan px) and background ($ground px)" test "$cyan" -gt 10 -a "$ground" -gt 10
@@ -79,6 +80,7 @@ check "blueprint: the test password unlocks" unlocked
 
 lock_in hi-fi
 check "hi-fi: the lock draws Blueprint's sheet, not Paper's print ($(lock_state | jq -r .look))" state_is '.look == "sheet"'
+check "hi-fi: the password field has no brackets around it ($(lock_state | jq -c .fieldMarks))" state_is '.fieldMarks == []'
 unlock
 check "hi-fi: the test password unlocks" unlocked
 

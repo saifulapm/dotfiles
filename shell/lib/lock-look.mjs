@@ -31,6 +31,7 @@ export function lockLook(tokens, user) {
       date: { format: 'yyyy-MM-dd · dddd', caps: true, family: t.ui, px: 11, italic: false, tracking: 2.2, color: c.accent },
       prompt,
       hint: `${mark(engraved, '↵')} UNLOCK`,
+      fieldMarks: engraved ? [] : ['[', ']'],
     };
   }
   // Paper: a printed page, a large serif clock over an italic date.

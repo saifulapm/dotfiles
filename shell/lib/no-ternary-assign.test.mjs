@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Quickshell's QML engine drops an assignment made inside a ternary's branch while node runs it, so a unit test passes on code that does nothing in the shell (m72's Playlist move).
+// Quickshell's QML engine drops an assignment made inside a ternary's branch while node runs it, so a unit test passes on code that does nothing in the shell.
 const lib = new URL('.', import.meta.url).pathname;
 // A branch after ? or : that opens with a parenthesised assignment: `? (a[k] = v)` or `: (seen[k] = true)`.
 const BRANCH_ASSIGN = /[?:]\s*\(\s*[\w$.]+(?:\[[^\]]*\])*\s*[-+*/%|&]?=(?![=>])/;

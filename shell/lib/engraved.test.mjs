@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens } from './theme.mjs';
+import { validateTheme, checkTokens, contrast } from './theme.mjs';
+import { surfaceStyle } from './surface.mjs';
 import { cards, cardName, tagline, windowLook } from './themes.mjs';
 import { engraving, marginLook, mark, launcherLook, listLook, islandLook, leaseLook, sendingLook, downloadingLook, clockLook } from './voice.mjs';
 import { lockLook } from './lock-look.mjs';
@@ -92,4 +93,20 @@ test('Hi-Fi engraves its labels with a 1 px line of ink at 8 % under each letter
   assert.deepEqual(engraving(shell('hi-fi')), { on: true, color: '#14EBDBB2' });
   for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual(engraving(shell(n)), { on: false, color: 'transparent' });
   assert.deepEqual(engraving(null), { on: false, color: 'transparent' });
+});
+
+test('Hi-Fi\'s island is a dark glass display its ink reads on, not Paper\'s ink slab', () => {
+  const t = shell('hi-fi');
+  for (const role of ['island', 'chip']) {
+    const s = surfaceStyle(t, role);
+    assert.deepEqual([s.fill, s.text, s.frame], ['#141617', '#EBDBB2', { width: 1, color: '#504945' }], role);
+  }
+  assert.ok(contrast(islandLook(t).body.color, surfaceStyle(t, 'island').fill) >= 4.5);
+  assert.equal(surfaceStyle(shell('blueprint'), 'island').fill, '#0A1526');
+  assert.equal(surfaceStyle(shell('paper'), 'island').fill, '#1C1915');
+});
+
+test('the Hi-Fi lock draws its password field without Blueprint\'s brackets', () => {
+  assert.deepEqual(lockLook(shell('hi-fi'), 'saiful').fieldMarks, []);
+  assert.deepEqual(lockLook(shell('blueprint'), 'saiful').fieldMarks, ['[', ']']);
 });
