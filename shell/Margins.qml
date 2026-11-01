@@ -109,7 +109,7 @@ PanelWindow {
             goalLamp: goalLamp.visible ? { light: goalLamp.light, box: box(goalLamp) } : null,
             islandLeft: width / 2 - islandWidth / 2,
             marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join(voice.engraved ? " " : "").trim(),
-            markLamps: Array.from({ length: markList.count }, (_, i) => markList.itemAt(i)?.modelData.lamp ?? "").filter(l => l),
+            markLamps: Array.from({ length: markList.count }, (_, i) => markList.itemAt(i)).filter(m => m && m.lamp.visible).map(m => ({ light: m.modelData.lamp, box: box(m.lamp) })),
             markColors: Array.from(marks.children).filter(l => l.text !== undefined).map(l => String(l.color)),
             right: right,
             leftEnd: marks.mapToItem(null, marks.width, 0).x,
@@ -202,9 +202,11 @@ PanelWindow {
                     required property var modelData
                     readonly property alias text: markLabel.text
                     readonly property alias color: markLabel.color
+                    readonly property Item lamp: markLamp
                     spacing: 7
 
                     Root.Lamp {
+                        id: markLamp
                         visible: (parent.modelData.lamp ?? "") !== ""
                         anchors.verticalCenter: parent.verticalCenter
                         tokens: root.theme.tokens

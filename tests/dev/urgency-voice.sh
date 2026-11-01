@@ -39,11 +39,22 @@ in_theme blueprint
 until_ok 2000 marks_are "[!05][!07]"
 check "blueprint: the marks read [!05][!07]" marks_are "[!05][!07]"
 check "blueprint: in amber #FFB547" colors_are '["#ffb547"]'
-lamps_are() { margins | jq -e --argjson want "$1" '.drawn.markLamps == $want' >/dev/null 2>&1; }
+lamps_are() { margins | jq -e --argjson want "$1" '[.drawn.markLamps[].light] == $want' >/dev/null 2>&1; }
+read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
+# The mean colour at the centre of the first urgent workspace's lamp, as r g b.
+first_lamp() { margins | jq -r '.drawn.markLamps[0].box | "\(.x + .w / 2 | floor) \(.y + .h / 2 | floor)"'; }
+lamp_red() {
+  local x y r g b
+  read -r x y < <(first_lamp)
+  read -r r g b < <(grim -s 1 -t ppm -g "$((ox + x)),$((oy + y)) 1x1" - | mean_rgb)
+  ((r > 220 && g < 110 && b < 100))
+}
 in_theme hi-fi
 until_ok 2000 marks_are "05 07"
 check "hi-fi: the marks read 05 07" marks_are "05 07"
 check "hi-fi: in muted #A89984, each after a red lamp" eval 'colors_are '"'"'["#a89984"]'"'"' && lamps_are '"'"'["red","red"]'"'"''
+until_ok 1000 lamp_red
+check "hi-fi: the first lamp's centre reads red #FB4934" lamp_red
 
 touch "$bells/ws2" "$bells/ws3"
 # A Text paints past its width unless it elides, so the check reads both its box and its elision.
