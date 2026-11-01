@@ -31,7 +31,7 @@ export function jump(names, name, digit) {
 
 // The card the cursor lands on plays its theme's desktop switch in miniature, as Paper.qml plays it full size.
 export function previewSwitch(motion, slowdown) {
-  const kind = { snappy: 'slide', spring: 'zoom', linear: 'scan' }[motion] ?? 'cut';
+  const kind = { snappy: 'slide', spring: 'zoom', linear: 'scan', dial: 'sweep' }[motion] ?? 'cut';
   return { kind, ms: kind === 'cut' ? 0 : 220 * slowdown };
 }
 

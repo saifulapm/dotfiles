@@ -23,6 +23,8 @@ Item {
     property real playT0: 0
     property real offset: 0
     property real reveal: 196
+    // How much of the preview's width the stage shows, left of Hi-Fi's pointer.
+    property real across: 306
 
     // Plays the card's own theme switch in miniature: the specimen comes in over the current paper.
     function play(t0) {
@@ -69,7 +71,7 @@ Item {
             clock: clock.text,
             terminal: terminal.lines(),
             paperReady: fill.ready,
-            stage: { y: stage.y, h: stage.height, opacity: stage.opacity, scale: stage.scale }
+            stage: { y: stage.y, h: stage.height, w: stage.width, opacity: stage.opacity, scale: stage.scale }
         };
     }
 
@@ -94,9 +96,9 @@ Item {
             Item {
                 id: stage
                 y: specimen.offset
-                width: parent.width
+                width: specimen.across
                 height: specimen.reveal
-                clip: specimen.reveal < preview.height
+                clip: specimen.reveal < preview.height || specimen.across < preview.width
 
                 Item {
                     width: preview.width
@@ -319,6 +321,22 @@ Item {
                 height: 2
                 color: specimen.c.accent
             }
+
+            // Hi-Fi's pointer, at the edge of what it has swept: 2 px of danger red in a faint glow.
+            Rectangle {
+                visible: playing.running && specimen.motion.kind === "sweep"
+                x: stage.width - 4
+                width: 6
+                height: parent.height
+                color: Qt.alpha(specimen.c.danger, 0.3)
+            }
+            Rectangle {
+                visible: playing.running && specimen.motion.kind === "sweep"
+                x: stage.width - 2
+                width: 2
+                height: parent.height
+                color: specimen.c.danger
+            }
         }
 
         Item {
@@ -395,6 +413,15 @@ Item {
             from: specimen.motion.kind === "scan" ? 0 : 196
             to: 196
             duration: specimen.motion.ms
+        }
+        // Hi-Fi: a red pointer crosses left to right and the sheet shows left of it.
+        NumberAnimation {
+            target: specimen
+            property: "across"
+            from: specimen.motion.kind === "sweep" ? 0 : 306
+            to: 306
+            duration: specimen.motion.ms
+            easing.type: Easing.InOutQuad
         }
     }
 

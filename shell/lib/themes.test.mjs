@@ -131,12 +131,14 @@ test('a digit jumps to its card, and one with no card changes nothing', () => {
   assert.equal(jump(names, 'artboard', 0), 'artboard');
 });
 
-test('a card plays its own theme switch in miniature: Paper slides, Artboard zooms, Blueprint scans, in 220 ms', () => {
+test('a card plays its own theme switch in miniature: Paper slides, Artboard zooms, Blueprint scans, Hi-Fi sweeps, in 220 ms', () => {
   assert.deepEqual([paper, artboard, blueprint].map((t) => previewSwitch(t.primitive.motion, 1)), [
     { kind: 'slide', ms: 220 }, { kind: 'zoom', ms: 220 }, { kind: 'scan', ms: 220 },
   ]);
   assert.deepEqual(previewSwitch('ease', 1), { kind: 'cut', ms: 0 });
   assert.deepEqual(previewSwitch('linear', 10), { kind: 'scan', ms: 2200 });
+  assert.deepEqual(previewSwitch('dial', 1), { kind: 'sweep', ms: 220 });
+  assert.equal(previewSwitch('dial', 20).ms, 4400);
 });
 
 test('a themes.json entry the shell would refuse gets no card, and the rest keep theirs', () => {

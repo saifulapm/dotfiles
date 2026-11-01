@@ -60,6 +60,14 @@ check "hi-fi: the Hi-fi card's tagline reads BRUSHED · AMBER · DIAL whole besi
 lamp_rgb() { box_rgb '.cards[3].lamp.box' 2 2 2 2; }
 green_lamp() { near "$(lamp_rgb)" '#B8BB26' 12; }
 check "hi-fi: a grim of the in-use lamp reads #B8BB26 ($(lamp_rgb))" green_lamp
+
+# The cursor lands on the Hi-fi card from Blueprint's: its sweep plays in 220 ms.
+wtype k
+until_ok 2000 state_is '.selected == "blueprint" and .played.ms >= 0'
+wtype j
+until_ok 2000 state_is '.played.name == "hi-fi" and .played.ms >= 0'
+check "hi-fi: the cursor onto the Hi-fi card plays its sweep in 210 to 240 ms ($(themes_state | jq -c .played))" \
+  state_is '.played.name == "hi-fi" and .played.ms >= 210 and .played.ms <= 240'
 close_picker
 
 switch paper

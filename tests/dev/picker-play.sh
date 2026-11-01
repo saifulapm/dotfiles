@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slowed 20 times, each card's miniature switch is seen mid-play: Blueprint's scan, Artboard's fade and zoom, Paper's slide.
+# Slowed 20 times, each card's miniature switch is seen mid-play: Blueprint's scan, Hi-Fi's sweep, Artboard's fade and zoom, Paper's slide.
 {
 export DOTS_MOTION_SLOWDOWN=20
 source "$(dirname "$0")/lib.sh"
@@ -34,6 +34,32 @@ check "blueprint mid-scan: the bottom is still Paper's paper ($bottom)" near "$b
 check "blueprint mid-scan: the top is already its navy ($top)" near "$top" "12 26 46" 20
 until_ok 4000 state_is '.played.ms >= 0'
 
+# Hi-Fi's sweep, 4.4 s slowed: halfway, its dark paper is left of the pointer, Paper's cream right of it, and red pixels sit at the stage's edge.
+wtype 4
+sleep 2.2
+mid=$(stage hi-fi)
+left=$(preview_mean hi-fi 20 90 40 8)
+right=$(preview_mean hi-fi 250 90 40 8)
+# The columns of row 100 of card $1's preview that read #FB4934, as a first and last x.
+red_span() {
+  local x y
+  read -r x y < <(themes_state | jq -r --arg n "$1" --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == $n) | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
+  grim -s 1 -t ppm -g "$x,$((y + 100)) 306x1" - | node -e '
+    const b = require("fs").readFileSync(0);
+    const px = b.subarray(b.toString("latin1").match(/^P6\s+\d+\s+\d+\s+\d+\s/)[0].length);
+    const xs = [];
+    for (let i = 0; i < px.length / 3; i++) if (px[i * 3] > 200 && px[i * 3 + 1] < 110 && px[i * 3 + 2] < 110) xs.push(i);
+    console.log(xs.length ? `${xs[0]} ${xs[xs.length - 1]}` : "none");
+  '
+}
+red=$(red_span hi-fi)
+w=$(stage hi-fi | jq .w)
+check "hi-fi mid-sweep has crossed part of its card: $mid" jq -e '.w > 40 and .w < 266' <<<"$mid"
+check "hi-fi mid-sweep: left of the pointer is its dark paper ($left)" near "$left" "29 32 33" 20
+check "hi-fi mid-sweep: right of the pointer is still Paper's paper ($right)" near "$right" "241 233 216" 12
+check "hi-fi mid-sweep: red pointer pixels lie at the stage's edge ($red, stage $w)" bash -c 'read -r a b <<<"$1"; [[ $a =~ ^[0-9]+$ && $a -ge $(($2 - 30)) && $b -le $(($2 + 30)) ]]' _ "$red" "${w%.*}"
+until_ok 4000 state_is '.played.ms >= 0'
+
 # Artboard's zoom fades its card in over 4.4 s.
 wtype 2
 sleep 1.1
@@ -47,7 +73,7 @@ sleep 0.2
 mid=$(stage paper)
 check "paper mid-slide is below its place: $mid" jq -e '.y > 10' <<<"$mid"
 until_ok 6000 state_is '.played.ms >= 0'
-check "at rest every card is drawn whole" state_is 'all(.cards[]; .stage == {"y": 0, "h": 196, "opacity": 1, "scale": 1})'
+check "at rest every card is drawn whole" state_is 'all(.cards[]; .stage == {"y": 0, "h": 196, "w": 306, "opacity": 1, "scale": 1})'
 
 wtype -k Escape
 exit $((fails > 0))
