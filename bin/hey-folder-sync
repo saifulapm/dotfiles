@@ -15,7 +15,8 @@
 # inherits the Screener for free — no app, no rules engine, no server support.
 # The folders are the mechanism; "INBOX = the Imbox" is the deliverable.
 #
-#   INBOX            tag:inbox and tag:screened            the ONLY thing that notifies
+#   INBOX            tag:inbox and tag:screened, unread    the ONLY thing that notifies
+#   HEY/Read         tag:inbox and tag:screened, read      the desktop's Read box
 #   HEY/Screener     tag:inbox and tag:unread and not tag:screened
 #   HEY/Feed         tag:thefeed
 #   HEY/PaperTrail   tag:/^ledger\//
@@ -154,6 +155,10 @@ rule "HEY/SetAside"   "Set Aside"   'tag:setaside'
 rule "HEY/Feed"       "The Feed"    'tag:thefeed'
 rule "HEY/PaperTrail" "Paper Trail" 'tag:/^ledger\//'
 rule "HEY/Screener"   "Screener"    'tag:inbox and tag:unread and not tag:screened'
+# Read before INBOX, so INBOX holds only unread Imbox mail, like the desktop
+# Imbox. Read state comes from iCloud, so a mail read on the phone leaves INBOX
+# on the next sync, and one marked unread again comes back.
+rule "HEY/Read"       "Read"        'tag:inbox and tag:screened and not tag:unread'
 rule "INBOX"          "Imbox"       'tag:inbox and tag:screened'
 rule "Archive"        "Archived"    '*'
 
@@ -166,7 +171,7 @@ rule "Archive"        "Archived"    '*'
 # `tag:inbox` must never be uploaded to Apple by a rule that only looked at its
 # tags. Restricting the source list is what guarantees that.
 MOVABLE=("INBOX" "Archive" "HEY/Bubbled" "HEY/ReplyLater" "HEY/SetAside"
-         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener")
+         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener" "HEY/Read")
 
 # Folders whose membership is watched for external moves, i.e. every folder a
 # phone can plausibly drag a message into. Junk and Deleted Messages are here
@@ -194,6 +199,9 @@ reverse_ops() {
         # sender's standing decision is unchanged and their next mail still
         # goes wherever `H i`/`H f`/`H p` said. Making a drag rewrite a
         # standing rule is a much bigger claim than a drag can carry.
+        # Same as INBOX: read state is not ours to set (see above), so the
+        # folder a dragged mail lands in is decided by its read state.
+        "HEY/Read")        printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
         "HEY/Screener")    printf '+inbox -screened -archived -replylater -setaside -bubble' ;;
         "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived' ;;
         "HEY/SetAside")    printf '+setaside -replylater -bubble -archived' ;;
@@ -241,7 +249,7 @@ if [ ! -e "$ENABLE_DB" ]; then
 # hey-folder-sync names them; anything not listed here is never moved.
 #
 #   HEY/Screener  HEY/Feed  HEY/PaperTrail  HEY/ReplyLater  HEY/SetAside
-#   HEY/Bubbled   Archive
+#   HEY/Bubbled   HEY/Read  Archive
 #
 # INBOX is always live and does not need listing — mail leaving a box has to
 # have somewhere to come home to.
