@@ -1,5 +1,5 @@
 // What Files writes, in each theme's voice; its listing, sizes and preview come from picker.mjs.
-import { oneLine, sizeText as pickerSize, sortRows } from './picker.mjs';
+import { nextSort, oneLine, sizeText as pickerSize, SORT_FIRST, SORT_WORDS, sortRows } from './picker.mjs';
 import { pad2 } from './margins.mjs';
 import { mark } from './voice.mjs';
 
@@ -269,14 +269,9 @@ export function appText(voice, app, engraved = false) {
 
 const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], [',', 'sort'], ['tab', 'places'], ['esc', 'close']];
 
-// , cycles the list's order; Files opens on date, newest first.
-const SORTS = ['modified', 'name', 'size'];
-const SORT_WORDS = { modified: 'date', name: 'name', size: 'size' };
-export const SORT_FIRST = SORTS[0];
-export const nextSort = (sort) => SORTS[(SORTS.indexOf(sort) + 1) % SORTS.length];
-
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
 const strip = (voice, pairs, engraved) => pairs.map((p) => keyPair(voice, p, engraved));
+export { nextSort, SORT_FIRST };
 export const keyStrip = (voice, sort = SORT_FIRST, engraved = false) => strip(voice, KEYS.map(([k, w]) => (k === ',' ? [k, `sort: ${SORT_WORDS[sort]}`] : [k, w])), engraved);
 export const dragKeys = (voice, engraved = false) => strip(voice, DRAG_KEYS, engraved);
 export const dropKeys = (voice, engraved = false) => strip(voice, DROP_KEYS, engraved);

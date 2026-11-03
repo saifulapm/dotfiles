@@ -68,9 +68,9 @@ in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme 
 iso='^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$'
 dotted='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4} · [0-9]{2}:[0-9]{2}$'
 comma='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4}, [0-9]{2}:[0-9]{2}$'
-for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ESC|SAVE IN|3 ITEMS|1 PLACE|✓|" \
-  "artboard|,,|1600 × 1200 px|640 × 480 px||PNG|$comma|3 marked|folders only|2 folders · files hidden|Name ↑,Items,Modified|↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc||3 items|→ Downloads|✓|" \
-  "blueprint|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|PREVIEW IMAGE||$iso|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]|> FOLDER|3 ITEMS|1 PLACE|[x]|[ ]"; do
+for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ⌃, SORT: NAME · ESC|SAVE IN|3 ITEMS|1 PLACE|✓|" \
+  "artboard|,,|1600 × 1200 px|640 × 480 px||PNG|$comma|3 marked|folders only|2 folders · files hidden|Name ↑,Items,Modified|↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: name · esc||3 items|→ Downloads|✓|" \
+  "blueprint|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|PREVIEW IMAGE||$iso|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: NAME · [ESC]|> FOLDER|3 ITEMS|1 PLACE|[x]|[ ]"; do
   IFS='|' read -r name labels png jpg head badge date marked only folders heads strip lead items match on off <<<"$t"
   in_theme "$name"
 
@@ -138,7 +138,7 @@ ask "multi-hi-fi" "$(request open "$look/hifi" true)"
 shown
 cursor_to '[draft].md'
 mark
-check "hi-fi: the several-files strip keys ↵ OPEN ... ⌃␣ SELECT · ESC ($(pk_state | jq -c .hint))" state_is '.hint == "↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ESC"'
+check "hi-fi: the several-files strip keys ↵ OPEN ... ⌃␣ SELECT · ESC ($(pk_state | jq -c .hint))" state_is '.hint == "↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ⌃, SORT: NAME · ESC"'
 check "hi-fi: a marked file draws ✓ and the file keeps its brackets ($(row_look '[draft].md'))" until_ok 1000 state_is '(.rows[] | select(.name == "[draft].md") | .mark) == "✓"'
 check "hi-fi: nothing the picker reports holds a bracket but a file name ($(pk_state | marked | grep -vxF '[draft].md' | head -3 | paste -sd'|'))" eval '[ -z "$(pk_state | marked | grep -vxF "[draft].md")" ]'
 cancel "multi-hi-fi"

@@ -44,6 +44,15 @@ export function appName(apps, id) {
   return a ? a.name : id;
 }
 
+// The orders Files' , and the picker's ctrl+, cycle; both open on date, newest first. A folder's size says nothing, so a folders-only list skips size.
+const SORTS = ['modified', 'name', 'size'];
+export const SORT_WORDS = { modified: 'date', name: 'name', size: 'size' };
+export const SORT_FIRST = SORTS[0];
+export function nextSort(sort, folders = false) {
+  const next = SORTS[(SORTS.indexOf(sort) + 1) % SORTS.length];
+  return folders && next === 'size' ? nextSort(next, true) : next;
+}
+
 // Folders first, then files, each by name with case ignored, as every board lists them; by modified the newest leads, by size the largest file (folders by name, a folder's size says nothing).
 export function sortRows(rows, by = 'name') {
   const key = (r) => r.name.toLowerCase();
@@ -82,9 +91,10 @@ export function headingText(voice, app, mode, multiple, engraved = false) {
 }
 
 // Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣. Paper's several-files strip calls ctrl+space MARK.
-export function pickerKeys(voice, mode, multiple, engraved = false) {
+export function pickerKeys(voice, mode, multiple, engraved = false, sort = SORT_FIRST) {
   const space = multiple && voice === 'caps' ? 'mark' : 'select';
-  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', space], ['esc', '']];
+  const sorted = ['ctrl+,', `sort: ${SORT_WORDS[sort]}`];
+  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], sorted, ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], sorted, ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', space], sorted, ['esc', '']];
   if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
   const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
   return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, key(k)) : key(k), word: w.toUpperCase() }));

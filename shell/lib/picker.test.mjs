@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
+import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -95,16 +95,16 @@ test('a save request heads the card Save as, in each voice', () => {
 
 test('the key strip in each voice', () => {
   const strip = (v) => pickerKeys(v).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc');
-  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ESC');
-  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]');
+  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
+  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ⌃, SORT: DATE · ESC');
+  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: DATE · [ESC]');
 });
 
 test("a several-files strip marks in Paper's words, and selects in Artboard's and Blueprint's", () => {
   const strip = (v) => pickerKeys(v, 'open', true).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ESC');
-  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · esc');
-  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [ESC]');
+  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ⌃, SORT: DATE · ESC');
+  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
+  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: DATE · [ESC]');
 });
 
 test('the heading chip counts the marked files, or says a folder request lists folders only', () => {
@@ -119,9 +119,9 @@ test('the heading chip counts the marked files, or says a folder request lists f
 
 test('the save strip saves and selects nothing', () => {
   const strip = (v) => pickerKeys(v, 'save').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ save · tab places · ctrl+l path · ctrl+h hidden · esc');
-  assert.equal(strip('caps'), '↵ SAVE · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ESC');
-  assert.equal(strip('bracket'), '[↵] SAVE · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [ESC]');
+  assert.equal(strip('plain'), '↵ save · tab places · ctrl+l path · ctrl+h hidden · ctrl+, sort: date · esc');
+  assert.equal(strip('caps'), '↵ SAVE · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃, SORT: DATE · ESC');
+  assert.equal(strip('bracket'), '[↵] SAVE · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃,] SORT: DATE · [ESC]');
 });
 
 test('a name to save is refused when empty, a path, a dot name or a folder, and asked about when it exists', () => {
@@ -215,6 +215,17 @@ test('by date the newest comes first and by size the largest, folders still on t
   assert.deepEqual(sortRows(rows, 'modified').map((r) => r.name), ['Recent', 'Archive', 'new.pdf', 'mid.pdf', 'old.pdf']);
   assert.deepEqual(sortRows(rows, 'size').map((r) => r.name), ['Archive', 'Recent', 'mid.pdf', 'old.pdf', 'new.pdf']);
   assert.deepEqual(sortRows(rows, 'name').map((r) => r.name), ['Archive', 'Recent', 'mid.pdf', 'new.pdf', 'old.pdf']);
+});
+
+test('ctrl+, cycles date, name and size, a folders-only list skipping size, and the strip names the one in use', () => {
+  assert.equal(SORT_FIRST, 'modified');
+  assert.equal(nextSort('modified'), 'name');
+  assert.equal(nextSort('name'), 'size');
+  assert.equal(nextSort('size'), 'modified');
+  assert.equal(nextSort('name', true), 'modified');
+  const word = (k) => k.find((p) => p.key.indexOf(',') >= 0).word;
+  assert.equal(word(pickerKeys('plain', 'open', false, false, 'size')), 'sort: size');
+  assert.equal(word(pickerKeys('bracket', 'save', false, false, 'name')), 'SORT: NAME');
 });
 
 test('the rows shown follow the sort asked for', () => {
@@ -373,9 +384,9 @@ test('an app that allows several files heads the card Open files, and a folder r
 
 test('the folder strip enters with Enter and chooses with ctrl+Enter', () => {
   const strip = (v) => pickerKeys(v, 'folder').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ enter folder · ctrl+↵ choose this folder · esc');
-  assert.equal(strip('caps'), '↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ESC');
-  assert.equal(strip('bracket'), '[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [ESC]');
+  assert.equal(strip('plain'), '↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: date · esc');
+  assert.equal(strip('caps'), '↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ⌃, SORT: DATE · ESC');
+  assert.equal(strip('bracket'), '[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [⌃,] SORT: DATE · [ESC]');
 });
 
 test('a folder request lists only folders, dot folders when shown', () => {

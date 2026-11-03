@@ -44,6 +44,8 @@ Item {
     property string query: ""
     readonly property var matches: P.placeMatches(allPlaces, query)
     property bool hidden: false
+    // ctrl+, cycles date, name and size; every request opens on date, newest first, or on DOTS_PICKER_SORT's, which checks that walk rows by name set.
+    property string sort: P.SORT_FIRST
     property int filterAt: 0
     readonly property var currentFilter: filters[filterAt] ?? null
     readonly property string filterName: P.oneLine(currentFilter?.name ?? "")
@@ -52,7 +54,8 @@ Item {
         hidden: hidden,
         filter: currentFilter,
         query: matches.length > 0 ? "" : query,
-        folders: choosingFolder
+        folders: choosingFolder,
+        sort: sort
     })
     property bool listed: false
     // A folder change while a listing runs asks for one more after it.
@@ -125,6 +128,7 @@ Item {
         opens += 1;
         bookmarksFile.reload();
         hidden = false;
+        sort = Quickshell.env("DOTS_PICKER_SORT") || P.SORT_FIRST;
         side = "list";
         typingPath = false;
         held = [];
@@ -273,6 +277,14 @@ Item {
             notice = problem;
         else
             reply(P.answerLine(0, [pathOf({ name: saveName })]));
+    }
+
+    // The cursor stays on its row through the new order; a save with no row under it keeps none.
+    function cycleSort() {
+        const name = selected >= 0 && cursorRow ? cursorRow.name : null;
+        sort = P.nextSort(sort, choosingFolder);
+        if (name !== null)
+            selected = Math.max(0, rows.findIndex(r => r.name === name));
     }
 
     function cycleFilter() {
@@ -439,6 +451,7 @@ Item {
                 count: box(countLabel)
             },
             hidden: hidden,
+            sort: sort,
             pathMode: typingPath,
             completionHead: typingPath ? completionHeadLabel.text : "",
             completions: typingPath ? done : [],
@@ -596,6 +609,8 @@ Item {
             }
             else if (ctrl && event.key === Qt.Key_H)
                 picker.hidden = !picker.hidden;
+            else if (ctrl && event.key === Qt.Key_Comma && !picker.typingPath)
+                picker.cycleSort();
             else if (event.key === Qt.Key_Down)
                 picker.move(1);
             else if (event.key === Qt.Key_Up)
@@ -903,23 +918,24 @@ Item {
                         Item {
                             implicitWidth: bracket && picker.multiple ? 28 : 16
                         }
+                        // Artboard arrows the column the rows sort by: names A to Z, the largest and the newest first.
                         Head {
                             id: nameHead
                             Layout.fillWidth: true
-                            text: plain ? "Name ↑" : "NAME"
+                            text: plain ? (picker.sort === "name" ? "Name ↑" : "Name") : "NAME"
                         }
                         // A folder request lists folders, so the column counts their items.
                         Head {
                             id: sizeHead
                             Layout.preferredWidth: 90
                             horizontalAlignment: Text.AlignRight
-                            text: picker.choosingFolder ? (plain ? "Items" : "ITEMS") : plain ? "Size" : "SIZE"
+                            text: picker.choosingFolder ? (plain ? "Items" : "ITEMS") : plain ? (picker.sort === "size" ? "Size ↓" : "Size") : "SIZE"
                         }
                         Head {
                             id: dateHead
                             Layout.preferredWidth: 130
                             horizontalAlignment: Text.AlignRight
-                            text: plain ? "Modified" : "MODIFIED"
+                            text: plain ? (picker.sort === "modified" ? "Modified ↓" : "Modified") : "MODIFIED"
                         }
                     }
 
@@ -1354,7 +1370,7 @@ Item {
 
                 Repeater {
                     id: keyRepeater
-                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).keys : picker.typingPath ? P.pathKeys(picker.voice, picker.engraved) : P.pickerKeys(picker.voice, picker.mode, picker.multiple, picker.engraved)
+                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).keys : picker.typingPath ? P.pathKeys(picker.voice, picker.engraved) : P.pickerKeys(picker.voice, picker.mode, picker.multiple, picker.engraved, picker.sort)
 
                     Rectangle {
                         id: keyPair

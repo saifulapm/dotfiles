@@ -126,9 +126,9 @@ done
 # Each theme heads both cards in its voice and writes the folder strip.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "paper|OPEN FILES · ${app^^}|CHOOSE FOLDER · ${app^^}|↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ESC" \
-  "artboard|Open files · $app|Choose folder · $app|↵ enter folder · ctrl+↵ choose this folder · esc" \
-  "blueprint|OPEN FILES // ${app^^}|CHOOSE FOLDER // ${app^^}|[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [ESC]"; do
+for t in "paper|OPEN FILES · ${app^^}|CHOOSE FOLDER · ${app^^}|↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ⌃, SORT: NAME · ESC" \
+  "artboard|Open files · $app|Choose folder · $app|↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: name · esc" \
+  "blueprint|OPEN FILES // ${app^^}|CHOOSE FOLDER // ${app^^}|[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [⌃,] SORT: NAME · [ESC]"; do
   IFS='|' read -r name multi folder strip <<<"$t"
   in_theme "$name"
   ask "multi-$name" "$(request open "$dl" true)"
