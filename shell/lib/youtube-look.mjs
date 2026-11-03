@@ -1,9 +1,9 @@
 // How the YouTube App reads under a token set, as the three themes' YouTube boards draw it: the title strip, the sidebar, the field and chips, the legend, the empty views and the error block.
-import { listLook, mark } from './voice.mjs';
+import { listLook, mark, plainTones } from './voice.mjs';
 import { EMPTY, count } from './youtube.mjs';
 
-// The boards' tints, which no token carries: Paper's chosen place, row rule and light ink on a lit row, Artboard's accent tint, field, tiles, thumbnail and error block, Blueprint's warning amber; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
-const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', errFill: '#FFF1E8', errInk: '#B4380B', errText: '#2B2F36', warn: '#FFB547' };
+// The boards' tints that no token carries: Paper's chosen place, row rule and light ink on a lit row, and Blueprint's warning amber. The plain voice's tint, field, tiles, thumbnail and error block come from the theme's plain tones; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
+const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', warn: '#FFB547' };
 
 const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['s', 'save'], ['p', 'add to playlist'], ['d/D', 'download audio/video'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
@@ -23,6 +23,8 @@ const PLACES = [
 
 export function youtubeLook(tokens) {
   const l = listLook(tokens);
+  const tones = plainTones(tokens);
+  const tint = Object.assign({}, TINT, { tint: tones.tint, deep: tones.deep, tile: tones.tile, field: tones.field, thumb: tones.thumb, errFill: tones.warnChip, errInk: tones.warn, errText: tones.strong });
   const voice = l.voice;
   const plain = voice === 'plain';
   const bracket = voice === 'bracket';
@@ -97,14 +99,14 @@ export function youtubeLook(tokens) {
     },
     // The download mark beside a row's duration: Paper's sits in its 16 px end, the others in the slot before the duration.
     mark: plain
-      ? { at: 'before', size: 12, stroke: TINT.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: TINT.tile } }
+      ? { at: 'before', size: 12, stroke: tint.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: tint.tile } }
       : { at: bracket ? 'before' : 'end', size: 14, stroke: (tokens && (bracket ? tokens.color.accent : tokens.color.ink)) || '', width: bracket ? 1.5 : 1.3, tile: null },
     // A row whose download failed says why in its channel line, and Enter tries again (ruling DS2ESKWX).
     retry: (reason) => (bracket ? `DOWNLOAD FAILED · ${reason} · ${m('↵')} RETRY` : `download failed · ${reason} · ↵ retry`),
-    retryColor: plain ? TINT.errInk : bracket ? TINT.warn : (tokens && tokens.color.danger) || '',
+    retryColor: plain ? tint.errInk : bracket ? TINT.warn : (tokens && tokens.color.danger) || '',
     fieldRadius: plain ? 14 : 0,
     rowRadius: plain ? 10 : 0,
     ruleDashed: bracket,
-    tint: TINT,
+    tint,
   });
 }

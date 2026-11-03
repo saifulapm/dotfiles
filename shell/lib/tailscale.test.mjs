@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
+import { checkTokens, validateTheme } from './theme.mjs';
 import { parseStatus, offlineText, stateText, tailscaleKeys, toggleFailedText, tailscaleLook } from './tailscale.mjs';
 
 const recorded = readFileSync(new URL('../../dev/tailscale-status.json', import.meta.url), 'utf8');
@@ -94,6 +95,15 @@ test("each theme words a machine's state and the list's count as its board does"
   assert.deepEqual([paper.count(3, 2), artboard.count(3, 2), blueprint.count(3, 2)], ['3 ONLINE', '', '3 ONLINE · 2 OFFLINE']);
   assert.deepEqual([paper.words('This device'), artboard.words('This device'), blueprint.words('Machines')], ['THIS DEVICE', 'This device', 'MACHINES']);
   assert.deepEqual([paper.stateLine('off'), artboard.stateLine('off'), blueprint.stateLine('off')], ['Tailscale is off', 'Tailscale is off', 'TAILSCALE IS OFF']);
+});
+
+test("Frost's badge and marks read its dark board colours: bar dot, tile chip, outline, online", () => {
+  const frost = tailscaleLook(checkTokens(validateTheme(theme('frost'))));
+  assert.equal(frost.badge(true).dot.fill, '#88C0D0');
+  assert.equal(frost.badge(false).fill, '#434C5E');
+  assert.equal(frost.badge(false).dot.line, '#AEB7C6');
+  assert.equal(frost.status({ online: true }).dot, '#A3BE8C');
+  assert.equal(frost.dotLine, '#AEB7C6');
 });
 
 test('a refused toggle reads its first line from tailscale, on one line', () => {

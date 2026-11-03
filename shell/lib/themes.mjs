@@ -1,5 +1,5 @@
 // The theme picker's cursor, captions and specimens, from each theme's tokens alone, so a theme added later draws too; pure, so node tests what the shell imports.
-import { marginLook, listLook, line, mark } from './voice.mjs';
+import { marginLook, listLook, line, mark, plainTones } from './voice.mjs';
 import { checkTokens } from './theme.mjs';
 import { marginStyle } from './surface.mjs';
 import { pad2 } from './margins.mjs';
@@ -41,8 +41,6 @@ const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const COUNT = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
 // An open can come before the theme's tokens load; until then the picker draws in black and white.
 const UNTHEMED = { name: '', color: { paper: 'black', ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
-// Artboard's tiles, a board tint no token carries.
-const TILE = '#F6F7F9';
 
 // A card's name in its own theme's typeface and voice; the picker draws it in the current theme's ink, so it always reads.
 export function cardName(t) {
@@ -88,7 +86,7 @@ export function pickerLook(themed) {
     return Object.assign(base, {
       header: (n) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: `${n} themes`, subFont: t.ui, subSize: 13, italic: false, right: '' }),
       tag: (current, cursor) => (current ? { text: 'Current', color: c.accent, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
-      tile: { fill: TILE, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
+      tile: { fill: plainTones(themed).field, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
       cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: c.accent, alpha: 0.45 }, radius: 12, ticks: false },
     });
   }

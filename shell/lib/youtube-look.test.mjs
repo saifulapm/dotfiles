@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
+import { checkTokens, validateTheme } from './theme.mjs';
 import { youtubeLook } from './youtube-look.mjs';
 
 const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
@@ -143,6 +144,14 @@ test("each board draws the download mark its own way: Paper's ink arrow at the r
   assert.deepEqual(look('paper').mark, { at: 'end', size: 14, stroke: '#1C1915', width: 1.3, tile: null });
   assert.deepEqual(look('artboard').mark, { at: 'before', size: 12, stroke: '#2638C9', width: 2, tile: { width: 22, height: 20, radius: 6, color: '#F2F3F6' } });
   assert.deepEqual(look('blueprint').mark, { at: 'before', size: 14, stroke: '#7FE3F0', width: 1.5, tile: null });
+});
+
+test("Frost's board tints are its dark ones; Artboard's stay light", () => {
+  const f = youtubeLook(checkTokens(validateTheme(theme('frost'))));
+  assert.deepEqual([f.tint.tint, f.tint.deep, f.tint.tile, f.tint.field, f.tint.thumb], ['#475666', '#ECEFF4', '#434C5E', '#323845', '#434C5E']);
+  assert.deepEqual([f.tint.errFill, f.tint.errInk, f.tint.errText, f.retryColor, f.mark.stroke, f.mark.tile.color], ['#434C5E', '#EBCB8B', '#ECEFF4', '#EBCB8B', '#ECEFF4', '#434C5E']);
+  const a = look('artboard');
+  assert.deepEqual([a.tint.tint, a.tint.errInk, a.tint.errText, a.retryColor], ['#EEF1FF', '#B4380B', '#2B2F36', '#B4380B']);
 });
 
 test('a failed download reads in the channel line with the key that retries it, in the error colour', () => {

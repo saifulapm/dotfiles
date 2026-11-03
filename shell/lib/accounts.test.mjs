@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
+import { checkTokens, validateTheme } from './theme.mjs';
 import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
@@ -199,6 +200,12 @@ test("a warning draws in each theme's danger token, a stale row in its muted one
   assert.deepEqual(paper.active, { text: 'ACTIVE', color: '#1C1915', fill: 'transparent', border: '#1C1915', radius: 0, dot: '' });
   assert.deepEqual(artboard.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
   assert.deepEqual(blueprint.active, { text: '[ACTIVE]', color: '#7FE3F0', fill: 'transparent', border: 'transparent', radius: 0, dot: '' });
+});
+
+test("Frost's ACTIVE dot and bar track are its bar and rule colours", () => {
+  const frost = accountsLook(checkTokens(validateTheme(parseToml(readFileSync(new URL('../../themes/frost/theme.toml', import.meta.url), 'utf8')))));
+  assert.equal(frost.active.dot, '#88C0D0');
+  assert.equal(frost.bar.track, '#434C5E');
 });
 
 test('Enter makes an account that is not active the active one, and does nothing on a balance, a usage row or the active account', () => {

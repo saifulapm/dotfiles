@@ -1,5 +1,5 @@
 // Accounts' card from bin/dots-accounts' rows and the Claude account registry: one group of accounts with their limits, then balances, then usage, in the words the boards use.
-import { line, mark } from './voice.mjs';
+import { line, mark, plainTones } from './voice.mjs';
 
 // Labels come from a registry file and from provider names, so each is one line with no control characters, and elided.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
@@ -160,8 +160,8 @@ export const useTarget = (item) => (item && item.kind === 'account' && !item.act
 // What the island says once the registry names the account; the label is the card's, already one line.
 export const activeNotice = (label) => `Claude · ${label} is active for new sessions`;
 
-// The boards' marks that no token carries: Artboard's bar track and the dot in its ACTIVE chip.
-const MARKS = { plain: { track: '#E3E6EB', dot: '#6C83FF', on: '#FFFFFF' } };
+// The text of the ACTIVE chip, white on the ink fill; its dot and the bar's track come from the theme's plain tones.
+const ACTIVE_ON = '#FFFFFF';
 const upper = (s) => String(s).toUpperCase();
 const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : '');
 
@@ -192,12 +192,12 @@ export function accountsLook(tokens) {
     limitName: (s) => (bracket ? upper(s) : lowerFirst(s)),
     figure,
     active: plain
-      ? { text: 'ACTIVE', color: MARKS.plain.on, fill: c.ink, border: 'transparent', radius: 8, dot: MARKS.plain.dot }
+      ? { text: 'ACTIVE', color: ACTIVE_ON, fill: c.ink, border: 'transparent', radius: 8, dot: plainTones(tokens).bar }
       : bracket
         ? { text: mark(tokens.type.engraved === true, 'ACTIVE'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0, dot: '' }
         : { text: 'ACTIVE', color: c.ink, fill: 'transparent', border: c.ink, radius: 0, dot: '' },
     // Paper's outlined box, Artboard's rounded 6 px bar, Blueprint's row of twenty blocks.
-    bar: plain ? { kind: 'round', track: MARKS.plain.track, fill: c.accent } : bracket ? { kind: 'blocks', track: c.line, fill: c.accent } : { kind: 'box', track: c.ink, fill: c.ink },
+    bar: plain ? { kind: 'round', track: plainTones(tokens).rule, fill: c.accent } : bracket ? { kind: 'blocks', track: c.line, fill: c.accent } : { kind: 'box', track: c.ink, fill: c.ink },
     warn: c.danger,
     dim: c.muted,
   };

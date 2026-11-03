@@ -55,6 +55,10 @@ test('Artboard dresses the picker: Themes · 3 themes, a white tile outlined 1.5
   assert.equal(l.chips, true);
 });
 
+test("Frost's picker tile is its dark field colour", () => {
+  assert.equal(pickerLook(checkTokens(load('frost'))).tile.fill, '#323845');
+});
+
 test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbered sheets, [ACTIVE] and [↵]', () => {
   const l = pickerLook(blueprint);
   const h = l.header(3, 'blueprint');

@@ -1,5 +1,5 @@
 // Tailscale's rows from `tailscale status --json`: this device, the machines with online state, and the backend state the surface draws instead of an empty list.
-import { line } from './voice.mjs';
+import { line, plainTones } from './voice.mjs';
 
 // A machine's name, address and the rest come from the tailnet, so a name is one line with no control characters.
 const clean = (s) => line(String(s || '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
@@ -55,8 +55,8 @@ export function tailscaleKeys(look, state) {
   return look.keys([['esc', '']]);
 }
 
-// The boards' marks that no token carries: Paper's green square, Artboard's badge dot, online dot, outline grey and badge chip.
-const MARKS = { caps: { online: '#3D6B3A' }, plain: { on: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', chip: '#F2F3F6' } };
+// Paper's green square, which no token carries; the plain boards' badge dot, online dot, outline grey and badge chip come from the theme's plain tones.
+const MARKS = { caps: { online: '#3D6B3A' } };
 
 // How the surface's own parts read under a theme: the ON or OFF badge, a machine's state word and mark, the count, and the one-line states.
 export function tailscaleLook(tokens) {
@@ -64,7 +64,8 @@ export function tailscaleLook(tokens) {
   const voice = tokens.type.voice;
   const say = (s) => (voice === 'plain' ? s : s.toUpperCase());
   if (voice === 'plain') {
-    const m = MARKS.plain;
+    const tones = plainTones(tokens);
+    const m = { on: tones.bar, online: tones.online, outline: tones.outline, chip: tones.tile };
     return {
       voice,
       words: say,
