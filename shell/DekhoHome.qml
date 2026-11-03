@@ -12,6 +12,7 @@ FocusScope {
     property alias playingBar: nowBar
 
     readonly property var c: dekho.c
+    readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
     readonly property string voice: dekho.voice
@@ -369,7 +370,7 @@ FocusScope {
             visible: home.offline
             implicitHeight: noticeRow.implicitHeight + 20
             radius: plain ? 12 : 0
-            color: plain ? "#FFF1E8" : "transparent"
+            color: plain ? tones.warnChip : "transparent"
             border.width: plain ? 0 : 1
             border.color: (bracket ? c.accent : c.ink) ?? "black"
 
@@ -385,7 +386,7 @@ FocusScope {
                     implicitWidth: 18
                     implicitHeight: 18
                     radius: plain ? 9 : 0
-                    color: (plain ? "#B4380B" : bracket ? c.danger : c.ink) ?? "black"
+                    color: (plain ? tones.warn : bracket ? c.danger : c.ink) ?? "black"
 
                     Text {
                         anchors.centerIn: parent
@@ -401,7 +402,7 @@ FocusScope {
                     id: noticeLead
                     textFormat: Text.PlainText
                     text: words.unreachable
-                    color: (plain ? "#B4380B" : c.ink) ?? "black"
+                    color: (plain ? tones.warn : c.ink) ?? "black"
                     font.family: home.bodyFont
                     font.pixelSize: plain ? 13 : 12
                     font.weight: Font.Bold
@@ -411,7 +412,7 @@ FocusScope {
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
                     text: words.showing(home.savedFrom)
-                    color: (plain ? "#B4380B" : c.ink) ?? "black"
+                    color: (plain ? tones.warn : c.ink) ?? "black"
                     font.family: home.bodyFont
                     font.pixelSize: plain ? 13 : 12
                     elide: Text.ElideRight
@@ -424,7 +425,7 @@ FocusScope {
                         id: retryKey
                         textFormat: Text.PlainText
                         text: words.retry[0]
-                        color: (bracket ? c.accent : plain ? "#B4380B" : c.ink) ?? "black"
+                        color: (bracket ? c.accent : plain ? tones.warn : c.ink) ?? "black"
                         font.family: home.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Bold
@@ -434,7 +435,7 @@ FocusScope {
                         id: retryWord
                         textFormat: Text.PlainText
                         text: words.retry[1]
-                        color: (plain ? "#B4380B" : c.ink) ?? "black"
+                        color: (plain ? tones.warn : c.ink) ?? "black"
                         font.family: home.bodyFont
                         font.pixelSize: 12
                         font.letterSpacing: bracket ? 0.72 : 0
@@ -452,7 +453,7 @@ FocusScope {
             Layout.bottomMargin: 6
             implicitHeight: plain ? 48 : 46
             radius: plain ? 14 : 0
-            color: plain ? "#F6F7F9" : "transparent"
+            color: plain ? tones.field : "transparent"
             border.width: plain ? 0 : 1
             border.color: (bracket ? c.line : home.offline && voice === "caps" ? c.ink : c.muted) ?? "gray"
 

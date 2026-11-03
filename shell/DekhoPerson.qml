@@ -14,6 +14,7 @@ FocusScope {
     property alias playingBar: nowBar
 
     readonly property var c: dekho.c
+    readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
     readonly property string voice: dekho.voice
@@ -291,7 +292,7 @@ FocusScope {
                             anchors.fill: parent
                             visible: picture.status !== Image.Ready
                             radius: plain ? 60 : 0
-                            color: plain ? "#E9ECF1" : "transparent"
+                            color: plain ? tones.thumb : "transparent"
                             clip: true
 
                             Shape {
@@ -668,7 +669,7 @@ FocusScope {
                                             Layout.preferredWidth: 18
                                             Layout.preferredHeight: 27
                                             radius: page.plain ? 4 : 0
-                                            color: page.plain ? "#E9ECF1" : page.bracket ? page.c.surface ?? "black" : "transparent"
+                                            color: page.plain ? page.tones.thumb : page.bracket ? page.c.surface ?? "black" : "transparent"
                                             border.width: page.plain ? 0 : 1
                                             border.color: (page.bracket ? ln.soft : page.c.muted) ?? "gray"
                                             clip: true
@@ -725,7 +726,7 @@ FocusScope {
                                             Layout.fillWidth: true
                                             textFormat: Text.PlainText
                                             text: ln.head ? "" : ln.modelData.row.titleText
-                                            color: ln.cursor && page.plain ? "#2638C9" : ln.fore
+                                            color: ln.cursor && page.plain ? page.tones.deep : ln.fore
                                             font.family: page.bodyFont
                                             font.pixelSize: page.plain ? 14 : 13
                                             font.weight: ln.cursor && page.bracket ? Font.Bold : Font.Medium

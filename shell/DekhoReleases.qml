@@ -14,6 +14,7 @@ FocusScope {
     required property var dekho
 
     readonly property var c: dekho.c
+    readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
     readonly property string voice: dekho.voice
@@ -969,7 +970,7 @@ FocusScope {
                     id: qualityText
                     textFormat: Text.PlainText
                     text: rel.auto ? page.words.auto : D.title(rel.modelData.quality)
-                    color: rel.cursor && page.plain ? "#2638C9" : rel.fore
+                    color: rel.cursor && page.plain ? page.tones.deep : rel.fore
                     font.family: page.bodyFont
                     font.pixelSize: page.plain ? 14 : 13
                     font.weight: rel.inverse && page.bracket ? Font.Bold : Font.Medium

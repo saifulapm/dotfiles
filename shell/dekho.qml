@@ -39,6 +39,7 @@ ShellRoot {
     readonly property string playBin: Quickshell.shellDir + "/../bin/dots-dekho-play"
 
     readonly property var c: theme.color
+    readonly property var tones: L.plainTones(theme.tokens)
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var engraving: L.engraving(theme.tokens)

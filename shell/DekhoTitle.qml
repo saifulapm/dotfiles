@@ -14,6 +14,7 @@ FocusScope {
     property alias playingBar: nowBar
 
     readonly property var c: dekho.c
+    readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
     readonly property string voice: dekho.voice
@@ -590,7 +591,7 @@ FocusScope {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 300
                     radius: plain ? 14 : 0
-                    color: plain ? "#E9ECF1" : "transparent"
+                    color: plain ? tones.thumb : "transparent"
                     border.width: plain ? 0 : 1
                     border.color: (bracket ? c.accent : c.muted) ?? "gray"
                     clip: true
@@ -1026,7 +1027,7 @@ FocusScope {
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: "S" + tab.modelData
-                                color: (tab.current ? (page.plain ? "#2638C9" : page.c.surface) : page.c.muted) ?? "gray"
+                                color: (tab.current ? (page.plain ? page.tones.deep : page.c.surface) : page.c.muted) ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: tab.current && page.caps ? 10 : tab.current && page.bracket ? 11 : 12
                                 font.weight: tab.current && !page.caps ? (page.plain ? Font.Medium : Font.Bold) : Font.Normal
@@ -1222,7 +1223,7 @@ FocusScope {
         implicitWidth: chipBody.implicitWidth + 14
         implicitHeight: 26
         radius: page.plain ? 13 : 0
-        color: page.plain ? "#F6F7F9" : "transparent"
+        color: page.plain ? page.tones.field : "transparent"
         border.width: focused ? 1.5 : page.plain ? 0 : 1
         border.color: (focused ? page.c.accent : page.bracket ? page.c.line : "#B9AE99") ?? "gray"
 
@@ -1237,7 +1238,7 @@ FocusScope {
                 width: 20
                 height: 20
                 radius: page.plain ? 10 : 0
-                color: page.plain ? "#E9ECF1" : page.bracket ? page.c.surface ?? "black" : "transparent"
+                color: page.plain ? page.tones.thumb : page.bracket ? page.c.surface ?? "black" : "transparent"
                 border.width: page.plain ? 0 : 1
                 border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
                 clip: true
@@ -1408,7 +1409,7 @@ FocusScope {
                 Layout.preferredWidth: 40
                 Layout.preferredHeight: 22
                 radius: page.plain ? 4 : 0
-                color: page.plain ? "#E9ECF1" : "transparent"
+                color: page.plain ? page.tones.thumb : "transparent"
                 border.width: page.plain ? 0 : 1
                 border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
                 clip: true
@@ -1450,7 +1451,7 @@ FocusScope {
                 Layout.fillWidth: true
                 textFormat: Text.PlainText
                 text: D.title(ep.modelData.name)
-                color: !ep.due ? page.c.muted ?? "gray" : ep.cursor && page.plain ? "#2638C9" : ep.fore
+                color: !ep.due ? page.c.muted ?? "gray" : ep.cursor && page.plain ? page.tones.deep : ep.fore
                 font.family: page.bodyFont
                 font.pixelSize: page.plain ? 14 : 13
                 font.weight: ep.cursor ? (page.bracket ? Font.Bold : Font.Medium) : Font.Normal

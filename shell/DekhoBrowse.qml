@@ -14,6 +14,7 @@ FocusScope {
     property alias playingBar: nowBar
 
     readonly property var c: dekho.c
+    readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
     readonly property string voice: dekho.voice
@@ -448,7 +449,7 @@ FocusScope {
                             anchors.centerIn: parent
                             textFormat: Text.PlainText
                             text: kindTab.current && page.caps ? B.kindName(kindTab.modelData).toUpperCase() : page.words.kind(kindTab.modelData)
-                            color: (kindTab.current ? (page.plain ? "#2638C9" : page.c.surface) : page.c.muted) ?? "gray"
+                            color: (kindTab.current ? (page.plain ? page.tones.deep : page.c.surface) : page.c.muted) ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: kindTab.current && page.caps ? 10 : kindTab.current && page.bracket ? 11 : 12
                             font.weight: kindTab.current && !page.caps ? (page.plain ? Font.Medium : Font.Bold) : Font.Normal
@@ -517,7 +518,7 @@ FocusScope {
                     Layout.maximumWidth: 220
                     clip: true
                     radius: page.plain ? 10 : 0
-                    color: open ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? "#F6F7F9" : "transparent"
+                    color: open ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? page.tones.field : "transparent"
                     border.width: page.plain ? (open ? 1.5 : 0) : 1
                     border.color: (page.plain ? page.c.accent : page.bracket ? (open ? page.c.surface : page.c.line) : open ? page.c.ink : page.c.muted) ?? "gray"
 
@@ -548,7 +549,7 @@ FocusScope {
                             width: Math.min(implicitWidth, 120)
                             textFormat: Text.PlainText
                             text: facetBox.open ? page.words.typing : facetBox.modelData[2]
-                            color: facetBox.open ? (page.plain ? "#2638C9" : page.c.surface) ?? "white" : page.c.ink ?? "black"
+                            color: facetBox.open ? (page.plain ? page.tones.deep : page.c.surface) ?? "white" : page.c.ink ?? "black"
                             font.family: page.bodyFont
                             font.pixelSize: 12
                             font.weight: Font.Medium
@@ -619,7 +620,7 @@ FocusScope {
                         width: Math.min(implicitWidth, 200)
                         textFormat: Text.PlainText
                         text: modelData
-                        color: (page.plain ? "#2638C9" : page.c.ink) ?? "black"
+                        color: (page.plain ? page.tones.deep : page.c.ink) ?? "black"
                         font.family: page.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Medium
@@ -944,7 +945,7 @@ FocusScope {
             Rule {
                 Layout.fillWidth: true
                 dashed: page.bracket
-                color: (page.plain ? "#E3E6EB" : page.bracket ? page.c.line : "#D8CDB6") ?? "gray"
+                color: (page.plain ? page.tones.rule : page.bracket ? page.c.line : "#D8CDB6") ?? "gray"
             }
             ColumnLayout {
                 Layout.fillWidth: true
@@ -991,7 +992,7 @@ FocusScope {
                                 Layout.fillWidth: true
                                 textFormat: Text.PlainText
                                 text: D.title(personRow.modelData.name)
-                                color: (personRow.inverse ? page.c.surface : page.plain && personRow.cursor ? "#2638C9" : page.c.ink) ?? "black"
+                                color: (personRow.inverse ? page.c.surface : page.plain && personRow.cursor ? page.tones.deep : page.c.ink) ?? "black"
                                 font.family: page.bodyFont
                                 font.pixelSize: page.plain ? 14 : 13
                                 font.weight: personRow.inverse && page.bracket ? Font.Bold : Font.Medium
@@ -1017,7 +1018,7 @@ FocusScope {
             Rule {
                 Layout.fillWidth: true
                 dashed: page.bracket
-                color: (page.plain ? "#E3E6EB" : page.bracket ? page.c.line : "#D8CDB6") ?? "gray"
+                color: (page.plain ? page.tones.rule : page.bracket ? page.c.line : "#D8CDB6") ?? "gray"
             }
             Flow {
                 Layout.fillWidth: true
@@ -1097,7 +1098,7 @@ FocusScope {
                     width: 24
                     height: 34
                     radius: page.plain ? 6 : 0
-                    color: page.plain ? (columns.lit ? page.c.surface : "#E9ECF1") ?? "white" : page.bracket ? page.c.surface ?? "black" : "transparent"
+                    color: page.plain ? (columns.lit ? page.c.surface : page.tones.thumb) ?? "white" : page.bracket ? page.c.surface ?? "black" : "transparent"
                     border.width: page.plain ? 0 : 1
                     border.color: (page.bracket ? (columns.inverse ? page.c.surface : page.c.line) : page.c.muted) ?? "gray"
                     clip: true
@@ -1131,7 +1132,7 @@ FocusScope {
                 Layout.fillWidth: true
                 textFormat: Text.PlainText
                 text: columns.cells[0] ?? ""
-                color: columns.head ? page.c.muted ?? "gray" : columns.inverse ? page.c.surface ?? "white" : columns.lit ? "#2638C9" : page.c.ink ?? "black"
+                color: columns.head ? page.c.muted ?? "gray" : columns.inverse ? page.c.surface ?? "white" : columns.lit ? page.tones.deep : page.c.ink ?? "black"
                 font.family: page.bodyFont
                 font.pixelSize: columns.head ? (page.caps ? 10 : 11) : page.plain ? 14 : 13
                 font.weight: columns.head ? Font.Normal : columns.inverse && page.bracket ? Font.Bold : Font.Medium

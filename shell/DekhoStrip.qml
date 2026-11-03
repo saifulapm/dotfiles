@@ -140,7 +140,7 @@ ColumnLayout {
         }
 
         implicitHeight: body.implicitHeight + 20
-        color: page.plain ? (focused ? page.c.surface ?? "white" : "#F6F7F9") : page.bracket && focused ? Qt.alpha(page.c.accent ?? "cyan", 0.1) : "transparent"
+        color: page.plain ? (focused ? page.c.surface ?? "white" : page.tones.field) : page.bracket && focused ? Qt.alpha(page.c.accent ?? "cyan", 0.1) : "transparent"
         border.width: page.plain ? (focused ? 1.5 : 0) : 1
         border.color: (page.plain ? page.c.accent : page.bracket ? (focused ? page.c.accent : page.c.line) : page.c.ink) ?? "black"
 
@@ -174,7 +174,7 @@ ColumnLayout {
                     implicitWidth: card.page.plain ? 36 : 38
                     implicitHeight: card.page.plain ? 54 : 56
                     radius: card.page.plain ? 8 : 0
-                    color: card.page.plain ? "#E9ECF1" : "transparent"
+                    color: card.page.plain ? card.page.tones.thumb : "transparent"
                     border.width: card.page.plain ? 0 : 1
                     border.color: (card.page.bracket ? card.page.c.line : card.page.c.muted) ?? "gray"
                     clip: true
