@@ -36,7 +36,8 @@ void main() {
     vec2 q = p / 90.0;
     q += vec2(noise(q * 2.0 + 7.0), noise(q * 2.0 + 19.0)) * 1.5;
     float ridge = 1.0 - abs(2.0 * noise(q) - 1.0);
-    float vein = smoothstep(1.0 - 0.08 * edge, 1.0, ridge);
+    // The lower bound stays under 1.0, since smoothstep is undefined when its two bounds meet.
+    float vein = smoothstep(0.999 - 0.08 * edge, 1.0, ridge);
     float a = frostAlpha * edge * clamp(mix(grain * 0.8, 1.0, vein), 0.0, 1.0);
     fragColor = vec4(mix(base.rgb, ink.rgb, a), 1.0) * qt_Opacity;
 }
