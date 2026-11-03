@@ -36,15 +36,6 @@ test('Frost\'s meters fill in its accent, not Artboard\'s periwinkle', () => {
 const LIGHT = ['#EEF1FF', '#2638C9', '#F2F3F6', '#F6F7F9', '#6C83FF', '#E3E6EB', '#E9ECF1', '#1E8E5A', '#8A909B', '#B4380B', '#FFF1E8'];
 // Files that still name them, with how many lines; a ratchet that fails only on a new offender, its entries struck as each file comes to read the table.
 const LEFT = {
-  'shell/DeenDuas.qml': 1,
-  'shell/DeenHadith.qml': 7,
-  'shell/DeenPrayer.qml': 1,
-  'shell/DeenRead.qml': 2,
-  'shell/Tailscale.qml': 1,
-  'shell/lib/accounts.mjs': 1,
-  'shell/lib/tailscale.mjs': 1,
-  'shell/lib/themes.mjs': 1,
-  'shell/lib/youtube-look.mjs': 1,
 };
 
 const root = new URL('../..', import.meta.url).pathname;
