@@ -378,6 +378,21 @@ test("Hi-Fi's resting clock is lit amber with a glow on its glass; the other the
   for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual(restLook(checkTokens(validateTheme(theme(n)))), { color: '', glow: '' }, n);
 });
 
+test("Frost's bar sets the workspace as 2 in accent semibold, the app in ink and the path in muted, a danger dot before an ink goal, and an ink date at 12.5 px", () => {
+  const f = margin('frost');
+  assert.deepEqual([f.number(2), f.numberColor, f.numberWeight, f.size, f.chip], ['2', '#88C0D0', 600, 12.5, true]);
+  assert.equal(f.drawn(foot, SUN, right).left, '2  foot  ~');
+  assert.deepEqual([f.tail(foot), f.tailColor, f.path(foot)], ['  foot', '#D8DEE9', '  ~']);
+  assert.deepEqual([f.dot, f.dotColor, f.goalColor, f.dateColor], [true, '#BF616A', '#D8DEE9', '#D8DEE9']);
+  assert.equal(f.drawn(foot, SUN, right).right, 'Ship v2 · 3d Wi-Fi 82% Sun 18 Oct');
+});
+
+test("Artboard's bar keeps Page 02, its muted tail, accent dot and muted date, with no size of its own", () => {
+  const a = margin('artboard');
+  assert.deepEqual([a.number(2), a.numberColor, a.tailColor, a.path(foot), a.dotColor, a.dateColor, a.size], ['Page 02', '#15171B', '#57606A', '', '#3D5AFE', '#57606A', undefined]);
+  assert.equal(a.chip, false);
+});
+
 test("Hi-Fi's bar reads the app in ink and the path in muted caps, the goal in ink after a red lamp, and the date as SUN 1 NOV", () => {
   const h = hifiMargin();
   assert.deepEqual([h.tail(foot), h.tailColor, h.path(foot), h.path({ idx: 4, app: null, title: null })], ['  FOOT', '#EBDBB2', '  ~', '']);

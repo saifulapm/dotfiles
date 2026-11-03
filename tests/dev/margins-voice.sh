@@ -65,9 +65,43 @@ check "hi-fi: under the number's last amber row ($last) $below pixels are lit, a
 in_theme blueprint
 check "blueprint: its labels are not engraved" eval 'margins | jq -e ".drawn.raised == false" >/dev/null'
 
-# A title and a goal can be any length; each elides 8 px short of the island in every theme.
+# A goal due in 3 days, so the goal item draws its dot.
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 mkdir -p "$(dirname "$store")"
+node --input-type=module - "$repo/shell/lib/goals.mjs" >"$store.tmp" <<'JS'
+const G = await import(process.argv[2]);
+console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'Ship v2', Date.now() + 71 * 3600000, Date.now(), 'g0')));
+JS
+mv "$store.tmp" "$store"
+
+# Frost sets the workspace number on a glass chip, blurs behind that chip alone, and dots the goal in danger red.
+near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= $3 && b[i] - a[i] <= $3)) || return 1; done; }
+state_is() { margins | jq -e "$1" >/dev/null 2>&1; }
+mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
+# A 4 x 10 box in the chip's left padding, clear of the digit, and the same box 12 px left of the chip on the bare paper.
+inside_geo() { margins | jq -r '.drawn.chip.box | "\(.x + 3 | round),\(.y + .h / 2 - 5 | round) 4x10"'; }
+outside_geo() { margins | jq -r '.drawn.chip.box | "\(.x - 12 | round),\(.y + .h / 2 - 5 | round) 4x10"'; }
+dot_geo() { margins | jq -r '.drawn.dotBox | "\(.x + 2 | round),\(.y + 2 | round) 2x2"'; }
+chip_is_region='.drawn.chip as $c | .drawn.blurRegion as $r | ($r | length) == 1 and $c.radius == 7 and $r[0].radius == 7 and ([$r[0].x - $c.box.x, $r[0].y - $c.box.y, $r[0].w - $c.box.w, $r[0].h - $c.box.h] | map(fabs < 1) | all)'
+in_theme frost
+until_ok 2000 drawn_is left "2  foot  ~"
+until_ok 2000 state_is '.drawn.goalColor == "#d8dee9"'
+echo "     drawn: $(margins | jq -c .drawn)"
+check "frost: the top-left reads 2  foot  ~, no Page and no zero pad" drawn_is left "2  foot  ~"
+check "frost: the number is drawn in the accent #88c0d0" state_is '.drawn.numberColor == "#88c0d0"'
+check "frost: the chip is glass #d93b4252 and its box is the one blur region, radius 7" state_is "(.drawn.chip.fill == \"#d93b4252\") and ($chip_is_region)"
+glass_in=$(mean_at "$(inside_geo)")
+bare_out=$(mean_at "$(outside_geo)")
+echo "     inside the chip: $glass_in, bare paper beside it: $bare_out"
+check "frost: inside the chip reads glass ($glass_in), not the bare paper ($bare_out)" eval 'near "$glass_in" "59 66 82" 6 && ! near "$glass_in" "$bare_out" 4'
+check "frost: the goal dot is danger #bf616a ($(mean_at "$(dot_geo)"))" near "$(mean_at "$(dot_geo)")" "191 97 106" 8
+check "frost: the goal text is ink #d8dee9" state_is '.drawn.goalColor == "#d8dee9"'
+in_theme artboard
+until_ok 2000 drawn_is left "Page 02 / foot — ~"
+check "artboard: the bar asks for no blur region and draws no chip" state_is '.drawn.blurRegion == [] and .drawn.chip == null'
+check "artboard: the goal dot stays the accent, not Frost's danger ($(mean_at "$(dot_geo)"))" eval '! near "$(mean_at "$(dot_geo)")" "191 97 106" 30'
+
+# A title and a goal can be any length; each elides 8 px short of the island in every theme.
 node --input-type=module - "$repo/shell/lib/goals.mjs" >"$store.tmp" <<'JS'
 const G = await import(process.argv[2]);
 console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'G'.repeat(2000), Date.now() + 71 * 3600000, Date.now(), 'g0')));

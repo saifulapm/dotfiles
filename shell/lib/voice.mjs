@@ -731,12 +731,17 @@ export function marginLook(tokens) {
   const plain = voice === 'plain';
   const bracket = voice === 'bracket';
   const engraved = (tokens || UNTHEMED).type.engraved === true;
+  // Frost: glass under the workspace number, a danger dot, the app and path split as Hi-Fi's.
+  const glass = (tokens || UNTHEMED).niri?.blur === true;
   // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
   const words = (s) => say(line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')));
   const look = {
     voice,
-    number: (idx) => (plain ? `Page ${pad2(idx)}` : bracket ? mark(engraved, pad2(idx)) : pad2(idx)),
-    numberColor: bracket ? c.accent : c.ink,
+    number: (idx) => (glass ? String(idx) : plain ? `Page ${pad2(idx)}` : bracket ? mark(engraved, pad2(idx)) : pad2(idx)),
+    numberColor: bracket || glass ? c.accent : c.ink,
+    // The margins' own type size, where the theme sets one; the others take the surface style's.
+    size: glass ? 12.5 : undefined,
+    chip: glass,
     numberWeight: plain ? 600 : bracket ? 400 : 700,
     engraved,
     // Hi-Fi shows only the shown workspace, as the other themes do: a lit amber lamp before its number in amber.
@@ -747,12 +752,12 @@ export function marginLook(tokens) {
       if (view.app === null && view.title === null) return '';
       const app = words(view.app);
       const title = words(view.title);
-      if (engraved) return `  ${app}`;
+      if (engraved || glass) return `  ${app}`;
       return plain ? ` / ${app} — ${title}` : bracket ? ` ${app} — ${title}` : ` — ${app} · ${title}`;
     },
     // Hi-Fi draws the app in ink and the path after it in muted, so the path is a word of its own there.
-    tailColor: engraved ? c.ink : c.muted,
-    path: (view) => (engraved && view.title !== null ? `  ${words(view.title)}` : ''),
+    tailColor: engraved || glass ? c.ink : c.muted,
+    path: (view) => ((engraved || glass) && view.title !== null ? `  ${words(view.title)}` : ''),
     goal(g) {
       if (!g) return '';
       const title = say(g.title);
@@ -765,14 +770,14 @@ export function marginLook(tokens) {
     goalLamp: engraved ? 'red' : '',
     goalWeight: bracket ? 400 : plain ? 500 : 700,
     dot: plain,
-    dotColor: c.accent,
+    dotColor: glass ? c.danger : c.accent,
     // Unread mail is something to act on: ink in Paper (bold) and Artboard (medium), Blueprint's accent.
     mail: (n) => (n > 0 ? (plain ? `mail ${n}` : `MAIL ${n}`) : ''),
     mailColor: bracket ? c.accent : c.ink,
     mailWeight: bracket ? 400 : plain ? 500 : 700,
     word: (w) => (plain ? same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi') : upper(w)),
     date: (d) => (bracket && !engraved ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
-    dateColor: engraved ? c.ink : c.muted,
+    dateColor: engraved || glass ? c.ink : c.muted,
     // Hi-Fi's board spaces its right-hand words 18 px apart with no separator.
     sep: plain || engraved ? '' : bracket ? '·' : '—',
     spacing: engraved ? 18 : plain ? 16 : 14,

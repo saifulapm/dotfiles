@@ -47,6 +47,14 @@ PanelWindow {
     // Hi-Fi's groove draws its second line at y 41, one row below the other themes' rule.
     implicitHeight: voice.engraved ? 42 : 41
     color: "transparent"
+    // Frost asks niri to blur behind the number's chip only; the rest of the bar stays clear.
+    readonly property Region chipRegion: Region {
+        item: chip
+        radius: chip.radius
+    }
+    readonly property var blurRegion: voice.chip && visible ? chipRegion : null
+    BackgroundEffect.blurRegion: blurRegion
+
     // Only the Notes corner takes the pointer; clicks anywhere else go through to the windows under the margins.
     mask: Region {
         item: notesCorner
@@ -78,7 +86,7 @@ PanelWindow {
         textFormat: Text.PlainText
         color: root.theme.color.muted ?? "black"
         font.family: root.look.font
-        font.pixelSize: root.look.size
+        font.pixelSize: root.voice.size ?? root.look.size
         font.letterSpacing: root.look.tracking
         font.capitalization: root.look.caps ? Font.AllUppercase : Font.MixedCase
         style: root.engraving.on ? Text.Raised : Text.Normal
@@ -107,6 +115,12 @@ PanelWindow {
             lamps: lamps.map(l => ({ idx: l.modelData.idx, lit: l.modelData.light === "lit", light: l.modelData.light, box: box(l.lamp) })),
             numbers: numbers,
             goalLamp: goalLamp.visible ? { light: goalLamp.light, box: box(goalLamp) } : null,
+            chip: chip.visible ? { box: box(chip), fill: String(chip.color), radius: chip.radius } : null,
+            numberColor: String(number.color),
+            dotColor: String(goalDot.color),
+            dotBox: box(goalDot),
+            goalColor: String(goalLabel.color),
+            blurRegion: blurRegion ? [{ x: box(chip).x, y: box(chip).y, w: chip.width, h: chip.height, radius: chipRegion.radius }] : [],
             islandLeft: width / 2 - islandWidth / 2,
             marks: Array.from(marks.children).filter(l => l.text !== undefined).map(l => l.text).join(voice.engraved ? " " : "").trim(),
             markLamps: Array.from({ length: markList.count }, (_, i) => markList.itemAt(i)).filter(m => m && m.lamp.visible).map(m => ({ light: m.modelData.lamp, box: box(m.lamp) })),
@@ -125,12 +139,32 @@ PanelWindow {
         x: 32
         y: 17
 
-        Label {
-            id: number
+        // Frost sets the number on a glass chip, 8 px in from its edge; the others draw it bare.
+        Item {
+            id: numberSlot
             visible: !root.voice.engraved
-            text: root.voice.number(root.view.idx)
-            color: root.voice.numberColor ?? "black"
-            font.weight: root.voice.numberWeight
+            width: number.width + (root.voice.chip ? 16 : 0)
+            height: number.height
+
+            Rectangle {
+                id: chip
+                visible: root.voice.chip
+                y: -3
+                width: parent.width
+                height: parent.height + 6
+                radius: 7
+                color: root.theme.color.glass ?? "black"
+                border.width: 1
+                border.color: root.theme.color.edge ?? "transparent"
+            }
+
+            Label {
+                id: number
+                anchors.centerIn: parent
+                text: root.voice.number(root.view.idx)
+                color: root.voice.numberColor ?? "black"
+                font.weight: root.voice.numberWeight
+            }
         }
 
         // Hi-Fi's shown workspace, its number after a lit pilot lamp.
@@ -174,7 +208,7 @@ PanelWindow {
         Label {
             id: tail
             // The room before the island, less what the number or the lamps, the column and the marks take.
-            readonly property real room: root.lineEnd - 32 - (number.visible ? number.width : 0) - lampRow.width - column.width - marks.width
+            readonly property real room: root.lineEnd - 32 - (numberSlot.visible ? numberSlot.width : 0) - lampRow.width - column.width - marks.width
             text: root.voice.tail(root.view)
             width: Math.min(implicitWidth, Math.max(0, room))
             elide: Text.ElideRight
@@ -261,6 +295,7 @@ PanelWindow {
             spacing: 6
 
             Rectangle {
+                id: goalDot
                 visible: root.voice.dot
                 anchors.verticalCenter: parent.verticalCenter
                 width: 6
