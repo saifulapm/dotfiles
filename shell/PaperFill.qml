@@ -13,7 +13,7 @@ Item {
     // Opaque at rest; a fill whose ancestor fades must blend, or qt_Opacity darkens it instead.
     property bool blending: opacity < 1
     // flat and gradient stay the plain fill below.
-    readonly property string shader: ({ grain: "grain", dots: "dots", grid: "grid", brushed: "brushed" })[tokens?.primitive.paper] ?? ""
+    readonly property string shader: ({ grain: "grain", dots: "dots", grid: "grid", brushed: "brushed", frost: "frost" })[tokens?.primitive.paper] ?? ""
     property string shaderUrl: ""
     property bool shaderFailed: false
     readonly property bool ready: shader === "" || shaderFailed || effect.item !== null
@@ -58,6 +58,7 @@ Item {
             property real majorAlpha: fill.tokens.paper.major_alpha ?? 0
             property color ink: fill.tokens.color.ink
             property real streakAlpha: fill.tokens.paper.streak_alpha ?? 0
+            property real frostAlpha: fill.tokens.paper.frost_alpha ?? 0
             property real period: fill.period
         }
     }
