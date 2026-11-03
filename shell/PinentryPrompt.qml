@@ -227,11 +227,12 @@ Item {
                     Keys.onEscapePressed: prompt.close()
                 }
 
+                // A block caret sits on the first cell, so the placeholder starts after it rather than under it.
                 Text {
                     textFormat: Text.PlainText
                     visible: input.text === ""
                     anchors.verticalCenter: parent.verticalCenter
-                    x: 12
+                    x: prompt.look.caret === "block" ? 12 + 11 + 6 : 12
                     text: V.line(prompt.seen?.prompt).replace(/:$/, "") || "Passphrase"
                     color: prompt.c.muted
                     font.family: prompt.fonts.ui
@@ -315,21 +316,33 @@ Item {
         }
     }
 
+    FontMetrics {
+        id: caretMetrics
+        font: input.font
+    }
+
+    // Qt sizes the delegate to the cursor's line, which grows once a mask dot is drawn from a fallback font, so the block keeps the field font's line height, centred in the field, empty or typed.
     Component {
         id: blockCaret
 
-        Rectangle {
+        Item {
+            id: caretSlot
             width: 11
-            height: input.font.pixelSize
-            color: prompt.look.prompt.color
             // Qt hides only its own caret when the field loses focus, so a delegate follows cursorVisible itself.
             visible: input.cursorVisible
 
-            RectangularShadow {
-                anchors.fill: parent
-                z: -1
-                blur: 9.6
-                color: Qt.alpha(prompt.look.prompt.color, 0.8)
+            Rectangle {
+                width: parent.width
+                height: Math.round(caretMetrics.height)
+                y: Math.round((input.height - height) / 2 - caretSlot.y)
+                color: prompt.look.prompt.color
+
+                RectangularShadow {
+                    anchors.fill: parent
+                    z: -1
+                    blur: 9.6
+                    color: Qt.alpha(prompt.look.prompt.color, 0.8)
+                }
             }
         }
     }
