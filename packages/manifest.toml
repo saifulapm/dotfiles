@@ -622,7 +622,8 @@ why = "Code-coverage driver for Pest/PHPUnit --coverage (user pick 2026-08-08) �
 # system 8.5 (multi-version decision 2026-08-07; ~/.dotfiles/bin/php picks
 # per project via .php-version). The remi-release rpm that provides these is
 # bootstrapped by 00-install-packages (not a copr). Each phpXX meta pulls
-# cli/common/mbstring/opcache; the rest are listed explicitly because
+# cli/common/opcache — NOT mbstring (php84 had none until 2026-11-03, when
+# a Laravel mail view died on mb_strcut()); the rest are listed explicitly because
 # install_weak_deps=False skips anything softer than Requires — fpm and xml
 # included (checked with rpm -qa 2026-08-07: neither arrives on its own).
 
@@ -823,6 +824,12 @@ name = "php84-php-pecl-pcov"
 category = "dev"
 arch = "all"
 why = "PHP 8.4: pcov coverage driver (Remi; same rationale as php-pecl-pcov)"
+
+[[pkg]]
+name = "php84-php-mbstring"
+category = "dev"
+arch = "all"
+why = "PHP 8.4: mbstring — Laravel requirement; the php84 meta does NOT pull it (found live 2026-11-03: password-reset mail died on mb_strcut() under php84-fpm)"
 
 [[pkg]]
 name = "php84-php-fpm"
