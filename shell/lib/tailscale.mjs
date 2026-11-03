@@ -69,7 +69,7 @@ export function tailscaleLook(tokens) {
     return {
       voice,
       words: say,
-      badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? '#FFFFFF' : c.muted, fill: on ? c.ink : m.chip, border: 'transparent', dashed: false, radius: 8, dot: { size: 6, fill: on ? m.on : 'transparent', line: on ? 'transparent' : m.outline, radius: 3 } }),
+      badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? c.surface : c.muted, fill: on ? c.ink : m.chip, border: 'transparent', dashed: false, radius: 8, dot: { size: 6, fill: on ? m.on : 'transparent', line: on ? 'transparent' : m.outline, radius: 3 } }),
       status: (row) => ({ word: row.online ? 'online' : row.age, dot: row.online ? m.online : 'transparent' }),
       dotLine: m.outline,
       detail: (row) => (row.online ? row.ip : 'offline'),

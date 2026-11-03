@@ -100,6 +100,8 @@ test("each theme words a machine's state and the list's count as its board does"
 test("Frost's badge and marks read its dark board colours: bar dot, tile chip, outline, online", () => {
   const frost = tailscaleLook(checkTokens(validateTheme(theme('frost'))));
   assert.equal(frost.badge(true).dot.fill, '#88C0D0');
+  // ON sits on the ink fill, so its text is the surface: never white on Frost's light ink.
+  assert.equal(frost.badge(true).color, '#3B4252');
   assert.equal(frost.badge(false).fill, '#434C5E');
   assert.equal(frost.badge(false).dot.line, '#AEB7C6');
   assert.equal(frost.status({ online: true }).dot, '#A3BE8C');
