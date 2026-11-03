@@ -36,7 +36,7 @@ PDF
 ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=200x200 -frames:v 1 "$work/red.png"
 
 "$repo/bin/dots" theme paper
-themes=(blueprint artboard paper)
+themes=(blueprint artboard frost paper)
 
 # mpv: two players on this display, each with the socket dots-ipc.lua opens.
 mpv_socks() { local pid; for pid in $(pgrep -x mpv); do grep -qzxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" "/proc/$pid/environ" 2>/dev/null && echo "$XDG_RUNTIME_DIR/mpv-$pid.sock"; done; }

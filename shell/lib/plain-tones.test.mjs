@@ -48,7 +48,6 @@ const LEFT = {
   'shell/DekhoTitle.qml': 6,
   'shell/Tailscale.qml': 1,
   'shell/lib/accounts.mjs': 1,
-  'shell/lib/apps.mjs': 1,
   'shell/lib/tailscale.mjs': 1,
   'shell/lib/themes.mjs': 1,
   'shell/lib/youtube-look.mjs': 1,

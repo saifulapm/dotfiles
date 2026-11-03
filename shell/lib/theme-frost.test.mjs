@@ -6,7 +6,8 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens, renderNiri } from './theme.mjs';
+import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootOsc } from './theme.mjs';
+import { renderHelix, renderChromiumTheme, renderGtkSettings, renderZathura, renderNewtabCss } from './apps.mjs';
 
 const render = new URL('./theme-render.mjs', import.meta.url).pathname;
 const dots = new URL('../../bin/dots', import.meta.url).pathname;
@@ -123,4 +124,44 @@ test('niri accepts Frost\'s fragment', (t) => {
   writeFileSync(join(dir, 'niri.kdl'), renderNiri(frost()));
   const r = spawnSync('niri', ['validate', '-c', join(dir, 'niri.kdl')], { encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
+});
+
+test('Frost\'s apps are dark Nord: foot and an open foot, helix, Chromium and GTK', () => {
+  const t = frost();
+  const foot = renderFoot(t);
+  assert.match(foot, /initial-color-theme=dark/);
+  assert.match(foot, /\[colors-dark\][\s\S]*background=3B4252[\s\S]*regular1=BF616A[\s\S]*bright0=AEB7C6/);
+  const osc = renderFootOsc(t);
+  for (const seq of ['4;1;#BF616A', '4;8;#AEB7C6', '11;#3B4252']) assert.ok(osc.includes(`\x1b]${seq}\x1b\\`), seq);
+  assert.match(renderHelix(t), /"comment" = \{ fg = "#7b88a1"/);
+  const chrome = JSON.parse(renderChromiumTheme(t)).theme.colors;
+  assert.deepEqual([chrome.frame, chrome.toolbar], [[46, 52, 64], [59, 66, 82]]);
+  assert.match(renderGtkSettings(t), /gtk-application-prefer-dark-theme=true/);
+  assert.match(renderZathura(t), /set recolor true[\s\S]*set recolor-keephue true|set recolor-keephue true[\s\S]*set recolor true/);
+});
+
+test('Frost\'s new tab takes the plain board colours from its own row, dark, and Artboard\'s stay', () => {
+  const css = renderNewtabCss(frost());
+  for (const [k, v] of [['tile', '#434C5E'], ['field', '#323845'], ['tint', '#475666'], ['deep', '#ECEFF4']]) assert.match(css, new RegExp(`--${k}: ${v};`), k);
+  const art = renderNewtabCss(validateTheme(load('artboard')));
+  for (const [k, v] of [['tile', '#F2F3F6'], ['field', '#F6F7F9'], ['tint', '#EEF1FF'], ['deep', '#2638C9']]) assert.match(art, new RegExp(`--${k}: ${v};`), k);
+});
+
+test('dots theme frost sets GTK dark, and Paper after it sets light and zathura recolor false again', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-frost-gtk-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  const bin = join(state, 'bin');
+  mkdirSync(bin);
+  const log = join(state, 'gsettings.log');
+  writeFileSync(join(bin, 'gsettings'), `#!/bin/bash\necho "$*" >>${log}\n`, { mode: 0o755 });
+  const env = Object.assign({}, process.env, {
+    PATH: `${bin}:${process.env.PATH}`, XDG_STATE_HOME: state, WAYLAND_DISPLAY: '', DBUS_SESSION_BUS_ADDRESS: `unix:path=${state}/no-bus`,
+    TMUX_TMPDIR: state, XDG_RUNTIME_DIR: state, DOTS_AGENT_HOME: `${state}/agents`,
+  });
+  delete env.TMUX;
+  assert.equal(spawnSync(dots, ['theme', 'frost'], { env }).status, 0);
+  assert.match(readFileSync(log, 'utf8'), /color-scheme prefer-dark/);
+  assert.equal(spawnSync(dots, ['theme', 'paper'], { env }).status, 0);
+  assert.match(readFileSync(log, 'utf8').trim().split('\n').filter((l) => l.includes('color-scheme')).pop(), /prefer-light/);
+  assert.match(readFileSync(join(state, 'dots/theme-out/zathura'), 'utf8'), /set recolor false/);
 });

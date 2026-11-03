@@ -1,5 +1,6 @@
 // Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, imv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
+import { plainTones } from './voice.mjs';
 
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
@@ -326,8 +327,13 @@ export function renderNewtabHtml(t) {
 `;
 }
 
-// Board hexes for the new-tab page that no token carries: Paper's tile, Artboard's field, tile, row tint and its deep blue.
-const NEWTAB_BOARD = { paper: { tile: '#E8DEC6' }, artboard: { tile: '#F2F3F6', field: '#F6F7F9', tint: '#EEF1FF', deep: '#2638C9' } };
+// Board hexes for the new-tab page that no token carries: Paper's tile; a plain theme's field, tile, row tint and deep text come from its row of the plain table.
+const NEWTAB_BOARD = { paper: { tile: '#E8DEC6' } };
+const newtabBoard = (t) => {
+  if (t.type.voice !== 'plain') return NEWTAB_BOARD[t.name] || {};
+  const { tile, field, tint, deep } = plainTones(t);
+  return { tile, field, tint, deep };
+};
 
 // The page's paper, drawn as the shell draws it: Paper's grain scales the paper by 1 +- grain as its shader does, Blueprint's grid from its paper tokens, Artboard's dots.
 function newtabTexture(t) {
@@ -350,7 +356,7 @@ function newtabTexture(t) {
 
 export function renderNewtabCss(t) {
   const c = t.color;
-  const board = NEWTAB_BOARD[t.name] || {};
+  const board = newtabBoard(t);
   const vars = [
     ['paper', c.paper], ['ink', c.ink], ['muted', c.muted], ['line', c.line], ['surface', c.surface], ['accent', c.accent],
     ['display', `"${t.type.display}"`], ['ui', `"${t.type.ui}"`],
