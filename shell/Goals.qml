@@ -32,6 +32,8 @@ Item {
     readonly property var row: list[selected] ?? null
     readonly property int count: G.activeGoals(store).length
     readonly property var c: theme.color
+    // In a theme that blurs, the panel's box is the one region the Surfaces window asks niri to blur while Goals draws.
+    readonly property var blurRegion: panel.glass && visible ? panel.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property bool caps: S.marginStyle(theme.tokens).caps
     readonly property bool capsTitles: theme.tokens ? theme.tokens.type.voice === "bracket" : false
@@ -83,6 +85,7 @@ Item {
             settled: motion.settled,
             drawing: view.visible,
             cardBox: panel.drawnBox(),
+            blurRegion: blurRegion ? [panel.regionBox()] : [],
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: view.Window.active
         });

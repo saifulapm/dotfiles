@@ -25,6 +25,8 @@ Item {
     readonly property string dir: Quickshell.env("DOTS_RECORDINGS_DIR") || Quickshell.env("HOME") + "/Videos/Recordings"
 
     readonly property var c: theme.color
+    // In a theme that blurs, the hint card's box is the one region the Surfaces window asks niri to blur while the picker draws.
+    readonly property var blurRegion: hintCard.glass && visible ? hintCard.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     // Plays only the picker's open and close; a recording runs with the picker gone.
@@ -80,7 +82,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), blurRegion: blurRegion ? [hintCard.regionBox()] : [], frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {

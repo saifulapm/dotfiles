@@ -98,6 +98,8 @@ Item {
 
     readonly property string home: Quickshell.env("HOME")
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the picker draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var engraving: L.engraving(theme.tokens)
@@ -471,6 +473,7 @@ Item {
             settled: motion.settled,
             drawing: picker.visible,
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             frameLabel: card.frameLabel(),
             keyboard: picker.Window.active
         });

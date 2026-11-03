@@ -23,6 +23,8 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
+    // In a theme that blurs, the panel's box is the one region the Surfaces window asks niri to blur while the switcher draws.
+    readonly property var blurRegion: panel.glass && visible ? panel.region : null
     readonly property var look: Lib.pickerLook(theme.tokens)
     readonly property var header: look.header(themes.length, theme.name)
     readonly property Root.Motion motion: Root.Motion {
@@ -91,6 +93,7 @@ Item {
             settled: motion.settled,
             drawing: switcher.visible,
             cardBox: panel.drawnBox(),
+            blurRegion: blurRegion ? [panel.regionBox()] : [],
             header: [title.text + sub.text, headRight.text],
             headerBaselines: [title.mapToItem(null, 0, title.baselineOffset).y, headRight.mapToItem(null, 0, headRight.baselineOffset).y],
             legend: legend.line(),

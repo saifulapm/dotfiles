@@ -36,6 +36,8 @@ Item {
 
     readonly property string command: Quickshell.env("DOTS_DNS") || "dots-dns"
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the panel draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var marks: D.dnsLook(theme.tokens)
@@ -240,6 +242,8 @@ Item {
             groups: groups,
             rows: rows,
             cursorBox: box,
+            cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             pane: {
                 name: paneName.text,
                 path: panePath.text,

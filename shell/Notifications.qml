@@ -25,6 +25,8 @@ Item {
     property real openedAt: 0
 
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the centre draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -160,6 +162,7 @@ Item {
             settled: motion.settled,
             drawing: centre.visible,
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             frameLabel: card.frameLabel(),
             headingKind: look.label.kind,
             heading: heading.text,

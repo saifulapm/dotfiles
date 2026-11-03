@@ -31,6 +31,8 @@ Item {
     readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || "dots-accounts"
     readonly property string registryPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/claude-accounts.json"
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the panel draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var marks: A.accountsLook(theme.tokens ?? { color: {}, type: { voice: "caps" } })
@@ -137,6 +139,7 @@ Item {
             opens: opens,
             settled: motion.settled,
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             keyboard: panel.Window.active
         });
     }

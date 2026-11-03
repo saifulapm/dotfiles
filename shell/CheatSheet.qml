@@ -25,6 +25,8 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the sheet draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
@@ -84,6 +86,7 @@ Item {
             settled: motion.settled,
             drawing: sheet.visible,
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             headingKind: look.label.kind,
             ruleBox: { x: r.x, y: r.y, w: topRule.width, h: topRule.height },

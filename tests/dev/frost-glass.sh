@@ -27,6 +27,47 @@ behind() {
   niri msg action maximize-column
 }
 
+# The other panels, each opened the way its own check opens it. Polkit asks a fake authority on the nested bus, Pinentry a gpg key with a passphrase, the file picker its socket.
+panels="notifs goals cheatsheet record themes tailscale accounts dns pass polkit pinentry picker"
+fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
+sock=$XDG_RUNTIME_DIR/dots-picker-$WAYLAND_DISPLAY.sock
+passphrase=dots-test-phrase
+fake_pid=0 asks=0
+cleanup() { kill "$fake_pid" 2>/dev/null; gpgconf --kill gpg-agent 2>/dev/null; }
+
+unset PINENTRY_USER_DATA GPG_TTY
+mkdir -p -m 700 "$GNUPGHOME" "$DOTS_DEV_DIR/Downloads"
+echo "pinentry-program $repo/bin/dots-pinentry" >"$GNUPGHOME/gpg-agent.conf"
+gpg --batch --pinentry-mode loopback --passphrase "$passphrase" --quick-gen-key 'Dots Test <dots@test>' default default never 2>/dev/null
+pass init dots@test >/dev/null
+printf '%s\n' hunter2 | pass insert -e web/github.com >/dev/null
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+fake_pid=$!
+until_ok 3000 fake Registered >/dev/null 2>&1
+# The agent registers as the shell starts, so the shell restarts once the authority is up.
+systemctl --user restart "$DOTS_DEV_UNIT"
+until_ok 5000 shell_status >/dev/null
+
+panel_state() { timeout 0.5 qs ipc call "$1" state 2>/dev/null; }
+panel_is() { local p=$1; shift; panel_state "$p" | jq -e "$@" >/dev/null 2>&1; }
+exclusive() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+open_panel() {
+  asks=$((asks + 1))
+  case $1 in
+    polkit) fake Begin s "g$asks" >/dev/null ;;
+    pinentry)
+      gpgconf --kill gpg-agent
+      pass show web/github.com >/dev/null 2>&1 &
+      ;;
+    picker)
+      node -e 'const s = require("net").connect(process.argv[1], () => s.write(process.argv[2] + "\n")); s.on("data", () => {}); s.on("close", () => process.exit())' "$sock" "$(jq -cn --arg f "$DOTS_DEV_DIR/Downloads" '{mode: "open", multiple: false, title: "Open File", app: "chromium-browser", folder: $f, name: "", filters: [], filter: 0, accept: ""}')" &
+      ;;
+    *) niri msg action spawn -- dots-call "$1" toggle ;;
+  esac
+  until_ok 8000 panel_is "$1" '(.open // .picking) and .settled' && until_ok 3000 exclusive
+}
+close_panel() { wtype -k Escape; until_ok 3000 panel_is "$1" '((.open // .picking) | not) and .drawing == false'; }
+
 until_ok 5000 shell_status >/dev/null
 in_theme frost
 
@@ -37,6 +78,14 @@ check "frost: the Surfaces window asks niri for one region while Control draws" 
 in_geo=$(inside_geo)
 close_control
 check "frost: after Esc the Surfaces window asks for no region" blur_is '.surfaces == 0'
+
+for p in $panels; do
+  open_panel "$p"
+  check "frost: $p asks for one blur region, its card's box with radius 10 ($(panel_state "$p" | jq -c '[.blurRegion, .cardBox]'))" panel_is "$p" "$region_is_card"
+  check "frost: the Surfaces window asks niri for one region while $p draws" blur_is '.surfaces == 1'
+  close_panel "$p"
+  check "frost: after $p closes the Surfaces window asks for no region" blur_is '.surfaces == 0'
+done
 
 behind ffffff
 # With Control closed the white foot shows where the card was, so no blurred box is left on the desktop.
@@ -69,6 +118,12 @@ for t in paper artboard blueprint hi-fi; do
   check "$t: Control asks for no blur region ($(control_state | jq -c .blurRegion))" state_is '.blurRegion == []'
   check "$t: the Surfaces window asks niri for no region" blur_is '.surfaces == 0'
   close_control
+  for p in $panels; do
+    open_panel "$p"
+    check "$t: $p asks for no blur region ($(panel_state "$p" | jq -c .blurRegion))" panel_is "$p" '.blurRegion == []'
+    check "$t: the Surfaces window asks niri for no region while $p draws" blur_is '.surfaces == 0'
+    close_panel "$p"
+  done
 done
 
 errors=$(qml_errors)

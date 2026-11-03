@@ -24,6 +24,8 @@ Item {
         seen = asked
 
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the prompt draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
@@ -84,6 +86,7 @@ Item {
             drawing: prompt.visible,
             frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
             message: flow?.message ?? "",
             drawnMessage: messageText.text,
             prompt: flow?.inputPrompt ?? "",

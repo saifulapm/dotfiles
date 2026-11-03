@@ -18,6 +18,8 @@ Item {
     readonly property bool confirm: seen?.kind === "confirm"
 
     readonly property var c: theme.color
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the prompt draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property var words: P.cardText(look, seen?.kind ?? "passphrase")
@@ -100,7 +102,8 @@ Item {
             motion: motion.curves?.kind ?? null,
             settled: motion.settled,
             drawing: prompt.visible,
-            cardBox: card.drawnBox()
+            cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : []
         });
     }
 
