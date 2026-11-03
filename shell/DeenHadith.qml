@@ -21,10 +21,10 @@ FocusScope {
     readonly property bool caps: voice === "caps"
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
     readonly property string headFont: (caps ? fonts.display : bodyFont) ?? ""
-    // Artboard's tints, which no token carries.
-    readonly property string tint: "#EEF1FF"
-    readonly property string deep: "#2638C9"
-    readonly property string tile: "#F2F3F6"
+    readonly property var tones: deen.tones
+    readonly property string tint: tones.tint ?? "transparent"
+    readonly property string deep: tones.deep ?? "gray"
+    readonly property string tile: tones.tile ?? "transparent"
 
     // True once status reads ready: the browse is on and the download view goes.
     property bool ready: false
@@ -438,7 +438,7 @@ FocusScope {
                 Layout.topMargin: 12
                 Layout.bottomMargin: 20
                 radius: page.plain ? 14 : 0
-                color: page.plain && failed ? "#F6F7F9" : page.plain ? "#FFFFFF" : "transparent"
+                color: page.plain && failed ? page.tones.field : page.plain ? page.tones.card : "transparent"
                 border.width: page.plain ? (failed ? 0 : 1.5) : page.caps && !failed ? 2 : 1
                 border.color: (page.plain || page.bracket && !failed ? page.c.accent : page.bracket ? page.c.line : failed ? page.c.muted : page.c.ink) ?? "black"
 
@@ -488,7 +488,7 @@ FocusScope {
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
                         text: card.failed ? "The download did not finish" : page.download.phase === "converting" ? "Putting the corpus together" : "Getting the hadith corpus"
-                        color: (page.plain && card.failed ? "#B4380B" : page.c.ink) ?? "black"
+                        color: (page.plain && card.failed ? page.tones.warn : page.c.ink) ?? "black"
                         font.family: page.headFont
                         font.pixelSize: page.caps ? 25 : page.plain ? 18 : 16
                         font.weight: page.caps ? Font.Normal : Font.Bold
@@ -505,7 +505,7 @@ FocusScope {
                             Layout.fillWidth: true
                             implicitHeight: 8
                             radius: page.plain ? 4 : 0
-                            color: (page.plain ? "#E3E6EB" : page.bracket ? page.c.line : "#E8DEC6") ?? "gray"
+                            color: (page.plain ? page.tones.rule : page.bracket ? page.c.line : "#E8DEC6") ?? "gray"
 
                             Rectangle {
                                 width: parent.width * (page.download.phase === "converting" ? 1 : page.shown.fraction)
@@ -547,7 +547,7 @@ FocusScope {
                         visible: card.failed
                         textFormat: Text.PlainText
                         text: H.failText(page.download)
-                        color: (page.plain ? "#2B2F36" : page.c.ink) ?? "black"
+                        color: (page.plain ? page.tones.strong : page.c.ink) ?? "black"
                         font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
                         font.pixelSize: page.plain ? 14 : 13
                         lineHeight: 1.5
@@ -598,7 +598,7 @@ FocusScope {
                             Layout.fillWidth: true
                             Layout.bottomMargin: 6
                             dashed: page.bracket
-                            color: (page.plain ? "#E3E6EB" : page.c.line) ?? "gray"
+                            color: (page.plain ? page.tones.rule : page.c.line) ?? "gray"
                         }
                         Text {
                             id: meanwhileHead
@@ -1142,7 +1142,7 @@ FocusScope {
         implicitWidth: gradeText.implicitWidth + (grade.host.bracket ? 0 : grade.host.plain ? 16 : 12)
         implicitHeight: gradeText.implicitHeight + (grade.host.bracket ? 0 : grade.host.plain ? 4 : 2)
         radius: grade.host.plain ? 8 : 0
-        color: grade.host.plain ? (on ? "#FFFFFF" : grade.host.tile) : "transparent"
+        color: grade.host.plain ? (on ? grade.host.tones.card : grade.host.tile) : "transparent"
         border.width: grade.host.caps ? 1 : 0
         border.color: (on ? grade.host.c.surface : grade.host.c.ink) ?? "black"
 

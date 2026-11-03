@@ -14,6 +14,7 @@ FocusScope {
     readonly property var c: deen.c
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
+    readonly property var tones: deen.tones
     readonly property string voice: deen.voice
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
@@ -626,7 +627,7 @@ FocusScope {
                         width: parent.width
                         height: 1
                         visible: !page.bracket
-                        color: page.plain ? "#E3E6EB" : "#D8CDB6"
+                        color: page.plain ? page.tones.rule : "#D8CDB6"
                     }
                     Dashed {
                         id: ayahDash
@@ -651,7 +652,7 @@ FocusScope {
             visible: !!page.focused && !page.noData
             implicitHeight: barRow.implicitHeight + 24
             radius: page.plain ? 12 : 0
-            color: page.plain ? "#F6F7F9" : "transparent"
+            color: page.plain ? page.tones.field : "transparent"
             border.width: page.plain ? 0 : 1
             border.color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
 

@@ -20,6 +20,7 @@ ShellRoot {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
+    readonly property var tones: L.plainTones(theme.tokens)
     readonly property string voice: look.voice
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property string bengali: D.bengaliFamily(voice)

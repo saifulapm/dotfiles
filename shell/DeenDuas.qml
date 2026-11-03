@@ -13,6 +13,7 @@ FocusScope {
     readonly property var c: deen.c
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
+    readonly property var tones: deen.tones
     readonly property string voice: deen.voice
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
@@ -181,7 +182,7 @@ FocusScope {
                     anchors.margins: 10
                     height: plain ? 38 : 36
                     radius: plain ? 12 : 0
-                    color: plain ? "#F6F7F9" : "transparent"
+                    color: plain ? tones.field : "transparent"
                     border.width: plain ? 0 : 1
                     border.color: (bracket ? c.line : c.muted) ?? "gray"
 

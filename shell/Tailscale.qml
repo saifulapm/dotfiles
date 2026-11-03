@@ -30,6 +30,7 @@ Item {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
+    readonly property var tones: L.plainTones(theme.tokens)
     readonly property var marks: T.tailscaleLook(theme.tokens ?? { color: {}, type: { voice: "caps" } })
     readonly property bool isOn: status.state === "on"
     readonly property var rows: isOn ? status.machines : []
@@ -368,7 +369,7 @@ Item {
                     width: parent.width - 36
                     height: deviceColumn.implicitHeight
                     radius: 12
-                    color: "#F6F7F9"
+                    color: tones.field ?? "transparent"
                 }
 
                 ColumnLayout {
