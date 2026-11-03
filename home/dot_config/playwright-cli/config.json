@@ -3,6 +3,7 @@
     "browserName": "chromium",
     "launchOptions": {
       "executablePath": "/usr/bin/chromium-browser",
+      "chromiumSandbox": true,
       "headless": true
     }
   }

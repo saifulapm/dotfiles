@@ -130,3 +130,9 @@ test('the config open gets launches Fedora\'s chromium with the desktop scaling 
   assert.equal(config.browser.launchOptions.executablePath, '/usr/bin/chromium-browser');
   assert.deepEqual(config.browser.launchOptions.args, ['--enable-features=CDPScreenshotNewSurface,WaylandPerSurfaceScale,WaylandUiScale']);
 });
+
+// Playwright launches Chromium with --no-sandbox unless asked, and an agent browsing the open web should not run a browser bug as the user.
+test('every playwright config launches chromium with its sandbox on', () => {
+  for (const file of ['home/dot_config/playwright/cli.config.json', 'home/dot_config/playwright-cli/config.json'])
+    assert.equal(JSON.parse(readFileSync(join(repo, file), 'utf8')).browser.launchOptions.chromiumSandbox, true, file);
+});
