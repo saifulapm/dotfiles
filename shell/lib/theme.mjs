@@ -328,10 +328,6 @@ export function renderNiri(t) {
     const glsl = shaders[{ 'window-open': 'open', 'window-close': 'close' }[name]];
     return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
   };
-  // A blurring theme asks niri for xray behind the shell's glass, on the three layers that draw it; each panel names its own blur region, so the rest of a full-screen layer stays clear.
-  const glass = n.blur
-    ? '\nlayer-rule {\n    match namespace="^dots-surfaces$"\n    match namespace="^dots-island$"\n    match namespace="^dots-margins$"\n    background-effect {\n        xray true\n    }\n}\n'
-    : '';
   const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
   return `layout {
     gaps ${t.niri.gaps}
@@ -373,7 +369,7 @@ window-rule {
     geometry-corner-radius ${radius}
     clip-to-geometry true
 }
-${glass}
+
 animations {
 ${animations}
 }

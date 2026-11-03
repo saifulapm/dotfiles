@@ -110,11 +110,9 @@ test('Frost frames windows in a 1 px frost-blue border with 10 px corners, 20 px
   assert.match(kdl, /window-close \{\s*duration-ms 90\s*curve "linear"\s*\}/);
 });
 
-test('Frost turns xray on for the three shell layers that draw glass, and the other themes ask for no background effect', () => {
-  const rule = renderNiri(frost()).match(/layer-rule \{\n([\s\S]*?)\n\}/)?.[1] ?? '';
-  assert.deepEqual(rule.match(/match namespace="[^"]+"/g), ['match namespace="^dots-surfaces$"', 'match namespace="^dots-island$"', 'match namespace="^dots-margins$"']);
-  assert.match(rule, /background-effect \{\s*xray true\s*\}/);
-  for (const name of ['paper', 'artboard', 'blueprint', 'hi-fi']) assert.doesNotMatch(renderNiri(validateTheme(load(name))), /background-effect|layer-rule/, name);
+// niri turns xray on by itself behind a region a surface asks to blur; a layer-rule's xray would show the paper over every window behind the full-screen shell layers whenever no region is asked for.
+test('no theme\'s niri.kdl holds a layer-rule or background effect, Frost included', () => {
+  for (const name of ['paper', 'artboard', 'blueprint', 'frost', 'hi-fi']) assert.doesNotMatch(renderNiri(validateTheme(load(name))), /background-effect|layer-rule/, name);
 });
 
 test('niri accepts Frost\'s fragment', (t) => {
