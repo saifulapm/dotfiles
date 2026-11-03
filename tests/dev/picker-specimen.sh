@@ -60,8 +60,7 @@ until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \
 niri msg action spawn -- dots-call themes toggle
 until_ok 3000 state_is '.open and .settled and (.cards | length == 5) and all(.cards[]; .paperReady)'
 check "the picker shows five cards, each paper settled" state_is '.open and (.cards | length == 5) and all(.cards[]; .paperReady)'
-# Below the windows and their shadows, the bottom rows of a preview are bare paper.
-# Five cards scale each specimen by the card's fit, so a sample's place inside the 196 px preview scales with it.
+# Below the windows and their shadows, the bottom rows of a preview are bare paper; five cards scale each specimen by the card's fit, so a sample's place inside the 196 px preview scales with it.
 fit=$(themes_state | jq '.cards[0].preview.h / 196')
 at() { node -e "console.log(Math.round($1 * $fit))"; }
 paper_shades() { (($(grab paper "$(at 60)" "$(at 184)" 40 8 | shades) >= 20)); }
