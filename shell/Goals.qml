@@ -32,6 +32,8 @@ Item {
     readonly property var row: list[selected] ?? null
     readonly property int count: G.activeGoals(store).length
     readonly property var c: theme.color
+    // A warning's colour: danger, or in Frost ink after a danger dot.
+    readonly property var warn: theme.tokens ? V.warnLook(theme.tokens) : ({ color: c.danger, dot: "" })
     // In a theme that blurs, the panel's box is the one region the Surfaces window asks niri to blur while Goals draws.
     readonly property var blurRegion: panel.glass && visible ? panel.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -67,7 +69,14 @@ Item {
         }
     }
 
+    // An item's box in the window's pixels.
+    function box(item) {
+        const p = item.mapToItem(null, 0, 0);
+        return { x: p.x, y: p.y, w: item.width, h: item.height };
+    }
+
     function state() {
+        const selBlock = Array.from({ length: blockRepeater.count }, (_, i) => blockRepeater.itemAt(i)).find(b => b && b.sel && b.head.kind === "goal");
         return JSON.stringify({
             open: shown,
             selected: selected,
@@ -78,6 +87,10 @@ Item {
             hint: count === 0 ? "n to add a goal" : "",
             prompt: prompt ? { kind: prompt.kind, text: input.text, error: prompt.error } : null,
             confirm: confirm,
+            // The drawn warnings: the selected goal's due date, and the confirm label with its dot.
+            warn: view.warn,
+            due: selBlock ? selBlock.drawnDue() : null,
+            confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), dot: promptDot.visible ? box(promptDot) : null, box: box(promptLabel) } : null,
             openMs: openMs,
             opens: opens,
             motion: motion.curves?.kind ?? null,
@@ -322,6 +335,7 @@ Item {
                     }
 
                     Repeater {
+                        id: blockRepeater
                         model: V.blocks(view.list)
 
                         Rectangle {
@@ -330,6 +344,10 @@ Item {
                             readonly property var head: modelData.head
                             readonly property bool sel: view.selected >= modelData.row && view.selected <= modelData.row + modelData.tasks.length
                             readonly property var parts: head.kind === "goal" ? head.count.split("/").map(Number) : [0, 0]
+                            // The due date as drawn, for state().
+                            function drawnDue() {
+                                return { text: dueText.text, color: String(dueText.color), box: view.box(dueText), dot: dueDot.visible ? view.box(dueDot) : null };
+                            }
                             Layout.fillWidth: true
                             implicitHeight: inner.implicitHeight + 24
                             radius: panel.style.corner.radius ? 8 : 0
@@ -367,11 +385,22 @@ Item {
                                         font.family: fonts.mono
                                         font.pixelSize: 12
                                     }
+                                    Rectangle {
+                                        id: dueDot
+                                        visible: block.head.kind === "goal" && block.sel && view.warn.dot !== "" && (block.head.due ?? "") !== ""
+                                        Layout.alignment: Qt.AlignVCenter
+                                        Layout.rightMargin: -4
+                                        implicitWidth: 6
+                                        implicitHeight: 6
+                                        radius: 3
+                                        color: view.warn.dot || "transparent"
+                                    }
                                     Text {
+                                        id: dueText
                                         visible: block.head.kind === "goal"
                                         textFormat: Text.PlainText
                                         text: block.head.due ?? ""
-                                        color: block.sel ? c.danger : c.muted
+                                        color: block.sel ? view.warn.color : c.muted
                                         font.family: fonts.mono
                                         font.pixelSize: 12
                                         font.capitalization: view.caps ? Font.AllUppercase : Font.MixedCase
@@ -427,10 +456,21 @@ Item {
                     Layout.bottomMargin: 12
                     spacing: 10
 
+                    Rectangle {
+                        id: promptDot
+                        visible: view.confirm && view.warn.dot !== ""
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.rightMargin: -4
+                        implicitWidth: 6
+                        implicitHeight: 6
+                        radius: 3
+                        color: view.warn.dot || "transparent"
+                    }
                     Text {
+                        id: promptLabel
                         textFormat: Text.PlainText
                         text: view.confirm ? "delete? y" : !view.prompt ? "" : view.prompt.kind === "deadline" ? "deadline (3d, 5h, 2026-10-21 or empty)" : view.prompt.kind === "task" ? "task" : "goal"
-                        color: view.confirm ? c.danger : c.muted
+                        color: view.confirm ? view.warn.color : c.muted
                         font.family: fonts.ui
                         font.pixelSize: 13
                     }
@@ -452,11 +492,20 @@ Item {
                             event.accepted = true;
                         }
                     }
+                    Rectangle {
+                        visible: (view.prompt?.error ?? "") !== "" && view.warn.dot !== ""
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.rightMargin: -4
+                        implicitWidth: 6
+                        implicitHeight: 6
+                        radius: 3
+                        color: view.warn.dot || "transparent"
+                    }
                     Text {
                         visible: (view.prompt?.error ?? "") !== ""
                         textFormat: Text.PlainText
                         text: view.prompt?.error ?? ""
-                        color: c.danger
+                        color: view.warn.color
                         font.family: fonts.ui
                         font.pixelSize: 12
                     }

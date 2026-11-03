@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as G from './goals.mjs';
-import { rows, blocks, findRow } from './goals-view.mjs';
+import { readFileSync } from 'node:fs';
+import { parseToml } from './toml.mjs';
+import { validateTheme, checkTokens } from './theme.mjs';
+import { rows, blocks, findRow, warnLook } from './goals-view.mjs';
 
 const now = new Date(2026, 9, 19, 0, 0).getTime();
 let store = G.emptyStore();
@@ -51,4 +54,11 @@ test('findRow finds a row by kind and id, or -1', () => {
   const list = rows(store, { b: true }, false, now);
   assert.equal(findRow(list, 'task', 't2'), 3);
   assert.equal(findRow(list, 'goal', 't2'), -1);
+});
+
+const theme = (n) => checkTokens(validateTheme(parseToml(readFileSync(new URL(`../../themes/${n}/theme.toml`, import.meta.url), 'utf8'))));
+
+test("Frost's warning text is ink after a danger dot, since its red reads about 3:1 on glass; every other theme writes it in danger", () => {
+  assert.deepEqual(warnLook(theme('frost')), { color: '#D8DEE9', dot: '#BF616A' });
+  for (const n of ['paper', 'artboard', 'blueprint', 'hi-fi']) assert.deepEqual(warnLook(theme(n)), { color: theme(n).color.danger, dot: '' }, n);
 });

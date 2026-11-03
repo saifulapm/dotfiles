@@ -36,3 +36,9 @@ export function blocks(list) {
 }
 
 export const findRow = (list, kind, id) => list.findIndex((r) => r.kind === kind && r.id === id);
+
+// A warning's text, as the due date of a selected goal, the delete confirm and a prompt error: Frost's danger is a dot only, so its text is ink after a danger dot; the other themes write it in danger.
+export function warnLook(tokens) {
+  const c = tokens.color;
+  return tokens.niri?.blur === true ? { color: c.ink, dot: c.danger } : { color: c.danger, dot: '' };
+}
