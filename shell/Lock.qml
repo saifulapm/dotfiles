@@ -48,8 +48,12 @@ Scope {
     property Item dialItem: null
     property Item fieldItem: null
     property Item labelItem: null
-    // Hi-Fi's top row reads the words the margins show; the desk's Power service is not made here, so its low-battery notice is not sent twice.
-    readonly property string meter: [network.wifi, UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && UPower.displayDevice.isPresent ? M.batteryText(UPower.displayDevice.percentage, UPower.displayDevice.state === UPowerDeviceState.Charging) : ""].filter(w => w !== "").join(" ").toUpperCase()
+    property Item hostItem: null
+    property Item dateItem: null
+    property Item statusItem: null
+    property Item iconItem: null
+    // Hi-Fi's and Frost's top rows read the words the margins show; the desk's Power service is not made here, so its low-battery notice is not sent twice.
+    readonly property string meter: L.lockMeter(theme.tokens, network.wifi, UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && UPower.displayDevice.isPresent ? M.batteryText(UPower.displayDevice.percentage, UPower.displayDevice.state === UPowerDeviceState.Charging) : "")
     // just dev points this at a fake, so no check messages the phone.
     readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/../bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
@@ -141,6 +145,14 @@ Scope {
         const f = fieldItem && fieldItem.visible ? fieldItem : null;
         const r = f ? f.mapToItem(null, 0, 0) : null;
         const l = labelItem && labelItem.visible ? labelItem : null;
+        // A drawn item's box in window pixels, or null when it is hidden or not made.
+        const box = item => {
+            if (!item || !item.visible)
+                return null;
+            const at = item.mapToItem(null, 0, 0);
+            return { x: at.x, y: at.y, w: item.width, h: item.height };
+        };
+        const h = hostItem && hostItem.visible ? hostItem : null;
         return JSON.stringify({
             locked: session.locked,
             secure: session.secure,
@@ -162,7 +174,15 @@ Scope {
             clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null,
             dialBox: d ? { x: q.x, y: q.y, w: d.width, h: d.height } : null,
             fieldBox: f ? { x: r.x, y: r.y, w: f.width, h: f.height } : null,
-            label: l ? l.text : ""
+            label: l ? l.text : "",
+            hostText: h ? h.text : "",
+            hostColor: h ? String(h.color) : "",
+            hostBox: box(h),
+            dateBox: box(dateItem),
+            statusText: statusItem ? statusItem.text : "",
+            statusBox: box(statusItem),
+            iconBox: box(iconItem),
+            meter: meter
         });
     }
 
@@ -329,10 +349,27 @@ Scope {
                 y: Math.round(statusText.y + (statusText.height - height) / 2)
             }
 
+            // Frost's padlock before Locked, in muted.
+            Root.FilesIcon {
+                id: lockIcon
+                visible: surface.kind === "frost"
+                x: 24
+                y: Math.round(statusText.y + (statusText.height - height) / 2)
+                path: surface.look.status.icon ?? ""
+                color: surface.look.status.iconColor ?? "transparent"
+                stroke: 1.4
+                box: 14
+                size: 14
+                // A Shape sizes itself to its path's bounds, so the 14 px box is set here.
+                width: 14
+                height: 14
+                Component.onCompleted: screenLock.iconItem = lockIcon
+            }
+
             Text {
                 id: statusText
                 textFormat: Text.PlainText
-                x: surface.kind === "receiver" ? 69 : surface.kind === "frost" ? 24 : 32
+                x: surface.kind === "receiver" ? 69 : surface.kind === "frost" ? 46 : 32
                 y: 16
                 text: surface.look.status.text
                 color: surface.look.status.color
@@ -340,19 +377,34 @@ Scope {
                 font.pixelSize: surface.kind === "card" ? 12 : surface.kind === "frost" ? 13 : 11
                 font.weight: surface.kind === "card" ? Font.DemiBold : Font.Normal
                 font.letterSpacing: surface.kind === "card" || surface.kind === "frost" ? 0 : 1.32
+                Component.onCompleted: screenLock.statusItem = statusText
             }
 
             Text {
-                visible: surface.kind === "receiver"
+                visible: surface.kind === "receiver" || surface.kind === "frost"
                 textFormat: Text.PlainText
                 anchors.right: parent.right
-                anchors.rightMargin: 56
+                anchors.rightMargin: surface.kind === "frost" ? 24 : 56
                 y: 16
                 text: screenLock.meter
                 color: screenLock.c.muted
                 font.family: screenLock.fonts.ui
-                font.pixelSize: 11
-                font.letterSpacing: 1.32
+                font.pixelSize: surface.kind === "frost" ? 13 : 11
+                font.letterSpacing: surface.kind === "frost" ? 0 : 1.32
+            }
+
+            // Frost names the machine in muted, 6 px above the clock.
+            Text {
+                id: frostHost
+                visible: surface.kind === "frost"
+                textFormat: Text.PlainText
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: face.y - 6 - height
+                text: surface.look.host ?? ""
+                color: screenLock.c.muted
+                font.family: screenLock.fonts.ui
+                font.pixelSize: 13
+                Component.onCompleted: screenLock.hostItem = frostHost
             }
 
             // Hi-Fi's dial window: the machine's name over it, a tuning scale and the clock lit inside it.
@@ -505,7 +557,7 @@ Scope {
                 id: face
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: surface.kind === "card" ? card.y + 36 : surface.kind === "receiver" ? dial.y + 68 : Math.round(surface.height * (surface.kind === "sheet" || surface.kind === "frost" ? 0.22 : 0.167))
-                spacing: surface.kind === "sheet" ? 18 : 4
+                spacing: surface.kind === "sheet" ? 18 : surface.kind === "frost" ? 14 : 4
 
                 Text {
                     visible: surface.kind === "sheet"
@@ -548,6 +600,7 @@ Scope {
                 }
 
                 Text {
+                    id: dateText
                     visible: surface.kind === "print" || surface.kind === "receiver" || surface.kind === "frost"
                     textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
@@ -557,6 +610,7 @@ Scope {
                     font.italic: surface.look.date.italic
                     font.pixelSize: surface.look.date.px
                     font.letterSpacing: surface.look.date.tracking
+                    Component.onCompleted: screenLock.dateItem = dateText
                 }
 
                 // Blueprint's dimension line: end ticks, a rule each side and the date in the middle.

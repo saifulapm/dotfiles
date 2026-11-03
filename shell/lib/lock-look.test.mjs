@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens } from './theme.mjs';
-import { lockLook } from './lock-look.mjs';
+import { lockLook, lockMeter } from './lock-look.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 
@@ -57,7 +57,8 @@ test('Hi-Fi: the receiver front, the machine named over a dial with a 160 px amb
 test('Frost: a 168 px Inter Light clock in snow over heavier frost, a glass field with an Unlock chip', () => {
   assert.deepEqual(lockLook(load('frost'), 'saiful', 'macbook-m2'), {
     kind: 'frost',
-    status: { text: 'Locked', color: '#D8DEE9' },
+    status: { text: 'Locked', color: '#D8DEE9', icon: 'M 4 6 H 10 A 1.5 1.5 0 0 1 11.5 7.5 V 11 A 1.5 1.5 0 0 1 10 12.5 H 4 A 1.5 1.5 0 0 1 2.5 11 V 7.5 A 1.5 1.5 0 0 1 4 6 Z M 4.5 6 V 4.5 A 2.5 2.5 0 0 1 9.5 4.5 V 6', iconColor: '#AEB7C6' },
+    host: 'macbook-m2',
     clock: { family: 'Inter', px: 168, bold: false, weight: 'light', tracking: -5.04, fill: '#ECEFF4', stroke: 'transparent' },
     date: { format: 'dddd, d MMMM', caps: false, family: 'Inter', px: 20, italic: false, tracking: 0, color: '#D8DEE9' },
     prompt: 'Password for saiful',
@@ -65,6 +66,12 @@ test('Frost: a 168 px Inter Light clock in snow over heavier frost, a glass fiel
     dots: '#ECEFF4',
     paper: { start: 0.3, grain: 0.3, vein: 0.4 },
   });
+});
+
+test("the bar's meter: Frost writes Wi-Fi in sentence case, Hi-Fi keeps its caps", () => {
+  assert.equal(lockMeter(load('frost'), 'wifi', '82%'), 'Wi-Fi 82%');
+  assert.equal(lockMeter(load('frost'), 'no wifi', ''), 'No Wi-Fi');
+  assert.equal(lockMeter(checkTokens(load('hi-fi')), 'wifi', '82% charging'), 'WIFI 82% CHARGING');
 });
 
 test('before the theme loads, the lock still draws a white clock on black', () => {

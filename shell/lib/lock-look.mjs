@@ -1,6 +1,12 @@
 // How the lock screen draws under a token set, from its frame primitive, as the four lock designs do.
 
-import { plainTones } from './voice.mjs';
+import { plainTones, marginLook } from './voice.mjs';
+
+// The words on the bar's right, from the margins' wifi and battery words: Frost writes them as its desktop bar does, Hi-Fi in caps.
+export function lockMeter(tokens, wifi, battery) {
+  const words = [wifi, battery].filter((w) => w !== '');
+  return tokens?.niri?.blur === true ? words.map(marginLook(tokens).word).join(' ') : words.join(' ').toUpperCase();
+}
 
 // Lock.qml draws before the theme loads after a crash, so it needs colours of its own.
 export const FALLBACK = { paper: 'black', ink: 'white', muted: 'gray', accent: 'white', danger: 'white' };
@@ -14,7 +20,9 @@ export function lockLook(tokens, user, host = '') {
   if (tokens && tokens.niri?.blur === true) {
     return {
       kind: 'frost',
-      status: { text: 'Locked', color: c.ink },
+      // A closed padlock in a 14-unit box before the word, as the lock board draws it.
+      status: { text: 'Locked', color: c.ink, icon: 'M 4 6 H 10 A 1.5 1.5 0 0 1 11.5 7.5 V 11 A 1.5 1.5 0 0 1 10 12.5 H 4 A 1.5 1.5 0 0 1 2.5 11 V 7.5 A 1.5 1.5 0 0 1 4 6 Z M 4.5 6 V 4.5 A 2.5 2.5 0 0 1 9.5 4.5 V 6', iconColor: c.muted },
+      host,
       clock: { family: t.display, px: 168, bold: false, weight: 'light', tracking: -5.04, fill: plainTones(tokens).strong, stroke: 'transparent' },
       date: { format: 'dddd, d MMMM', caps: false, family: t.ui, px: 20, italic: false, tracking: 0, color: c.ink },
       prompt: `Password for ${user}`,

@@ -113,6 +113,14 @@ check "frost: the clock asks for #eceff4 ($(lock_state | jq -r .clockFill))" sta
 read -r snow _ < <(rows_runs 236 239 244 8)
 check "frost: rows across the clock hold $snow px within 8 of #ECEFF4" test "$snow" -gt 10
 check "frost: the field is 380 px wide under 'Password for saiful' ($(lock_state | jq -c '[.fieldBox.w, .label]'))" state_is '.fieldBox.w == 380 and .label == "Password for saiful"'
+host=$(tr -d '\n' </etc/hostname)
+check "frost: the host name in muted #aeb7c6 sits above the clock ($(lock_state | jq -c '[.hostText, .hostColor]'))" state_is --arg h "$host" '.hostText == $h and (.hostColor | ascii_downcase) == "#aeb7c6" and .hostBox.y + .hostBox.h <= .clockBox.y'
+check "frost: the date sits 14 px under the clock ($(lock_state | jq -c '.dateBox.y - (.clockBox.y + .clockBox.h)'))" state_is '.dateBox.y - (.clockBox.y + .clockBox.h) == 14'
+check "frost: the bar reads Locked after a 14 px lock icon ($(lock_state | jq -c '[.statusText, .iconBox]'))" state_is '.statusText == "Locked" and .iconBox.w == 14 and .iconBox.x + .iconBox.w < .statusBox.x'
+# The icon's 1.4 px strokes in muted cover a few whole pixels; the frost behind it stays at least 50 under muted.
+read -r strokes _ < <(near_runs "$(lock_state | jq -r '.iconBox | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"')" 174 183 198 40)
+check "frost: the lock icon draws $strokes px near muted #AEB7C6" test "$strokes" -ge 4
+check "frost: the bar's right reads the wifi and battery words in sentence case ('$(lock_state | jq -r .meter)')" state_is '(.meter | test("WIFI") | not) and (.meter | test("^((No )?Wi-Fi)?( ?[0-9]+%( charging)?)?$"))'
 for c in tl tr bl br; do
   check "frost: the lock's $c corner ($(corner_rgb "$c")) is brighter than the desktop's (${desk[$c]}) by 4 or more" until_ok 3000 corner_brighter "$c" "${desk[$c]}"
 done
