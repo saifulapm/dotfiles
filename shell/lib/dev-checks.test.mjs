@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -36,6 +36,28 @@ test('lib.sh\'s slow-drawing FAIL prints the live session\'s lock state', () => 
   assert.match(block, /WAYLAND_DISPLAY="\$live_wl"[^\n]*bin\/dots-call" lock state/, 'the FAIL reads the live shell\'s lock state');
   assert.match(block, /locked[^\n]*heldBy[^\n]*monitorsOff/, 'and prints locked, heldBy and monitorsOff');
   assert.ok(lib.indexOf('live_wl=') < lib.indexOf('source "$dev_out"'), 'live_wl is taken before the nested env replaces WAYLAND_DISPLAY');
+});
+
+// A walker's orphaned sleep held the lock past its walk twice (m56, m75); the FAIL names who holds it, so nothing is killed blind.
+test('lock-holders.sh names each process holding the lock file, and lib.sh\'s lock FAIL runs it', () => {
+  const scratch = mkdtempSync(join(tmpdir(), 'lock-holders-'));
+  const lock = join(scratch, 'dots-dev-check.lock');
+  writeFileSync(lock, '');
+  const holder = spawn('bash', ['-c', `exec 9>"${lock}"; exec sleep 30`], { stdio: 'ignore' });
+  try {
+    let out = '';
+    for (let i = 0; i < 50 && !out.includes('sleep'); i++) {
+      out = spawnSync('bash', [dir + 'lock-holders.sh', lock], { encoding: 'utf8' }).stdout;
+      if (!out.includes('sleep')) spawnSync('sleep', ['0.05']);
+    }
+    assert.match(out, new RegExp(`\\b${holder.pid}\\b.*sleep 30`), 'prints the holder\'s pid and command line');
+  } finally {
+    holder.kill();
+    rmSync(scratch, { recursive: true, force: true });
+  }
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const fail = lib.slice(lib.search(/flock\s+-w\s+\d+\s+9\b/)).split('\n')[0];
+  assert.match(fail, /lock-holders\.sh/, 'the 15 min FAIL prints the holders');
 });
 
 // bin/ is on the live desktop's PATH, so a fake ddcutil there would hide the real one from the live shell.
