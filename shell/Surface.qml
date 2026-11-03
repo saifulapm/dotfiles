@@ -1,3 +1,4 @@
+import Quickshell
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Shapes
@@ -27,6 +28,12 @@ Item {
     readonly property alias highlight: highlightLine
     // The fill as the body draws it, so a state function can report the colour on screen.
     readonly property alias drawnFill: fillRect.color
+    // A theme that blurs draws this box as glass; the panel hands `region` to its window, which asks niri to blur behind it.
+    readonly property bool glass: tokens ? tokens.niri.blur === true : false
+    readonly property Region region: Region {
+        item: surface
+        radius: surface.style.corner.radius
+    }
 
     scale: pose.scale
 
@@ -40,6 +47,11 @@ Item {
         const a = mapToItem(null, 0, 0);
         const b = mapToItem(null, width, height);
         return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+    }
+    // The blur region as niri gets it, in the window's pixels, so a state function can report it.
+    function regionBox() {
+        const b = drawnBox();
+        return { x: b.x, y: b.y, w: b.w, h: b.h, radius: region.radius };
     }
     transform: Translate {
         y: surface.pose.lift

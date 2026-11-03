@@ -61,14 +61,16 @@ export function surfaceStyle(tokens, role) {
   const glass = islandish(role) && tokens.type.engraved === true;
   // A dark theme's ink is light, so its island is its surface instead, and the island's light text reads on it.
   const inkIsland = islandish(role) && p.frame !== 'glow' && !glass && tokens.mode !== 'dark';
+  // A theme that blurs (Frost) draws every panel and its island as glass in the frost-white edge, over the 62 % wash of its launcher board.
+  const blurred = tokens.niri?.blur === true;
   const style = {
-    fill: glass ? c.glass : inkIsland ? c.ink : c.surface,
+    fill: glass || blurred ? c.glass : inkIsland ? c.ink : c.surface,
     text: inkIsland ? c.paper : c.ink,
-    frame: glass ? { width: 1, color: c.line } : frameOf(p, c, role),
-    // A card rounds like the theme's windows when niri names their radius.
-    corner: { radius: p.corner === 'round' ? (role === 'card' && tokens.niri?.radius) || ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
+    frame: glass ? { width: 1, color: c.line } : blurred && c.edge ? { width: 1, color: c.edge } : frameOf(p, c, role),
+    // A card rounds like the theme's windows when niri names their radius, and so does a blurred island.
+    corner: { radius: p.corner === 'round' ? ((role === 'card' || (blurred && role === 'island')) && tokens.niri?.radius) || ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
     shadow: shadowOf(p, c, role),
-    wash: p.frame === 'none' ? 0.62 : 0.72,
+    wash: p.frame === 'none' || blurred ? 0.62 : 0.72,
     misregistered: islandish(role) && p.shadow === 'hard-offset',
     handles: role === 'card' && p.frame === 'none',
     ticks: role === 'card' && p.corner === 'cut',

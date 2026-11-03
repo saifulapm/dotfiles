@@ -121,13 +121,15 @@ notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png "With icon"
 shown '.note.summary == "With icon"'
 check "artboard: an icon sent as a path draws in the tile instead of the letter" state_is '.note.tileBox != null and .note.glyph == null'
 check "artboard: the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
-# Frost is a dark plain theme: its island is its surface, not its light ink, so Artboard's layout reads on it.
+# Frost is a dark plain theme: its island is glass, not its light ink, so Artboard's layout reads on it.
 in_theme frost
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'
 read -r ratio fill < <(drawn_contrast "$(geo summaryBox)")
 check "frost: the summary reads at 4.5:1 or more against the island drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
-check "frost: that fill is Frost's surface #3b4252, not its light ink ($fill)" test "$fill" = "#3b4252"
+# Frost's glass is #3B4252 at 85 % over the #2E3440 paper, #394050 where nothing shows through.
+glass_fill() { local f=$((16#${fill#\#})) w=$((16#394050)) i; for i in 16 8 0; do (((f >> i & 255) - (w >> i & 255) <= 8 && (w >> i & 255) - (f >> i & 255) <= 8)) || return 1; done; }
+check "frost: that fill is Frost's glass over its paper, near #394050, not its light ink ($fill)" glass_fill
 # Each notification above replaced the one before; the last one's 5 s end before the timers are counted.
 until_ok 6000 state_is '.mode == "rest"'
 status=$(shell_status)

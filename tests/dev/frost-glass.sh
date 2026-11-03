@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Frost's panels are glass: Control asks niri to blur its own rounded box, so a white or a black window behind it reads the same inside it, and closing it drops the region; the other themes ask for none.
+{
+source "$(dirname "$0")/lib.sh"
+
+control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
+state_is() { control_state | jq -e "$1" >/dev/null; }
+blur_is() { timeout 0.5 qs ipc call shell blur 2>/dev/null | jq -e "$1" >/dev/null; }
+status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
+open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 state_is '.open and .keyboard and .settled'; }
+close_control() { wtype -k Escape; until_ok 2000 state_is '.open == false and .drawing == false'; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= $3 && b[i] - a[i] <= $3)) || return 1; done; }
+mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
+
+# A 40 x 40 box inside the card, 60 px in from its right edge and halfway down.
+inside_geo() { control_state | jq -r '.cardBox | "\(.x + .w - 60 | round),\(.y + .h / 2 - 20 | round) 40x40"'; }
+# The region asked for is the card's box with the theme's 10 px corner.
+region_is_card='(.blurRegion | length) == 1 and (.blurRegion[0] as $r | .cardBox as $c | ([$r.x - $c.x, $r.y - $c.y, $r.w - $c.w, $r.h - $c.h] | map(fabs < 1) | all) and $r.radius == 10)'
+
+foot_count() { niri msg -j windows | jq '[.[] | select(.app_id == "foot")] | length'; }
+no_foot() { (($(foot_count) == 0)); }
+# A maximised foot of one flat colour behind Control.
+behind() {
+  niri msg action spawn -- foot -c /dev/null -o "colors.background=$1"
+  until_ok 5000 bash -c 'niri msg -j focused-window | jq -e ".app_id == \"foot\"" >/dev/null'
+  niri msg action maximize-column
+}
+
+until_ok 5000 shell_status >/dev/null
+in_theme frost
+
+open_control
+check "frost: Control's card is glass #d93b4252 ($(control_state | jq -c .cardFill))" state_is '.cardFill == "#d93b4252"'
+check "frost: Control asks for one blur region, its card's box with radius 10 ($(control_state | jq -c '[.blurRegion, .cardBox]'))" state_is "$region_is_card"
+check "frost: the Surfaces window asks niri for one region while Control draws" blur_is '.surfaces == 1'
+in_geo=$(inside_geo)
+close_control
+check "frost: after Esc the Surfaces window asks for no region" blur_is '.surfaces == 0'
+
+behind ffffff
+# With Control closed the white foot shows where the card was, so no blurred box is left on the desktop.
+white_up() { near "$(mean_at "$in_geo")" "255 255 255" 4; }
+until_ok 5000 white_up
+check "frost: a maximised white foot fills $in_geo with Control closed ($(mean_at "$in_geo"))" white_up
+open_control
+in_white=$(mean_at "$in_geo")
+close_control
+until_ok 2000 white_up
+check "frost: after Esc the white foot shows at $in_geo again ($(mean_at "$in_geo"))" white_up
+niri msg action close-window
+until_ok 3000 no_foot
+
+behind 000000
+black_up() { near "$(mean_at "$in_geo")" "0 0 0" 4; }
+until_ok 5000 black_up
+check "frost: a maximised black foot fills $in_geo with Control closed ($(mean_at "$in_geo"))" black_up
+open_control
+in_black=$(mean_at "$in_geo")
+close_control
+niri msg action close-window
+until_ok 3000 no_foot
+
+check "frost: inside Control at $in_geo reads the same over a white foot ($in_white) and a black one ($in_black), within 3" near "$in_white" "$in_black" 3
+
+for t in paper artboard blueprint hi-fi; do
+  in_theme "$t"
+  open_control
+  check "$t: Control asks for no blur region ($(control_state | jq -c .blurRegion))" state_is '.blurRegion == []'
+  check "$t: the Surfaces window asks niri for no region" blur_is '.surfaces == 0'
+  close_control
+done
+
+errors=$(qml_errors)
+[ -n "$errors" ] && echo "$errors"
+check "the shell's journal has no QML error" test -z "$errors"
+
+exit $((fails > 0))
+}

@@ -121,20 +121,33 @@ test("Hi-Fi's panels are lit like the focused window: a 1 px amber frame and its
   assert.deepEqual([surfaceStyle(hifi, 'island').frame, surfaceStyle(hifi, 'island').shadow.kind], [{ width: 1, color: '#504945' }, 'none']);
 });
 
-test("Frost's card is framed in its 1 px frost-white edge and rounded at niri's 10 px; its island keeps the plain look", () => {
+test("Frost's card is glass framed in its 1 px frost-white edge, rounded at niri's 10 px, over a 0.62 wash", () => {
   const frost = qtTokens(load('frost'));
   assert.deepEqual(surfaceStyle(frost, 'card'), {
-    fill: '#3B4252',
+    fill: '#D93B4252',
     text: '#D8DEE9',
     frame: { width: 1, color: '#24ECEFF4' },
     corner: { radius: 10, chamfer: 0 },
     shadow: { kind: 'none', x: 0, y: 0, blur: 0, spread: 0, color: 'transparent', alpha: 0 },
-    wash: 0.72,
+    wash: 0.62,
     misregistered: false,
     handles: false,
     ticks: false,
   });
-  assert.deepEqual([surfaceStyle(frost, 'island').frame, surfaceStyle(frost, 'island').corner], [{ width: 0, color: '#D8DEE9' }, { radius: 17, chamfer: 0 }]);
+});
+
+test("Frost's island is a glass card too, in the same edge and 10 px corners; its specimen chip keeps the chip's corner", () => {
+  const frost = qtTokens(load('frost'));
+  const island = surfaceStyle(frost, 'island');
+  assert.deepEqual([island.fill, island.text, island.frame, island.corner], ['#D93B4252', '#D8DEE9', { width: 1, color: '#24ECEFF4' }, { radius: 10, chamfer: 0 }]);
+  assert.deepEqual([surfaceStyle(frost, 'chip').fill, surfaceStyle(frost, 'chip').corner], ['#D93B4252', { radius: 8, chamfer: 0 }]);
+});
+
+test('a theme that does not blur keeps its solid fill and wash, Artboard with it', () => {
+  const frost = qtTokens(load('frost'));
+  const solid = Object.assign({}, frost, { niri: Object.assign({}, frost.niri, { blur: false }) });
+  assert.deepEqual([surfaceStyle(solid, 'card').fill, surfaceStyle(solid, 'card').wash, surfaceStyle(solid, 'island').corner.radius], ['#3B4252', 0.72, 17]);
+  assert.deepEqual([surfaceStyle(artboard, 'card').wash, surfaceStyle(artboard, 'island').corner.radius], [0.62, 17]);
 });
 
 test('a hairline theme without an edge or a niri radius keeps its line frame and round corner', () => {

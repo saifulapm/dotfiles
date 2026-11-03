@@ -24,6 +24,8 @@ Item {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var sections: [audio, wifi, bluetooth, power, display, route]
     readonly property var section: sections[current]
+    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while Control draws.
+    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var rows: section.rows
     readonly property var look: V.listLook(theme.tokens)
     readonly property var legend: look.keys(section.typing ? (section.typingKeys ?? [["↵", "join"], ["ctrl+v", "paste"], ["esc", "cancel"]]) : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
@@ -88,6 +90,8 @@ Item {
             settled: motion.settled,
             drawing: control.visible,
             cardBox: card.drawnBox(),
+            blurRegion: blurRegion ? [card.regionBox()] : [],
+            cardFill: String(card.drawnFill),
             frameLabel: card.frameLabel(),
             heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,
