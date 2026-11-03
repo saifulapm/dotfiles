@@ -224,6 +224,20 @@ test('the other themes keep their bar OSD for volume and brightness alike', () =
   for (const n of ['paper', 'artboard', 'blueprint']) assert.deepEqual([osd(n).kind('volume'), osd(n).kind('brightness'), osd(n).meter], ['bar', 'bar', null], n);
 });
 
+test("Frost's volume OSD is a 320 x 52 glass bar: a 6 px #ECEFF4 track at 12 %, an accent fill over 160 ms, the value in #ECEFF4 semibold; brightness keeps the bar", () => {
+  const f = osdLook(checkTokens(validateTheme(theme('frost'))));
+  assert.deepEqual([f.kind('volume'), f.kind('brightness')], ['track', 'bar']);
+  assert.deepEqual([f.track.width, f.track.height, f.track.thickness], [320, 52, 6]);
+  assert.deepEqual([f.track.color, f.track.fill, f.track.duration], ['#1FECEFF4', '#88C0D0', 160]);
+  assert.deepEqual([f.track.value.color, f.track.value.weight], ['#ECEFF4', 600]);
+  assert.deepEqual([f.width, f.height], [300, 40]);
+});
+
+test("Artboard's OSD stays its rounded bar for volume and brightness", () => {
+  const a = osdLook(checkTokens(validateTheme(theme('artboard'))));
+  assert.deepEqual([a.kind('volume'), a.kind('brightness'), a.track, a.width, a.height, a.bars], ['bar', 'bar', null, 300, 40, 'round']);
+});
+
 const OCR = { kind: 'ocr', title: 'Text copied', detail: '214 characters', swatch: null };
 const COLOUR = { kind: 'colour', title: 'Copied', detail: '#C8381E', swatch: '#C8381E' };
 const QR = { kind: 'qr', title: 'QR code copied', detail: '', swatch: null };

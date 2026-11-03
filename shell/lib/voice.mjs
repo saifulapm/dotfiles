@@ -548,7 +548,12 @@ export function osdLook(tokens) {
     value: { font: t.mono, size: 12, weight: 700, spacing: 1, color: c.accent },
   };
   if (voice === 'plain') {
+    // Frost's volume is a 320 x 52 glass bar: a 6 px track of the strong ink at 12 % (Qt's #AARRGGBB) filled in the accent over 160 ms. Brightness keeps the round bar.
+    const glass = tokens?.niri?.blur === true;
+    const strong = tokens ? plainTones(tokens).strong : c.ink;
     return Object.assign(base, {
+      kind: (k) => (glass && k === 'volume' ? 'track' : 'bar'),
+      track: glass ? { width: 320, height: 52, thickness: 6, color: `#1F${strong.slice(1)}`, fill: c.accent, duration: 160, value: { font: t.ui, size: 13, weight: 600, color: strong } } : null,
       width: 300,
       height: 40,
       word: () => '',
