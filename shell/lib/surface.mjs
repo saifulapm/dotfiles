@@ -22,6 +22,8 @@ function frameOf(p, c, role) {
   if (p.frame === 'glow') return { width: 1, color: c.accent };
   // With no frame the focused card shows a 1.5 px accent selection outline instead.
   if (p.frame === 'none') return { width: role === 'card' ? 1.5 : 0, color: c.accent };
+  // Frost's hairline is its 1 px frost-white edge, which carries its own alpha.
+  if (p.frame === 'hairline' && c.edge) return { width: 1, color: c.edge };
   const width = p.frame === 'double' ? 3 : role === 'card' ? 1.5 : 1;
   return { width, color: p.frame === 'hairline' ? c.line : c.ink };
 }
@@ -62,7 +64,8 @@ export function surfaceStyle(tokens, role) {
     fill: glass ? c.glass : inkIsland ? c.ink : c.surface,
     text: inkIsland ? c.paper : c.ink,
     frame: glass ? { width: 1, color: c.line } : frameOf(p, c, role),
-    corner: { radius: p.corner === 'round' ? ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
+    // A card rounds like the theme's windows when niri names their radius.
+    corner: { radius: p.corner === 'round' ? (role === 'card' && tokens.niri?.radius) || ROUND[role] : 0, chamfer: p.corner === 'cut' ? CHAMFER[role] : 0 },
     shadow: shadowOf(p, c, role),
     wash: p.frame === 'none' ? 0.62 : 0.72,
     misregistered: islandish(role) && p.shadow === 'hard-offset',

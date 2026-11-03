@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens } from './theme.mjs';
+import { validateTheme, checkTokens, qtTokens } from './theme.mjs';
 import { surfaceStyle, marginStyle, restyled } from './surface.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
@@ -119,6 +119,31 @@ test("Hi-Fi's panels are lit like the focused window: a 1 px amber frame and its
   const card = surfaceStyle(hifi, 'card');
   assert.deepEqual([card.fill, card.frame, card.shadow], ['#282828', { width: 1, color: '#FABD2F' }, { kind: 'glow', x: 0, y: 0, blur: 24, spread: 0, color: '#FABD2F', alpha: 0.22 }]);
   assert.deepEqual([surfaceStyle(hifi, 'island').frame, surfaceStyle(hifi, 'island').shadow.kind], [{ width: 1, color: '#504945' }, 'none']);
+});
+
+test("Frost's card is framed in its 1 px frost-white edge and rounded at niri's 10 px; its island keeps the plain look", () => {
+  const frost = qtTokens(load('frost'));
+  assert.deepEqual(surfaceStyle(frost, 'card'), {
+    fill: '#3B4252',
+    text: '#D8DEE9',
+    frame: { width: 1, color: '#24ECEFF4' },
+    corner: { radius: 10, chamfer: 0 },
+    shadow: { kind: 'none', x: 0, y: 0, blur: 0, spread: 0, color: 'transparent', alpha: 0 },
+    wash: 0.72,
+    misregistered: false,
+    handles: false,
+    ticks: false,
+  });
+  assert.deepEqual([surfaceStyle(frost, 'island').frame, surfaceStyle(frost, 'island').corner], [{ width: 0, color: '#D8DEE9' }, { radius: 17, chamfer: 0 }]);
+});
+
+test('a hairline theme without an edge or a niri radius keeps its line frame and round corner', () => {
+  const frost = qtTokens(load('frost'));
+  const plain = Object.assign({}, frost, { color: Object.assign({}, frost.color), niri: Object.assign({}, frost.niri) });
+  delete plain.color.edge;
+  delete plain.niri.radius;
+  const s = surfaceStyle(plain, 'card');
+  assert.deepEqual([s.frame, s.corner], [{ width: 1.5, color: '#434C5E' }, { radius: 14, chamfer: 0 }]);
 });
 
 test('the look follows the primitives, not the name', () => {
