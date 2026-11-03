@@ -13,6 +13,11 @@ Shape {
 
     implicitWidth: size
     implicitHeight: size
+    // The geometry renderer kept a stroke colour from before the theme's tokens arrived (YouTube's magnifier stayed its fallback), so a new colour rebuilds the path.
+    onColorChanged: {
+        svg.path = "";
+        svg.path = Qt.binding(() => icon.path);
+    }
     // The curve renderer drew nothing for the trash path at Artboard's 1.5 stroke; the geometry renderer draws every path.
     preferredRendererType: Shape.GeometryRenderer
 
@@ -24,6 +29,7 @@ Shape {
         capStyle: ShapePath.RoundCap
         scale: Qt.size(icon.size / icon.box, icon.size / icon.box)
         PathSvg {
+            id: svg
             path: icon.path
         }
     }

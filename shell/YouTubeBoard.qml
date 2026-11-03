@@ -198,6 +198,7 @@ Rectangle {
                 pills: [labelPill.color.a > 0, fromPill.color.a > 0],
                 frameRadius: board.radius,
                 fieldRadius: fieldBox.radius,
+                searchIcon: String(searchIcon.color),
                 ruleDashed: headRule.dashed,
                 placeholder: placeholderText.text,
                 hint: hintText.text,

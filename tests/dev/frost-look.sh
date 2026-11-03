@@ -8,7 +8,7 @@ launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 control_is() { control_state | jq -e "$1" >/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 eval "shell_status | jq -e '.transition == \"\"' >/dev/null"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns each bind's command through niri.
 open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 control_is '.open and .keyboard and .cursorBox != null and .settled'; }
 close_control() { wtype -k Escape; until_ok 2000 control_is '.open == false and .drawing == false'; }
@@ -63,6 +63,21 @@ read -r ratio fill < <(drawn_contrast "$(launcher_state | geo cursorNameBox)")
 check "frost: the lit row's name reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 check "frost: that fill is the lit row's #475666 ($fill)" test "$fill" = "#475666"
 close_launcher
+
+# The YouTube App draws its magnifier in the theme's muted once the tokens arrive, not the black it starts in; Frost draws nothing near black, so any near-black pixel is that stale stroke.
+yt_qml=$repo/shell/youtube.qml
+yt_work=$(mktemp -d)
+cleanup() { rm -rf "$yt_work"; }
+yt_state() { timeout 0.5 qs ipc -p "$yt_qml" call youtube state 2>/dev/null; }
+yt_up() { [ "$(niri msg -j windows | jq '[.[] | select(.app_id == "youtube")] | length')" = 1 ] && yt_state | jq -e '.firstFrameMs != null' >/dev/null; }
+niri msg action spawn -- sh -c "exec env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube XDG_DATA_HOME=$yt_work XDG_CACHE_HOME=$yt_work $repo/bin/dots-youtube"
+until_ok 8000 yt_up
+sleep 1
+check "frost: YouTube's magnifier is Frost's muted ($(yt_state | jq -c .look.searchIcon))" eval 'yt_state | jq -e ".look.searchIcon == \"#aeb7c6\"" >/dev/null'
+read -r ow oh < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.width) \(.height)"')
+black=$(near "0,0 $((ow / 2))x$((oh / 3))" 0 0 0 16)
+check "frost: nothing in YouTube's top-left draws near black, so the magnifier took its colour ($black px)" test "$black" -eq 0
+niri msg -j windows | jq -r '.[] | select(.app_id == "youtube") | .id' | xargs -r -I{} niri msg action close-window --id {}
 
 in_theme artboard
 open_control
