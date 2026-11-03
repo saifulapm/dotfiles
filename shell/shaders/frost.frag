@@ -10,6 +10,9 @@ layout(std140, binding = 0) uniform buf {
     vec4 ink;
     float frostAlpha;
     float period;
+    // Where the edge falloff starts, 0 at the centre and 1 at the edge, and the grain's alpha as a share of frostAlpha; the desktop's 0.8 and 1 keep its paper as it was.
+    float frostStart;
+    float grainShare;
 };
 
 float hash(vec2 p) {
@@ -28,8 +31,8 @@ float noise(vec2 p) {
 void main() {
     // Hashed per pixel and by smooth noise, never tiled, so no column repeats at a fractional output scale.
     vec2 p = qt_TexCoord0 * outputSize / period;
-    // Each axis frosts over its outer tenth; the two add, so the corners carry the most and the middle none.
-    vec2 e = smoothstep(0.8, 1.0, abs(2.0 * qt_TexCoord0 - 1.0));
+    // Each axis frosts from frostStart out, its outer tenth on the desktop; the two add, so the corners carry the most and the middle none.
+    vec2 e = smoothstep(frostStart, 1.0, abs(2.0 * qt_TexCoord0 - 1.0));
     float edge = (e.x + e.y) * 0.5;
     float grain = 0.3 + 0.7 * hash(floor(p));
     // A warped ridge of noise draws thin branching lines, and they widen as they near the edge.
@@ -38,6 +41,6 @@ void main() {
     float ridge = 1.0 - abs(2.0 * noise(q) - 1.0);
     // The lower bound stays under 1.0, since smoothstep is undefined when its two bounds meet.
     float vein = smoothstep(0.999 - 0.08 * edge, 1.0, ridge);
-    float a = frostAlpha * edge * clamp(mix(grain * 0.8, 1.0, vein), 0.0, 1.0);
+    float a = frostAlpha * edge * clamp(mix(grain * 0.8 * grainShare, 1.0, vein), 0.0, 1.0);
     fragColor = vec4(mix(base.rgb, ink.rgb, a), 1.0) * qt_Opacity;
 }

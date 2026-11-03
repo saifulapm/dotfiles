@@ -46,6 +46,8 @@ Scope {
     // The clock a lock surface drew last, so state() reports what is on screen rather than the lookup.
     property Item clockItem: null
     property Item dialItem: null
+    property Item fieldItem: null
+    property Item labelItem: null
     // Hi-Fi's top row reads the words the margins show; the desk's Power service is not made here, so its low-battery notice is not sent twice.
     readonly property string meter: [network.wifi, UPower.displayDevice.ready && UPower.displayDevice.isLaptopBattery && UPower.displayDevice.isPresent ? M.batteryText(UPower.displayDevice.percentage, UPower.displayDevice.state === UPowerDeviceState.Charging) : ""].filter(w => w !== "").join(" ").toUpperCase()
     // just dev points this at a fake, so no check messages the phone.
@@ -136,6 +138,9 @@ Scope {
         const p = t ? t.mapToItem(null, 0, 0) : null;
         const d = dialItem && dialItem.visible ? dialItem : null;
         const q = d ? d.mapToItem(null, 0, 0) : null;
+        const f = fieldItem && fieldItem.visible ? fieldItem : null;
+        const r = f ? f.mapToItem(null, 0, 0) : null;
+        const l = labelItem && labelItem.visible ? labelItem : null;
         return JSON.stringify({
             locked: session.locked,
             secure: session.secure,
@@ -151,10 +156,13 @@ Scope {
             fieldMarks: look.fieldMarks ?? [],
             clockFamily: t ? t.font.family : "",
             clockPx: t ? t.font.pixelSize : 0,
+            clockWeight: t ? t.font.weight : 0,
             clockFill: t ? String(t.color) : "",
             clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
             clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null,
-            dialBox: d ? { x: q.x, y: q.y, w: d.width, h: d.height } : null
+            dialBox: d ? { x: q.x, y: q.y, w: d.width, h: d.height } : null,
+            fieldBox: f ? { x: r.x, y: r.y, w: f.width, h: f.height } : null,
+            label: l ? l.text : ""
         });
     }
 
@@ -278,6 +286,16 @@ Scope {
                 id: clock
             }
 
+            // Frost's heavier frost over the whole screen; the other locks pass no tokens, so they draw no paper shader.
+            Root.PaperFill {
+                anchors.fill: parent
+                tokens: surface.kind === "frost" ? screenLock.theme.tokens : null
+                dir: screenLock.theme.dir
+                frostStart: surface.look.paper?.start ?? 0.8
+                veinAlpha: surface.look.paper?.vein ?? 0
+                grainAlpha: surface.look.paper?.grain ?? 0
+            }
+
             // Hi-Fi's walnut cheeks, a dark grain line every 9 px and a faint light one between.
             Repeater {
                 model: surface.kind === "receiver" ? 2 : 0
@@ -314,14 +332,14 @@ Scope {
             Text {
                 id: statusText
                 textFormat: Text.PlainText
-                x: surface.kind === "receiver" ? 69 : 32
+                x: surface.kind === "receiver" ? 69 : surface.kind === "frost" ? 24 : 32
                 y: 16
                 text: surface.look.status.text
                 color: surface.look.status.color
                 font.family: screenLock.fonts.ui
-                font.pixelSize: surface.kind === "card" ? 12 : 11
+                font.pixelSize: surface.kind === "card" ? 12 : surface.kind === "frost" ? 13 : 11
                 font.weight: surface.kind === "card" ? Font.DemiBold : Font.Normal
-                font.letterSpacing: surface.kind === "card" ? 0 : 1.32
+                font.letterSpacing: surface.kind === "card" || surface.kind === "frost" ? 0 : 1.32
             }
 
             Text {
@@ -486,7 +504,7 @@ Scope {
             Column {
                 id: face
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: surface.kind === "card" ? card.y + 36 : surface.kind === "receiver" ? dial.y + 68 : Math.round(surface.height * (surface.kind === "sheet" ? 0.22 : 0.167))
+                y: surface.kind === "card" ? card.y + 36 : surface.kind === "receiver" ? dial.y + 68 : Math.round(surface.height * (surface.kind === "sheet" || surface.kind === "frost" ? 0.22 : 0.167))
                 spacing: surface.kind === "sheet" ? 18 : 4
 
                 Text {
@@ -512,7 +530,8 @@ Scope {
                     styleColor: surface.look.clock.stroke
                     font.family: surface.look.clock.family
                     font.pixelSize: surface.look.clock.px
-                    font.bold: surface.look.clock.bold
+                    // One weight binding: font.bold writes the same weight, and of two bindings the later evaluated wins.
+                    font.weight: surface.look.clock.weight === "light" ? Font.Light : surface.look.clock.bold ? Font.Bold : Font.Normal
                     font.letterSpacing: surface.look.clock.tracking
                     // Hi-Fi's clock glows like a lit display; the layer is made only for a look that asks for it.
                     layer.enabled: (surface.look.clock.glow ?? "") !== ""
@@ -529,7 +548,7 @@ Scope {
                 }
 
                 Text {
-                    visible: surface.kind === "print" || surface.kind === "receiver"
+                    visible: surface.kind === "print" || surface.kind === "receiver" || surface.kind === "frost"
                     textFormat: Text.PlainText
                     anchors.horizontalCenter: parent.horizontalCenter
                     text: surface.date
@@ -589,13 +608,14 @@ Scope {
 
             Column {
                 id: entry
-                readonly property bool centred: surface.kind !== "print"
+                readonly property bool centred: surface.kind !== "print" && surface.kind !== "frost"
                 x: Math.round((surface.width - width) / 2) + screenLock.shakeX
-                y: surface.kind === "card" ? face.y + face.height + 22 : surface.kind === "receiver" ? dial.y + dial.height + 90 : Math.round(surface.height * (surface.kind === "sheet" ? 0.71 : 0.69))
-                width: surface.kind === "card" ? 380 : 400
-                spacing: surface.kind === "sheet" || surface.kind === "receiver" ? 12 : 10
+                y: surface.kind === "card" ? face.y + face.height + 22 : surface.kind === "receiver" ? dial.y + dial.height + 90 : Math.round(surface.height * (surface.kind === "sheet" ? 0.71 : surface.kind === "frost" ? 0.55 : 0.69))
+                width: surface.kind === "card" || surface.kind === "frost" ? 380 : 400
+                spacing: surface.kind === "sheet" || surface.kind === "receiver" ? 12 : surface.kind === "frost" ? 8 : 10
 
                 Text {
+                    id: promptText
                     visible: surface.look.prompt !== ""
                     textFormat: Text.PlainText
                     width: parent.width
@@ -603,13 +623,48 @@ Scope {
                     text: surface.look.prompt
                     color: screenLock.c.muted
                     font.family: screenLock.fonts.ui
-                    font.pixelSize: 10
-                    font.letterSpacing: surface.kind === "sheet" || surface.kind === "receiver" ? 2 : 1.6
+                    font.pixelSize: surface.kind === "frost" ? 13 : 10
+                    font.letterSpacing: surface.kind === "sheet" || surface.kind === "receiver" ? 2 : surface.kind === "frost" ? 0 : 1.6
+                    Component.onCompleted: screenLock.labelItem = promptText
                 }
 
                 Item {
                     width: parent.width
-                    height: surface.kind === "card" ? 46 : surface.kind === "receiver" ? 48 : input.implicitHeight
+                    height: surface.kind === "card" ? 46 : surface.kind === "receiver" ? 48 : surface.kind === "frost" ? 50 : input.implicitHeight
+
+                    // Frost's field is glass over the frost: a fill only, since a session lock surface is no layer niri can blur behind.
+                    Rectangle {
+                        id: glassField
+                        visible: surface.kind === "frost"
+                        anchors.fill: parent
+                        radius: screenLock.theme.tokens?.niri.radius ?? 10
+                        color: screenLock.c.glass ?? screenLock.c.surface ?? "transparent"
+                        border.width: 1
+                        border.color: screenLock.c.edge ?? screenLock.c.line ?? "transparent"
+                        Component.onCompleted: screenLock.fieldItem = glassField
+
+                        Rectangle {
+                            id: unlockChip
+                            anchors.right: parent.right
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: chipText.implicitWidth + 24
+                            height: 34
+                            radius: 7
+                            color: Qt.alpha(screenLock.c.accent, 0.16)
+
+                            Text {
+                                id: chipText
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: surface.look.hint
+                                color: surface.look.dots ?? screenLock.c.ink
+                                font.family: screenLock.fonts.ui
+                                font.pixelSize: 13
+                                font.weight: Font.Medium
+                            }
+                        }
+                    }
 
                     // Hi-Fi's field is a glass well.
                     Root.Glass {
@@ -650,12 +705,14 @@ Scope {
                     TextInput {
                         id: input
                         anchors.centerIn: parent
-                        width: surface.kind === "sheet" || surface.kind === "receiver" ? 240 : surface.kind === "card" ? parent.width - 32 : parent.width
+                        // Frost's dots start 16 px in and stop 12 px short of the chip.
+                        anchors.horizontalCenterOffset: surface.kind === "frost" ? (16 - 12 - unlockChip.width - 8) / 2 : 0
+                        width: surface.kind === "sheet" || surface.kind === "receiver" ? 240 : surface.kind === "card" ? parent.width - 32 : surface.kind === "frost" ? parent.width - 16 - 12 - unlockChip.width - 8 : parent.width
                         horizontalAlignment: entry.centred ? TextInput.AlignHCenter : TextInput.AlignLeft
-                        color: surface.kind === "sheet" || surface.kind === "receiver" ? screenLock.c.accent : screenLock.c.ink
+                        color: surface.kind === "sheet" || surface.kind === "receiver" ? screenLock.c.accent : surface.look.dots ?? screenLock.c.ink
                         font.family: screenLock.fonts.ui
                         font.pixelSize: surface.kind === "card" ? 16 : 20
-                        font.letterSpacing: surface.kind === "card" ? 4.8 : 7
+                        font.letterSpacing: surface.kind === "card" ? 4.8 : surface.kind === "frost" ? 3.6 : 7
                         echoMode: TextInput.Password
                         inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoPredictiveText
                         // Blueprint's and Hi-Fi's cursor is a block, the others a 2 px bar.
@@ -691,7 +748,9 @@ Scope {
                     color: screenLock.c.ink
                 }
 
+                // Frost's hint is the chip inside its field.
                 Text {
+                    visible: surface.kind !== "frost"
                     textFormat: Text.PlainText
                     width: parent.width
                     horizontalAlignment: entry.centred ? Text.AlignHCenter : Text.AlignLeft

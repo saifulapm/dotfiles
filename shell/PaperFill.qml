@@ -10,6 +10,10 @@ Item {
     property string dir: ""
     // Scales the dot spacing, the grid's cells, the crop marks and the brushed streaks; 1 is the desktop's paper.
     property real period: 1
+    // Frost's edge falloff start (0 the centre, 1 the edge) and its vein and grain alphas; the lock frosts heavier than the desktop's paper.
+    property real frostStart: 0.8
+    property real veinAlpha: tokens?.paper.frost_alpha ?? 0
+    property real grainAlpha: veinAlpha
     // Opaque at rest; a fill whose ancestor fades must blend, or qt_Opacity darkens it instead.
     property bool blending: opacity < 1
     // flat and gradient stay the plain fill below.
@@ -58,8 +62,11 @@ Item {
             property real majorAlpha: fill.tokens.paper.major_alpha ?? 0
             property color ink: fill.tokens.color.ink
             property real streakAlpha: fill.tokens.paper.streak_alpha ?? 0
-            property real frostAlpha: fill.tokens.paper.frost_alpha ?? 0
+            property real frostAlpha: fill.veinAlpha
             property real period: fill.period
+            property real frostStart: fill.frostStart
+            // The shader scales the grain by this share of frostAlpha, so the desktop's equal alphas multiply by exactly 1.
+            property real grainShare: fill.veinAlpha > 0 ? fill.grainAlpha / fill.veinAlpha : 1
         }
     }
 

@@ -54,6 +54,19 @@ test('Hi-Fi: the receiver front, the machine named over a dial with a 160 px amb
   });
 });
 
+test('Frost: a 168 px Inter Light clock in snow over heavier frost, a glass field with an Unlock chip', () => {
+  assert.deepEqual(lockLook(load('frost'), 'saiful', 'macbook-m2'), {
+    kind: 'frost',
+    status: { text: 'Locked', color: '#D8DEE9' },
+    clock: { family: 'Inter', px: 168, bold: false, weight: 'light', tracking: -5.04, fill: '#ECEFF4', stroke: 'transparent' },
+    date: { format: 'dddd, d MMMM', caps: false, family: 'Inter', px: 20, italic: false, tracking: 0, color: '#D8DEE9' },
+    prompt: 'Password for saiful',
+    hint: '↵ Unlock',
+    dots: '#ECEFF4',
+    paper: { start: 0.3, grain: 0.3, vein: 0.4 },
+  });
+});
+
 test('before the theme loads, the lock still draws a white clock on black', () => {
   const look = lockLook(null, 'saiful', 'macbook-m2');
   assert.equal(look.kind, 'print');
