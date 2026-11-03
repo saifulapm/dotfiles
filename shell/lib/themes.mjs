@@ -60,6 +60,8 @@ export function tagline(t) {
     return { text: [word('paper', p.paper), word('frame', p.frame), p.corner].join(' // ').toUpperCase(), font: t.type.ui, size: 9, italic: false, spacing: 1.26 };
   }
   if (t.type.voice === 'plain') {
+    // A theme with glass names its material and motion, as Frost's card does: Frost · glass · ease.
+    if (t.niri?.blur) return { text: `${cap(word('paper', p.paper))} · glass · ${p.motion}`, font: t.type.ui, size: 11, italic: false, spacing: 0 };
     return { text: `${cap(word('paper', p.paper))} · ${word('shadow', p.shadow)} shadow · ${p.corner}`, font: t.type.ui, size: 11, italic: false, spacing: 0 };
   }
   return { text: `${word('paper', p.paper)}, ${word('frame', p.frame)}, a ${word('shadow', p.shadow)} shadow`, font: t.type.display, size: 15, italic: true, spacing: 0 };

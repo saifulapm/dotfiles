@@ -212,3 +212,9 @@ test("Hi-Fi's specimen bar lights one lamp before the shown workspace and puts a
   assert.deepEqual([m.number + m.tail, m.numberColor, m.goalLamp], ['03  FOOT', '#FABD2F', 'red']);
   assert.deepEqual([specimenMargins(paper).lamps, specimenMargins(paper).goalLamp], [[], '']);
 });
+
+test('Frost\'s card reads Frost · glass · ease in Inter, its name too, sentence case', () => {
+  const frost = checkTokens(load('frost'));
+  assert.deepEqual([tagline(frost).text, tagline(frost).font], ['Frost · glass · ease', 'Inter']);
+  assert.deepEqual([cardName(frost).text, cardName(frost).font], ['Frost', 'Inter']);
+});
