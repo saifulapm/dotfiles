@@ -178,6 +178,8 @@ PanelWindow {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // Hi-Fi draws volume as a VU meter and brightness as the bar; every other theme draws the bar.
     readonly property bool osdMeter: osdLook.kind(heldOsd?.kind ?? "volume") === "meter"
+    // Frost draws volume as a glass track and brightness as the bar.
+    readonly property bool osdTrack: osdLook.kind(heldOsd?.kind ?? "volume") === "track"
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
@@ -191,7 +193,7 @@ PanelWindow {
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
-            osd: osdMeter ? [osdLook.meter.width, osdLook.meter.height] : [osdLook.width, osdLook.height]
+            osd: osdMeter ? [osdLook.meter.width, osdLook.meter.height] : osdTrack ? [osdLook.track.width, osdLook.track.height] : [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
     readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
@@ -509,12 +511,15 @@ PanelWindow {
         const word = meter ? meter.word : osdWord;
         const value = meter ? meter.valueText : osdValue;
         return {
-            kind: meter ? "meter" : "bar",
+            kind: meter ? "meter" : osdTrack ? "track" : "bar",
             word: word.text,
             value: value.text,
             valueFont: [value.font.family, value.font.pixelSize],
-            bars: meter ? null : osdLook.bars,
-            lit: meter ? null : osdBars.drawn(),
+            bars: meter || osdTrack ? null : osdLook.bars,
+            lit: meter || osdTrack ? null : osdBars.drawn(),
+            // The track and its fill as drawn, for pixel reads.
+            islandBox: at(box),
+            track: osdTrack ? { box: at(osdTrackBar), fill: at(osdTrackBar.fillItem) } : null,
             valueBox: at(value),
             // The needle as drawn, and two points on the dial for pixel reads: inside the needle near its tip, and the middle of the red zone.
             needleAngle: meter ? Math.round(meter.needle.rotation * 10) / 10 : null,
@@ -2146,8 +2151,17 @@ PanelWindow {
                         }
                     }
 
+                    OsdTrack {
+                        id: osdTrackBar
+                        visible: island.osdTrack
+                        Layout.fillWidth: true
+                        look: island.osdLook.track ?? ({ thickness: 0, color: "transparent", fill: "transparent", duration: 0 })
+                        value: island.heldOsd?.value ?? 0
+                    }
+
                     OsdBars {
                         id: osdBars
+                        visible: !island.osdTrack
                         Layout.fillWidth: true
                         look: island.osdLook
                         value: island.heldOsd?.value ?? 0
@@ -2158,10 +2172,11 @@ PanelWindow {
                         textFormat: Text.PlainText
                         horizontalAlignment: Text.AlignRight
                         text: island.heldOsd ? island.osdLook.valueText(island.heldOsd.value) : ""
-                        color: island.osdLook.value.color || box.style.text
-                        font.family: island.osdLook.value.font
-                        font.pixelSize: island.osdLook.value.size
-                        font.weight: island.osdLook.value.weight
+                        readonly property var look: island.osdTrack ? island.osdLook.track.value : island.osdLook.value
+                        color: look.color || box.style.text
+                        font.family: look.font
+                        font.pixelSize: look.size
+                        font.weight: look.weight
                     }
                 }
             }
