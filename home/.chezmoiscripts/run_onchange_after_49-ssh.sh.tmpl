@@ -1,0 +1,14 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+if root firewall-cmd --state >/dev/null 2>&1; then
+  # SSH comes only over the tailnet, so port 22 opens to the tailnet's own addresses and the default zone's ssh service goes, keeping sshd's password login off the wifi; the tailnet rule goes in first so a session over it is never cut.
+  for rule in 'rule family="ipv4" source address="100.64.0.0/10" port port="22" protocol="tcp" accept' \
+    'rule family="ipv6" source address="fd7a:115c:a1e0::/48" port port="22" protocol="tcp" accept'; do
+    root firewall-cmd -q --add-rich-rule="$rule" && root firewall-cmd -q --permanent --add-rich-rule="$rule" || die "could not let the tailnet reach ssh on 22"
+  done
+  for keep in "" --permanent; do
+    if root firewall-cmd -q $keep --query-service=ssh; then
+      root firewall-cmd -q $keep --remove-service=ssh || die "could not close ssh to the default zone"
+    fi
+  done
+fi
