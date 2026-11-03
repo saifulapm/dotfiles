@@ -59,6 +59,28 @@ test("Frost's picker tile is its dark field colour", () => {
   assert.equal(pickerLook(checkTokens(load('frost'))).tile.fill, '#323845');
 });
 
+test("Frost's picker is a glass board: Themes · five on the shelf, In use: Frost, #434C5E edges, an accent-tinted cursor, an ok lamp", () => {
+  const l = pickerLook(checkTokens(load('frost')));
+  const h = l.header(5, 'frost');
+  assert.deepEqual([h.title + h.sub, h.right, h.font, h.subFont], ['Themes · five on the shelf', 'In use: Frost', 'Inter', 'Inter']);
+  assert.deepEqual(l.tile.border, { width: 1, color: '#434C5E' });
+  assert.equal(l.tile.radius, 10);
+  assert.deepEqual([l.cursor.fill, l.cursor.border, l.cursor.shadow], ['#1a88C0D0', { width: 1, color: '#88C0D0' }, undefined]);
+  assert.deepEqual([l.tag(true, true).text, l.tag(true, true).lamp, l.tag(false, true).text, l.tag(false, true).lamp, l.tag(false, false)], ['In use', 'green', '↵ Apply', undefined, null]);
+  assert.deepEqual(l.legend(5).map((k) => `${k.key} ${k.word}`), ['j k Choose', '1–5 Jump', '↵ Apply']);
+  assert.equal(l.esc, 'esc Close');
+});
+
+test("Artboard's picker stays as it was: Themes, 5 themes, Current, a 1.5 px outline and a soft shadow", () => {
+  const l = pickerLook(artboard);
+  assert.deepEqual([l.header(5, 'artboard').sub, l.header(5, 'artboard').right], ['5 themes', '']);
+  assert.deepEqual([l.tag(true, true).text, l.tag(false, true).text], ['Current', '↵']);
+  assert.deepEqual(l.tile, { fill: '#F6F7F9', border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 });
+  assert.deepEqual(l.cursor, { fill: '#FFFFFF', border: { width: 1.5, color: '#3D5AFE' }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: '#3D5AFE', alpha: 0.45 }, radius: 12, ticks: false });
+  assert.deepEqual(l.legend(5).map((k) => `${k.key} ${k.word}`), ['j/k choose', '1–5 jump', '↵ apply']);
+  assert.equal(l.esc, 'esc');
+});
+
 test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbered sheets, [ACTIVE] and [↵]', () => {
   const l = pickerLook(blueprint);
   const h = l.header(3, 'blueprint');

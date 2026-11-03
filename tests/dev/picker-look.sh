@@ -121,10 +121,68 @@ open_picker
 check "hi-fi: the header reads THEMES · 5 SOURCES, IN USE: HI-FI" state_is '.header == ["THEMES · 5 SOURCES", "IN USE: HI-FI"]'
 check "hi-fi: the current card shows IN USE after a green lamp" state_is '[.cards[].tag] == ["", "", "", "", "IN USE"] and .cards[4].lamp.light == "green"'
 check "hi-fi: the keys are bare ($(themes_state | jq -r .legend))" state_is '.legend == "J K CHOOSE  1–5 JUMP  ↵ APPLY  ESC"'
+check "hi-fi: Frost's card reads Frost · glass · ease, whole" \
+  state_is '.cards[] | select(.name == "frost") | .tagline == "Frost · glass · ease" and .taglineElided == false'
 # Each other card's specimen speaks in its own theme's voice, so only the panel's own words and Hi-Fi's card are read.
 own() { themes_state | jq '{header, legend, tags: [.cards[].tag], hifi: [.cards[] | select(.name == "hi-fi")]}'; }
 check "hi-fi: nothing the panel or Hi-Fi's card reports holds a bracket ($(own | marked | head -3 | paste -sd'|'))" eval '[ -z "$(own | marked)" ]'
 close_picker
+# Frost's board is glass: the panel reads its header, #434C5E edges, an accent-tinted cursor card and an ok lamp.
+switch frost
+until_ok 3000 status_theme frost
+open_picker
+check "frost: the cards read Paper, Artboard, Blueprint, Frost, Hi-fi in that order" \
+  state_is '[.cards[].title] == ["Paper", "Artboard", "BLUEPRINT", "Frost", "Hi-fi"]'
+check "frost: each card is 257.6 px wide ($(themes_state | jq -c '[.cards[].box.w]'))" \
+  state_is 'all(.cards[]; (.box.w - 257.6 | fabs) < 0.5)'
+check "frost: the header reads Themes · five on the shelf, In use: Frost" state_is '.header == ["Themes · five on the shelf", "In use: Frost"]'
+check "frost: the keys read j k Choose  1–5 Jump  ↵ Apply  esc Close" state_is '.legend == "j k Choose  1–5 Jump  ↵ Apply  esc Close"'
+wtype 5
+until_ok 1000 state_is '.selected == "hi-fi"'
+wtype 4
+until_ok 1000 state_is '.selected == "frost"'
+wtype 5
+until_ok 1000 state_is '.selected == "hi-fi"'
+sleep 0.3
+read -r w h < <(card_size hi-fi)
+check "frost: the cursor card reports a 1 px #88c0d0 border and ↵ Apply" \
+  state_is '.cards[4].border == {"width": 1, "color": "#88c0d0"} and .cards[4].tag == "↵ Apply" and .cards[4].fill == "#1a88c0d0"'
+# The top edge sits on a whole pixel row, where the side edges (x = 1657.4) blend into their neighbours.
+cursor_edge() { card_grab hi-fi $((w / 2)) 0 4 1 | all_rgb 136 192 208 6; }
+check "frost: the cursor card's edge reads #88C0D0 on screen" cursor_edge
+tint() { card_grab hi-fi 3 $((h / 2)) 4 4 | all_rgb 67 79 95 14; }
+check "frost: inside the cursor card the accent tint reads over the glass" tint
+check "frost: a card that is not the cursor reports a #434c5e 1 px border" state_is '.cards[1].border == {"width": 1, "color": "#434c5e"}'
+quiet_edge() { card_grab artboard $((w / 2)) 0 4 1 | all_rgb 67 76 94 6; }
+check "frost: a card that is not the cursor has a #434C5E edge on screen" quiet_edge
+check "frost: the card in use shows In use after an ok #a3be8c lamp" \
+  state_is '[.cards[].tag] == ["", "", "", "In use", "↵ Apply"] and .cards[3].lamp.light == "green" and (.cards[3].lamp.color | ascii_downcase) == "#a3be8c"'
+lamp_dot() {
+  local x y
+  read -r x y < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[3].lamp.box | "\(.x + .w / 2 - 1 + $ox | round) \(.y + .h / 2 - 1 + $oy | round)"')
+  grim -s 1 -t ppm -g "$x,$y 2x2" - | has_rgb 163 190 140 12
+}
+check "frost: the lamp before In use is #A3BE8C on screen" lamp_dot
+# The Frost card's paper is #2E3440 where its windows leave it bare, and frost brightens its corners.
+frost_paper() {
+  local px py pw
+  read -r px py pw < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "frost") | .preview | "\(.x + $ox | round) \(.y + $oy | round) \(.w | round)"')
+  grim -s 1 -t ppm -g "$((px + pw / 2)),$((py + 180)) 6x4" - | all_rgb 46 52 64 6
+}
+check "frost: the Frost card's paper reads #2E3440 at the middle of its bare lower rows" frost_paper
+# Mean channel sum of the PPM on stdin.
+lift() { node -e 'const b=require("fs").readFileSync(0);const h=b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);const p=b.subarray(h[0].length);let s=0;for(const v of p)s+=v;console.log(Math.round(s/(p.length/3)))'; }
+frost_corner() {
+  local px py mid corner
+  read -r px py < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "frost") | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
+  corner=$(grim -s 1 -t ppm -g "$px,$py 3x3" - | lift)
+  mid=$(grim -s 1 -t ppm -g "$((px + 130)),$((py + 180)) 6x4" - | lift)
+  echo "corner $corner, middle $mid" >&2
+  ((corner > mid + 20))
+}
+check "frost: the Frost card's paper is brighter at its corner than at its middle" frost_corner
+close_picker
+
 switch blueprint
 until_ok 3000 status_theme blueprint
 

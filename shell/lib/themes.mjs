@@ -84,6 +84,17 @@ export function pickerLook(themed) {
     esc: l.keyText('esc'),
     number: () => '',
   };
+  // Frost's glass board: an accent-tinted cursor with no shadow, 1 px line edges, and an ok lamp before the theme in use.
+  if (voice === 'plain' && tokens.niri?.blur === true) {
+    return Object.assign(base, {
+      header: (n, current) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: ` · ${COUNT[n] ?? n} on the shelf`, subFont: t.ui, subSize: 13, italic: false, right: `In use: ${cap(current)}` }),
+      legend: (n) => l.keys([['j k', 'Choose'], [n > 1 ? `1–${Math.min(n, 9)}` : '1', 'Jump'], ['↵', 'Apply']]),
+      esc: 'esc Close',
+      tag: (current, cursor) => (current ? { text: 'In use', lamp: 'green', color: c.ink, fill: 'transparent', border: 'transparent', radius: 6 } : cursor ? { text: '↵ Apply', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
+      tile: { fill: plainTones(themed).field, border: { width: 1, color: c.line }, radius: 10, pad: 10 },
+      cursor: { fill: qtColor(c.accent, 0.1), border: { width: 1, color: c.accent }, radius: 10, ticks: false },
+    });
+  }
   if (voice === 'plain') {
     return Object.assign(base, {
       header: (n) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: `${n} themes`, subFont: t.ui, subSize: 13, italic: false, right: '' }),

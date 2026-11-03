@@ -263,7 +263,7 @@ Item {
                                         number: number.text,
                                         title: name.text,
                                         tag: tagText.visible ? tagText.text : "",
-                                        lamp: tagLamp.visible ? { light: tagLamp.light, box: { x: l.x, y: l.y, w: tagLamp.width, h: tagLamp.height } } : null,
+                                        lamp: tagLamp.visible ? { light: tagLamp.light, color: tagLamp.look.color.toString(), box: { x: l.x, y: l.y, w: tagLamp.width, h: tagLamp.height } } : null,
                                         baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y],
                                         nameRight: name.mapToItem(null, name.width, 0).x,
                                         tagline: taglineText.text,
