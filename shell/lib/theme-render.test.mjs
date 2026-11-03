@@ -75,7 +75,7 @@ test('themes.json lists every valid theme, paper first, and skips a broken one',
   const state = join(root, 'state');
   execFileSync('node', [join(root, 'shell/lib/theme-render.mjs'), 'paper'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const themes = JSON.parse(readFileSync(join(state, 'dots/theme-out/themes.json'), 'utf8'));
-  assert.deepEqual(themes.map((x) => x.name), ['paper', 'artboard', 'blueprint', 'hi-fi']);
+  assert.deepEqual(themes.map((x) => x.name), ['paper', 'artboard', 'blueprint', 'frost', 'hi-fi']);
   assert.deepEqual(Object.keys(themes[2]), ['name', 'mode', 'color', 'syntax', 'primitive', 'paper', 'type', 'niri']);
   assert.equal(themes[2].color.paper, '#0C1A2E');
   assert.equal(themes[2].primitive.frame, 'glow');

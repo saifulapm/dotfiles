@@ -120,6 +120,11 @@ arch = "all"
 why = "the terminal multiplexer, themed from theme-out/tmux.conf"
 
 [[package]]
+name = "rsms-inter-fonts"
+arch = "all"
+why = "Inter, the face Frost draws the shell in"
+
+[[package]]
 name = "google-noto-sans-vf-fonts"
 arch = "all"
 why = "Noto Sans, what web pages get for sans-serif"

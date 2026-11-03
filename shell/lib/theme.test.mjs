@@ -88,10 +88,10 @@ test('foot\'s own chrome takes the theme too: cursor, selection, URLs, labels, s
   assert.match(ini, /^search-box-no-match=0A1526 FFB547$/m);
 });
 
-test('Inter is not a theme font: the themes draw with Maple Mono and Instrument Serif', () => {
+test('a theme font is Maple Mono, Inter or Instrument Serif; Inter is Frost\'s alone', () => {
   const bad = structuredClone(paper);
-  bad.type.ui = 'Inter';
-  assert.throws(() => validateTheme(bad), /type\.ui: "Inter"/);
+  bad.type.ui = 'Helvetica';
+  assert.throws(() => validateTheme(bad), /type\.ui: "Helvetica" is not one of Maple Mono, Inter, Instrument Serif/);
   assert.deepEqual([load('artboard').type.display, load('artboard').type.ui], ['Maple Mono', 'Maple Mono']);
 });
 

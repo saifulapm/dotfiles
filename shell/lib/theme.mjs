@@ -1,6 +1,6 @@
 // Validates a parsed theme.toml and renders its fragments; pure, so the shell can import it too.
 const MENUS = {
-  paper: ['flat', 'grain', 'dots', 'grid', 'gradient', 'brushed'],
+  paper: ['flat', 'grain', 'dots', 'grid', 'gradient', 'brushed', 'frost'],
   frame: ['hairline', 'ink', 'double', 'none', 'glow'],
   shadow: ['soft', 'hard-offset', 'none'],
   corner: ['round', 'square', 'cut'],
@@ -8,9 +8,10 @@ const MENUS = {
 };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
 const SYNTAX = ['keyword', 'function', 'string', 'type', 'value', 'variable', 'attribute', 'meta', 'builtin', 'comment'];
-const FONTS = ['Maple Mono', 'Instrument Serif'];
+const FONTS = ['Maple Mono', 'Inter', 'Instrument Serif'];
 const VOICES = ['plain', 'caps', 'bracket', 'engraved'];
 const HEX = /^#[0-9A-Fa-f]{6}$/;
+const HEXA = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
 const NIRI_COLORS = ['border_active', 'border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
 const TAB_SIDES = ['left', 'right', 'top', 'bottom'];
 
@@ -21,8 +22,8 @@ export function validateTheme(doc) {
   if (meta.mode !== 'light' && meta.mode !== 'dark') fail(`meta.mode: "${meta.mode}" is not light or dark`);
   const color = doc.color ?? fail('missing [color]');
   for (const k of COLORS) if (!HEX.test(color[k] ?? '')) fail(`color.${k}: "${color[k]}" is not #RRGGBB`);
-  // Glass is the island's, OSDs' and fields' fill; a theme without one draws them on its surface.
-  if ('glass' in color && !HEX.test(color.glass)) fail(`color.glass: "${color.glass}" is not #RRGGBB`);
+  // Glass is the island's, OSDs' and fields' fill; a theme without one draws them on its surface. Edge is a frame's colour apart from line; a theme without one frames as before. Both may carry alpha last, as niri writes it.
+  for (const k of ['glass', 'edge']) if (k in color && !HEXA.test(color[k])) fail(`color.${k}: "${color[k]}" is not #RRGGBB or #RRGGBBAA`);
   if (!Array.isArray(color.ansi) || color.ansi.length !== 16 || !color.ansi.every((c) => HEX.test(c))) {
     fail('color.ansi must hold 16 #RRGGBB colours');
   }
@@ -37,7 +38,7 @@ export function validateTheme(doc) {
   if (!VOICES.includes(type.voice)) fail(`type.voice: "${type.voice}" is not one of ${VOICES.join(', ')}`);
   const niri = doc.niri ?? fail('missing [niri]');
   for (const k of NIRI_COLORS) {
-    if (k in niri && !/^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
+    if (k in niri && !HEXA.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
   }
   if ('tab_position' in niri && !TAB_SIDES.includes(niri.tab_position)) fail(`niri.tab_position: "${niri.tab_position}" is not one of ${TAB_SIDES.join(', ')}`);
   return {
@@ -50,6 +51,13 @@ export function validateTheme(doc) {
     type: { display: type.display, ui: type.ui, mono: type.mono, voice: type.voice, scale: type.scale ?? 1 },
     niri: Object.assign({}, niri, { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false }),
   };
+}
+
+// The tokens as Qt reads them: theme.toml writes alpha last (#RRGGBBAA, niri's order) and Qt wants it first (#AARRGGBB).
+export function qtTokens(t) {
+  const qt = (hex) => (hex.length === 9 ? `#${hex.slice(7)}${hex.slice(1, 7)}`.toUpperCase() : hex);
+  const color = Object.assign({}, t.color, { glass: qt(t.color.glass) }, 'edge' in t.color ? { edge: qt(t.color.edge) } : {});
+  return Object.assign({}, t, { color });
 }
 
 // The WCAG contrast ratio of two #RRGGBB colours.

@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rename
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
+import { validateTheme, checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
@@ -51,7 +51,7 @@ const dir = new URL('../../themes/', import.meta.url).pathname;
 for (const d of readdirSync(dir).sort()) {
   try {
     const t = validateTheme(parseToml(readFileSync(join(dir, d, 'theme.toml'), 'utf8')));
-    themes.push(t);
+    themes.push(qtTokens(t));
   } catch (e) {
     continue;
   }
@@ -72,7 +72,7 @@ if (!process.env.XDG_STATE_HOME) {
 const out = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots/theme-out');
 mkdirSync(out, { recursive: true });
 const files = {
-  'shell.json': JSON.stringify(theme, null, 2) + '\n',
+  'shell.json': JSON.stringify(qtTokens(theme), null, 2) + '\n',
   'niri.kdl': renderNiri(theme),
   'foot.ini': renderFoot(theme),
   'foot.args': renderFootArgs(theme),
