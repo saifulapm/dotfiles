@@ -97,6 +97,8 @@ Item {
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
             cursorLamp: cur && cur.lamp.visible ? box(cur.lamp) : null,
+            cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
+            cursorDetail: cur ? Object.assign(box(cur.detailItem), { truncated: cur.detailItem.truncated }) : null,
             legend: legend.map(k => k.key + " " + k.word).join("  "),
             legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).label).join("  "),
             legendSpacing: look.small.spacing,
@@ -274,6 +276,10 @@ Item {
                         readonly property bool on: index === control.section.selected
                         readonly property string drawnDetail: detailLabel.text
                         readonly property Item lamp: rowLamp
+                        readonly property Item nameItem: nameLabel
+                        readonly property Item detailItem: detailLabel
+                        // The width the name and detail share, from the row and its other parts' own widths, never the grid's, so the grid lays out once.
+                        readonly property real textWidth: row.width - (rowLamp.visible ? rowLamp.size + row.spacing : 0) - (marker.visible ? marker.implicitWidth + row.spacing : 0) - (badgeBox.visible ? badgeBox.implicitWidth + row.spacing : 0)
                         width: list.width
                         implicitHeight: row.implicitHeight + 22
                         radius: look.cursor.radius
@@ -300,6 +306,7 @@ Item {
 
                             // Paper marks the cursor row with the accent's ▸.
                             Text {
+                                id: marker
                                 visible: look.slot === "marker"
                                 textFormat: Text.PlainText
                                 text: "▸"
@@ -316,8 +323,11 @@ Item {
                                 columnSpacing: 14
 
                                 Text {
+                                    id: nameLabel
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
+                                    // Beside a long detail the name keeps its own width, up to half the row.
+                                    Layout.minimumWidth: parent.columns === 2 ? Math.min(Math.ceil(implicitWidth), textWidth / 2) : 0
                                     text: look.title(modelData.title)
                                     // A right-to-left name would otherwise set itself against the detail.
                                     horizontalAlignment: Text.AlignLeft
@@ -331,6 +341,9 @@ Item {
                                 Text {
                                     id: detailLabel
                                     textFormat: Text.PlainText
+                                    // A detail too long for the row elides in the width the name leaves it.
+                                    Layout.maximumWidth: parent.columns === 2 ? Math.max(0, textWidth - parent.columnSpacing - Math.min(Math.ceil(nameLabel.implicitWidth), textWidth / 2)) : textWidth
+                                    elide: Text.ElideRight
                                     text: look.detailText(modelData.detail)
                                     color: on ? look.cursor.detail : look.detail.color
                                     font.family: look.detail.font
@@ -341,6 +354,7 @@ Item {
                             }
 
                             Rectangle {
+                                id: badgeBox
                                 visible: on && look.cursor.badge !== ""
                                 implicitWidth: badge.implicitWidth + 14
                                 implicitHeight: badge.implicitHeight + 4
