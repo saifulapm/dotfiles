@@ -78,6 +78,9 @@ Item {
     }
     readonly property var rows: found.slice(0, 8)
     readonly property var look: L.launcherLook(theme.tokens)
+    // A theme that blurs draws the card as glass and asks niri to blur the card's rounded box, nothing else.
+    readonly property bool glass: theme.tokens ? theme.tokens.niri.blur === true : false
+    readonly property var blurRegion: glass && visible ? cardRegion : null
     readonly property Root.Motion motion: Root.Motion {
         shown: launcher.shown
         tokens: launcher.theme.tokens
@@ -196,6 +199,9 @@ Item {
             drawing: launcher.visible,
             frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
+            glassFill: String(card.drawnFill),
+            blurRegion: blurRegion ? [{ x: blurRegion.x, y: blurRegion.y, w: blurRegion.width, h: blurRegion.height, radius: blurRegion.radius }] : [],
+            nameFont: nameBox ? nameBox.fontInfo.family : null,
             look: look.voice,
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
@@ -310,6 +316,16 @@ Item {
             color: look.slot === "lamp" ? Qt.alpha(launcher.theme.tokens.color.glass, 0.74) : Qt.alpha(c.paper, card.style.wash)
         }
 
+        // The card's box at rest, in the Surfaces window's pixels, as Surfaces hands it to niri for blur.
+        Region {
+            id: cardRegion
+            x: card.x
+            y: card.y
+            width: card.width
+            height: card.height
+            radius: card.style.corner.radius
+        }
+
         Root.Surface {
             id: card
             x: Math.round((parent.width - width) / 2)
@@ -319,6 +335,7 @@ Item {
             tokens: launcher.theme.tokens
             label: "Launcher"
             motion: launcher.motion
+            restyle: launcher.glass ? ({ fill: launcher.theme.tokens.color.glass }) : null
 
             // Hi-Fi's surface has a 1 px top highlight of ink under its frame.
             Rectangle {

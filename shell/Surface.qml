@@ -25,6 +25,8 @@ Item {
     default property alias content: inner.data
     // The glass highlight line, so a state function can report where it is drawn.
     readonly property alias highlight: highlightLine
+    // The fill as the body draws it, so a state function can report the colour on screen.
+    readonly property alias drawnFill: fillRect.color
 
     scale: pose.scale
 
@@ -71,6 +73,7 @@ Item {
     }
 
     Rectangle {
+        id: fillRect
         visible: !surface.chamfer && surface.pose.outline >= 1
         anchors.fill: parent
         radius: surface.style.corner.radius

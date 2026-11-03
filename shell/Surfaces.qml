@@ -201,6 +201,9 @@ PanelWindow {
         id: noInput
     }
 
+    // niri blurs only the region a surface asks for, so the rest of this full-output layer stays clear.
+    BackgroundEffect.blurRegion: launcher?.blurRegion ?? null
+
     // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed, and Esc or Enter closes the overview on the window it shows focused.
     Item {
         id: overviewKeys
