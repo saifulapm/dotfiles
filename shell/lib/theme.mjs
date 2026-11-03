@@ -79,9 +79,10 @@ export function checkTokens(t) {
   return checked;
 }
 
-const CURVES = {
-  ease: 'duration-ms 200\n        curve "ease-out-cubic"',
-  typewriter: 'duration-ms 90\n        curve "linear"',
+// Ease and typewriter open on a plain ease-out and close fast and linear, with no shader.
+const OPEN_CLOSE = {
+  'window-open': 'duration-ms 200\n        curve "ease-out-cubic"',
+  'window-close': 'duration-ms 90\n        curve "linear"',
 };
 
 const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
@@ -89,7 +90,7 @@ const eased = (ms, curve) => `duration-ms ${ms}\n        curve "${curve}"`;
 // niri 26.04 names no ease-in or ease-in-out curve, so those are its cubic-bezier.
 const bezier = (ms, ...p) => `duration-ms ${ms}\n        curve "cubic-bezier" ${p.join(' ')}`;
 const inOutCubic = (ms) => bezier(ms, 0.65, 0, 0.35, 1);
-// Every animation's timing for the four motions the Motion boards draw; another motion keeps CURVES for open and close only.
+// Every animation's timing for the four motions the Motion boards draw; another motion keeps OPEN_CLOSE for open and close only.
 const MOTION = {
   snappy: {
     'window-open': eased(140, 'ease-out-expo'),
@@ -308,7 +309,7 @@ export function renderNiri(t) {
       ...(n.shadow_inactive ? [`        inactive-color "${n.shadow_inactive}"`] : []), '    }',
     ].join('\n')
     : 'shadow {\n        off\n    }';
-  const radius = t.primitive.corner === 'round' ? 14 : 0;
+  const radius = n.radius ?? (t.primitive.corner === 'round' ? 14 : 0);
   // Tabs take the focus colour and the inactive frame's colour; a round theme draws them as pills.
   const tabs = n.tab_position
     ? [
@@ -319,8 +320,7 @@ export function renderNiri(t) {
       `        urgent-color "${c.danger}"`, '    }',
     ].join('\n')
     : 'tab-indicator {\n        hide-when-single-tab\n    }';
-  const motion = MOTION[t.primitive.motion]
-    ?? { 'window-open': CURVES[t.primitive.motion], 'window-close': CURVES[t.primitive.motion] };
+  const motion = MOTION[t.primitive.motion] ?? OPEN_CLOSE;
   // The glow's farthest edge past the window: its blur, spread and offset.
   const reach = n.shadow_color ? (n.shadow_softness ?? 30) + (n.shadow_spread ?? 0) + Math.max(Math.abs(ox), Math.abs(oy)) : 0;
   const shaders = SHADERS[t.primitive.motion]?.(c, reach) ?? {};
@@ -328,6 +328,10 @@ export function renderNiri(t) {
     const glsl = shaders[{ 'window-open': 'open', 'window-close': 'close' }[name]];
     return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
   };
+  // A blurring theme asks niri for xray behind the shell's glass, on the three layers that draw it; each panel names its own blur region, so the rest of a full-screen layer stays clear.
+  const glass = n.blur
+    ? '\nlayer-rule {\n    match namespace="^dots-surfaces$"\n    match namespace="^dots-island$"\n    match namespace="^dots-margins$"\n    background-effect {\n        xray true\n    }\n}\n'
+    : '';
   const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
   return `layout {
     gaps ${t.niri.gaps}
@@ -369,7 +373,7 @@ window-rule {
     geometry-corner-radius ${radius}
     clip-to-geometry true
 }
-
+${glass}
 animations {
 ${animations}
 }

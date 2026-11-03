@@ -194,6 +194,7 @@ test('a motion outside the three boards keeps one open and close curve and leave
   t.primitive.motion = 'ease';
   const kdl = renderNiri(t);
   assert.match(kdl, /window-open \{\s*duration-ms 200\s*curve "ease-out-cubic"\s*\}/);
+  assert.match(kdl, /window-close \{\s*duration-ms 90\s*curve "linear"\s*\}/);
   assert.doesNotMatch(kdl, /workspace-switch|window-movement/);
 });
 

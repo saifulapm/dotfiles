@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens } from './theme.mjs';
+import { validateTheme, checkTokens, renderNiri } from './theme.mjs';
 
 const render = new URL('./theme-render.mjs', import.meta.url).pathname;
 const dots = new URL('../../bin/dots', import.meta.url).pathname;
@@ -97,4 +97,30 @@ test('dots theme frost switches and writes frost to the state file', (t) => {
   const r = spawnSync(dots, ['theme', 'frost'], { env, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(readFileSync(join(state, 'dots/theme'), 'utf8').trim(), 'frost');
+});
+
+test('Frost frames windows in a 1 px frost-blue border with 10 px corners, 20 px gaps and no shadow', () => {
+  const kdl = renderNiri(frost());
+  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#88C0D0"\s*inactive-color "#434C5E"/);
+  assert.match(kdl, /shadow \{\s*off\s*\}/);
+  assert.match(kdl, /gaps 20\n/);
+  assert.match(kdl, /window-rule \{\s*geometry-corner-radius 10\s/);
+  assert.match(kdl, /window-open \{\s*duration-ms 200\s*curve "ease-out-cubic"\s*\}/);
+  assert.match(kdl, /window-close \{\s*duration-ms 90\s*curve "linear"\s*\}/);
+});
+
+test('Frost turns xray on for the three shell layers that draw glass, and the other themes ask for no background effect', () => {
+  const rule = renderNiri(frost()).match(/layer-rule \{\n([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.deepEqual(rule.match(/match namespace="[^"]+"/g), ['match namespace="^dots-surfaces$"', 'match namespace="^dots-island$"', 'match namespace="^dots-margins$"']);
+  assert.match(rule, /background-effect \{\s*xray true\s*\}/);
+  for (const name of ['paper', 'artboard', 'blueprint', 'hi-fi']) assert.doesNotMatch(renderNiri(validateTheme(load(name))), /background-effect|layer-rule/, name);
+});
+
+test('niri accepts Frost\'s fragment', (t) => {
+  if (spawnSync('niri', ['--version']).status !== 0) return t.skip('no niri here');
+  const dir = mkdtempSync(join(tmpdir(), 'dots-frost-niri-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  writeFileSync(join(dir, 'niri.kdl'), renderNiri(frost()));
+  const r = spawnSync('niri', ['validate', '-c', join(dir, 'niri.kdl')], { encoding: 'utf8' });
+  assert.equal(r.status, 0, r.stderr);
 });
