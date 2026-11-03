@@ -231,7 +231,7 @@ FocusScope {
                         implicitWidth: hintText.implicitWidth + (plain ? 14 : 0)
                         implicitHeight: hintText.implicitHeight + (plain ? 4 : 0)
                         radius: 6
-                        color: plain ? "white" : "transparent"
+                        color: plain ? tones.card : "transparent"
 
                         Text {
                             id: hintText

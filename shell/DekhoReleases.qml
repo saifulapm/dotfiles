@@ -989,7 +989,7 @@ FocusScope {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: page.words.best
-                        color: (page.bracket ? rel.fore : page.plain ? "white" : rel.inverse ? page.c.ink : page.c.surface) ?? "white"
+                        color: (page.bracket ? rel.fore : page.plain ? page.tones.card : rel.inverse ? page.c.ink : page.c.surface) ?? "white"
                         font.family: page.bodyFont
                         font.pixelSize: page.plain ? 11 : 10
                         font.weight: page.caps ? Font.Normal : page.plain ? Font.Medium : Font.Bold
@@ -1084,7 +1084,7 @@ FocusScope {
                 box: page.plain ? 9 : 16
                 stroke: page.plain ? 1.5 : 2.6
                 path: page.plain ? "M1.5 4.6L3.5 6.6L7.5 2.4" : "M3.5 8.5L6.5 11.5L12.5 4.5"
-                color: (page.plain ? "white" : page.c.surface) ?? "white"
+                color: (page.plain ? page.tones.card : page.c.surface) ?? "white"
             }
         }
         Text {

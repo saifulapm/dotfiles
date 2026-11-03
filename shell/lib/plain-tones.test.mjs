@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parseToml } from './toml.mjs';
-import { checkTokens, validateTheme } from './theme.mjs';
-import { plainTones, launcherLook, listLook, osdLook, chipLook } from './voice.mjs';
+import { checkTokens, validateTheme, contrast } from './theme.mjs';
+import { plainTones, launcherLook, listLook, osdLook, chipLook, islandLook } from './voice.mjs';
+import { surfaceStyle } from './surface.mjs';
 
 const load = (n) => checkTokens(validateTheme(parseToml(readFileSync(new URL(`../../themes/${n}/theme.toml`, import.meta.url), 'utf8'))));
 const frost = load('frost');
@@ -53,4 +54,47 @@ test('no file in shell/ names an Artboard light colour outside the plain table',
     if (n) found[relative(root, p)] = n;
   }
   assert.deepEqual(found, {}, 'a file names an Artboard light colour; read it from plainTones(tokens)');
+});
+
+// Text is read against the fill drawn behind it: every theme's island and lit row keep 4.5:1, so a dark theme's light ink never fills a slab under light text.
+const ALL = ['paper', 'artboard', 'blueprint', 'frost', 'hi-fi'].map(load);
+const solid = (hex) => hex.slice(0, 7);
+
+test('every theme\'s island note reads at 4.5:1 or more against the island\'s own fill', () => {
+  const low = [];
+  for (const t of ALL) {
+    const style = surfaceStyle(t, 'island');
+    const note = islandLook(t);
+    for (const part of ['head', 'summary', 'body']) {
+      const color = note[part].color || style.text;
+      const r = contrast(solid(color), solid(style.fill));
+      if (r < 4.5) low.push(`${t.name} ${part} ${color} on ${style.fill}: ${r.toFixed(2)}`);
+    }
+  }
+  assert.deepEqual(low, []);
+});
+
+test('every theme\'s lit row reads its detail at 4.5:1, and a plain mode pill its word', () => {
+  const low = [];
+  for (const t of ALL) {
+    const l = launcherLook(t);
+    const r = contrast(solid(l.cursor.detail), solid(l.cursor.fill));
+    if (r < 4.5) low.push(`${t.name} detail ${l.cursor.detail} on ${l.cursor.fill}: ${r.toFixed(2)}`);
+    if (l.label.kind === 'pill') {
+      const p = contrast(solid(l.label.color), solid(l.label.fill));
+      if (p < 4.5) low.push(`${t.name} pill ${l.label.color} on ${l.label.fill}: ${p.toFixed(2)}`);
+    }
+  }
+  assert.deepEqual(low, []);
+});
+
+// A plain branch's white is Artboard's card; on Frost it is a light slab, so it reads the table's card, white only in Artboard.
+test('no shell surface draws a literal white on a plain branch', () => {
+  const found = [];
+  for (const p of walk(join(root, 'shell')).filter((f) => f.endsWith('.qml'))) {
+    readFileSync(p, 'utf8').split('\n').forEach((l, i) => {
+      if (/plain \? "(white|#fff|#ffffff)"/i.test(l)) found.push(`${relative(root, p)}:${i + 1}`);
+    });
+  }
+  assert.deepEqual(found, []);
 });

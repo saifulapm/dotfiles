@@ -392,7 +392,7 @@ FocusScope {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: "!"
-                        color: (plain ? "white" : c.surface) ?? "white"
+                        color: (plain ? tones.card : c.surface) ?? "white"
                         font.family: home.bodyFont
                         font.pixelSize: bracket ? 10 : 11
                         font.weight: Font.Bold

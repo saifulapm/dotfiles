@@ -1361,7 +1361,7 @@ FocusScope {
                         box: page.plain ? 9 : 16
                         stroke: page.plain ? 1.5 : 2.4
                         path: page.plain ? "M1.5 4.6L3.5 6.6L7.5 2.4" : "M3.5 8.5L6.5 11.5L12.5 4.5"
-                        color: (page.plain ? "white" : ep.inverse ? (page.bracket ? page.c.accent : page.c.ink) : page.c.surface) ?? "white"
+                        color: (page.plain ? page.tones.card : ep.inverse ? (page.bracket ? page.c.accent : page.c.ink) : page.c.surface) ?? "white"
                     }
                 }
                 Rectangle {
@@ -1471,7 +1471,7 @@ FocusScope {
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: words.nextUp
-                    color: (page.bracket ? ep.fore : page.plain ? "white" : ep.inverse ? page.c.ink : page.c.surface) ?? "white"
+                    color: (page.bracket ? ep.fore : page.plain ? page.tones.card : ep.inverse ? page.c.ink : page.c.surface) ?? "white"
                     font.family: page.bodyFont
                     font.pixelSize: page.plain ? 11 : 10
                     font.weight: page.caps ? Font.Normal : page.plain ? Font.Medium : Font.Bold

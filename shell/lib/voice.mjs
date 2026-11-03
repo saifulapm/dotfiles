@@ -12,10 +12,10 @@ const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'c
 const PLAIN_WORD = { calc: 'calculator' };
 const CAPS_NAME = { calculator: 'CALC', reminder: 'REMIND' };
 
-// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text and a card. A plain theme without its own row draws Artboard's.
+// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text, a card, and the island's text and tile on its slab. A plain theme without its own row draws Artboard's.
 const PLAIN = {
-  artboard: { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF' },
-  frost: { tint: '#475666', deep: '#ECEFF4', tile: '#434C5E', field: '#323845', thumb: '#434C5E', rule: '#434C5E', bar: '#88C0D0', online: '#A3BE8C', outline: '#AEB7C6', warn: '#EBCB8B', warnChip: '#434C5E', strong: '#ECEFF4', card: '#3B4252' },
+  artboard: { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' } },
+  frost: { tint: '#475666', deep: '#ECEFF4', tile: '#434C5E', field: '#323845', thumb: '#434C5E', rule: '#434C5E', bar: '#88C0D0', online: '#A3BE8C', outline: '#AEB7C6', warn: '#EBCB8B', warnChip: '#434C5E', strong: '#ECEFF4', card: '#3B4252', island: { head: '#AEB7C6', body: '#D8DEE9', summary: '#ECEFF4', tile: '#434C5E' } },
 };
 export const plainTones = (tokens) => PLAIN[tokens?.name] ?? PLAIN.artboard;
 
@@ -40,6 +40,7 @@ export function launcherLook(tokens) {
   const t = (tokens || UNTHEMED).type;
   const voice = t.voice;
   const engraved = t.engraved === true;
+  const dark = tokens?.mode === 'dark';
   const caps = voice !== 'plain';
   const key = (k) => (voice === 'bracket' ? mark(engraved, upper(k)) : caps ? upper(k) : k);
   // Reminder mode names the keys its rows take; Paper also names Enter's, as its board does.
@@ -89,11 +90,12 @@ export function launcherLook(tokens) {
     return Object.assign(base, {
       query: { font: t.ui, size: 20, italic: false },
       prompt: { text: '', color: c.muted, search: true },
-      label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: plainTones(tokens).tint, color: c.accent },
+      // A dark theme's accent and muted fall under 4.5:1 on its tint, so its pill word and lit detail take the deep text and the ink.
+      label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: plainTones(tokens).tint, color: dark ? plainTones(tokens).deep : c.accent },
       slot: 'icon',
       name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
       detail: { font: t.ui, size: 12, italic: false, color: c.muted },
-      cursor: { fill: plainTones(tokens).tint, text: plainTones(tokens).deep, detail: c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
+      cursor: { fill: plainTones(tokens).tint, text: plainTones(tokens).deep, detail: dark ? c.ink : c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
       rule: { color: c.line, dashed: false },
       small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
       chip: { fill: plainTones(tokens).tile, key: c.ink },
@@ -139,7 +141,6 @@ export function launcherLook(tokens) {
 // The island's board tints on its dark box, which no token carries.
 const ISLAND = {
   caps: { head: '#B9AE99', body: '#D9CFBB', track: '#4A4338' },
-  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' },
 };
 
 // How the island draws a notification; every colour not named here is the island's own text colour.
@@ -169,10 +170,10 @@ export function islandLook(tokens) {
       width: 440,
       age: 'now',
       pad: { x: 16, top: 14, bottom: 14 },
-      head: { font: t.ui, size: 12, spacing: 0, color: ISLAND.plain.head },
-      summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: ISLAND.plain.summary },
-      body: { font: t.ui, size: 13, color: ISLAND.plain.body },
-      tile: { size: 40, radius: 12, fill: ISLAND.plain.tile },
+      head: { font: t.ui, size: 12, spacing: 0, color: plainTones(tokens).island.head },
+      summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: plainTones(tokens).island.summary },
+      body: { font: t.ui, size: 13, color: plainTones(tokens).island.body },
+      tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
     });
   }
   if (voice === 'bracket') {
@@ -243,7 +244,7 @@ export function leaseLook(tokens) {
   const time = (ms) => (voice === 'bracket' ? 'T−' : '') + minutes(ms);
   const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
   if (voice === 'plain') {
-    const head = tokens ? ISLAND.plain.head : c.muted;
+    const head = tokens ? plainTones(tokens).island.head : c.muted;
     return {
       voice,
       time,
@@ -254,8 +255,8 @@ export function leaseLook(tokens) {
         gap: 10,
         mark: { shape: 'dot', size: 8, color: tokens ? plainTones(tokens).bar : c.accent },
         label: Object.assign(text(13, ''), { text: '' }),
-        who: Object.assign(text(13, tokens ? ISLAND.plain.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
-        time: text(13, tokens ? ISLAND.plain.summary : '', { weight: 500 }),
+        who: Object.assign(text(13, tokens ? plainTones(tokens).island.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
+        time: text(13, tokens ? plainTones(tokens).island.summary : '', { weight: 500 }),
       },
       warning: { box: null, label: '', time: plainTones(tokens).warn, chip: plainTones(tokens).warnChip, ring: plainTones(tokens).warnChip, mark: plainTones(tokens).warn },
       card: {
@@ -264,14 +265,14 @@ export function leaseLook(tokens) {
         // The board draws the open card as a selected frame, named Island beside its corner.
         box: tokens ? { frame: { width: 1.5, color: c.accent }, handles: true, handleFill: c.surface } : null,
         label: 'Island',
-        ink: tokens ? ISLAND.plain.summary : '',
+        ink: tokens ? plainTones(tokens).island.summary : '',
         head: 'Agent · lease',
         headColor: head,
         who: line,
         unlocked: (hhmm) => `unlocked ${hhmm}`,
-        unlockedColor: tokens ? ISLAND.plain.body : c.muted,
+        unlockedColor: tokens ? plainTones(tokens).island.body : c.muted,
         left: 'left',
-        tile: tokens ? ISLAND.plain.tile : c.muted,
+        tile: tokens ? plainTones(tokens).island.tile : c.muted,
         bar: 'round',
         barFill: tokens ? plainTones(tokens).bar : c.accent,
         keys: [['↵', 'lock now'], ['esc', 'close']],
@@ -352,7 +353,7 @@ export function sendingLook(tokens) {
       mark: { shape: 'upload', size: 16, color: '' },
       parts: [Object.assign(text(13, '', { weight: 500, name: true }), { text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` })],
       pct: null,
-      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? ISLAND.plain.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
+      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
     };
   }
   if (voice === 'bracket') {
@@ -396,10 +397,10 @@ export function downloadingLook(tokens) {
       height: 76,
       pad: 16,
       gap: 6,
-      tile: { size: 40, radius: 12, fill: ISLAND.plain.tile },
-      head: Object.assign(text(t.ui, 12, ISLAND.plain.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
+      tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
+      head: Object.assign(text(t.ui, 12, plainTones(tokens).island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
       line: text(t.ui, 15, '', { weight: 700 }),
-      bar: { height: 4, radius: 2, track: ISLAND.plain.tile, fill: plainTones(tokens).bar },
+      bar: { height: 4, radius: 2, track: plainTones(tokens).island.tile, fill: plainTones(tokens).bar },
       chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
       failure: { mark: null, color: '', box: null },
     };
@@ -457,7 +458,7 @@ export function chipLook(tokens) {
       glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
       toastPlace: 'column',
       rowPlace: 'afterAge',
-      toast: place(ISLAND.plain.tile, ISLAND.plain.tile, ISLAND.plain.body, ISLAND.plain.head, ISLAND.plain.summary, [8, 10, 8, 10], 10),
+      toast: place(plainTones(tokens).island.tile, plainTones(tokens).island.tile, plainTones(tokens).island.body, plainTones(tokens).island.head, plainTones(tokens).island.summary, [8, 10, 8, 10], 10),
       row,
       cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
       empty: { color: plainTones(tokens).bar, width: 1.5, content: false },
@@ -551,7 +552,7 @@ export function osdLook(tokens) {
       word: () => '',
       bars: 'round',
       lit: { color: tokens ? plainTones(tokens).bar : c.accent },
-      unlit: { color: tokens ? ISLAND.plain.tile : c.muted },
+      unlit: { color: tokens ? plainTones(tokens).island.tile : c.muted },
       value: { font: t.ui, size: 13, weight: 600, color: '' },
     });
   }
@@ -592,7 +593,7 @@ export function clockLook(tokens) {
   const voice = t.voice;
   const text = (font, size, extra) => Object.assign({ font, size, weight: 400, spacing: 0, color: '' }, extra);
   if (voice === 'plain') {
-    const head = ISLAND.plain.head;
+    const head = plainTones(tokens).island.head;
     return {
       gridWidth: 224,
       gap: 22,
@@ -608,7 +609,7 @@ export function clockLook(tokens) {
       city: same,
       offsetText: same,
       dayText: same,
-      rule: { color: ISLAND.plain.tile, dashed: false },
+      rule: { color: plainTones(tokens).island.tile, dashed: false },
       grid: {
         head: '',
         header: '',
@@ -620,8 +621,8 @@ export function clockLook(tokens) {
         rowGap: 0,
         gap: 6,
         title: { place: 'line', parts: (g) => [`${g.month} ${g.year}`], left: text(t.ui, 15, { weight: 500 }), right: null },
-        weekday: text(t.mono, 11, { color: ISLAND.plain.head }),
-        day: text(t.mono, 12, { color: ISLAND.plain.body }),
+        weekday: text(t.mono, 11, { color: plainTones(tokens).island.head }),
+        day: text(t.mono, 12, { color: plainTones(tokens).island.body }),
         today: { w: 28, h: 24, radius: 8, inverted: true, fill: '', border: 0, borderColor: '', weight: 700 },
       },
     };

@@ -59,7 +59,8 @@ export function surfaceStyle(tokens, role) {
   const c = tokens.color;
   // Hi-Fi's island is a dark glass display in a 1 px line frame, so Blueprint's layout reads on it as on Blueprint's dark island.
   const glass = islandish(role) && tokens.type.engraved === true;
-  const inkIsland = islandish(role) && p.frame !== 'glow' && !glass;
+  // A dark theme's ink is light, so its island is its surface instead, and the island's light text reads on it.
+  const inkIsland = islandish(role) && p.frame !== 'glow' && !glass && tokens.mode !== 'dark';
   const style = {
     fill: glass ? c.glass : inkIsland ? c.ink : c.surface,
     text: inkIsland ? c.paper : c.ink,

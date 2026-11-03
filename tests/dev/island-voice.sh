@@ -20,6 +20,23 @@ near() {
   ' "$2" "$3" "$4" "$5"
 }
 geo() { island | jq -r ".note.$1 | \"\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)\""; }
+# The WCAG contrast of the text drawn in geometry $1 against the fill behind it: the fill is the box's commonest colour, the text its tenth most distant pixel.
+drawn_contrast() {
+  grim -s 1 -t ppm -g "$1" - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length), n = head[1] * head[2];
+    const lum = (i) => [0, 1, 2].map((c) => px[i * 3 + c] / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((s, v, c) => s + v * [0.2126, 0.7152, 0.0722][c], 0);
+    const counts = new Map();
+    for (let i = 0; i < n; i++) { const k = px.readUIntBE(i * 3, 3); counts.set(k, (counts.get(k) ?? 0) + 1); }
+    const fillKey = [...counts].sort((a, z) => z[1] - a[1])[0][0];
+    let fillAt = 0;
+    while (px.readUIntBE(fillAt * 3, 3) !== fillKey) fillAt++;
+    const f = lum(fillAt), ratios = [];
+    for (let i = 0; i < n; i++) { const l = lum(i); ratios.push((Math.max(l, f) + 0.05) / (Math.min(l, f) + 0.05)); }
+    ratios.sort((a, z) => z - a);
+    console.log((ratios[9] ?? 1).toFixed(2), "#" + fillKey.toString(16).padStart(6, "0"));
+  '
+}
 # Notify with an app name notify-send would not send as given; the newest notification replaces the shown one, so each check waits for its own summary.
 notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "${3:-}" '[]' '{}' 5000 >/dev/null; }
 
@@ -104,6 +121,13 @@ notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png "With icon"
 shown '.note.summary == "With icon"'
 check "artboard: an icon sent as a path draws in the tile instead of the letter" state_is '.note.tileBox != null and .note.glyph == null'
 check "artboard: the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
+# Frost is a dark plain theme: its island is its surface, not its light ink, so Artboard's layout reads on it.
+in_theme frost
+notify-send "Download complete" "report-october.pdf · 2.4 MB"
+shown '.note.summary == "Download complete"'
+read -r ratio fill < <(drawn_contrast "$(geo summaryBox)")
+check "frost: the summary reads at 4.5:1 or more against the island drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
+check "frost: that fill is Frost's surface #3b4252, not its light ink ($fill)" test "$fill" = "#3b4252"
 # Each notification above replaced the one before; the last one's 5 s end before the timers are counted.
 until_ok 6000 state_is '.mode == "rest"'
 status=$(shell_status)
