@@ -12,8 +12,12 @@ const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'c
 const PLAIN_WORD = { calc: 'calculator' };
 const CAPS_NAME = { calculator: 'CALC', reminder: 'REMIND' };
 
-// Artboard's board tints, which no token carries and no mix of tokens lands on.
-const ARTBOARD = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6' };
+// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text and a card. A plain theme without its own row draws Artboard's.
+const PLAIN = {
+  artboard: { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF' },
+  frost: { tint: '#475666', deep: '#ECEFF4', tile: '#434C5E', field: '#323845', thumb: '#434C5E', rule: '#434C5E', bar: '#88C0D0', online: '#A3BE8C', outline: '#AEB7C6', warn: '#EBCB8B', warnChip: '#434C5E', strong: '#ECEFF4', card: '#3B4252' },
+};
+export const plainTones = (tokens) => PLAIN[tokens?.name] ?? PLAIN.artboard;
 
 // An open can come before the theme's tokens load; until then the launcher draws in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
@@ -79,21 +83,21 @@ export function launcherLook(tokens) {
     caret: 'line',
     rule: { color: c.ink, dashed: false },
     small: { font: t.ui, size: 10, spacing: 1.4, color: c.muted },
-    tile: { size: 32, radius: 9, fill: ARTBOARD.tile },
+    tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
   };
   if (voice === 'plain') {
     return Object.assign(base, {
       query: { font: t.ui, size: 20, italic: false },
       prompt: { text: '', color: c.muted, search: true },
-      label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: ARTBOARD.tint, color: c.accent },
+      label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: plainTones(tokens).tint, color: c.accent },
       slot: 'icon',
       name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
       detail: { font: t.ui, size: 12, italic: false, color: c.muted },
-      cursor: { fill: ARTBOARD.tint, text: ARTBOARD.deep, detail: c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
+      cursor: { fill: plainTones(tokens).tint, text: plainTones(tokens).deep, detail: c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
       rule: { color: c.line, dashed: false },
       small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
-      chip: { fill: ARTBOARD.tile, key: c.ink },
-      keyChip: { fill: ARTBOARD.tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: ARTBOARD.deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0, column: 0 },
+      chip: { fill: plainTones(tokens).tile, key: c.ink },
+      keyChip: { fill: plainTones(tokens).tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: plainTones(tokens).deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0, column: 0 },
     });
   }
   if (voice === 'bracket') {
@@ -135,7 +139,7 @@ export function launcherLook(tokens) {
 // The island's board tints on its dark box, which no token carries.
 const ISLAND = {
   caps: { head: '#B9AE99', body: '#D9CFBB', track: '#4A4338' },
-  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36', bar: '#6C83FF' },
+  plain: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' },
 };
 
 // How the island draws a notification; every colour not named here is the island's own text colour.
@@ -227,9 +231,6 @@ export function captureLook(tokens) {
   };
 }
 
-// The m21 boards' colours that no token carries: Artboard's last-minute chip.
-const LEASE = { artboardWarn: '#B4380B', artboardChip: '#FFF1E8' };
-
 // How the island draws an agent's lease in place of the clock, its last minute and its Mod+I card, as the m21 boards do (XX2P8V57); a colour left empty is the island's own text colour.
 export function leaseLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -251,12 +252,12 @@ export function leaseLook(tokens) {
         height: 40,
         pad: 16,
         gap: 10,
-        mark: { shape: 'dot', size: 8, color: tokens ? ISLAND.plain.bar : c.accent },
+        mark: { shape: 'dot', size: 8, color: tokens ? plainTones(tokens).bar : c.accent },
         label: Object.assign(text(13, ''), { text: '' }),
         who: Object.assign(text(13, tokens ? ISLAND.plain.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
         time: text(13, tokens ? ISLAND.plain.summary : '', { weight: 500 }),
       },
-      warning: { box: null, label: '', time: LEASE.artboardWarn, chip: LEASE.artboardChip, ring: LEASE.artboardChip, mark: LEASE.artboardWarn },
+      warning: { box: null, label: '', time: plainTones(tokens).warn, chip: plainTones(tokens).warnChip, ring: plainTones(tokens).warnChip, mark: plainTones(tokens).warn },
       card: {
         layout: 'card',
         width: 440,
@@ -272,7 +273,7 @@ export function leaseLook(tokens) {
         left: 'left',
         tile: tokens ? ISLAND.plain.tile : c.muted,
         bar: 'round',
-        barFill: tokens ? ISLAND.plain.bar : c.accent,
+        barFill: tokens ? plainTones(tokens).bar : c.accent,
         keys: [['↵', 'lock now'], ['esc', 'close']],
       },
     };
@@ -351,7 +352,7 @@ export function sendingLook(tokens) {
       mark: { shape: 'upload', size: 16, color: '' },
       parts: [Object.assign(text(13, '', { weight: 500, name: true }), { text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` })],
       pct: null,
-      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? ISLAND.plain.tile : c.muted, fill: tokens ? ISLAND.plain.bar : c.accent },
+      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? ISLAND.plain.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
     };
   }
   if (voice === 'bracket') {
@@ -398,8 +399,8 @@ export function downloadingLook(tokens) {
       tile: { size: 40, radius: 12, fill: ISLAND.plain.tile },
       head: Object.assign(text(t.ui, 12, ISLAND.plain.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
       line: text(t.ui, 15, '', { weight: 700 }),
-      bar: { height: 4, radius: 2, track: ISLAND.plain.tile, fill: ISLAND.plain.bar },
-      chip: { fill: LEASE.artboardChip, color: LEASE.artboardWarn, radius: 8, padX: 8, padY: 2 },
+      bar: { height: 4, radius: 2, track: ISLAND.plain.tile, fill: plainTones(tokens).bar },
+      chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
       failure: { mark: null, color: '', box: null },
     };
   }
@@ -443,7 +444,7 @@ export function chipLook(tokens) {
   const name = (files) => (files.length === 1 ? line(files[0].slice(files[0].lastIndexOf('/') + 1)).replace(CONTROLS, '') : label(files));
   const place = (fill, frame, text, grip, glyph, pad, radius) => ({ fill, frame, text, grip, glyph, pad, radius });
   if (voice === 'plain') {
-    const row = place(ARTBOARD.tile, ARTBOARD.tile, c.muted, '#8A909B', c.muted, [5, 8, 5, 8], 8);
+    const row = place(plainTones(tokens).tile, plainTones(tokens).tile, c.muted, plainTones(tokens).outline, c.muted, [5, 8, 5, 8], 8);
     return {
       label,
       name,
@@ -459,10 +460,10 @@ export function chipLook(tokens) {
       toast: place(ISLAND.plain.tile, ISLAND.plain.tile, ISLAND.plain.body, ISLAND.plain.head, ISLAND.plain.summary, [8, 10, 8, 10], 10),
       row,
       cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
-      empty: { color: ISLAND.plain.bar, width: 1.5, content: false },
+      empty: { color: plainTones(tokens).bar, width: 1.5, content: false },
       frame: null,
       dragAge: '',
-      drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: ARTBOARD.deep, shadow: null, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10, cut: 0 },
+      drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: plainTones(tokens).deep, shadow: null, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10, cut: 0 },
     };
   }
   if (voice === 'bracket') {
@@ -549,7 +550,7 @@ export function osdLook(tokens) {
       height: 40,
       word: () => '',
       bars: 'round',
-      lit: { color: tokens ? ISLAND.plain.bar : c.accent },
+      lit: { color: tokens ? plainTones(tokens).bar : c.accent },
       unlit: { color: tokens ? ISLAND.plain.tile : c.muted },
       value: { font: t.ui, size: 13, weight: 600, color: '' },
     });
