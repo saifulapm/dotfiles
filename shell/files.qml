@@ -326,11 +326,14 @@ ShellRoot {
         doer.running = true;
     }
 
-    // y and x remember the targets with their sizes, for the progress and the failure card.
+    // y and x remember the targets with their sizes, for the progress and the failure card, and put them all on the clipboard for other apps.
     function yankTargets(how) {
         const paths = F.targets(rows, marked, folder, cursorRow);
         if (!listed || !paths.length)
             return;
+        uriCopier.createObject(app, {
+            text: F.uriList(paths)
+        });
         yank = {
             mode: how,
             from: folder,
@@ -587,6 +590,23 @@ ShellRoot {
             app.query = "";
             app.landOn = land;
             app.list();
+        }
+    }
+
+    // wl-copy serves the copy itself, so it outlives this window; the list goes on stdin, since one argument is capped at 128 KiB.
+    Component {
+        id: uriCopier
+
+        Process {
+            property string text
+            running: true
+            stdinEnabled: true
+            command: ["wl-copy", "--type", "text/uri-list"]
+            onStarted: {
+                write(text);
+                stdinEnabled = false;
+            }
+            onExited: destroy()
         }
     }
 

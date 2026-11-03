@@ -49,6 +49,9 @@ until_ok 1000 files_is '.rows == ["IMG_2039.jpg", "IMG_2040.jpg"]'
 wtype -k space -k space
 wtype y
 until_ok 1000 files_is '.op.yank == "copy 2"'
+yanked_uris() { [ "$(wl-paste --no-newline --type text/uri-list 2>/dev/null | tr -d '\r')" = "$(printf 'file://%s\nfile://%s' "$h/Downloads/IMG_2039.jpg" "$h/Downloads/IMG_2040.jpg")" ]; }
+until_ok 2000 yanked_uris
+check "and puts both on the clipboard as text/uri-list, for a paste in another app ($(wl-paste --list-types 2>/dev/null | head -1))" yanked_uris
 go code /Codes
 wtype p
 until_ok 3000 files_is '.op.running == false and (.rows | length) == 2'
