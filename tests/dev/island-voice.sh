@@ -123,8 +123,13 @@ check "artboard: an icon sent as a path draws in the tile instead of the letter"
 check "artboard: the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
 # Frost is a dark plain theme: its island is glass, not its light ink, so Artboard's layout reads on it.
 in_theme frost
-notify-send "Download complete" "report-october.pdf · 2.4 MB"
+notify-send -a Chromium "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'
+echo "     note: $(island | jq -c '.note | {app, age, summaryColor, tileBox, glyph, bodyBox}')"
+check "frost: the card reads Chromium and now over a #eceff4 title" state_is '.note.app == "Chromium" and .note.age == "now" and .note.summaryColor == "#eceff4"'
+check "frost: the notification shows a 32 px tile" state_is '.note.tileBox.w == 32 and .note.tileBox.h == 32'
+read -r ratio fill < <(drawn_contrast "$(geo bodyBox)")
+check "frost: the muted body reads at 4.5:1 or more against the glass drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 read -r ratio fill < <(drawn_contrast "$(geo summaryBox)")
 check "frost: the summary reads at 4.5:1 or more against the island drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 # Frost's glass is #3B4252 at 85 % over the #2E3440 paper, #394050 where nothing shows through.

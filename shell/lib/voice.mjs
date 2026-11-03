@@ -166,14 +166,16 @@ export function islandLook(tokens) {
     glass: false,
   };
   if (voice === 'plain') {
+    // Frost's glass card: a smaller muted head and body, and an accent icon on accent at 16 % (Qt's #AARRGGBB).
+    const glass = (tokens || UNTHEMED).niri?.blur === true;
     return Object.assign(base, {
       width: 440,
       age: 'now',
       pad: { x: 16, top: 14, bottom: 14 },
-      head: { font: t.ui, size: 12, spacing: 0, color: plainTones(tokens).island.head },
+      head: { font: t.ui, size: glass ? 11.5 : 12, spacing: 0, color: plainTones(tokens).island.head },
       summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: plainTones(tokens).island.summary },
-      body: { font: t.ui, size: 13, color: plainTones(tokens).island.body },
-      tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
+      body: { font: t.ui, size: 13, color: glass ? c.muted : plainTones(tokens).island.body },
+      tile: glass ? { size: 32, radius: 9, fill: `#29${c.accent.slice(1)}`, ink: c.accent } : { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
     });
   }
   if (voice === 'bracket') {

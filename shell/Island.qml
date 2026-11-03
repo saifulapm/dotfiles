@@ -698,7 +698,11 @@ PanelWindow {
             boxBottom: box.mapToItem(null, 0, box.height).y,
             summaryFont: [summary.font.family, summary.font.pixelSize],
             summaryBox: at(summary),
+            summaryColor: String(summary.color),
+            bodyBox: body.visible ? at(body) : null,
             islandBox: at(box),
+            // The region niri blurs behind the box, in the island window's pixels.
+            blurRegion: blurRegion ? [box.regionBox()] : [],
             highlightBox: box.highlight.visible ? at(box.highlight) : null,
             scale: noteScale.visible ? { box: at(noteScale), ticks: noteScale.marks.ticks.length } : null,
             bracketsShown: openBracket.visible,
@@ -884,6 +888,9 @@ PanelWindow {
     mask: Region {
         item: box
     }
+    // In a theme that blurs the island is glass at rest too, so its window always asks niri to blur behind its own box.
+    readonly property var blurRegion: box.glass ? box.region : null
+    BackgroundEffect.blurRegion: blurRegion
 
     Connections {
         target: Root.Pairing
@@ -2195,6 +2202,12 @@ PanelWindow {
                             source: tile.visible ? island.heldNotification?.icon ?? "" : ""
                             sourceSize.width: 24
                             sourceSize.height: 24
+                            // Frost draws the app's icon in its accent.
+                            layer.enabled: !!island.noteLook.tile?.ink
+                            layer.effect: MultiEffect {
+                                colorization: 1
+                                colorizationColor: island.noteLook.tile?.ink ?? "transparent"
+                            }
                         }
 
                         Text {
@@ -2204,7 +2217,7 @@ PanelWindow {
                             // An icon that is missing or fails to load leaves the letter.
                             visible: icon.status !== Image.Ready && !island.heldNotification?.swatch
                             text: island.noteLook.glyph(island.heldNotification?.app ?? "")
-                            color: box.style.text
+                            color: island.noteLook.tile?.ink ?? box.style.text
                             font.family: island.theme.tokens?.type.mono ?? ""
                             font.pixelSize: 15
                             font.weight: Font.DemiBold

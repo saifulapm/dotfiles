@@ -160,6 +160,27 @@ test("Artboard's notification has a 40 px rounded tile, the app and now muted, a
   assert.equal(a.width, 440);
 });
 
+const shape = (n) => ({ width: n.width, age: n.age, pad: n.pad, head: n.head, summary: n.summary, body: n.body, tile: n.tile });
+
+test("Frost's notification is a glass card: the app and now muted at 11.5 px, a #ECEFF4 semibold title, a muted body and an accent icon in a 32 px tile of accent at 16 %", () => {
+  const f = islandLook(checkTokens(validateTheme(theme('frost'))));
+  assert.deepEqual([f.head.size, f.head.color, f.appLabel('Chromium'), f.age], [11.5, '#AEB7C6', 'Chromium', 'now']);
+  assert.deepEqual([f.summary.color, f.summary.weight, f.body.color], ['#ECEFF4', 600, '#AEB7C6']);
+  assert.deepEqual(f.tile, { size: 32, radius: 9, fill: '#2988C0D0', ink: '#88C0D0' });
+});
+
+test("Artboard's notification keeps its look beside Frost's", () => {
+  assert.deepEqual(shape(islandLook(checkTokens(validateTheme(theme('artboard'))))), {
+    width: 440,
+    age: 'now',
+    pad: { x: 16, top: 14, bottom: 14 },
+    head: { font: 'Maple Mono', size: 12, spacing: 0, color: '#A3A9B4' },
+    summary: { font: 'Maple Mono', size: 15, weight: 600, spacing: 0, color: '#FFFFFF' },
+    body: { font: 'Maple Mono', size: 13, color: '#C9CED6' },
+    tile: { size: 40, radius: 12, fill: '#2B2F36' },
+  });
+});
+
 test('an empty app name draws no empty brackets and no empty caps', () => {
   for (const n of ['paper', 'artboard', 'blueprint']) assert.equal(island(n).appLabel(''), '', n);
   assert.equal(island('blueprint').appLabel(null), '');
