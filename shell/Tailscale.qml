@@ -397,7 +397,7 @@ Item {
 
                         Tile {
                             visible: plain
-                            color: "#FFFFFF"
+                            color: tones.card
                             glyph: "laptop"
                             ink: c.muted
                         }
@@ -588,7 +588,7 @@ Item {
 
                                 Tile {
                                     visible: plain
-                                    color: rowItem.isCurrent ? "#FFFFFF" : look.tile.fill
+                                    color: rowItem.isCurrent ? tones.card : look.tile.fill
                                     glyph: rowItem.modelData.phone ? "phone" : "box"
                                     ink: rowItem.isCurrent ? look.cursor.text : rowItem.online ? c.muted : marks.dotLine
                                 }
@@ -686,7 +686,7 @@ Item {
                                     implicitWidth: 22
                                     implicitHeight: 18
                                     radius: 6
-                                    color: "#FFFFFF"
+                                    color: tones.card
                                     Text {
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText

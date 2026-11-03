@@ -206,6 +206,8 @@ test("Frost's ACTIVE dot and bar track are its bar and rule colours", () => {
   const frost = accountsLook(checkTokens(validateTheme(parseToml(readFileSync(new URL('../../themes/frost/theme.toml', import.meta.url), 'utf8')))));
   assert.equal(frost.active.dot, '#88C0D0');
   assert.equal(frost.bar.track, '#434C5E');
+  // The chip's text sits on the ink fill, so it is the surface: white in Artboard, Polar Night in Frost, never white on Frost's light ink.
+  assert.equal(frost.active.color, '#3B4252');
 });
 
 test('Enter makes an account that is not active the active one, and does nothing on a balance, a usage row or the active account', () => {

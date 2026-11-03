@@ -160,8 +160,6 @@ export const useTarget = (item) => (item && item.kind === 'account' && !item.act
 // What the island says once the registry names the account; the label is the card's, already one line.
 export const activeNotice = (label) => `Claude · ${label} is active for new sessions`;
 
-// The text of the ACTIVE chip, white on the ink fill; its dot and the bar's track come from the theme's plain tones.
-const ACTIVE_ON = '#FFFFFF';
 const upper = (s) => String(s).toUpperCase();
 const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : '');
 
@@ -192,7 +190,7 @@ export function accountsLook(tokens) {
     limitName: (s) => (bracket ? upper(s) : lowerFirst(s)),
     figure,
     active: plain
-      ? { text: 'ACTIVE', color: ACTIVE_ON, fill: c.ink, border: 'transparent', radius: 8, dot: plainTones(tokens).bar }
+      ? { text: 'ACTIVE', color: c.surface, fill: c.ink, border: 'transparent', radius: 8, dot: plainTones(tokens).bar }
       : bracket
         ? { text: mark(tokens.type.engraved === true, 'ACTIVE'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0, dot: '' }
         : { text: 'ACTIVE', color: c.ink, fill: 'transparent', border: c.ink, radius: 0, dot: '' },
