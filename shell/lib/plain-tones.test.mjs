@@ -34,10 +34,6 @@ test('Frost\'s meters fill in its accent, not Artboard\'s periwinkle', () => {
 
 // Artboard's light board colours, which on Frost's dark glass would draw light tints; only the plain table may name them.
 const LIGHT = ['#EEF1FF', '#2638C9', '#F2F3F6', '#F6F7F9', '#6C83FF', '#E3E6EB', '#E9ECF1', '#1E8E5A', '#8A909B', '#B4380B', '#FFF1E8'];
-// Files that still name them, with how many lines; a ratchet that fails only on a new offender, its entries struck as each file comes to read the table.
-const LEFT = {
-};
-
 const root = new URL('../..', import.meta.url).pathname;
 function walk(dir) {
   return readdirSync(dir).flatMap((f) => {
@@ -47,7 +43,7 @@ function walk(dir) {
   });
 }
 
-test('no file in shell/ names an Artboard light colour outside the plain table, but those still listed', () => {
+test('no file in shell/ names an Artboard light colour outside the plain table', () => {
   const pattern = new RegExp(LIGHT.map((h) => h.slice(1)).join('|'), 'i');
   const found = {};
   for (const p of walk(join(root, 'shell'))) {
@@ -56,6 +52,5 @@ test('no file in shell/ names an Artboard light colour outside the plain table, 
     const n = text.split('\n').filter((l) => pattern.test(l)).length;
     if (n) found[relative(root, p)] = n;
   }
-  const grew = Object.entries(found).filter(([f, n]) => n > (LEFT[f] ?? 0)).map(([f, n]) => `${f}: ${n} (allowed ${LEFT[f] ?? 0})`);
-  assert.deepEqual(grew, [], 'a file names an Artboard light colour; read it from plainTones(tokens)');
+  assert.deepEqual(found, {}, 'a file names an Artboard light colour; read it from plainTones(tokens)');
 });
