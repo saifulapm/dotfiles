@@ -158,6 +158,19 @@ check "a third , comes back to date ($(files_state | jq -r .sort))" files_is '.s
 wtype -k Escape
 until_ok 3000 no_files_process
 
+# q closes as Esc does; inside a find it types into the query instead.
+mod_y
+until_ok 5000 files_up
+until_ok 2000 files_is '.listed'
+wtype /q
+until_ok 1000 files_is '.query == "q"'
+check "q inside a find types into the query and leaves Files open" files_up
+wtype -k Escape
+until_ok 1000 files_is '.finding == false'
+wtype q
+until_ok 3000 no_files_process
+check "q closes Files and ends its process" no_files_process
+
 mod_y
 until_ok 5000 files_up
 niri msg action close-window

@@ -267,7 +267,7 @@ export function appText(voice, app, engraved = false) {
 }
 
 
-const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], [',', 'sort'], ['tab', 'places'], ['esc', 'close']];
+const KEYS = [['j/k', 'move'], ['h/l', 'up / in'], ['space', 'mark'], ['y x p', 'copy cut paste'], ['r', 'rename'], ['a', 'new folder'], ['d', 'trash'], ['o', 'open with'], ['s', 'share'], ['e', 'eject drive'], ['/', 'find'], [',', 'sort'], ['tab', 'places'], ['q/esc', 'close']];
 
 // Paper and Artboard write keys as typed, Blueprint brackets them and every word in caps.
 const strip = (voice, pairs, engraved) => pairs.map((p) => keyPair(voice, p, engraved));

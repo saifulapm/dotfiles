@@ -208,7 +208,7 @@ test('the key strip pairs each key with its word in the theme\'s idiom', () => {
   const paper = F.keyStrip('caps');
   assert.deepEqual(paper[0], { key: 'j/k', word: 'move' });
   assert.deepEqual(F.keyStrip('bracket')[0], { key: '[J/K]', word: 'MOVE' });
-  assert.deepEqual(paper.map((k) => k.key), ['j/k', 'h/l', 'space', 'y x p', 'r', 'a', 'd', 'o', 's', 'e', '/', ',', 'tab', 'esc']);
+  assert.deepEqual(paper.map((k) => k.key), ['j/k', 'h/l', 'space', 'y x p', 'r', 'a', 'd', 'o', 's', 'e', '/', ',', 'tab', 'q/esc']);
 });
 
 test(', cycles the sort from date to name to size, and the strip names the one in use', () => {

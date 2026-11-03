@@ -847,7 +847,7 @@ ShellRoot {
                     app.hidden = !app.hidden;
                 else if (t === ",")
                     app.cycleSort();
-                else if (k === Qt.Key_Escape)
+                else if (k === Qt.Key_Escape || t === "q")
                     app.quit();
                 else if (k === Qt.Key_Tab)
                     app.toSide();
