@@ -15,6 +15,17 @@ on   = "p"
 run  = "plugin smart-paste"
 desc = "Paste into the hovered directory or CWD"
 
+# y and x also put every selected file on the clipboard as text/uri-list, as Files does, so foot pastes them all as quoted paths.
+[[mgr.prepend_keymap]]
+on   = "y"
+run  = [ '''shell -- python3 -c 'import sys, urllib.parse; sys.stdout.write("".join("file://" + urllib.parse.quote(p) + "\r\n" for p in sys.argv[1:]))' %s | wl-copy --type text/uri-list''', "yank" ]
+desc = "Yank selected files and copy them to the clipboard"
+
+[[mgr.prepend_keymap]]
+on   = "x"
+run  = [ '''shell -- python3 -c 'import sys, urllib.parse; sys.stdout.write("".join("file://" + urllib.parse.quote(p) + "\r\n" for p in sys.argv[1:]))' %s | wl-copy --type text/uri-list''', "yank --cut" ]
+desc = "Cut selected files and copy them to the clipboard"
+
 [[mgr.prepend_keymap]]
 on   = [ "t", "t" ]
 run  = "plugin smart-tab"
