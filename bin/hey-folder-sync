@@ -35,12 +35,14 @@ rule "HEY/SetAside"   "Set Aside"   'tag:setaside'
 rule "HEY/Feed"       "The Feed"    'tag:thefeed'
 rule "HEY/PaperTrail" "Paper Trail" 'tag:/^ledger\//'
 rule "HEY/Screener"   "Screener"    'tag:inbox and tag:unread and not tag:screened'
+# Read before INBOX, so INBOX holds only unread Imbox mail, like the desktop Imbox; read state comes from iCloud, so mail read on the phone leaves INBOX on the next sync.
+rule "HEY/Read"       "Read"        'tag:inbox and tag:screened and not tag:unread'
 rule "INBOX"          "Imbox"       'tag:inbox and tag:screened'
 rule "Archive"        "Archived"    '*'
 
 # Only these may be moved out of: iCloud's own folders feed the post-new hook's tags, and mail outside $STORE must never be uploaded.
 MOVABLE=("INBOX" "Archive" "HEY/Bubbled" "HEY/ReplyLater" "HEY/SetAside"
-         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener")
+         "HEY/Feed" "HEY/PaperTrail" "HEY/Screener" "HEY/Read")
 
 # Junk and Deleted Messages are watched but not movable: a swipe to junk tags the message and leaves it where it went.
 TRACKED=("${MOVABLE[@]}" "Junk" "Deleted Messages")
@@ -50,6 +52,8 @@ reverse_ops() {
     case "$1" in
         # Clears every pile, or `replylater` would bounce it straight back out.
         "INBOX")           printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
+        # Same as INBOX: read state is not ours to set, so the mail's read flag decides which of the two it lands in.
+        "HEY/Read")        printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
         # Un-screens this message only; screened.db keeps the sender's decision.
         "HEY/Screener")    printf '+inbox -screened -archived -replylater -setaside -bubble' ;;
         "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived' ;;
@@ -79,7 +83,7 @@ bubble_from_folder() {
 }
 
 if [ ! -e "$ENABLE_DB" ]; then
-    printf '%s\n' '# One box per line to file into (HEY/Screener HEY/Feed HEY/PaperTrail HEY/ReplyLater HEY/SetAside HEY/Bubbled Archive); INBOX is always live. Run hey-folder-sync with no arguments to see what would move.' >"$ENABLE_DB"
+    printf '%s\n' '# One box per line to file into (HEY/Screener HEY/Feed HEY/PaperTrail HEY/ReplyLater HEY/SetAside HEY/Bubbled HEY/Read Archive); INBOX is always live. Run hey-folder-sync with no arguments to see what would move.' >"$ENABLE_DB"
     log "created $ENABLE_DB (nothing enabled)"
 fi
 
