@@ -8,8 +8,8 @@ until_ok 5000 paper_layer
 until_ok 5000 shell_status >/dev/null
 
 read -r ox oy w h < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width) \(.height)"')
-# Dots and grid lines sit on multiples of 16 from the output's top-left, so 3 px into a cell is bare paper.
-cx=$((ox + w / 2 / 16 * 16 + 3)) cy=$((oy + h / 2 / 16 * 16 + 3))
+# Dots and grid lines sit on multiples of 16 from the output's top-left, so 3 px into a cell is bare paper; a quarter down sits under the bar and the island and above the day's passage card, which covers the middle.
+cx=$((ox + w / 2 / 16 * 16 + 3)) cy=$((oy + h / 4 / 16 * 16 + 3))
 
 mean_at() { grim -s 1 -t ppm -g "$1,$2 $3x$4" - | mean_rgb; }
 # Exits 0 if any pixel of the PPM on stdin is within $4 per channel of $1 $2 $3.
@@ -46,7 +46,7 @@ for t in "paper 241 233 216" "artboard 228 230 234" "blueprint 12 26 46"; do
       check "artboard: a dot #B4BAC4 sits at $((cx - 3)),$((cy - 3))" dot_shown
       ;;
     blueprint)
-      gx=$((ox + w / 2 / 80 * 80)) gy=$((oy + h / 2 / 80 * 80 + 8))
+      gx=$((ox + w / 2 / 80 * 80)) gy=$((oy + h / 4 / 80 * 80 + 8))
       read -r lr lg lb < <(mean_at "$gx" "$gy" 1 1)
       read -r cr cg cb < <(mean_at "$((gx + 8))" "$gy" 1 1)
       check "blueprint: the major line at x $gx ($lr $lg $lb) is brighter than the cell ($cr $cg $cb)" \
