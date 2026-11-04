@@ -39,6 +39,11 @@ test("Frost's launcher field is a nord0 well at 70 % with a #434C5E edge, an acc
   assert.deepEqual([f.cursor.fill, f.cursor.badge], ['#475666', '↵']);
 });
 
+test("Frost's launcher heads its pane Launch · Apps over the field, with the matches counted in muted at its right", () => {
+  const f = launcherLook(tokensOf('frost'));
+  assert.deepEqual([f.label.kind, f.label.text('apps'), f.label.color, f.count(3), f.count(1)], ['header', 'Launch · Apps', '#AEB7C6', '3 matches', '1 match']);
+});
+
 test("Artboard's launcher is what it was beside Frost's: no well, a magnifier, ink keys and no highlight", () => {
   const a = launcherLook(tokensOf('artboard'));
   assert.equal(JSON.stringify(a), '{"voice":"plain","engraved":false,"prompt":{"text":"","color":"#57606A","search":true},"caret":"line","rule":{"color":"#D0D7DE","dashed":false},"small":{"font":"Maple Mono","size":11,"spacing":0,"color":"#57606A"},"tile":{"size":32,"radius":9,"fill":"#F2F3F6"},"query":{"font":"Maple Mono","size":20,"italic":false},"label":{"kind":"pill","fill":"#EEF1FF","color":"#3D5AFE"},"slot":"icon","name":{"font":"Maple Mono","size":15,"weight":500,"spacing":0,"color":"#15171B"},"detail":{"font":"Maple Mono","size":12,"italic":false,"color":"#57606A"},"cursor":{"fill":"#EEF1FF","text":"#2638C9","detail":"#57606A","marker":"transparent","radius":10,"weight":600,"badge":"↵"},"chip":{"fill":"#F2F3F6","key":"#15171B"},"keyChip":{"fill":"#F2F3F6","text":"#57606A","border":0,"borderColor":"transparent","cursorFill":"#FFFFFF","cursorText":"#2638C9","cursorBorder":"transparent","radius":6,"size":11,"spacing":0,"column":0}}');

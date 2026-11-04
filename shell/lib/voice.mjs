@@ -95,6 +95,9 @@ export function launcherLook(tokens) {
     const frostLook = frosted
       ? {
           prompt: { text: '›', color: c.accent, search: false },
+          // The board heads the pane Launch · Apps and counts the matches, both muted, over the field.
+          label: { kind: 'header', text: (m) => `Launch · ${m.charAt(0).toUpperCase() + m.slice(1)}`, fill: 'transparent', color: c.muted },
+          count: (n) => `${n} ${n === 1 ? 'match' : 'matches'}`,
           field: { fill: `#B3${c.paper.slice(1)}`, border: tones.tile, caret: c.accent },
           highlight: `#0F${tones.deep.slice(1)}`,
         }

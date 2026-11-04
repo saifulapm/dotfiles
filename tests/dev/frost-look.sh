@@ -62,6 +62,7 @@ check "frost: the launcher's cursor row's fill is #475666 ($(launcher_state | jq
 read -r ratio fill < <(drawn_contrast "$(launcher_state | geo cursorNameBox)")
 check "frost: the lit row's name reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 check "frost: that fill is the lit row's #475666 ($fill)" test "$fill" = "#475666"
+check "frost: the pane is headed Launch · Apps with its matches counted ($(launcher_state | jq -c '[.label, .countText, .count]'))" launcher_is '.label == "Launch · Apps" and .countText == "\(.count) match\(if .count == 1 then "" else "es" end)"'
 check "frost: the lit row is Foot with a ↵ badge ($(launcher_state | jq -c '[.results[.selected], .cursorBadge]'))" launcher_is '.results[.selected] == "Foot" and .cursorBadge == "↵"'
 # The field is a well of nord0 at 70 % with a #434C5E edge, an accent › and caret; the keys are accent Maple Mono.
 check "frost: the field's well is nord0 at 70 % with a #434c5e edge ($(launcher_state | jq -c '[.fieldFill, .fieldBorder]'))" launcher_is '.fieldFill == "#b32e3440" and .fieldBorder == "#434c5e"'
