@@ -31,12 +31,16 @@ until_ok 5000 shell_status >/dev/null
 in_theme frost
 
 until_ok 3000 mode_is rest
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
+until_ok 3000 filled_to 40
+until_ok 3000 mode_is rest
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.62
 until_ok 3000 filled_to 62
 state=$(island)
 echo "     osd: $(jq -c '[.osd.value, .osd.track, .osd.islandBox]' <<<"$state")"
 check "volume 62: the OSD state reads 62 and is the track" state_has '.osd.value == "62" and .osd.kind == "track"'
 check "the fill is 62 % of the track's width" state_has '(.osd.track.fill.w - .osd.track.box.w * 0.62) | fabs < 1'
+check "from 40 to 62 the fill animation is 160 ms ease-out ending at 62 % of the track" state_has '.osd.fillAnimation == {ms: 160, curve: "ease-out", to: 0.62}'
 check "the island box is 320 x 52" state_has '(.osd.islandBox.w - 320 | fabs) < 1 and (.osd.islandBox.h - 52 | fabs) < 1'
 check "the value reads 62 in 13 px" state_has '.osd.value == "62" and .osd.valueFont[1] == 13'
 filled=$(patch .osd.track.fill 0.5)

@@ -520,6 +520,7 @@ PanelWindow {
             // The track and its fill as drawn, for pixel reads.
             islandBox: at(box),
             track: osdTrack ? { box: at(osdTrackBar), fill: at(osdTrackBar.fillItem) } : null,
+            fillAnimation: osdTrack ? osdTrackBar.fillAnimation : null,
             valueBox: at(value),
             // The needle as drawn, and two points on the dial for pixel reads: inside the needle near its tip, and the middle of the red zone.
             needleAngle: meter ? Math.round(meter.needle.rotation * 10) / 10 : null,

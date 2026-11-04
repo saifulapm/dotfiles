@@ -1,4 +1,5 @@
 import QtQuick
+import "." as Root
 
 // Frost's volume bar for a value from 0 to 100: a thin track with the accent fill growing to the value.
 Item {
@@ -7,6 +8,8 @@ Item {
     required property var look
     property real value: 0
     readonly property alias fillItem: fill
+    // The fill's animation as `island state` reports it: what the animation runs with, and the share of the track it grows to.
+    readonly property var fillAnimation: ({ ms: grow.duration, curve: "ease-out", to: Math.max(0, Math.min(100, value)) / 100 })
     implicitHeight: look.thickness
 
     Rectangle {
@@ -24,7 +27,9 @@ Item {
 
         Behavior on width {
             NumberAnimation {
-                duration: bar.look.duration
+                id: grow
+                // Slowed like every other motion.
+                duration: bar.look.duration * Root.State.slowdown
                 easing.type: Easing.OutCubic
             }
         }
