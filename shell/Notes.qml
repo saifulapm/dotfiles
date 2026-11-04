@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import QtQuick
 import QtQuick.Shapes
 import "lib/notes.mjs" as N
@@ -54,7 +55,16 @@ FloatingWindow {
     visible: shown
     implicitWidth: 420
     implicitHeight: 810
-    color: c.surface ?? "white"
+    // A theme that blurs draws the window as glass and asks niri to blur behind its box; niri draws the border and corner.
+    readonly property bool glass: theme.tokens ? theme.tokens.niri.blur === true : false
+    color: glass ? c.glass : c.surface ?? "white"
+    BackgroundEffect.blurRegion: glass ? windowRegion : null
+
+    Region {
+        id: windowRegion
+        item: win.contentItem
+        radius: 10
+    }
 
     // Mod+N: hidden → shown, shown → focused, focused → hidden with focus back where it was.
     function toggle() {
@@ -259,6 +269,8 @@ FloatingWindow {
     function state() {
         return {
             open: shown,
+            fill: String(color),
+            blurRegion: glass ? [{ x: 0, y: 0, w: contentItem.width, h: contentItem.height, radius: windowRegion.radius }] : [],
             focused,
             pinned,
             mode,

@@ -1,6 +1,7 @@
 //@ pragma AppId files
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import QtQuick
 import QtQuick.Layouts
 import "services" as Services
@@ -645,6 +646,8 @@ ShellRoot {
             return JSON.stringify({
                 folder: app.folder,
                 title: win.title,
+                fill: String(win.color),
+                blurRegion: win.glass ? [{ x: 0, y: 0, w: win.contentItem.width, h: win.contentItem.height, radius: windowRegion.radius }] : [],
                 head: app.head,
                 voice: app.voice,
                 firstFrameMs: app.firstFrameMs,
@@ -746,7 +749,16 @@ ShellRoot {
         title: app.head.folder
         implicitWidth: 1200
         implicitHeight: 716
-        color: c.surface ?? "white"
+        // A theme that blurs draws the window as glass and asks niri to blur behind its box; niri draws the border and corner.
+        readonly property bool glass: theme.tokens ? theme.tokens.niri.blur === true : false
+        color: glass ? c.glass : c.surface ?? "white"
+        BackgroundEffect.blurRegion: glass ? windowRegion : null
+
+        Region {
+            id: windowRegion
+            item: win.contentItem
+            radius: 10
+        }
 
         Connections {
             target: win.contentItem.Window.window
