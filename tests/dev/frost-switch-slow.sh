@@ -18,6 +18,24 @@ clear="$((ox + w / 2 - 200)),$((oy + h / 10)) 400x300"
 # The paper below the bar and the island, whose clock may tick between two grabs.
 lower="$ox,$((oy + h / 4)) ${w}x$((h * 3 / 4))"
 
+# Full frost hides the swap: from Paper, whose cream is far from Frost's paper, the middle reads the same just before and just after it.
+"$repo/bin/dots" theme paper >/dev/null
+until_ok 10000 status_at_rest paper
+sleep 1
+before=$(now_ms)
+"$repo/bin/dots" theme frost >/dev/null &
+pid=$!
+until_ok 3000 started_after "$before"
+began=$(shell_status | jq -r '.transitionStartedAt')
+while (($(now_ms) - began < 3540)); do sleep 0.01; done
+pre=$(grim -s 1 -t ppm -g "$centre" - | mean_rgb)
+while (($(now_ms) - began < 3640)); do sleep 0.01; done
+post=$(grim -s 1 -t ppm -g "$centre" - | mean_rgb)
+wait "$pid"
+same() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= 8 && b[i] - a[i] <= 8)) || return 1; done; }
+check "the middle reads the same at 177 ms ($pre) and at 182 ms ($post), so the swap under full frost never shows" same "$pre" "$post"
+until_ok 8000 status_at_rest frost
+
 # From Blueprint, whose navy is darker than Frost's paper, so only the frost can brighten the middle.
 "$repo/bin/dots" theme blueprint >/dev/null
 until_ok 10000 status_at_rest blueprint

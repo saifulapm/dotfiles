@@ -34,6 +34,9 @@ void main() {
     float front = reach * 1.4 - 0.15;
     float cover = 1.0 - smoothstep(front - 0.06, front + 0.06, d);
     float grain = 0.75 + 0.25 * hash(floor(px));
-    float a = 0.85 * cover * grain;
-    fragColor = vec4(ink.rgb * a, a) * qt_Opacity;
+    // Grained and part clear as it grows, then solid by full reach, so the theme swaps unseen under it; the grain stays in the colour.
+    float solid = smoothstep(0.7, 0.95, reach);
+    float a = cover * mix(0.85 * grain, 1.0, solid);
+    vec3 rgb = ink.rgb * mix(1.0, 0.9 + 0.1 * grain, solid);
+    fragColor = vec4(rgb * a, a) * qt_Opacity;
 }
