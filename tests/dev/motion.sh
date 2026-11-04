@@ -80,7 +80,7 @@ calibrate() {
   [ -n "$box" ]
 }
 
-switch_to() { "$repo/bin/dots" theme "$1" >/dev/null; }
+switch_to() { legacy_theme "$1" >/dev/null; }
 theme() {
   check "niri loads $1's fragment" reload switch_to "$1"
   check "niri compiles $1's shaders" no_shader_errors "$log_line"

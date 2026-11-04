@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
 open_goals() {
   until_ok 10000 desk_up

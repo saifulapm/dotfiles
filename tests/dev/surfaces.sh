@@ -33,7 +33,7 @@ span() {
 }
 
 show() {
-  "$repo/bin/dots" theme "$1" >/dev/null
+  legacy_theme "$1" >/dev/null
   until_ok 2000 status_theme "$1"
   niri msg action spawn -- dots-call launcher toggle
   until_ok 3000 launcher_open
@@ -76,6 +76,6 @@ blueprint_island() { cyan "$mid" $((oy + 10)); }
 until_ok 2000 blueprint_island
 check "blueprint: the island's top edge is the cyan stroke" blueprint_island
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 exit $((fails > 0))
 }

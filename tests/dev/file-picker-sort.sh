@@ -69,7 +69,7 @@ check "a folder request skips size: name, then date ($(names))" state_is '.sort 
 wtype -k Escape
 until_ok 3000 answered folder
 
-"$repo/bin/dots" theme artboard >/dev/null
+legacy_theme artboard >/dev/null
 until_ok 3000 status_theme artboard
 ask arrow "$(request open "$dir")"
 shown

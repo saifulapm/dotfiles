@@ -44,7 +44,7 @@ cleanup() { rm -f "$polls"; }
 switch_to() {
   local start pid poller k ended
   start=$(now_ms)
-  "$repo/bin/dots" theme "$1" >/dev/null &
+  legacy_theme "$1" >/dev/null &
   pid=$!
   while (($(now_ms) - start < 1000)); do shell_status | jq -r '.transition'; done >"$polls" &
   poller=$!
@@ -80,7 +80,7 @@ all_are() {
 }
 within() { [ -n "$done_ms" ] && ((done_ms <= 350)); }
 
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 3000 status_at_rest blueprint
 sleep 0.5
 
@@ -102,7 +102,7 @@ check "paper to blueprint: still the slide (saw: $kinds)" test "$kinds" = slide
 check "paper to blueprint: the row ends all blueprint ($final)" all_are ${rgb[blueprint]}
 sleep 0.5
 
-"$repo/bin/dots" theme artboard >/dev/null &
+legacy_theme artboard >/dev/null &
 pid=$!
 artboard_kinds=""
 start=$(now_ms)

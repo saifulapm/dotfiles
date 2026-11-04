@@ -7,7 +7,7 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 state_is() { island | jq -e "$@" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 no_transition() { shell_status | jq -e '.transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
 settled() { until_ok 3000 state_is "$1 and .animating == false"; sleep 0.1; }
 # The island's box: centred on the output, 10 px from the top.
 box() { niri msg -j outputs | jq -r --argjson w "$(island | jq .drawn)" --argjson h "$(island | jq .height)" 'first(.[]).logical | "\(((.width - $w) / 2 + .x) | floor),\(.y + 10) \($w | floor)x\($h | floor)"'; }

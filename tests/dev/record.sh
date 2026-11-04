@@ -17,7 +17,7 @@ until_ok 5000 shell_status >/dev/null
 
 # The picker's key hint reads in each theme's voice: Artboard plain, Blueprint bracketed, Paper caps.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 for t in "artboard|hjkl move  ⇧HJKL size  f full  ↵ rec  esc cancel" \
   "blueprint|[HJKL] MOVE  [⇧HJKL] SIZE  [F] FULL  [↵] REC  [ESC] CANCEL" \
   "paper|HJKL MOVE  ⇧HJKL SIZE  F FULL  ↵ REC  ESC CANCEL"; do

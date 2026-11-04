@@ -22,7 +22,7 @@ close_dns() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 idle() { until_ok "${1:-3000}" state_is '.busy == false and (.rows | length) > 0'; }
 badge_of() { dns_state | jq -r --arg k "$1" '.rows[] | select(.key == $k) | .badge'; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 badge_like() { state_is --arg k "$1" --arg re "$2" 'any(.rows[]; .key == $k and (.badge | test($re)))'; }
 ipad=carried:dev00ipad
 

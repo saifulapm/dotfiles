@@ -138,7 +138,7 @@ until_ok 3000 answered bare
 
 # Each theme writes the heading in its voice; Blueprint's caps are for labels, never for file names.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 for t in "paper|OPEN FILE · ${app^^}" "artboard|Open file · $app" "blueprint|OPEN FILE // ${app^^}"; do
   IFS='|' read -r name heading <<<"$t"
   in_theme "$name"

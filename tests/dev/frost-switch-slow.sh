@@ -19,11 +19,11 @@ clear="$((ox + w / 2 - 200)),$((oy + h / 10)) 400x300"
 lower="$ox,$((oy + h / 4)) ${w}x$((h * 3 / 4))"
 
 # Full frost hides the swap: from Paper, whose cream is far from Frost's paper, the middle reads the same just before and just after it.
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 10000 status_at_rest paper
 sleep 1
 before=$(now_ms)
-"$repo/bin/dots" theme frost >/dev/null &
+legacy_theme frost >/dev/null &
 pid=$!
 until_ok 3000 started_after "$before"
 began=$(shell_status | jq -r '.transitionStartedAt')
@@ -37,13 +37,13 @@ check "the middle reads the same at 177 ms ($pre) and at 182 ms ($post), so the 
 until_ok 8000 status_at_rest frost
 
 # From Blueprint, whose navy is darker than Frost's paper, so only the frost can brighten the middle.
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 10000 status_at_rest blueprint
 sleep 1
 
 # Just past the 180 ms point, timed from the shell's own start stamp, so Frost's dark paper is already under the frost; the polls before it only find the stamp.
 before=$(now_ms)
-"$repo/bin/dots" theme frost >/dev/null &
+legacy_theme frost >/dev/null &
 pid=$!
 until_ok 3000 started_after "$before"
 began=$(shell_status | jq -r '.transitionStartedAt')
@@ -70,9 +70,9 @@ near_paper() { local r g b; read -r r g b <<<"$1"; ((r - 46 <= 2 && 46 - r <= 2 
 check "after the switch the middle ($rest) is Frost's clear paper #2E3440" near_paper "$rest"
 
 # Blueprint asked for 1 s into the growth out of Frost, then Paper 1 s later: it ends on Paper and rests.
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 sleep 1
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 15000 status_at_rest paper
 check "a switch asked for mid-frost ends on the last theme asked for, paper" test "$(shell_status | jq -r .theme)" = paper
 sleep 2
@@ -86,13 +86,13 @@ check "the centre ($ended) is Paper's cream" cream "$ended"
 
 # Blueprint asked for past the swap of a frost switch into Frost: the frost switch out of Frost plays from what is on screen and ends on Blueprint at rest.
 before=$(now_ms)
-"$repo/bin/dots" theme frost >/dev/null &
+legacy_theme frost >/dev/null &
 pid=$!
 until_ok 3000 started_after "$before"
 began=$(shell_status | jq -r '.transitionStartedAt')
 wait "$pid"
 while (($(now_ms) - began < 200 * 20)); do sleep 0.01; done
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 15000 status_at_rest blueprint
 check "a switch asked for past the swap ends on the last theme asked for, blueprint" test "$(shell_status | jq -r .theme)" = blueprint
 sleep 2

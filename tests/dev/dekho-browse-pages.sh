@@ -13,7 +13,7 @@ cleanup() {
 }
 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 rows() { dekho_state | jq -c '.browse | [(.rows | length), .cursor, .more.shown, .loading]'; }
 # The discover calls since the log had $1 lines; the checks run their conditions in bash -c, which needs it.
 asked_since() { tail -n +"$(($1 + 1))" "$calls" | grep '^api discover '; }

@@ -9,7 +9,7 @@ blur_is() { timeout 0.5 qs ipc call shell blur 2>/dev/null | jq -e "$1" >/dev/nu
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 state_is '.open and .keyboard and .settled'; }
 close_control() { wtype -k Escape; until_ok 2000 state_is '.open == false and .drawing == false'; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= $3 && b[i] - a[i] <= $3)) || return 1; done; }
 mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
 

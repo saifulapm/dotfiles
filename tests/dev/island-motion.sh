@@ -35,7 +35,7 @@ read -r _ took < <(watch_morph)
 check "closing back to the clock settles faster than opening (${took} ms)" test "$took" -le 600
 check "at the clock's own width" eval 'island | jq -e ".drawn == .width and .width < 100" >/dev/null'
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 settled
 notify-send "snap"
 until_ok 2000 mode_is notification

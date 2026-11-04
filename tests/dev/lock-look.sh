@@ -20,7 +20,7 @@ unlock() {
 cleanup() { locked_shown && unlock; }
 
 lock_in() {
-  "$repo/bin/dots" theme "$1" >/dev/null
+  legacy_theme "$1" >/dev/null
   until_ok 2000 status_theme "$1"
   niri msg action spawn -- dots-call lock lock
   until_ok 3000 locked_shown
@@ -99,7 +99,7 @@ corner_rgb() { grim -s 1 -t ppm -g "$(corner "$1")" - | mean_rgb; }
 corner_brighter() { local a b; read -r -a a <<<"$(corner_rgb "$1")"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] >= 4)) || return 1; done; }
 failed_past() { state_is --argjson f "$1" '.failures > $f'; }
 
-"$repo/bin/dots" theme frost >/dev/null
+legacy_theme frost >/dev/null
 until_ok 2000 status_theme frost
 # The 300 ms switch frost melts back to the paper's edges well within a second.
 sleep 1
@@ -132,6 +132,6 @@ check "frost: the lock stays up with its field empty ($(lock_state | jq -c '[.lo
 unlock
 check "frost: the test password unlocks" unlocked
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 exit $((fails > 0))
 }

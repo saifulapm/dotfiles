@@ -16,7 +16,7 @@ state_is() { ts_state | jq -e "$@" >/dev/null 2>&1; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 clip() { timeout 1 wl-paste -n 2>/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 open_ts() { niri msg action spawn -- dots-call tailscale toggle; until_ok 3000 state_is '.open and .listed and .settled and .keyboard'; }
 close_ts() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }

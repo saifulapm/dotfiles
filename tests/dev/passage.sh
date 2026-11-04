@@ -50,7 +50,7 @@ drawn() { passage | jq -c ".drawn[0][0] | ${1:-.}"; }
 drawn_is() { passage | jq -e --arg arabic "$arabic" --arg bengali "$bengali" "(.drawn | length) == 1 and (.drawn[0] | length) == 1 and (.drawn[0][0] | $1)" >/dev/null 2>&1; }
 on_drawn() { dots-call passage date "$1" && until_ok 3000 drawn_is "$2"; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 # A theme switch is done when the sheet it left draws nothing.
 switched() { in_theme "$1" && until_ok 3000 drawn_is "$2"; }
 arabic=Amiri

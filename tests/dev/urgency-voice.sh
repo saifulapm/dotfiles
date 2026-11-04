@@ -8,7 +8,7 @@ marks_are() { margins | jq -e --arg want "$1" '.drawn.marks == $want' >/dev/null
 colors_are() { margins | jq -e --argjson want "$1" '.drawn.markColors | unique == ($want | sort)' >/dev/null 2>&1; }
 focused_is() { niri msg -j focused-window | jq -e --arg t "$1" '.title == $t' >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 bells="$DOTS_DEV_DIR/bells"
 mkdir -p "$bells"
 ringer() { niri msg action spawn -- foot -c /dev/null -o bell.urgent=yes -T "$1" sh -c "until [ -e '$bells/$1' ]; do sleep 0.05; done; printf '\a'; sleep 600"; until_ok 5000 focused_is "$1"; }

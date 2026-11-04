@@ -19,7 +19,7 @@ deen_gone() { [ "$(deen_windows)" = 0 ]; }
 deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 asked() { grep -cxF -- "prayer $1" "$DOTS_DEV_DIR/deen.log" 2>/dev/null || true; }
 asked_times() { test "$(asked "$1")" = "$2"; }
 any_asked() { grep -c '^prayer' "$DOTS_DEV_DIR/deen.log" 2>/dev/null || true; }

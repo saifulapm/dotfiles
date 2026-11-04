@@ -59,14 +59,14 @@ wtype .
 until_ok 1000 files_is '.hidden == false'
 check ". again hides them" files_is '(.rows | index(".hidden-note")) == null'
 
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 2000 status_theme blueprint
 until_ok 2000 files_is '.voice == "bracket"'
 wtype /2041
 until_ok 1000 files_is '.rows == ["IMG_2041.jpg"]'
 check "in Blueprint, IMG_2041.jpg draws in its real case ($(files_state | jq -c '.drawn.name'))" files_is '.drawn.name == "IMG_2041.jpg"'
 check "while Blueprint's preview kind is in caps ($(files_state | jq -c .preview.kind))" files_is '.preview.kind | endswith(" · JPEG IMAGE")'
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"

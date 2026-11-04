@@ -124,7 +124,7 @@ mkdir -p "$(dirname "$store")"
 node --input-type=module -e "const G = await import('$repo/shell/lib/goals.mjs'); console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'Ship the new tab', Date.now() + 86400000, Date.now(), 'g0')))" >"$store"
 
 # A fresh profile has no history, so its list reads one empty line and draws no row.
-"$repo/bin/dots" theme paper
+legacy_theme paper
 chromium fresh
 new_tab
 until_ok 10000 ready
@@ -148,7 +148,7 @@ sleep 12
 quit_chromium
 
 for theme in paper blueprint artboard hi-fi; do
-  "$repo/bin/dots" theme "$theme"
+  legacy_theme "$theme"
   chromium seeded
   # The keys typed after Ctrl+T must reach the page's field, not the address bar.
   new_tab fedora
@@ -175,13 +175,13 @@ for theme in paper blueprint artboard hi-fi; do
   quit_chromium
 done
 
-# A switch takes effect at Chromium's next start: Artboard's Chromium quits, dots theme paper, and the next start draws Paper.
-"$repo/bin/dots" theme paper
+# A switch takes effect at Chromium's next start: Artboard's Chromium quits, the switch to paper, and the next start draws Paper.
+legacy_theme paper
 chromium seeded
 new_tab
 until_ok 10000 ready
 until_ok 3000 centre_is "$(token paper)"
-check "after dots theme paper and a restart, Ctrl+T draws Paper's paper ($(page_centre))" centre_is "$(token paper)"
+check "after a switch to paper and a restart, Ctrl+T draws Paper's paper ($(page_centre))" centre_is "$(token paper)"
 check "and Paper's date, $(date_line paper), in $(cdp fonts newtab.html '#date')" \
   is "document.documentElement.dataset.theme === 'paper' && [document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line paper)'"
 check "and its date face is Instrument Serif as drawn ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "Instrument Serif"

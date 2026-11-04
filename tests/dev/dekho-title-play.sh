@@ -25,7 +25,7 @@ dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] |
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
 unit_inactive() { ! unit_active; }
 stop_unit() { systemctl --user stop "$DOTS_DEKHO_UNIT.service" 2>/dev/null; until_ok 3000 unit_inactive; }

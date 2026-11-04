@@ -36,7 +36,7 @@ files_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "files")] |
 files_up() { [ "$(files_windows)" = 1 ] && files_is '.firstFrameMs != null and .listed'; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 no_transition() { shell_status | jq -e '.transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
 open_share() { wtype s; until_ok 3000 files_is '.share.open and .share.listed and (.share.rows | length) > 0'; }
 close_share() { wtype -k Escape; until_ok 2000 files_is '.share.open == false'; }
 # Moves the list's cursor to the first row whose name starts with $1.

@@ -9,7 +9,7 @@ title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.ep
 named() { dekho_is --arg n "$1" '.page == "title" and .title.name == $n and (.title.similar.cards | length) > 0'; }
 film_loaded() { dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 similar() { dekho_state | jq -c '.title.similar | {head, shown, cursor, top, bottom, cards: [.cards[] | [.title[0:24], .lines, .shown, .poster.shown, .poster.file]]}'; }
 where() { dekho_state | jq -c '[.title.name, .title.zone, .title.similar.cursor]'; }
 # Every card drawn with its w342 poster, and as many drawn on screen as the row's five columns hold.

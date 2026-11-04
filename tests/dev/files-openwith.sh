@@ -59,7 +59,7 @@ check "a Name with a newline and U+202E draws on one line ($(ow '.rows[] | selec
 
 n=$(files_state | jq '.openWith.rows | length')
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null && until_ok 2000 status_theme "$1" && until_ok 2000 files_is --arg v "$2" '.voice == $v'; }
+in_theme() { legacy_theme "$1" >/dev/null && until_ok 2000 status_theme "$1" && until_ok 2000 files_is --arg v "$2" '.voice == $v'; }
 in_theme paper caps
 check "Paper: OPEN WITH · 3 JPEG images · $n apps ($(ow '| {label, title, count}'))" \
   files_is --arg c "$n apps" '.openWith | .label == "OPEN WITH" and .title == "3 JPEG images" and .count == $c'

@@ -26,7 +26,7 @@ deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 logged() { grep -qxF -- "$1" "$calls"; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 # A backend script as $1 answers in place of the fake deen.

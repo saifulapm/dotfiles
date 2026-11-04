@@ -9,7 +9,7 @@ control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 control_is() { control_state | jq -e "$1" >/dev/null 2>&1; }
 blur_is() { timeout 0.5 qs ipc call shell blur 2>/dev/null | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 control_is '.open and .keyboard and .settled'; }
 close_control() { wtype -k Escape; until_ok 2000 control_is '.open == false and .drawing == false'; }
 # A notification three lines deep, once its morph has settled; the island holds it 5 s.

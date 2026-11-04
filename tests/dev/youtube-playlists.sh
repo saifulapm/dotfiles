@@ -19,7 +19,7 @@ yt_up() { [ "$(yt_windows)" = 1 ] && yt_is '.firstFrameMs != null'; }
 yt_gone() { [ "$(yt_windows)" = 0 ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 # Focus holds three videos whose positions put the last added first; Gym is empty; the third's name is what a careless paste could type.
@@ -103,12 +103,12 @@ until_ok 1000 yt_is '.confirming'
 check "x asks Delete Deep focus and its 0 videos? under its row, the list beside dimmed ($(yt_state | jq -c '[.confirm, .dimmed]'))" \
   yt_is '.confirm == ["Delete Deep focus and its 0 videos?", "y delete", "esc keep"] and .dimmed'
 check "Paper frames the question in its red accent ($(yt_state | jq -c .confirmLook))" yt_is '.confirmLook == {"border": "#c8381e", "cut": false, "mark": ""}'
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 3000 status_theme blueprint
 blueprint_frame() { yt_is '.confirmLook == {"border": "#ffb547", "cut": false, "mark": "!"}'; }
 until_ok 3000 blueprint_frame
 check "Blueprint frames it in amber with its ! mark ($(yt_state | jq -c .confirmLook))" blueprint_frame
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 wtype j
 sleep 0.3
@@ -128,7 +128,7 @@ until_ok 2000 gone_in_store
 check "and the store keeps it as a tombstone" gone_in_store
 
 # The long name's question, in Blueprint's wider face, draws whole: its name cut, its count kept.
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 3000 status_theme blueprint
 wtype x
 until_ok 1000 yt_is '.confirming'
@@ -137,7 +137,7 @@ until_ok 2000 long_asked
 check "x on the 300-character Playlist asks a question drawn whole, ending and its 0 videos? ($(yt_state | jq -c '[.confirm[0], .confirmLook]'))" long_asked
 wtype -k Escape
 until_ok 1000 yt_is '.confirming == false'
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 # A blank name makes nothing, and Esc leaves the field making nothing.

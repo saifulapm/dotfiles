@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 state_is() { island | jq -e "$1" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # A notification the shell shows once its morph has settled, so its boxes are where they stay.
 shown() { until_ok 3000 state_is "$1 and .mode == \"notification\" and .animating == false"; }
 # Pixels of geometry $1 within $5 of r g b.

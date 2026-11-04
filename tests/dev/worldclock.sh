@@ -121,7 +121,7 @@ today_marked() { island | jq -e --argjson d "$(date +%-d)" '.calendar.grid.today
 for t in paper artboard blueprint; do
   wtype -k Escape
   until_ok 1000 mode_is rest
-  "$repo/bin/dots" theme "$t" >/dev/null
+  legacy_theme "$t" >/dev/null
   until_ok 2000 status_theme "$t"
   niri msg action spawn -- dots-call island focus
   until_ok 4000 loaded

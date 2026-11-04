@@ -137,7 +137,7 @@ until_ok 2000 state_is '.open == false and .drawing == false'
 look_keys='(.font | type == "string" and length > 0) and (.px | type == "number" and . > 0) and (.ink | type == "string") and (.border | type == "string") and (.placeholder | type == "string")'
 same_look() { jq -e -n --argjson a "$1" --argjson b "$2" "\$a == \$b and (\$a | $look_keys)" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 n=0
 for t in "paper|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET" "artboard|Wrong password|↵ join · ctrl+v paste · esc cancel|↵ connect · d forget" "blueprint|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET"; do
   n=$((n + 1))

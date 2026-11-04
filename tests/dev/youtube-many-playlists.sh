@@ -24,7 +24,7 @@ press() {
 }
 
 # Artboard draws the tallest sidebar rows, and 45 outgrow the nested session's 1415 px window.
-"$repo/bin/dots" theme artboard >/dev/null
+legacy_theme artboard >/dev/null
 until_ok 3000 status_theme artboard
 
 mkdir -p "$(dirname "$store")"

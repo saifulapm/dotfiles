@@ -14,7 +14,7 @@ from_start() { surface_is "$1" '(.firstFrame | type) == "number" and .firstFrame
 # Opens surface $1 in theme $2 and checks it settles as motion $3 within $4 ms, then closes it.
 settles() {
   local s=$1 theme=$2 kind=$3 ms=$4
-  "$repo/bin/dots" theme "$theme" >/dev/null
+  legacy_theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
   niri msg action spawn -- dots-call "$s" open >/dev/null
   until_ok 3000 surface_is "$s" .settled
@@ -35,7 +35,7 @@ done
 # The recorder's picker opens and closes on its one toggle.
 picker_settles() {
   local theme=$1 kind=$2 ms=$3
-  "$repo/bin/dots" theme "$theme" >/dev/null
+  legacy_theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
   niri msg action spawn -- dots-call record toggle >/dev/null
   until_ok 3000 surface_is record .settled
@@ -61,7 +61,7 @@ until_ok 5000 surface_is polkit .registered
 # A request opens the polkit prompt and Esc cancels it.
 prompt_settles() {
   local theme=$1 kind=$2 ms=$3
-  "$repo/bin/dots" theme "$theme" >/dev/null
+  legacy_theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
   fake Begin s "settle-$theme" >/dev/null
   until_ok 3000 surface_is polkit .settled
@@ -74,6 +74,6 @@ prompt_settles paper drop 140
 prompt_settles artboard spring 400
 prompt_settles blueprint plot 260
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 exit $((fails > 0))
 }

@@ -18,7 +18,7 @@ logged() { if [ -e "$log" ]; then grep -cxF -- "$1" "$log"; else echo 0; fi; }
 logged_is() { [ "$(logged "$1")" = "$2" ]; }
 fakes() { pgrep -f -- "$repo/bin/dev-fake-dns" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 bind=$(sed -n 's/^\s*Mod+Shift+D [^{]*{ spawn \(.*\); }$/\1/p' "$repo/home/dot_config/niri/binds.kdl" | tr -d '"')
 open_dns() { niri msg action spawn -- $bind; until_ok 3000 state_is '.open and .settled and .keyboard'; }

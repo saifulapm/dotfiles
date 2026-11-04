@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 drawn_is() { margins | jq -e --arg want "$2" ".drawn.$1 == \$want" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 
 until_ok 5000 shell_status >/dev/null
 # niri drops an empty workspace once focus leaves it, so workspace 1 keeps a window of its own.

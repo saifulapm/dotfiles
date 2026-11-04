@@ -23,7 +23,7 @@ select_row() {
   done
   return 1
 }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 eval 'shell_status | jq -e --arg t "$1" ".theme == \$t" >/dev/null'; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 eval 'shell_status | jq -e --arg t "$1" ".theme == \$t" >/dev/null'; }
 
 long="Built-in Audio Digital Stereo (HDMI) Output + Analog Stereo Input on HDMI / DisplayPort 3 of the NUC"
 until_ok 5000 shell_status >/dev/null

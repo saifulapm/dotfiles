@@ -8,7 +8,7 @@ note_is() { island | jq -e "$1" >/dev/null; }
 centre() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 centre_is() { centre | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 open_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 3000 centre_is '.open and .settled and .cursorBox != null'; }
 close_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 2000 centre_is '.open == false and .drawing == false'; }
 # Pixels of geometry $1 within $5 of r g b; with_cursor=1 takes the pointer and its drag image too.

@@ -56,7 +56,7 @@ check "and the prompt closes" state_is '.open | not'
 
 # The key hint reads in each theme's voice: Artboard plain, Blueprint bracketed, Paper caps.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 n=0
 for t in "artboard|↵ authenticate  esc cancel" "blueprint|[↵] AUTHENTICATE  [ESC] CANCEL" "paper|↵ AUTHENTICATE  ESC CANCEL"; do
   n=$((n + 1))

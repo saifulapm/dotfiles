@@ -12,7 +12,7 @@ status_theme() { shell_status | has --arg t "$1" '.theme == $t and .transition =
 filled_to() { island | has --arg v "$1" '.mode == "osd" and .osd.value == $v and .osd.track != null and ((.osd.track.fill.w - .osd.track.box.w * ($v | tonumber) / 100) | fabs) < 1' >/dev/null 2>&1; }
 
 until_ok 5000 shell_status >/dev/null
-"$repo/bin/dots" theme frost >/dev/null
+legacy_theme frost >/dev/null
 until_ok 10000 status_theme frost
 
 until_ok 3000 mode_is rest

@@ -8,7 +8,7 @@ chromium_log=$DOTS_DEV_DIR/chromium.log
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 film_loaded() { dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 links() { dekho_state | jq -c '[.title.links[] | [.text, .url]]'; }
 opened() { grep -cx "$1" "$chromium_log" 2>/dev/null; }
 opened_once() { [ "$(opened "$1")" = 1 ]; }

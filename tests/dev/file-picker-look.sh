@@ -64,7 +64,7 @@ ratio_at_least() { row_look "$2" | jq -e --argjson min "$1" '.contrast >= $min' 
 long=$(printf 'chrome-%0193d' 0)
 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 iso='^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$'
 dotted='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4} · [0-9]{2}:[0-9]{2}$'
 comma='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4}, [0-9]{2}:[0-9]{2}$'

@@ -14,7 +14,7 @@ press() { t0=$(now_ms); niri msg action spawn -- dots-call launcher toggle >/dev
 wait_until() { while (($(now_ms) - t0 < $1)); do sleep 0.005; done; }
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 theme() {
-  "$repo/bin/dots" theme "$1" >/dev/null
+  legacy_theme "$1" >/dev/null
   until_ok 2000 status_theme "$1"
 }
 

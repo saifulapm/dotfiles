@@ -113,7 +113,7 @@ until_ok 3000 state_is '.drawing == false'
 # Each theme draws the card with its own heading and key strip, read off the screen.
 read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 box_of() { pin_state | jq -r --argjson ox "$ox" --argjson oy "$oy" --arg k "$1" '.[$k] | "\(.x + $ox - 4 | round),\(.y + $oy - 4 | round) \(.w + 8 | round)x\(.h + 8 | round)"'; }
 # Paper's chip is light on ink, which tesseract reads only negated.
 negated() {

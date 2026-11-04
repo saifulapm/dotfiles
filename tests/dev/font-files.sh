@@ -20,7 +20,7 @@ open_close() {
 until_ok 10000 paper_up
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 for theme in paper artboard blueprint; do
-  "$repo/bin/dots" theme "$theme" >/dev/null
+  legacy_theme "$theme" >/dev/null
   until_ok 2000 status_theme "$theme"
   for t in launcher themes notifs cheatsheet control goals; do open_close "$t" open; done
   open_close launcher mode emoji

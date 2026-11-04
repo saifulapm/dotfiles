@@ -67,7 +67,7 @@ check "it leaves no Arabic from the ayah day before ($(passage | jq -c '[.ar, .d
 check "Paper labels it QUOTE, not HADITH ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "QUOTE" and .drawn[0][0].label == "QUOTE"'
 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 in_theme blueprint
 until_ok 3000 passage_is '.drawn[0][0].label == "[QUOTE]"'
 check "Blueprint labels it [QUOTE] ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "[QUOTE]" and .drawn[0][0].label == "[QUOTE]"'

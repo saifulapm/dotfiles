@@ -32,7 +32,7 @@ line_ends_shuffled() { yt_is '.look.nowPlaying[0] | endswith(" · shuffled")'; }
 history_zero() { yt_is '.look.sidebar[2] == "History 0"'; }
 
 systemctl --user stop youtube-audio 'youtube-video-*' 2>/dev/null
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 # Focus: four videos with a private one second.

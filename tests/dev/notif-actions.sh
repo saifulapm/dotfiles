@@ -148,7 +148,7 @@ done_asking
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 apart() { jq -e 'map(ascii_downcase) | .[0] != .[2] and .[1] != .[2]' >/dev/null <<<"$1"; }
 for t in paper artboard blueprint; do
-  "$repo/bin/dots" theme "$t" >/dev/null
+  legacy_theme "$t" >/dev/null
   until_ok 8000 status_theme "$t"
   ask -A yes=Yes ink
   until_ok 2000 shows ink

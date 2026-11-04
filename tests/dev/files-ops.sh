@@ -205,7 +205,7 @@ check "r after room is made retries c.bin and finishes ($(ls "$drive" | tr '\n' 
 close_files
 
 for t in artboard blueprint; do
-  "$repo/bin/dots" theme "$t" >/dev/null
+  legacy_theme "$t" >/dev/null
   rm -f "$drive"/*.bin
   open_files
   go down /Downloads
@@ -220,7 +220,7 @@ for t in artboard blueprint; do
   until_ok 5000 files_is '.op.running == false'
   close_files
 done
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 
 # Thirty files onto the full drive: the card lists them in a scrolled list and stays inside the window.
 rm -f "$drive"/*.bin

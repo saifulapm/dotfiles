@@ -21,7 +21,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 sidebar_has() { yt_is --arg s "$1" '.look.sidebar | index($s) != null'; }
 titles_are() { yt_is --argjson t "$1" '[.drawn[].title] == $t'; }
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 # Focus already holds Feather; Gym is empty.

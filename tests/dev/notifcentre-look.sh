@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 state_is() { notifs | jq -e "$1" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # A notification sent just before the centre opens, so its row's age is under a minute; the newest row comes first.
 send_fresh() { local n; n=$(notifs | jq .count); notify-send -a mail "fresh $1"; until_ok 2000 state_is ".count == $((n + 1))"; }
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }

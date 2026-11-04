@@ -32,7 +32,7 @@ fetch_pids() {
 fetches() { grep -cx 'hadith fetch --json' "$calls" 2>/dev/null; }
 fetches_are() { [ "$(fetches)" = "$1" ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 open_deen() { niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"; }

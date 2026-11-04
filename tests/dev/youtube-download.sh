@@ -44,7 +44,7 @@ launch() {
 
 systemctl --user stop youtube-get-dev youtube-audio 'youtube-video-*' 2>/dev/null
 rm -f "$get_log" "$index" "$DOTS_DEV_DIR/youtube-get-fail" "$DOTS_DEV_DIR/youtube-get.json"
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 # Focus: four videos with a private one second.
@@ -75,7 +75,7 @@ check "fetched as bestaudio with the cover and tags embedded" grep -q -- '-f bes
 check "the island leaves the download once the queue is done" until_ok 3000 bash -c '! timeout 0.5 qs ipc call island state | jq -e ".mode == \"downloading\"" >/dev/null'
 
 for theme in artboard blueprint paper; do
-  "$repo/bin/dots" theme "$theme" >/dev/null
+  legacy_theme "$theme" >/dev/null
   until_ok 3000 status_theme "$theme"
   check "$theme: the downloaded row draws its mark, and only it ($(yt_state | jq -c '[.drawn[0:3][].mark]'))" yt_is '.drawn[0].mark and (.drawn[1].mark | not)'
   # The cursor's row is lit: Paper's ink and Blueprint's accent fill it, so its mark takes the surface colour; Artboard's light tint keeps the blue.

@@ -27,7 +27,7 @@ calls() { [ -e "$log" ] && paste -sd'|' "$log"; }
 ncalls() { if [ -e "$log" ]; then wc -l <"$log"; else echo 0; fi; }
 fakes() { pgrep -f -- "$repo/bin/dev-fake-accounts" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 open_acc() { niri msg action spawn -- dots-call accounts toggle; until_ok 3000 state_is '.open and .settled and .keyboard'; }
 close_acc() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }

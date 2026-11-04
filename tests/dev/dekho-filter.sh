@@ -24,7 +24,7 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 rel() { dekho_state | jq -c ".releases$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }

@@ -17,7 +17,7 @@ logged() { if [ -e "$log" ]; then grep -cxF -- "$1" "$log"; else echo 0; fi; }
 logged_is() { [ "$(logged "$1")" = "$2" ]; }
 calls() { if [ -e "$log" ]; then wc -l <"$log"; else echo 0; fi; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 open_dns() { niri msg action spawn -- dots-call dns toggle; until_ok 3000 state_is '.open and .settled and .keyboard'; }
 close_dns() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 idle() { until_ok "${1:-3000}" state_is '.busy == false and (.rows | length) > 0'; }

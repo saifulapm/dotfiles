@@ -133,6 +133,9 @@ fi
 at_rest() { shell_status | jq -e '.timers == 1 and (.loaded | length) >= 7' >/dev/null 2>&1; }
 until_ok 6000 at_rest
 
+# Switches this session to a legacy theme (themes/<name>/theme.toml) by rendering it and naming it, as the shell and niri watch both; foot, tmux, GTK and the apps keep their colours.
+legacy_theme() { node "$repo/shell/lib/theme-render.mjs" "$1" >/dev/null && echo "$1" >"${XDG_STATE_HOME:?}/dots/theme"; }
+
 # A check that exports DOTS_DEV_FAKE_CASTS=1 before sourcing this file has its shell behind dev/niri-relay.mjs; these two are its handles.
 fake_event() { node "$repo/dev/niri-relay.mjs" inject "$DOTS_DEV_DIR/niri-relay.sock" "$1"; }
 relay_stops() { cat "$DOTS_DEV_DIR/niri-relay-stops" 2>/dev/null; }

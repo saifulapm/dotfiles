@@ -20,7 +20,7 @@ unlock() {
 cleanup() { locked_shown && unlock; }
 
 lock_in() {
-  "$repo/bin/dots" theme "$1" >/dev/null
+  legacy_theme "$1" >/dev/null
   until_ok 2000 status_theme "$1"
   niri msg action spawn -- dots-call lock lock
   until_ok 3000 locked_shown
@@ -70,6 +70,6 @@ check "hi-fi: a wrong password leaves the lock locked" locked_shown
 unlock
 check "hi-fi: the test password unlocks" unlocked
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 exit $((fails > 0))
 }

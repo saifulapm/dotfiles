@@ -97,7 +97,7 @@ until_ok 8000 mode_is rest
 
 # Each theme's volume board: Blueprint's VOL, blocks and 062; Paper's bars and serif value; Artboard's glyph and rounded bar.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 osd_is() { island | jq -e --arg v "$1" '.mode == "osd" and .animating == false and .osd.value == $v' >/dev/null 2>&1; }
 osd_reads() { until_ok 2000 osd_is "$1"; }
 in_theme blueprint

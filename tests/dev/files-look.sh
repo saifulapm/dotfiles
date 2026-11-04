@@ -18,7 +18,7 @@ files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
 json_is() { jq -e "$@" >/dev/null; }
 files_call() { timeout 0.5 qs ipc -p "$files_qml" call files "$@" 2>/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 files_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "files" and .is_focused)' >/dev/null; }
 files_gone() { ! niri msg -j windows | jq -e 'any(.[]; .app_id == "files")' >/dev/null; }
 

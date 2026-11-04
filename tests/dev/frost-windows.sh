@@ -11,7 +11,7 @@ mkdir -p "$h/Downloads" "$h/Codes" "$h/.config/gtk-3.0"
 for n in IMG_2039.jpg invoice-0912.pdf notes.txt; do : >"$h/Downloads/$n"; done
 
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= $3 && b[i] - a[i] <= $3)) || return 1; done; }
 mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
 

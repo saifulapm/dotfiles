@@ -8,7 +8,7 @@ state_is() { island | jq -e "$1" >/dev/null 2>&1; }
 # shows <text> <test on .capture>: the capture is what the island shows, and what it drew passes the test.
 shows() { island | jq -e --arg t "$1" ".mode == \"capture\" and .text == \$t and (.capture | $2)" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # How many notifications the Mod+A history holds; a capture never adds one.
 kept() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq .count; }
 rests() { island | jq -e '.mode == "rest"' >/dev/null 2>&1; }

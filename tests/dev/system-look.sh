@@ -40,7 +40,7 @@ labelled() {
   ((n > 15))
 }
 
-"$repo/bin/dots" theme artboard >/dev/null
+legacy_theme artboard >/dev/null
 until_ok 2000 status_theme artboard
 
 niri msg action spawn -- dots-call launcher toggle
@@ -83,7 +83,7 @@ until_ok 2000 is_open record '(.picking | not) and .drawing == false'
 
 # Each theme's key style is a different width, so the apps footer must fit the card in all three.
 for t in paper artboard blueprint; do
-  "$repo/bin/dots" theme "$t" >/dev/null
+  legacy_theme "$t" >/dev/null
   until_ok 2000 status_theme "$t"
   niri msg action spawn -- dots-call launcher toggle
   until_ok 3000 is_open launcher .open
@@ -93,6 +93,6 @@ for t in paper artboard blueprint; do
   until_ok 2000 is_open launcher '.open | not'
 done
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 exit $((fails > 0))
 }

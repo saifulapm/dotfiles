@@ -19,7 +19,7 @@ no_deen_process() { [ -z "$(deen_pids)" ]; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 # The nested shell scans the temp data dir's entries, so the repo's entry goes there for the launcher to list.
 cp "$entry" "$DOTS_DEV_DIR/data/applications/deen.desktop"

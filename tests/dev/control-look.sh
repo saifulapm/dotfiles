@@ -9,7 +9,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 open_control() { niri msg action spawn -- dots-call control toggle; until_ok 3000 state_is '.open and .keyboard and .cursorBox != null and .settled'; }
 close_control() { wtype -k Escape; until_ok 2000 state_is '.open == false and .drawing == false'; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # Pixels of geometry $1 within $5 of r g b.
 near() {
   grim -s 1 -t ppm -g "$1" - | node -e '

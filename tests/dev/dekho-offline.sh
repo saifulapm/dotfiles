@@ -21,7 +21,7 @@ dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] |
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 trending_calls() { grep -c '^api trending --kind tv$' "$fake_log"; }
 
 # The fake's saved copy is two days old, so the boards' dates are two days back; the minute may roll while the check runs, so the notice may carry any of the last three.

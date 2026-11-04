@@ -16,7 +16,7 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 state_has() { jq -e "$1" <<<"$state" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 # The OSD settled on value $1 with its fill grown to that share of the track (the fill eases in over 160 ms).
 filled_to() { island | jq -e --arg v "$1" '.mode == "osd" and .animating == false and .osd.value == $v and .osd.track != null and ((.osd.track.fill.w - .osd.track.box.w * ($v | tonumber) / 100) | fabs) < 1' >/dev/null 2>&1; }
 # Mean colour of the box at jq path $1, shrunk to a 4 x 4 patch at its fraction $2 along its width (or at its middle row for a box with a height of 6).

@@ -159,7 +159,7 @@ cancel filters
 
 # Each theme writes the match and the path mode in its own voice.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 for t in "paper|1 PLACE|PATH|3 MATCHES|FOLDERS|↵ GO · TAB COMPLETE · ⌃L BACK TO LIST · ESC|$codes/lareys/" \
   "artboard|→ Downloads|path||3 folders in $codes start with la|tab complete · ↵ go · ctrl+l filter · esc|lareys" \
   "blueprint|1 PLACE|> PATH|3 MATCHES|COMPLETING IN $codes|[↵] GO · [TAB] COMPLETE · [⌃L] BACK TO LIST · [ESC]|lareys/"; do

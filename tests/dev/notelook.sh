@@ -37,7 +37,7 @@ wtype -k Tab
 until_ok 2000 notes_is '.selectedRect != null'
 check "the selected card is outlined in Paper's #C8381E" is_accent '#C8381E'
 for t in artboard:#3D5AFE blueprint:#7FE3F0; do
-  "$repo/bin/dots" theme "${t%%:*}" >/dev/null 2>&1
+  legacy_theme "${t%%:*}" >/dev/null 2>&1
   until_ok 2000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"${t%%:*}\"' >/dev/null"
   sleep 0.3
   check "the selected card is outlined in ${t%%:*}'s ${t#*:}" is_accent "${t#*:}"
@@ -45,7 +45,7 @@ done
 check "blueprint: the sections hint and the checkboxes keep their brackets ($(notes_state | jq -c '[.keyHint, .checkbox]'))" notes_is '.keyHint == "[⌃K]" and .checkbox == "brackets"'
 
 # Hi-Fi draws Blueprint's layout without the marks; the one note here is plain words with no bracket.
-"$repo/bin/dots" theme hi-fi >/dev/null 2>&1
+legacy_theme hi-fi >/dev/null 2>&1
 until_ok 2000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"hi-fi\"' >/dev/null"
 sleep 0.3
 check "hi-fi: the sections hint is bare and the checkboxes are circles ($(notes_state | jq -c '[.keyHint, .checkbox]'))" notes_is '.keyHint == "⌃K" and .checkbox == "circle"'

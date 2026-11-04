@@ -34,8 +34,8 @@ function steps(file) {
     for (const n of names) if (!pixel.has(n) && (/\bgrim\b/.test(fns[n]) || calls(fns[n], [...pixel]))) grew = !!pixel.add(n);
   }
   // A switcher renders or switches to its first argument.
-  const switchers = names.filter((n) => /(bin\/dots"? theme|theme-render\.mjs"?|status_theme) "\$1"/.test(fns[n]) && n !== 'status_theme');
-  const switchAt = new RegExp(`^\\s*(${['"\\$repo/bin/dots" theme', 'until_ok \\d+ status_theme', ...switchers].join('|')})\\s+("?)(${THEMES}|\\S+)\\2(\\s|$)`);
+  const switchers = names.filter((n) => /(bin\/dots"? colorscheme|legacy_theme|theme-render\.mjs"?|status_theme) "\$1"/.test(fns[n]) && n !== 'status_theme');
+  const switchAt = new RegExp(`^\\s*(${['"\\$repo/bin/dots" colorscheme', 'legacy_theme', 'until_ok \\d+ status_theme', ...switchers].join('|')})\\s+("?)(${THEMES}|\\S+)\\2(\\s|$)`);
   const found = [];
   let cur = null;
   lines.forEach((line) => {

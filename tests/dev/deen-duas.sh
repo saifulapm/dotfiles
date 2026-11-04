@@ -19,7 +19,7 @@ deen_gone() { [ "$(deen_windows)" = 0 ]; }
 deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 # The pane's Arabic with tatweel, harakat and the alef carriers folded as the crate's normalise.rs does.
 letters() { node -e 'process.stdout.write(require("fs").readFileSync(0, "utf8").replace(/[ً-ٰٟۖ-ۭـ࣓-ࣿ]/g, "").replace(/[آأإٱ]/g, "ا"))'; }
 many() { printf "$1%.0s" $(seq "$2"); }

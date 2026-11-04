@@ -17,19 +17,19 @@ y=$((oy + h / 4 / 16 * 16 + 3))
 pixel() { grim -s 1 -t ppm -g "$((ox + $1)),$((oy + $2)) 1x1" - | mean_rgb; }
 
 # The lit lamp's centre, read in Hi-Fi at rest.
-"$repo/bin/dots" theme hi-fi >/dev/null
+legacy_theme hi-fi >/dev/null
 until_ok 10000 status_at_rest hi-fi
 lit_lamp() { margins | jq -e '.drawn.lamps | any(.lit)' >/dev/null; }
 until_ok 2000 lit_lamp
 read -r lx ly < <(margins | jq -r '.drawn.lamps[] | select(.lit) | .box | "\(.x + .w / 2 | floor) \(.y + .h / 2 | floor)"' | head -1)
 echo "     lit lamp at $lx $ly"
 
-"$repo/bin/dots" theme blueprint >/dev/null
+legacy_theme blueprint >/dev/null
 until_ok 10000 status_at_rest blueprint
 sleep 0.5
 
 start=$(now_ms)
-"$repo/bin/dots" theme hi-fi >/dev/null &
+legacy_theme hi-fi >/dev/null &
 pid=$!
 # Half the 4.4 s sweep, after the handover hifi-sweep.sh measured.
 while (($(now_ms) - start < 50 + 2200)); do sleep 0.01; done

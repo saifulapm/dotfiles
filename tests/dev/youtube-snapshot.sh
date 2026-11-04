@@ -23,7 +23,7 @@ sidebar_has() { yt_is --arg s "$1" '.look.sidebar | index($s) != null'; }
 # The head's count while the snapshot reads, caught between its first and last page.
 reading_midway() { yt_is '.look.results[1] | test("^reading [12]00 of 300$")'; }
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 until_ok 3000 status_theme paper
 
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_MACHINE=ytcheck DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work/data XDG_CACHE_HOME=$work $repo/bin/dots-youtube"

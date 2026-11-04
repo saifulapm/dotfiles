@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The outgoing theme's switch transition: seen mid-way on screen, done by 350 ms from the spawn (dots theme about 75 ms, the rebinding about 40, the 220 ms scan; #ANBVSPFJ), and nothing left running.
+# The outgoing theme's switch transition: seen mid-way on screen, done by 350 ms from the spawn (the render about 75 ms, the rebinding about 40, the 220 ms scan; #ANBVSPFJ), and nothing left running.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -37,7 +37,7 @@ seen=() final=""
 switch_from() {
   local start t pid
   start=$(now_ms)
-  "$repo/bin/dots" theme "$2" >/dev/null &
+  legacy_theme "$2" >/dev/null &
   pid=$!
   seen=()
   while t=$(($(now_ms) - start)) && ((t < 250)); do
@@ -65,7 +65,7 @@ all_are() {
   near12 "${v[@]:0:3}" "$@" && near12 "${v[@]:3:3}" "$@" && near12 "${v[@]:6:3}" "$@"
 }
 
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme paper >/dev/null
 all_are_now() { final=$(bands); all_are "$@"; }
 until_ok 3000 all_are_now ${rgb[paper]}
 check "the start is all paper ($final)" all_are ${rgb[paper]}
@@ -83,9 +83,9 @@ check "artboard to paper: all paper by 350 ms ($final)" all_are ${rgb[paper]}
 
 # The zoom pulls the canvas off the screen edges, so the edge band must fade like the middle, never swing back.
 edge_px() { grim -s 1 -t ppm -g "7,600 1x1" - | tail -c3 | od -An -tu1; }
-"$repo/bin/dots" theme artboard >/dev/null
+legacy_theme artboard >/dev/null
 sleep 0.6
-"$repo/bin/dots" theme blueprint >/dev/null &
+legacy_theme blueprint >/dev/null &
 sw=$!
 edge=()
 start=$(now_ms)
@@ -104,8 +104,8 @@ edge_monotonic() {
 check "artboard to blueprint: the screen edge fades without swinging back (${#edge[@]} frames)" edge_monotonic
 
 # Back to paper while the slide to blueprint still runs: paper must be what stays.
-"$repo/bin/dots" theme blueprint >/dev/null
-"$repo/bin/dots" theme paper >/dev/null
+legacy_theme blueprint >/dev/null
+legacy_theme paper >/dev/null
 sleep 0.8
 final=$(bands)
 check "paper, blueprint, paper inside one transition ends on paper ($final)" all_are ${rgb[paper]}

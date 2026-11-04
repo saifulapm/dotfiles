@@ -99,7 +99,7 @@ done
 
 # Each theme writes the heading and the question in its voice; the file's name keeps its case.
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { "$repo/bin/dots" theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 for t in "paper|SAVE AS · ${app^^}|report.pdf exists · ↵ REPLACE · ESC KEEP" \
   "artboard|Save as · $app|report.pdf exists · ↵ replace · esc keep" \
   "blueprint|SAVE AS // ${app^^}|! report.pdf EXISTS · [↵] REPLACE · [ESC] KEEP"; do
