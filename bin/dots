@@ -67,6 +67,15 @@ reload_foot() {
   done
 }
 
+# The tree-sitter highlighters take their faces when they are added, so each client's window gets them again after the new faces.
+# shellcheck disable=SC2016 # the $kak_client_list is kak's, expanded in its own %sh
+KAK_RECOLOUR='colorscheme dots
+evaluate-commands %sh{
+  for client in $kak_client_list; do
+    printf "evaluate-commands -client %s %%{ try %%{ remove-highlighter window/tree-sitter; add-highlighter window/tree-sitter tree-sitter }; try %%{ remove-highlighter window/rainbow; add-highlighter window/rainbow tree-sitter-rainbow } }\\n" "$client"
+  done
+}'
+
 reload_kak() {
   local pid session sessions
   sessions=$(kak -l 2>/dev/null) || return 0
@@ -74,7 +83,7 @@ reload_kak() {
     # A server without -s is named by its pid.
     session=$(tr '\0' '\n' <"/proc/$pid/cmdline" | sed -n '/^-s$/{n;p;q}')
     session=${session:-$pid}
-    grep -qxF "$session" <<<"$sessions" && echo 'colorscheme dots' | kak -p "$session"
+    grep -qxF "$session" <<<"$sessions" && kak -p "$session" <<<"$KAK_RECOLOUR"
   done
 }
 
