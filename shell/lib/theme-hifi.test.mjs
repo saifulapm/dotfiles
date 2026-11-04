@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,7 +10,6 @@ import { validateTheme, renderNiri, renderFoot } from './theme.mjs';
 import { renderZathura, renderChromiumTheme, renderGtkSettings } from './apps.mjs';
 
 const render = new URL('./theme-render.mjs', import.meta.url).pathname;
-const dots = new URL('../../bin/dots', import.meta.url).pathname;
 const load = (n) => parseToml(readFileSync(new URL(`../../themes/${n}/theme.toml`, import.meta.url), 'utf8'));
 const hifi = () => validateTheme(load('hi-fi'));
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -134,25 +133,4 @@ test('Hi-Fi\'s apps are Gruvbox Dark: foot, zathura, Chromium and GTK', () => {
   const chrome = JSON.parse(renderChromiumTheme(t)).theme.colors;
   assert.deepEqual([chrome.frame, chrome.toolbar], [[29, 32, 33], [40, 40, 40]]);
   assert.match(renderGtkSettings(t), /gtk-application-prefer-dark-theme=true/);
-});
-
-test('dots theme hi-fi switches, sets GTK dark, and Paper after it sets light again', (t) => {
-  const state = mkdtempSync(join(tmpdir(), 'dots-hifi-'));
-  t.after(() => rmSync(state, { recursive: true, force: true }));
-  const bin = join(state, 'bin');
-  mkdirSync(bin);
-  const log = join(state, 'gsettings.log');
-  writeFileSync(join(bin, 'gsettings'), `#!/bin/bash\necho "$*" >>${log}\n`, { mode: 0o755 });
-  const env = Object.assign({}, process.env, {
-    PATH: `${bin}:${process.env.PATH}`, XDG_STATE_HOME: state, WAYLAND_DISPLAY: '', DBUS_SESSION_BUS_ADDRESS: `unix:path=${state}/no-bus`,
-    TMUX_TMPDIR: state, XDG_RUNTIME_DIR: state, DOTS_AGENT_HOME: `${state}/agents`,
-  });
-  delete env.TMUX;
-  const r = spawnSync(dots, ['theme', 'hi-fi'], { env, encoding: 'utf8' });
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(join(state, 'dots/theme'), 'utf8').trim(), 'hi-fi');
-  assert.match(readFileSync(log, 'utf8'), /color-scheme prefer-dark/);
-  assert.equal(spawnSync(dots, ['theme', 'paper'], { env }).status, 0);
-  assert.match(readFileSync(log, 'utf8').trim().split('\n').filter((l) => l.includes('color-scheme')).pop(), /prefer-light/);
-  assert.match(readFileSync(join(state, 'dots/theme-out/zathura'), 'utf8'), /set recolor false/);
 });

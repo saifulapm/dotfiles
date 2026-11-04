@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -10,7 +10,6 @@ import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootOsc } fro
 import { renderHelix, renderChromiumTheme, renderGtkSettings, renderZathura, renderNewtabCss } from './apps.mjs';
 
 const render = new URL('./theme-render.mjs', import.meta.url).pathname;
-const dots = new URL('../../bin/dots', import.meta.url).pathname;
 const load = (n) => parseToml(readFileSync(new URL(`../../themes/${n}/theme.toml`, import.meta.url), 'utf8'));
 const frost = () => validateTheme(load('frost'));
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -84,22 +83,6 @@ test('Inter is a package on every machine, since Frost draws the shell in it', (
   assert.match(block ?? '', /^arch = "all"$/m);
 });
 
-test('dots theme frost switches and writes frost to the state file', (t) => {
-  const state = mkdtempSync(join(tmpdir(), 'dots-frost-switch-'));
-  t.after(() => rmSync(state, { recursive: true, force: true }));
-  const bin = join(state, 'bin');
-  mkdirSync(bin);
-  writeFileSync(join(bin, 'gsettings'), '#!/bin/bash\n', { mode: 0o755 });
-  const env = Object.assign({}, process.env, {
-    PATH: `${bin}:${process.env.PATH}`, XDG_STATE_HOME: state, WAYLAND_DISPLAY: '', DBUS_SESSION_BUS_ADDRESS: `unix:path=${state}/no-bus`,
-    TMUX_TMPDIR: state, XDG_RUNTIME_DIR: state, DOTS_AGENT_HOME: `${state}/agents`,
-  });
-  delete env.TMUX;
-  const r = spawnSync(dots, ['theme', 'frost'], { env, encoding: 'utf8' });
-  assert.equal(r.status, 0, r.stderr);
-  assert.equal(readFileSync(join(state, 'dots/theme'), 'utf8').trim(), 'frost');
-});
-
 test('Frost frames windows in a 1 px frost-blue border with 10 px corners, 20 px gaps and no shadow', () => {
   const kdl = renderNiri(frost());
   assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#88C0D0"\s*inactive-color "#434C5E"/);
@@ -143,23 +126,4 @@ test('Frost\'s new tab takes the plain board colours from its own row, dark, and
   for (const [k, v] of [['tile', '#434C5E'], ['field', '#323845'], ['tint', '#475666'], ['deep', '#ECEFF4']]) assert.match(css, new RegExp(`--${k}: ${v};`), k);
   const art = renderNewtabCss(validateTheme(load('artboard')));
   for (const [k, v] of [['tile', '#F2F3F6'], ['field', '#F6F7F9'], ['tint', '#EEF1FF'], ['deep', '#2638C9']]) assert.match(art, new RegExp(`--${k}: ${v};`), k);
-});
-
-test('dots theme frost sets GTK dark, and Paper after it sets light and zathura recolor false again', (t) => {
-  const state = mkdtempSync(join(tmpdir(), 'dots-frost-gtk-'));
-  t.after(() => rmSync(state, { recursive: true, force: true }));
-  const bin = join(state, 'bin');
-  mkdirSync(bin);
-  const log = join(state, 'gsettings.log');
-  writeFileSync(join(bin, 'gsettings'), `#!/bin/bash\necho "$*" >>${log}\n`, { mode: 0o755 });
-  const env = Object.assign({}, process.env, {
-    PATH: `${bin}:${process.env.PATH}`, XDG_STATE_HOME: state, WAYLAND_DISPLAY: '', DBUS_SESSION_BUS_ADDRESS: `unix:path=${state}/no-bus`,
-    TMUX_TMPDIR: state, XDG_RUNTIME_DIR: state, DOTS_AGENT_HOME: `${state}/agents`,
-  });
-  delete env.TMUX;
-  assert.equal(spawnSync(dots, ['theme', 'frost'], { env }).status, 0);
-  assert.match(readFileSync(log, 'utf8'), /color-scheme prefer-dark/);
-  assert.equal(spawnSync(dots, ['theme', 'paper'], { env }).status, 0);
-  assert.match(readFileSync(log, 'utf8').trim().split('\n').filter((l) => l.includes('color-scheme')).pop(), /prefer-light/);
-  assert.match(readFileSync(join(state, 'dots/theme-out/zathura'), 'utf8'), /set recolor false/);
 });

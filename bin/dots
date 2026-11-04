@@ -135,33 +135,30 @@ amx.toml .config/amx/themes/dots.toml
 AGENTS
 }
 
-theme() {
+colorscheme() {
   local name=${1:-} t0=${DOTS_SWITCH_T0:-} LC_ALL=C
-  [[ -n $name ]] || die "usage: dots theme <name>"
+  [[ -n $name ]] || die "usage: dots colorscheme <name>"
   # The name lands in paths, theme-switch.json and the island, so it is checked before anything runs; C keeps [a-z] ASCII.
-  [[ $name =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]] || die "theme $name: not a theme name"
+  [[ $name =~ ^[a-z0-9][a-z0-9_-]{0,31}$ ]] || die "colorscheme $name: not a colorscheme name"
   # The caller's stamp goes into arithmetic, so only a time in ms from the last minute is taken.
   local now
   now=$(date +%s%3N)
   [[ $t0 =~ ^[0-9]{13}$ ]] && ((now - t0 >= 0 && now - t0 <= 60000)) || t0=$now
-  local repo state out from
+  local repo state out from msg
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
   state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
   out=$state/theme-out
-  # Two switches at once would leave fragments from both, so they take turns; the fallback to paper already holds the lock.
-  if [[ -z ${theme_locked:-} ]]; then
-    mkdir -p -m 700 "$state"
-    exec 8>"$state/theme.lock"
-    flock -w 30 8 || die "theme $name: another switch held the lock for 30 s"
-    theme_locked=1
-  fi
+  # Two switches at once would leave fragments from both, so they take turns.
+  # shellcheck disable=SC2174 # only dots/ is made private; the state home above it is the user's
+  mkdir -p -m 700 "$state"
+  exec 8>"$state/theme.lock"
+  flock -w 30 8 || die "colorscheme $name: another switch held the lock for 30 s"
   from=$(cat "$state/theme" 2>/dev/null || true)
-  if ! node "$repo/shell/lib/theme-render.mjs" "$name"; then
-    local msg="theme $name: invalid theme.toml"
-    [[ -f $repo/themes/$name/theme.toml ]] || msg="theme $name: no such theme"
-    [[ $name == paper ]] && exit 1
-    theme paper
-    # The island shows what the shell finds here for 5 s.
+  # A refused render writes nothing, so the current colorscheme stays; the renderer's one line is the reason.
+  if ! msg=$(node "$repo/shell/lib/colorscheme-render.mjs" "$name" 2>&1); then
+    echo "$msg" >&2
+    mkdir -p "$out"
+    # The island shows what the shell finds here for 5 s, each time the file is written.
     echo "$msg" >"$out/notice"
     exit 1
   fi
@@ -184,22 +181,25 @@ theme() {
     gsettings set org.gnome.desktop.interface monospace-font-name "$mono 11" || echo gsettings >>"$failed"; } &
   { reload_agents "$out" || echo agents >>"$failed"; } &
   wait
-  # The island shows the notice for 5 s, so an app left on the old theme is named.
-  [[ -s $failed ]] && echo "theme $name: $(sort "$failed" | paste -sd, - | sed 's/,/, /g') did not reload" >"$out/notice"
+  local end
+  end=$(date +%s%3N)
+  # The island shows the notice for 5 s, so an app left on the old colorscheme is named.
+  [[ -s $failed ]] && echo "colorscheme $name: $(sort "$failed" | paste -sd, - | sed 's/,/, /g') did not reload" >"$out/notice"
   rm -f "$failed"
-  printf '{"from":"%s","to":"%s","ms":%d}\n' "$from" "$name" $(($(date +%s%3N) - t0)) >"$state/theme-switch.json"
+  printf '{"from":"%s","to":"%s","start":%d,"end":%d,"ms":%d}\n' "$from" "$name" "$t0" "$end" $((end - t0)) >"$state/theme-switch.json"
 }
 
 main() {
   case ${1:-} in
     install) install ;;
-    theme) theme "${2:-}" ;;
+    colorscheme) colorscheme "${2:-}" ;;
+    theme) die "dots theme is gone; use dots colorscheme <name>" ;;
     # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
     awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;
     dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
     sync | update | bump | secrets | cutover | claude-account | dns | clean) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-$1" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots update | dots bump | dots secrets | dots theme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
+      echo "usage: dots install | dots update | dots bump | dots secrets | dots colorscheme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
       exit 2
       ;;
   esac
