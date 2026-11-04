@@ -1,9 +1,8 @@
 #!/bin/bash
-# theme sources hash:{{ range concat (glob (joinPath .chezmoi.workingTree "themes/*/*")) (glob (joinPath .chezmoi.workingTree "shell/lib/theme*.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/apps.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/toml.mjs")) }} {{ include . | sha256sum }}{{ end }}
+# theme sources hash:{{ range concat (glob (joinPath .chezmoi.workingTree "colorschemes/*")) (glob (joinPath .chezmoi.workingTree "shell/lib/colorscheme*.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/render-out.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/theme.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/apps.mjs")) (list (joinPath .chezmoi.workingTree "shell/lib/toml.mjs")) }} {{ include . | sha256sum }}{{ end }}
 {{ template "lib.sh" . }}
 state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 # The clipboard history and the notifications, one-time codes among them, live here, so only the user reads it.
 mkdir -p "$state" && chmod 700 "$state"
-# A theme chosen earlier stays.
-[[ -f $state/theme ]] || echo paper >"$state/theme"
-node {{ joinPath .chezmoi.workingTree "shell/lib/theme-render.mjs" | quote }} "$(cat "$state/theme")" || die "theme render failed"
+# The render keeps a colorscheme chosen earlier, and saves artboard over a name that is none.
+node {{ joinPath .chezmoi.workingTree "shell/lib/colorscheme-render.mjs" | quote }} --saved || die "colorscheme render failed"
