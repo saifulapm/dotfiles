@@ -26,7 +26,8 @@ start=$(now_ms)
 while (($(now_ms) - start < 1600)); do sleep 0.01; done
 half=$(island | jq -c '.osd.track | (.fill.w / .box.w)')
 echo "     half-way the fill is $half of the track"
-check "half-way the fill is between 0.41 and 0.61 of the track ($half)" has '. > 0.41 and . < 0.61' <<<"$half"
+# An ease-out has most of the way grown by half its time (0.59 here); a linear fill would read 0.51.
+check "half-way the fill is between 0.55 and 0.618 of the track, eased out ($half)" has '. > 0.55 and . < 0.618' <<<"$half"
 
 until_ok 8000 filled_to 62
 state=$(island)

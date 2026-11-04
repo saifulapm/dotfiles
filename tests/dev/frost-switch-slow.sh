@@ -31,9 +31,14 @@ until_ok 3000 started_after "$before"
 began=$(shell_status | jq -r '.transitionStartedAt')
 while (($(now_ms) - began < 3630)); do sleep 0.01; done
 covered=$(grim -s 1 -t ppm -g "$centre" - | mean_rgb)
+# At 250 ms the frost has melted off the middle, which shows the theme swapped in under it, not Blueprint's navy.
+while (($(now_ms) - began < 250 * 20)); do sleep 0.01; done
+melted=$(grim -s 1 -t ppm -g "$clear" - | mean_rgb)
 wait "$pid"
 brighter() { local r g b; read -r r g b <<<"$1"; ((r >= 46 + 60 && g >= 52 + 60 && b >= 64 + 60)); }
 check "just past the 180 ms point the centre 400 x 300 ($covered) is brighter than #2E3440 by 60 on each channel" brighter "$covered"
+near_frost() { local r g b; read -r r g b <<<"$1"; ((r - 46 <= 8 && 46 - r <= 8 && g - 52 <= 8 && 52 - g <= 8 && b - 64 <= 8 && 64 - b <= 8)); }
+check "at 250 ms the melted middle ($melted) is Frost's paper, swapped in under the frost" near_frost "$melted"
 
 until_ok 8000 status_at_rest frost
 sleep 2
@@ -60,6 +65,26 @@ check "after it, two grims 2 s apart are identical" cmp -s "$a" "$b"
 cream() { local r g b; read -r r g b <<<"$1"; ((r > 200 && g > 200 && b > 180)); }
 ended=$(grim -s 1 -t ppm -g "$centre" - | mean_rgb)
 check "the centre ($ended) is Paper's cream" cream "$ended"
+
+# Blueprint asked for past the swap of a frost switch into Frost: the frost switch out of Frost plays from what is on screen and ends on Blueprint at rest.
+before=$(now_ms)
+"$repo/bin/dots" theme frost >/dev/null &
+pid=$!
+until_ok 3000 started_after "$before"
+began=$(shell_status | jq -r '.transitionStartedAt')
+wait "$pid"
+while (($(now_ms) - began < 200 * 20)); do sleep 0.01; done
+"$repo/bin/dots" theme blueprint >/dev/null
+until_ok 15000 status_at_rest blueprint
+check "a switch asked for past the swap ends on the last theme asked for, blueprint" test "$(shell_status | jq -r .theme)" = blueprint
+sleep 2
+grim -s 1 -t ppm -g "$lower" "$a"
+sleep 2
+grim -s 1 -t ppm -g "$lower" "$b"
+check "after it, two grims 2 s apart are identical" cmp -s "$a" "$b"
+navy=$(grim -s 1 -t ppm -g "$clear" - | mean_rgb)
+is_navy() { local r g b; read -r r g b <<<"$1"; ((r < 30 && g < 40 && b > 35 && b < 70)); }
+check "the middle ($navy) is Blueprint's navy" is_navy "$navy"
 rm -f "$a" "$b"
 
 timers_one() { shell_status | jq -e '.timers == 1' >/dev/null; }
