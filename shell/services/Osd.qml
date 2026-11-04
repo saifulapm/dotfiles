@@ -78,7 +78,7 @@ Scope {
 
     Root.Tick {
         id: hold
-        interval: 1500
+        interval: 1500 * Root.State.slowdown
         onTriggered: osd.current = null
     }
 }
