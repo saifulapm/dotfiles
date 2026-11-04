@@ -6,3 +6,5 @@ state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 mkdir -p "$state" && chmod 700 "$state"
 # The render keeps a colorscheme chosen earlier, and saves artboard over a name that is none.
 node {{ joinPath .chezmoi.workingTree "shell/lib/colorscheme-render.mjs" | quote }} --saved || die "colorscheme render failed"
+# Only a switch tells GTK light or dark and recolours the open apps, so a dark old theme mapped to artboard leaves nothing dark.
+{{ joinPath .chezmoi.workingTree "bin/dots" | quote }} colorscheme "$(cat "$state/theme")" >/dev/null || die "colorscheme switch failed"
