@@ -62,7 +62,27 @@ check "frost: the launcher's cursor row's fill is #475666 ($(launcher_state | jq
 read -r ratio fill < <(drawn_contrast "$(launcher_state | geo cursorNameBox)")
 check "frost: the lit row's name reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 check "frost: that fill is the lit row's #475666 ($fill)" test "$fill" = "#475666"
+check "frost: the lit row is Foot with a ↵ badge ($(launcher_state | jq -c '[.results[.selected], .cursorBadge]'))" launcher_is '.results[.selected] == "Foot" and .cursorBadge == "↵"'
+# The field is a well of nord0 at 70 % with a #434C5E edge, an accent › and caret; the keys are accent Maple Mono.
+check "frost: the field's well is nord0 at 70 % with a #434c5e edge ($(launcher_state | jq -c '[.fieldFill, .fieldBorder]'))" launcher_is '.fieldFill == "#b32e3440" and .fieldBorder == "#434c5e"'
+check "frost: the prompt is an accent › and the caret is accent ($(launcher_state | jq -c '[.prompt, .caretColor]'))" launcher_is '.prompt == {text: "›", color: "#88C0D0"} and .caretColor == "#88C0D0"'
+check "frost: the key line's keys are #88c0d0 Maple Mono ($(launcher_state | jq -c '[.keyColor, .keyFont]'))" launcher_is '.keyColor == "#88c0d0" and .keyFont == "Maple Mono"'
+# The well's top edge row reads #434C5E, and the first key's glyphs hold accent pixels the muted words never do.
+edge=$(near "$(launcher_state | jq -r '.fieldBox | "\(.x + 40 | floor),\(.y | floor) 40x1"')" 67 76 94 6)
+check "frost: the well's edge reads #434C5E on screen ($edge of 40 px)" test "$edge" -gt 30
+wellpx=$(near "$(launcher_state | jq -r '.fieldBox | "\(.x + .w / 2 | floor),\(.y + 8 | floor) 20x8"')" 46 52 64 12)
+check "frost: inside the well reads a nord0 tint ($wellpx of 160 px)" test "$wellpx" -gt 120
+keypx=$(near "$(launcher_state | jq -r '.keyBox | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"')" 136 192 208 24)
+check "frost: the first key draws accent pixels on screen ($keypx px)" test "$keypx" -gt 6
 close_launcher
+
+in_theme artboard
+open_launcher
+check "artboard: the launcher has no well, no highlight and an ink key line ($(launcher_state | jq -c '[.fieldFill, .highlight, .keyColor]'))" launcher_is '.fieldFill == null and .highlight == null and .keyColor == "#15171b"'
+inkpx=$(near "$(launcher_state | jq -r '.keyBox | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"')" 21 23 27 30)
+check "artboard: the first key draws ink pixels on screen ($inkpx px)" test "$inkpx" -gt 2
+close_launcher
+in_theme frost
 
 # The YouTube App draws its magnifier in the theme's muted once the tokens arrive, not the black it starts in; Frost draws nothing near black, so any near-black pixel is that stale stroke.
 yt_qml=$repo/shell/youtube.qml

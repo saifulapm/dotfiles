@@ -28,6 +28,22 @@ test("Artboard's launcher follows its board: a search glyph, an Apps pill, icon 
   assert.equal(a.count(3), '');
 });
 
+const tokensOf = (name) => checkTokens(validateTheme(theme(name)));
+
+test("Frost's launcher field is a nord0 well at 70 % with a #434C5E edge, an accent › and caret, accent Maple Mono keys and a 1 px #ECEFF4 highlight at 6 %", () => {
+  const f = launcherLook(tokensOf('frost'));
+  assert.deepEqual(f.field, { fill: '#B32E3440', border: '#434C5E', caret: '#88C0D0' });
+  assert.deepEqual(f.prompt, { text: '›', color: '#88C0D0', search: false });
+  assert.deepEqual(f.chip, { fill: '#434C5E', key: '#88C0D0', font: 'Maple Mono' });
+  assert.equal(f.highlight, '#0FECEFF4');
+  assert.deepEqual([f.cursor.fill, f.cursor.badge], ['#475666', '↵']);
+});
+
+test("Artboard's launcher is what it was beside Frost's: no well, a magnifier, ink keys and no highlight", () => {
+  const a = launcherLook(tokensOf('artboard'));
+  assert.equal(JSON.stringify(a), '{"voice":"plain","engraved":false,"prompt":{"text":"","color":"#57606A","search":true},"caret":"line","rule":{"color":"#D0D7DE","dashed":false},"small":{"font":"Maple Mono","size":11,"spacing":0,"color":"#57606A"},"tile":{"size":32,"radius":9,"fill":"#F2F3F6"},"query":{"font":"Maple Mono","size":20,"italic":false},"label":{"kind":"pill","fill":"#EEF1FF","color":"#3D5AFE"},"slot":"icon","name":{"font":"Maple Mono","size":15,"weight":500,"spacing":0,"color":"#15171B"},"detail":{"font":"Maple Mono","size":12,"italic":false,"color":"#57606A"},"cursor":{"fill":"#EEF1FF","text":"#2638C9","detail":"#57606A","marker":"transparent","radius":10,"weight":600,"badge":"↵"},"chip":{"fill":"#F2F3F6","key":"#15171B"},"keyChip":{"fill":"#F2F3F6","text":"#57606A","border":0,"borderColor":"transparent","cursorFill":"#FFFFFF","cursorText":"#2638C9","cursorBorder":"transparent","radius":6,"size":11,"spacing":0,"column":0}}');
+});
+
 test("Blueprint's launcher follows its board: LAUNCH // <mode>, n MATCHES, a > prompt, numbered uppercase rows and a cyan cursor", () => {
   const b = look('blueprint');
   assert.deepEqual([b.label.kind, b.label.text('apps'), b.count(3)], ['header', 'LAUNCH // APPS', '3 MATCHES']);

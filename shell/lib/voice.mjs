@@ -87,6 +87,16 @@ export function launcherLook(tokens) {
     tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
   };
   if (voice === 'plain') {
+    // A theme that blurs draws its field as a well of paper at 70 % (Qt's #AARRGGBB) with a tile-coloured edge, an accent › and caret and accent mono keys, and a 1 px highlight of its deep text at 6 % inside the pane.
+    const frosted = tokens?.niri?.blur === true;
+    const tones = plainTones(tokens);
+    const frostLook = frosted
+      ? {
+          prompt: { text: '›', color: c.accent, search: false },
+          field: { fill: `#B3${c.paper.slice(1)}`, border: tones.tile, caret: c.accent },
+          highlight: `#0F${tones.deep.slice(1)}`,
+        }
+      : {};
     return Object.assign(base, {
       query: { font: t.ui, size: 20, italic: false },
       prompt: { text: '', color: c.muted, search: true },
@@ -98,9 +108,9 @@ export function launcherLook(tokens) {
       cursor: { fill: plainTones(tokens).tint, text: plainTones(tokens).deep, detail: dark ? c.ink : c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
       rule: { color: c.line, dashed: false },
       small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
-      chip: { fill: plainTones(tokens).tile, key: c.ink },
+      chip: frosted ? { fill: tones.tile, key: c.accent, font: t.mono } : { fill: tones.tile, key: c.ink },
       keyChip: { fill: plainTones(tokens).tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: plainTones(tokens).deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0, column: 0 },
-    });
+    }, frostLook);
   }
   if (voice === 'bracket') {
     // Hi-Fi lights the cursor row like a lamp: a #32302F row with an amber name and an ink category, its own lamp in place of Blueprint's number.

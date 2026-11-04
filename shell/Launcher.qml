@@ -202,6 +202,16 @@ Item {
             glassFill: String(card.drawnFill),
             blurRegion: blurRegion ? [card.regionBox()] : [],
             nameFont: nameBox ? nameBox.fontInfo.family : null,
+            fieldFill: look.field ? String(well.color) : null,
+            fieldBorder: look.field ? String(well.border.color) : null,
+            fieldBox: look.field ? { x: well.mapToItem(null, 0, 0).x, y: well.mapToItem(null, 0, 0).y, w: well.width, h: well.height } : null,
+            prompt: { text: look.prompt.text, color: look.prompt.color },
+            caretColor: look.field ? String(look.field.caret) : null,
+            highlight: look.highlight ? String(paneHighlight.color) : null,
+            keyColor: footerKeys.count > 0 ? String(footerKeys.itemAt(0).keyGlyph.color) : null,
+            keyFont: footerKeys.count > 0 ? footerKeys.itemAt(0).keyGlyph.fontInfo.family : null,
+            keyBox: footerKeys.count > 0 ? { x: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).x, y: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).y, w: footerKeys.itemAt(0).keyGlyph.width, h: footerKeys.itemAt(0).keyGlyph.height } : null,
+            cursorBadge: cur ? cur.badgeText : null,
             look: look.voice,
             label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
             count: found.length,
@@ -336,6 +346,31 @@ Item {
                 color: look.slot === "lamp" ? H.glass(launcher.theme.tokens).highlight : "transparent"
             }
 
+            // A blurring theme's pane has a 1 px inner highlight under its frame.
+            Rectangle {
+                id: paneHighlight
+                visible: !!look.highlight
+                x: 1
+                y: 1
+                width: column.width - 2
+                height: 1
+                color: look.highlight ?? "transparent"
+            }
+
+            // A blurring theme's field is a well with an edge around the prompt and the query.
+            Rectangle {
+                id: well
+                visible: !!look.field
+                x: field.x - 10
+                y: field.y - 6
+                width: field.width + 20
+                height: field.height + 12
+                radius: 8
+                color: look.field ? look.field.fill : "transparent"
+                border.width: 1
+                border.color: look.field ? look.field.border : "transparent"
+            }
+
             // Hi-Fi's field is a glass well around the prompt and the query.
             Root.Glass {
                 visible: launcher.look.slot === "lamp"
@@ -449,7 +484,7 @@ Item {
                         font.pixelSize: look.query.size
                         clip: true
                         focus: true
-                        cursorDelegate: look.caret === "block" ? blockCaret : null
+                        cursorDelegate: look.caret === "block" ? blockCaret : look.field ? lineCaret : null
                         Keys.onPressed: event => {
                             const ctrl = event.modifiers & Qt.ControlModifier;
                             if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
@@ -555,6 +590,7 @@ Item {
                                 readonly property bool elided: title.truncated
                                 readonly property real detailWidth: detail.width
                                 readonly property string keyText: keyChip.visible ? keyLabel.text : ""
+                                readonly property string badgeText: badgeBox.visible ? badge.text : ""
                                 readonly property string headText: modelData.head ? headLabel.text : ""
                                 readonly property Item box: rowBox
                                 readonly property Item nameText: title
@@ -728,6 +764,7 @@ Item {
                                     }
 
                                     Rectangle {
+                                        id: badgeBox
                                         visible: current && look.cursor.badge !== ""
                                         implicitWidth: badge.implicitWidth + 14
                                         implicitHeight: badge.implicitHeight + 4
@@ -777,16 +814,19 @@ Item {
                                 radius: 6
                                 color: look.chip.fill
 
+                                property alias keyGlyph: pairKey
+
                                 Row {
                                     id: pair
                                     anchors.centerIn: parent
                                     spacing: look.legend(launcher.mode).chips ? 6 : 5
 
                                     Text {
+                                        id: pairKey
                                         textFormat: Text.PlainText
                                         text: modelData.key
                                         color: look.chip.key
-                                        font.family: fonts.mono
+                                        font.family: look.chip.font ?? fonts.mono
                                         font.pixelSize: look.small.size
                                         font.letterSpacing: look.small.spacing
                                         font.bold: true
@@ -817,6 +857,17 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    // A blurring theme's caret: a 2 px line of its field's caret colour.
+    Component {
+        id: lineCaret
+
+        Rectangle {
+            width: 2
+            color: look.field.caret
+            visible: input.cursorVisible
         }
     }
 
