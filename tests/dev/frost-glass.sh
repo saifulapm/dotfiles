@@ -15,6 +15,11 @@ mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
 
 # A 40 x 40 box inside the card, 60 px in from its right edge and halfway down.
 inside_geo() { control_state | jq -r '.cardBox | "\(.x + .w - 60 | round),\(.y + .h / 2 - 20 | round) 40x40"'; }
+# A 200 x 3 strip inside the card's bottom edge, 2 px up from it, and one 2 px above its top edge: the open's lift moves the card, so a blur region left where the open began misses the one and blurs the other.
+bottom_geo() { control_state | jq -r '.cardBox | "\(.x + .w / 2 - 100 | round),\(.y + .h - 5 | round) 200x3"'; }
+above_geo() { control_state | jq -r '.cardBox | "\(.x + .w / 2 - 100 | round),\(.y - 5 | round) 200x3"'; }
+# The same strip 40 px higher, where only the dim wash lies over the window.
+wash_geo() { control_state | jq -r '.cardBox | "\(.x + .w / 2 - 100 | round),\(.y - 45 | round) 200x3"'; }
 # The region asked for is the card's box with the theme's 10 px corner.
 region_is_card='(.blurRegion | length) == 1 and (.blurRegion[0] as $r | .cardBox as $c | ([$r.x - $c.x, $r.y - $c.y, $r.w - $c.w, $r.h - $c.h] | map(fabs < 1) | all) and $r.radius == 10)'
 
@@ -76,6 +81,9 @@ check "frost: Control's card is glass #d93b4252 ($(control_state | jq -c .cardFi
 check "frost: Control asks for one blur region, its card's box with radius 10 ($(control_state | jq -c '[.blurRegion, .cardBox]'))" state_is "$region_is_card"
 check "frost: the Surfaces window asks niri for one region while Control draws" blur_is '.surfaces == 1'
 in_geo=$(inside_geo)
+bottom=$(bottom_geo)
+above=$(above_geo)
+wash=$(wash_geo)
 close_control
 check "frost: after Esc the Surfaces window asks for no region" blur_is '.surfaces == 0'
 
@@ -94,6 +102,9 @@ until_ok 5000 white_up
 check "frost: a maximised white foot fills $in_geo with Control closed ($(mean_at "$in_geo"))" white_up
 open_control
 in_white=$(mean_at "$in_geo")
+bottom_white=$(mean_at "$bottom")
+above_white=$(mean_at "$above")
+wash_white=$(mean_at "$wash")
 close_control
 until_ok 2000 white_up
 check "frost: after Esc the white foot shows at $in_geo again ($(mean_at "$in_geo"))" white_up
@@ -106,11 +117,14 @@ until_ok 5000 black_up
 check "frost: a maximised black foot fills $in_geo with Control closed ($(mean_at "$in_geo"))" black_up
 open_control
 in_black=$(mean_at "$in_geo")
+bottom_black=$(mean_at "$bottom")
 close_control
 niri msg action close-window
 until_ok 3000 no_foot
 
 check "frost: inside Control at $in_geo reads the same over a white foot ($in_white) and a black one ($in_black), within 3" near "$in_white" "$in_black" 3
+check "frost: along Control's bottom edge at $bottom the glass reads the same over white ($bottom_white) and black ($bottom_black), within 3, so the region reaches the resting card" near "$bottom_white" "$bottom_black" 3
+check "frost: just above Control at $above the white foot shows under the wash ($above_white), as 40 px higher ($wash_white), so no region is left above the resting card" near "$above_white" "$wash_white" 4
 
 for t in paper artboard blueprint hi-fi; do
   in_theme "$t"

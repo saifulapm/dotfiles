@@ -30,8 +30,13 @@ Item {
     readonly property alias drawnFill: fillRect.color
     // A theme that blurs draws this box as glass; the panel hands `region` to its window, which asks niri to blur behind it.
     readonly property bool glass: tokens ? tokens.niri.blur === true : false
+    // The box at rest, mapped from the parent: Region follows an item's geometry, not the open's lift and scale, so a region on the surface itself stays where the open began.
     readonly property Region region: Region {
-        item: surface
+        readonly property point at: surface.parent ? surface.parent.mapToItem(null, surface.x, surface.y) : Qt.point(surface.x, surface.y)
+        x: Math.round(at.x)
+        y: Math.round(at.y)
+        width: Math.round(surface.width)
+        height: Math.round(surface.height)
         radius: surface.style.corner.radius
     }
 
@@ -48,10 +53,9 @@ Item {
         const b = mapToItem(null, width, height);
         return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
     }
-    // The blur region as niri gets it, in the window's pixels, so a state function can report it.
+    // The blur region as niri gets it, in the window's pixels, read from the Region itself so a state function reports what is asked for.
     function regionBox() {
-        const b = drawnBox();
-        return { x: b.x, y: b.y, w: b.w, h: b.h, radius: region.radius };
+        return { x: region.x, y: region.y, w: region.width, h: region.height, radius: region.radius };
     }
     transform: Translate {
         y: surface.pose.lift
