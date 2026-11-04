@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# In Hi-Fi niri glows amber around the focused window only, and an open foot wears Gruvbox Dark on `dots theme hi-fi` and Paper again on `dots theme paper`.
+# In Hi-Fi niri glows amber around the focused window only, and an open foot wears Gruvbox Dark on `dots colorscheme gruvbox-dark` and Artboard's white on `dots colorscheme artboard`.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -22,8 +22,7 @@ id1=$(niri msg -j windows | jq -r 'sort_by(.id) | [.[] | select(.app_id == "foot
 id2=$(niri msg -j windows | jq -r 'sort_by(.id) | [.[] | select(.app_id == "foot")][1].id')
 read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
 
-"$repo/bin/dots" theme hi-fi
-check "the switch names no app that missed it ($(cat "$XDG_STATE_HOME/dots/theme-out/notice"))" test ! -s "$XDG_STATE_HOME/dots/theme-out/notice"
+legacy_theme hi-fi
 
 # niri reports a tiled window's place only when it floats, so the two sit side by side as floating windows, 100 px apart; the spots 4 px out of their outer edges are far from the other window's glow.
 for id in "$id1" "$id2"; do
@@ -52,6 +51,9 @@ until_ok 2000 is_focused "$id1"
 check "after focus moves, the first foot glows 4 px left of it (red - blue = $(warmth "$left_spot" $((oy + m1))))" glow_is "$left_spot" $((oy + m1))
 check "and the second foot has none 4 px right of it (red - blue = $(warmth "$right_spot" $((oy + m2))))" no_glow $right_spot $((oy + m2))
 
+# Hi-Fi's foot wore Gruvbox Dark, and only dots colorscheme reloads an open foot.
+"$repo/bin/dots" colorscheme gruvbox-dark
+check "the switch names no app that missed it ($(cat "$XDG_STATE_HOME/dots/theme-out/notice"))" test ! -s "$XDG_STATE_HOME/dots/theme-out/notice"
 # Foot's colours are read from its pixels: low in the window is its background, and the printed cells are ANSI colour 1.
 read -r fl fr _ < <(edges "$id1")
 read -r fy fh < <(niri msg -j windows | jq -r --argjson id "$id1" '.[] | select(.id == $id) | .layout | "\((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor) \(.window_size[1])"')
@@ -68,14 +70,14 @@ red_cells() {
   '
 }
 until_ok 1000 foot_bg_is 40 40 40
-check "the open foot's background is Hi-Fi's #282828 ($(pixel "$bg_x" "$bg_y"))" foot_bg_is 40 40 40
+check "the open foot's background is Gruvbox Dark's #282828 ($(pixel "$bg_x" "$bg_y"))" foot_bg_is 40 40 40
 many_red() { test "$(red_cells)" -ge 100; }
 until_ok 1000 many_red
 check "its ANSI colour 1 is #CC241D ($(red_cells) pixels)" test "$(red_cells)" -ge 100
 
-"$repo/bin/dots" theme paper
-until_ok 1000 foot_bg_is 250 246 236
-check "back on Paper the foot's background is #FAF6EC ($(pixel "$bg_x" "$bg_y"))" foot_bg_is 250 246 236
+"$repo/bin/dots" colorscheme artboard
+until_ok 1000 foot_bg_is 255 255 255
+check "on Artboard the foot's background is #FFFFFF ($(pixel "$bg_x" "$bg_y"))" foot_bg_is 255 255 255
 check "and no #CC241D cells are left" test "$(red_cells)" -lt 100
 
 exit $((fails > 0))

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# dots theme recolours an open zathura, imv and mpv in each theme, and Chromium wears the theme's exact colours from its next start.
+# dots colorscheme recolours an open zathura, imv and mpv in each colorscheme, and Chromium wears the colorscheme's exact colours from its next start.
 {
 # The nested session puts a stand-in chromium-browser first on its PATH, so the real one is found before lib.sh joins it.
 real_chromium=$(command -v chromium-browser) || { echo "FAIL no chromium-browser on PATH"; exit 1; }
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
 
 work=$DOTS_DEV_DIR/app-themes
@@ -35,8 +36,8 @@ trailer << /Root 1 0 R >>
 PDF
 ffmpeg -loglevel error -y -f lavfi -i color=c=red:s=200x200 -frames:v 1 "$work/red.png"
 
-"$repo/bin/dots" theme paper
-themes=(blueprint artboard frost paper)
+"$repo/bin/dots" colorscheme artboard
+themes=(catppuccin-mocha github-light gruvbox-dark artboard)
 
 # mpv: two players on this display, each with the socket dots-ipc.lua opens.
 mpv_socks() { local pid; for pid in $(pgrep -x mpv); do grep -qzxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" "/proc/$pid/environ" 2>/dev/null && echo "$XDG_RUNTIME_DIR/mpv-$pid.sock"; done; }
@@ -54,11 +55,11 @@ until_ok 8000 two_mpv
 ask_mpv() { echo "{\"command\":[\"get_property\",\"$2\"]}" | socat -t 0.5 - "UNIX-CONNECT:$1" | jq -r .data; }
 mpv_all() { local s; for s in $(mpv_socks); do test "$(ask_mpv "$s" osd-color | tr A-F a-f)" = "#ff$(token ink | tr A-F a-f | cut -c2-)" || return 1; done; }
 osc_all() { local s; for s in $(mpv_socks); do echo '{"command":["get_property","script-opts"]}' | socat -t 0.5 - "UNIX-CONNECT:$s" | jq -e --arg c "$(token surface | tr A-F a-f)" '.data["osc-background_color"] == $c' >/dev/null || return 1; done; }
-check "both players draw the OSD in Paper's ink" mpv_all
+check "both players draw the OSD in Artboard's ink" mpv_all
 for theme in "${themes[@]}"; do
   start=$(now_ms)
-  "$repo/bin/dots" theme "$theme"
-  check "dots theme $theme names no app that missed it ($(cat "$out/notice"))" test ! -s "$out/notice"
+  "$repo/bin/dots" colorscheme "$theme"
+  check "dots colorscheme $theme names no app that missed it ($(cat "$out/notice"))" test ! -s "$out/notice"
   until_ok 1000 mpv_all
   check "both players draw the OSD in $theme's ink $(($(now_ms) - start)) ms after the call" mpv_all
   check "both players' OSC sits on $theme's surface" osc_all
@@ -69,9 +70,9 @@ for s in $socks; do echo '{"command":["quit"]}' | socat -t 0.5 - "UNIX-CONNECT:$
 none_left() { local s; for s in $socks; do test ! -e "$s" || return 1; done; }
 until_ok 3000 none_left
 check "each player's socket is gone after it quits" none_left
-"$repo/bin/dots" theme paper
+"$repo/bin/dots" colorscheme artboard
 status=$?
-check "dots theme with no mpv open exits 0" test "$status" = 0
+check "dots colorscheme with no mpv open exits 0" test "$status" = 0
 
 # zathura reads this config, as ~/.config/zathura/zathurarc does, with the nested session's fragment.
 mkdir -p "$work/zathura"
@@ -82,11 +83,11 @@ sleep 1
 read -r zx zy zw zh < <(geometry org.pwmt.zathura)
 # Right of the page's middle is blank page; the window's left edge is zathura's background around the page.
 page_x=$((zx + zw / 2 + zh / 5)) page_y=$((zy + zh / 2)) side_x=$((zx + 12))
-check "zathura's page is white in Paper, recolouring off ($(pixel $page_x $page_y))" pixel_is $page_x $page_y '#FFFFFF'
-check "zathura's background is Paper's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"
+check "zathura's page is white in Artboard, recolouring off ($(pixel $page_x $page_y))" pixel_is $page_x $page_y '#FFFFFF'
+check "zathura's background is Artboard's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"
 for theme in "${themes[@]}"; do
   start=$(now_ms)
-  "$repo/bin/dots" theme "$theme"
+  "$repo/bin/dots" colorscheme "$theme"
   paper=$(token paper)
   page=$paper
   [[ $(jq -r .mode "$out/shell.json") == light ]] && page='#FFFFFF'
@@ -100,16 +101,16 @@ document=$(window_sum)
 wtype -k Tab
 sleep 0.3
 check "Tab shows zathura's index in place of the page" test "$(window_sum)" != "$document"
-"$repo/bin/dots" theme blueprint
+"$repo/bin/dots" colorscheme catppuccin-mocha
 until_ok 1000 pixel_is $side_x $page_y "$(token paper)"
-check "with the index open, zathura's background is Blueprint's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"
+check "with the index open, zathura's background is Catppuccin Mocha's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"
 wtype -k Tab
 sleep 0.3
 wtype /
 sleep 0.2
-"$repo/bin/dots" theme paper
+"$repo/bin/dots" colorscheme artboard
 until_ok 1000 pixel_is $page_x $page_y '#FFFFFF'
-check "with the search bar open, zathura's page is white again in Paper ($(pixel $page_x $page_y))" pixel_is $page_x $page_y '#FFFFFF'
+check "with the search bar open, zathura's page is white again in Artboard ($(pixel $page_x $page_y))" pixel_is $page_x $page_y '#FFFFFF'
 wtype -k Escape
 close_all org.pwmt.zathura
 until_ok 3000 bash -c '! niri msg -j windows | jq -e "any(.[]; .app_id == \"org.pwmt.zathura\")" >/dev/null'
@@ -120,15 +121,15 @@ niri msg action spawn -- env imv_config="$imv_config" imv "$work/red.png"
 until_ok 5000 has_window imv
 sleep 1
 read -r ix iy iw ih < <(geometry imv)
-check "imv's background is Paper's paper ($(pixel $((ix + 8)) $((iy + ih / 2))))" pixel_is $((ix + 8)) $((iy + ih / 2)) "$(token paper)"
+check "imv's background is Artboard's paper ($(pixel $((ix + 8)) $((iy + ih / 2))))" pixel_is $((ix + 8)) $((iy + ih / 2)) "$(token paper)"
 for theme in "${themes[@]}"; do
   start=$(now_ms)
-  "$repo/bin/dots" theme "$theme"
+  "$repo/bin/dots" colorscheme "$theme"
   until_ok 1000 pixel_is $((ix + 8)) $((iy + ih / 2)) "$(token paper)"
   check "imv's background is $theme's paper $(($(now_ms) - start)) ms after the call" pixel_is $((ix + 8)) $((iy + ih / 2)) "$(token paper)"
 done
-# An imv started after a switch draws its overlay text in the theme's ink.
-"$repo/bin/dots" theme blueprint
+# An imv started after a switch draws its overlay text in the colorscheme's ink.
+"$repo/bin/dots" colorscheme catppuccin-mocha
 close_all imv
 until_ok 3000 bash -c '! niri msg -j windows | jq -e "any(.[]; .app_id == \"imv\")" >/dev/null'
 niri msg action spawn -- env imv_config="$imv_config" imv -d "$work/red.png"
@@ -143,7 +144,7 @@ ink_pixels() { grim -s 1 -t ppm -g "$ix,$iy ${iw}x40" - | node -e '
   for (let i = 0; i < px.length; i += 3) if (Math.abs(px[i] - want[0]) <= 6 && Math.abs(px[i + 1] - want[1]) <= 6 && Math.abs(px[i + 2] - want[2]) <= 6) n++;
   console.log(n);
 ' "$(token ink | cut -c2-)"; }
-check "imv opened in Blueprint draws its overlay text in Blueprint's ink ($(ink_pixels) pixels)" test "$(ink_pixels)" -ge 20
+check "imv opened in Catppuccin Mocha draws its overlay text in Catppuccin Mocha's ink ($(ink_pixels) pixels)" test "$(ink_pixels)" -ge 20
 grim -s 1 "$work/imv-overlay.png"
 close_all imv
 until_ok 3000 bash -c '! niri msg -j windows | jq -e "any(.[]; .app_id == \"imv\")" >/dev/null'
@@ -175,11 +176,11 @@ chromium "$out/chromium-theme"
 until_ok 15000 chromium_up
 sleep 8
 quit_chromium
-"$repo/bin/dots" theme blueprint
+"$repo/bin/dots" colorscheme catppuccin-mocha
 chromium "$out/chromium-theme"
 until_ok 15000 chromium_up
 sleep 2
-grim -s 1 "$work/chromium-blueprint.png"
+grim -s 1 "$work/chromium-catppuccin-mocha.png"
 # niri's geometry for Chromium takes in its shadow, so the page is found by its magenta and the chrome is read upward from its top-left: colour runs, nearest first.
 chrome=$(grim -s 1 -t ppm - | node -e '
   const b = require("fs").readFileSync(0);
@@ -203,8 +204,8 @@ chrome=$(grim -s 1 -t ppm - | node -e '
 echo "Chromium's chrome above the page, nearest first: $chrome"
 # Nearest the page comes the toolbar, about 40 px, then the frame; an infobar or bubble under the toolbar doubles its band.
 bands() { jq -c '[.runs[] | select(.[1] >= 10)]' <<<"$chrome"; }
-check "Chromium's toolbar is Blueprint's surface #0a1526 exactly, with no bar or bubble under it ($(bands))" jq -e '[.runs[] | select(.[1] >= 10)] | .[0][0] == "#0a1526" and .[0][1] >= 20 and .[0][1] <= 60' <<<"$chrome"
-check "above it Chromium's frame is Blueprint's paper #0c1a2e exactly" jq -e '[.runs[] | select(.[1] >= 10)] | .[1][0] == "#0c1a2e"' <<<"$chrome"
+check "Chromium's toolbar is Catppuccin Mocha's surface #1e1e2e exactly, with no bar or bubble under it ($(bands))" jq -e '[.runs[] | select(.[1] >= 10)] | .[0][0] == "#1e1e2e" and .[0][1] >= 20 and .[0][1] <= 60' <<<"$chrome"
+check "above it Chromium's frame is Catppuccin Mocha's paper #11111b exactly" jq -e '[.runs[] | select(.[1] >= 10)] | .[1][0] == "#11111b"' <<<"$chrome"
 check "no bubble covers the page's top ($(jq -c '{width, covered}' <<<"$chrome"))" jq -e '.width >= 400 and .covered == 0' <<<"$chrome"
 check "Chromium opened no other window ($(niri msg -j windows | jq -c '[.[] | .title]'))" test "$(niri msg -j windows | jq length)" = 1
 quit_chromium

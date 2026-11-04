@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # A theme fragment niri rejects notifies "Config rejected" once per failure streak: again only after a good load, or from a shell started on a rejected config.
 {
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -50,17 +51,17 @@ load breaks
 check "three more rejected loads add nothing ($had before)" eval '[ "$had" = 1 ] && rejected_is 1'
 
 had=$(rejected)
-load "$repo/bin/dots" theme paper
+load "$repo/bin/dots" colorscheme artboard
 echo "     niri: $(last_loaded)"
-check "dots theme paper loads cleanly and notifies nothing ($had before)" eval '[ "$had" = 1 ] && rejected_is 1 && last_loaded | grep -q "\"failed\":false"'
+check "dots colorscheme artboard loads cleanly and notifies nothing ($had before)" eval '[ "$had" = 1 ] && rejected_is 1 && last_loaded | grep -q "\"failed\":false"'
 load breaks
 until_ok 3000 rejected_is 2
 check "the next rejection after a good load notifies again" rejected_is 2
 
-load "$repo/bin/dots" theme blueprint
+load "$repo/bin/dots" colorscheme catppuccin-mocha
 had=$(rejected)
-load "$repo/bin/dots" theme paper
-check "a theme switch on a good config notifies nothing ($had before)" eval '[ "$had" = 2 ] && rejected_is 2 && last_loaded | grep -q "\"failed\":false"'
+load "$repo/bin/dots" colorscheme artboard
+check "a colorscheme switch on a good config notifies nothing ($had before)" eval '[ "$had" = 2 ] && rejected_is 2 && last_loaded | grep -q "\"failed\":false"'
 
 # The island at rest first, so a notification still held there cannot pass for this one.
 until_ok 8000 eval 'island | jq -e ".mode == \"rest\"" >/dev/null'

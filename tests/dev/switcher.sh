@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Mod+Shift+T opens the theme switcher, j/k move the cursor, Enter applies through dots theme, Esc closes.
+# Mod+Shift+T opens the theme switcher, j/k move the cursor, Enter applies through dots colorscheme, Esc closes.
 {
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
@@ -9,15 +10,15 @@ state_is() { themes_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_shift_t() { niri msg action spawn -- dots-call themes toggle; }
 themes_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-# The right edge of the Blueprint card's preview, Blueprint's navy paper, which nothing else draws under Paper.
+# Near the right edge of the Catppuccin Mocha card's preview, by the card's box in the switcher's state: its dark paper, which nothing else draws under Artboard.
 card_rgb() {
   local geo
-  geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + ((.width - 1000) / 2 | floor) + 957),\(.y + 308) 10x10"')
+  geo=$(themes_state | jq -r 'first(.cards[] | select(.name == "catppuccin-mocha")).box | "\(.x + .w - 20 | floor),\(.y + 60 | floor) 10x10"')
   grim -s 1 -t ppm -g "$geo" - | mean_rgb
 }
-card_is_navy() { local r g b; read -r r g b < <(card_rgb); ((r < 40 && g < 50 && b < 70 && b > r)); }
-themes_shown() { state_is '.open and .settled' && themes_focus Exclusive && card_is_navy; }
-# No pixel check here: after a switch to Blueprint its paper is the same navy as the card.
+card_is_dark() { local r g b; read -r r g b < <(card_rgb); ((r < 50 && g < 50 && b < 70 && b > r)); }
+themes_shown() { state_is '.open and .settled' && themes_focus Exclusive && card_is_dark; }
+# No pixel check here: after the switch the switcher is gone, and its state names where it drew.
 themes_gone() { state_is '.open == false' && themes_focus None; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 open_ms() {
@@ -26,46 +27,46 @@ open_ms() {
 }
 
 until_ok 5000 shell_status >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 mod_shift_t
 until_ok 3000 themes_shown
 check "Mod+Shift+T shows the switcher with exclusive keyboard" themes_shown
-check "state lists paper, artboard, blueprint with paper selected and current" \
-  state_is '.open and .themes == ["paper","artboard","blueprint"] and .selected == "paper" and .current == "paper"'
+check "state lists the five colorschemes with artboard selected and current" \
+  state_is '.open and .themes == ["artboard","catppuccin-mocha","github-light","gruvbox-dark","rose-pine-dawn"] and .selected == "artboard" and .current == "artboard"'
 ms1=$(open_ms 1)
 
 wtype j
-until_ok 1000 state_is '.selected == "artboard"'
-check "j moves the cursor to artboard" state_is '.selected == "artboard"'
+until_ok 1000 state_is '.selected == "catppuccin-mocha"'
+check "j moves the cursor to catppuccin-mocha" state_is '.selected == "catppuccin-mocha"'
 wtype j
-until_ok 1000 state_is '.selected == "blueprint"'
-check "j again moves it to blueprint" state_is '.selected == "blueprint"'
+until_ok 1000 state_is '.selected == "github-light"'
+check "j again moves it to github-light" state_is '.selected == "github-light"'
 
 wtype -k Return
 until_ok 2000 themes_gone
 check "Enter closes the switcher and releases the keyboard" themes_gone
-until_ok 1000 status_theme blueprint
-check "shell status reports blueprint within 1 s" status_theme blueprint
-check "the state file reads blueprint" test "$(cat "$XDG_STATE_HOME/dots/theme" 2>/dev/null)" = blueprint
+until_ok 1000 status_theme github-light
+check "shell status reports github-light within 1 s" status_theme github-light
+check "the state file reads github-light" test "$(cat "$XDG_STATE_HOME/dots/theme" 2>/dev/null)" = github-light
 switch=$XDG_STATE_HOME/dots/theme-switch.json
-# dots theme writes this after its last reload, later than the state file.
-until_ok 2000 jq -e '.to == "blueprint"' "$switch" >/dev/null 2>&1
-check "theme-switch.json records paper to blueprint: $(cat "$switch" 2>/dev/null)" \
-  bash -c "jq -e '.from == \"paper\" and .to == \"blueprint\" and .ms <= 300' '$switch' >/dev/null"
+# dots colorscheme writes this after its last reload, later than the state file.
+until_ok 2000 jq -e '.to == "github-light"' "$switch" >/dev/null 2>&1
+check "theme-switch.json records artboard to github-light: $(cat "$switch" 2>/dev/null)" \
+  bash -c "jq -e '.from == \"artboard\" and .to == \"github-light\" and .ms <= 300' '$switch' >/dev/null"
 
 mod_shift_t
 until_ok 3000 state_is '.open' && until_ok 3000 themes_focus Exclusive
-check "reopening starts the cursor on blueprint" state_is '.open and .selected == "blueprint" and .current == "blueprint"'
+check "reopening starts the cursor on github-light" state_is '.open and .selected == "github-light" and .current == "github-light"'
 ms2=$(open_ms 2)
 wtype k
-until_ok 1000 state_is '.selected == "artboard"'
-check "k moves the cursor to artboard" state_is '.selected == "artboard"'
+until_ok 1000 state_is '.selected == "catppuccin-mocha"'
+check "k moves the cursor to catppuccin-mocha" state_is '.selected == "catppuccin-mocha"'
 wtype -k Escape
 until_ok 2000 themes_gone
 check "Esc closes the switcher and releases the keyboard" themes_gone
 sleep 0.5
-check "Esc applies nothing, status still blueprint" status_theme blueprint
+check "Esc applies nothing, status still github-light" status_theme github-light
 
 # The launcher and the switcher draw in one Overlay window, and opening one closes the other.
 launcher_is() { timeout 0.5 qs ipc call launcher state 2>/dev/null | jq -e "$1" >/dev/null; }
