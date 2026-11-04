@@ -24,7 +24,9 @@ const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 
 
 // Bidi marks, embeddings, overrides and isolates, which let an app's name redraw itself in another order.
 const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
-const same = (s) => (s || '').replace(BIDI, '');
+// Control characters other than tab, newline and return, which a font draws as tofu; they go, as the chip's do.
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+const same = (s) => (s || '').replace(BIDI, '').replace(CONTROL, '');
 // Text a sender wrote, drawn in the order it is spelt; its lines stay.
 export const inOrder = same;
 const upper = (s) => same(s).toUpperCase();

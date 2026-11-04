@@ -480,6 +480,15 @@ test('a polkit request cannot reorder what it asks with bidi controls, and keeps
   assert.equal(inOrder(undefined), '');
 });
 
+test('a notification cannot draw control characters: BEL and ESC drop out of its app, title and body, and the body keeps its lines and tabs', () => {
+  for (const n of ['paper', 'artboard', 'blueprint', 'frost', 'hi-fi']) {
+    const l = islandLook(checkTokens(validateTheme(theme(n))));
+    assert.equal(l.summaryText('A\u0007\u001b[31mred').toLowerCase(), 'a[31mred', n);
+    assert.equal(l.appText('Chro\u001bmium\u009b').toLowerCase(), 'chromium', n);
+    assert.equal(l.bodyText('one\u0000two\nthree\tfour\u007f'), 'onetwo\nthree\tfour', n);
+  }
+});
+
 // The lease slot and card as the m21 boards draw them (XX2P8V57): project/AgentLease*.dc.html and Lease*.dc.html.
 const lease = (name) => leaseLook(theme(name));
 const slotText = (l, who, left) => [l.slot.label.text, l.slot.who.text(who), l.time(left)].filter((x) => x).join(' ');
