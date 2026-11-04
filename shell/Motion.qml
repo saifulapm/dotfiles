@@ -14,7 +14,7 @@ Item {
     readonly property var curves: M.surfaceMotion(tokens?.primitive.motion, Root.State.slowdown)
     // How far through its open the card is drawn: 0 draws nothing, 1 is at rest.
     property real progress: 0
-    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1 })
+    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 })
     // A closing surface still draws, though it gave the keyboard back when its close began.
     readonly property bool drawing: shown || progress > 0
     readonly property bool settled: open && progress === 1
@@ -25,14 +25,26 @@ Item {
     property bool armed: false
     // How far through the open its first drawn frame was, or -1 until it is drawn; near 0 means the whole drop played.
     property real firstFrame: -1
+    // The ms the last close took from its start until progress reached 0, or -1 while one runs; a check times Esc by it.
+    property real closeTook: -1
+    property real closeStartedAt: 0
 
     onOpenChanged: {
         if (open) {
             startedAt = Date.now();
             settleMs = -1;
             firstFrame = -1;
+        } else {
+            closeStartedAt = Date.now();
+            closeTook = -1;
         }
         play();
+    }
+    onProgressChanged: {
+        if (!open && progress === 0 && closeStartedAt > 0) {
+            closeTook = Date.now() - closeStartedAt;
+            closeStartedAt = 0;
+        }
     }
     // A theme switch mid-motion carries on at the new theme's pace.
     onCurvesChanged: if (clock.running)

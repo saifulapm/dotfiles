@@ -21,7 +21,7 @@ Item {
     readonly property color accent: tokens ? tokens.color.accent : "transparent"
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
-    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1 })
+    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 })
     // What a surface puts in its card fades in with pose.text: with the fill after a plot's outline, after the glass in Hi-Fi.
     default property alias content: inner.data
     // The glass highlight line, so a state function can report where it is drawn.
@@ -95,8 +95,8 @@ Item {
         radius: surface.style.corner.radius
         color: surface.faded(surface.style.fill)
         border.width: surface.style.frame.width
-        // A warm open lights the frame with its glass, so the hairline never shows before it.
-        border.color: surface.motion?.curves?.kind === "warm" ? surface.faded(surface.style.frame.color) : surface.style.frame.color
+        // A warm or fade open lights the frame with its glass, so the hairline never shows before it.
+        border.color: ["warm", "fade"].includes(surface.motion?.curves?.kind) ? surface.faded(surface.style.frame.color) : surface.style.frame.color
     }
 
     // Hi-Fi's glass catches light in a 1 px line of ink under the top border, whatever the island shows.
@@ -242,5 +242,9 @@ Item {
         id: inner
         anchors.fill: parent
         opacity: surface.pose.text
+        // The content rises inside a card that stays put, so the glass and its blur region never part.
+        transform: Translate {
+            y: surface.pose.rise
+        }
     }
 }

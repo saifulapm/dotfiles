@@ -8,8 +8,8 @@ test('Paper drops 6 px in 120 ms with no fade', () => {
   const m = surfaceMotion('snappy');
   assert.equal(m.kind, 'drop');
   assert.equal(m.openMs, 120);
-  assert.deepEqual(surfacePose(m, 0), { lift: -6, scale: 1, outline: 1, fill: 1, text: 1 });
-  assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1 });
+  assert.deepEqual(surfacePose(m, 0), { lift: -6, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
+  assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
   // niri's snappy curve is front-loaded: halfway through it has dropped most of the way.
   assert.ok(surfacePose(m, 0.5).lift > -1);
 });
@@ -18,8 +18,8 @@ test('Artboard rises from 96% and 8 px lower on the island spring, and settles w
   const m = surfaceMotion('spring');
   assert.equal(m.kind, 'spring');
   assert.ok(m.openMs > 300 && m.openMs <= 400, `spring settles in ${m.openMs} ms`);
-  assert.deepEqual(surfacePose(m, 0), { lift: 8, scale: 0.96, outline: 1, fill: 1, text: 1 });
-  assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1 });
+  assert.deepEqual(surfacePose(m, 0), { lift: 8, scale: 0.96, outline: 1, fill: 1, text: 1, rise: 0 });
+  assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
   // It overshoots its rest before it settles.
   const peak = Math.max(...Array.from({ length: 101 }, (_, i) => surfacePose(m, i / 100).scale));
   assert.ok(peak > 1.001, `peak scale ${peak}`);
@@ -29,14 +29,14 @@ test('Blueprint plots the outline in 160 ms, then the fill in 80 ms', () => {
   const m = surfaceMotion('linear');
   assert.equal(m.kind, 'plot');
   assert.equal(m.openMs, 240);
-  assert.deepEqual(surfacePose(m, 0), { lift: 0, scale: 1, outline: 0, fill: 0, text: 0 });
+  assert.deepEqual(surfacePose(m, 0), { lift: 0, scale: 1, outline: 0, fill: 0, text: 0, rise: 0 });
   const at = (ms) => surfacePose(m, ms / 240);
   near(at(80).outline, 0.5);
   assert.equal(at(80).fill, 0);
   assert.equal(at(160).outline, 1);
   assert.equal(at(160).fill, 0);
   near(at(200).fill, 0.5);
-  assert.deepEqual(at(240), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1 });
+  assert.deepEqual(at(240), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
 });
 
 test('Hi-Fi lights the glass in 120 ms, then the text and lamps in 80 ms', () => {
@@ -45,8 +45,8 @@ test('Hi-Fi lights the glass in 120 ms, then the text and lamps in 80 ms', () =>
   assert.equal(m.openMs, 200);
   assert.equal(m.closeMs, 160);
   const at = (ms) => surfacePose(m, ms / 200);
-  assert.deepEqual(at(0), { lift: 0, scale: 1, outline: 1, fill: 0, text: 0 });
-  assert.deepEqual(at(200), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1 });
+  assert.deepEqual(at(0), { lift: 0, scale: 1, outline: 1, fill: 0, text: 0, rise: 0 });
+  assert.deepEqual(at(200), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
   // The glass eases out: past half its level at half its time.
   assert.ok(at(60).fill > 0.5 && at(60).fill < 1, `fill ${at(60).fill}`);
   assert.equal(at(60).text, 0);
@@ -54,6 +54,29 @@ test('Hi-Fi lights the glass in 120 ms, then the text and lamps in 80 ms', () =>
   assert.equal(at(120).text, 0);
   assert.equal(at(160).fill, 1);
   near(at(160).text, 0.5);
+});
+
+test('Frost fades the glass in over 160 ms ease-out while the content rises 4 px, and closes in 128 ms', () => {
+  const m = surfaceMotion('ease');
+  assert.equal(m.kind, 'fade');
+  assert.equal(m.openMs, 160);
+  assert.equal(m.closeMs, 128);
+  assert.equal(m.curve, 'ease-out');
+  assert.equal(m.rise, 4);
+  // The card neither moves nor scales, so the glass stays on its blur region.
+  assert.deepEqual(surfacePose(m, 0), { lift: 0, scale: 1, outline: 1, fill: 0, text: 0, rise: 4 });
+  assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 });
+  const half = surfacePose(m, 0.5);
+  assert.ok(half.fill > 0.5 && half.fill < 1, `fill ${half.fill}`);
+  assert.ok(half.rise > 0 && half.rise < 2, `rise ${half.rise}`);
+});
+
+test('only Frost names a curve and a rise', () => {
+  for (const token of ['snappy', 'spring', 'linear', 'typewriter', 'dial']) {
+    const m = surfaceMotion(token);
+    assert.equal(m.curve, null, token);
+    assert.equal(m.rise, 0, token);
+  }
 });
 
 test('drop, spring and plot poses carry text equal to their fill', () => {
@@ -87,7 +110,6 @@ test('the slowdown stretches open and close alike', () => {
 });
 
 test('the other motion tokens map to the nearest of the three', () => {
-  assert.equal(surfaceMotion('ease').kind, 'drop');
   assert.equal(surfaceMotion('typewriter').kind, 'plot');
   assert.equal(surfaceMotion(undefined), null);
 });

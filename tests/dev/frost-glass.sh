@@ -15,7 +15,7 @@ mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
 
 # A 40 x 40 box inside the card, 60 px in from its right edge and halfway down.
 inside_geo() { control_state | jq -r '.cardBox | "\(.x + .w - 60 | round),\(.y + .h / 2 - 20 | round) 40x40"'; }
-# A 200 x 3 strip inside the card's bottom edge, 2 px up from it, and one 2 px above its top edge: the open's lift moves the card, so a blur region left where the open began misses the one and blurs the other.
+# A 200 x 3 strip inside the card's bottom edge, 2 px up from it, and one 2 px above its top edge: a blur region off the resting card misses the one and blurs the other.
 bottom_geo() { control_state | jq -r '.cardBox | "\(.x + .w / 2 - 100 | round),\(.y + .h - 5 | round) 200x3"'; }
 above_geo() { control_state | jq -r '.cardBox | "\(.x + .w / 2 - 100 | round),\(.y - 5 | round) 200x3"'; }
 # The same strip 40 px higher, where only the dim wash lies over the window.
