@@ -11,6 +11,7 @@ const hifi = checkTokens(load('hi-fi'));
 const blueprint = checkTokens(load('blueprint'));
 const paper = checkTokens(load('paper'));
 const artboard = checkTokens(load('artboard'));
+const frost = checkTokens(load('frost'));
 
 test("Hi-Fi's own parts key on voice engraved, never on the theme's name", () => {
   assert.equal(isHifi(hifi), true);
@@ -55,6 +56,14 @@ test('a switch into or out of Hi-Fi sweeps; every other pair plays the outgoing 
   assert.equal(switchKind(paper, blueprint), 'slide');
   assert.equal(switchKind(blueprint, artboard), 'scan');
   assert.equal(switchKind(artboard, paper), 'zoom');
+});
+
+test('a switch into or out of Frost plays the frost switch, and between Hi-Fi and Frost the incoming theme\'s', () => {
+  assert.equal(switchKind(paper, frost), 'frost');
+  assert.equal(switchKind(frost, blueprint), 'frost');
+  assert.equal(switchKind(frost, artboard), 'frost');
+  assert.equal(switchKind(hifi, frost), 'frost');
+  assert.equal(switchKind(frost, hifi), 'sweep');
 });
 
 test('the sweep pointer eases in and out, and the lamps warm over the last 60 of its 220 ms', () => {

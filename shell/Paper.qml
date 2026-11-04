@@ -17,7 +17,7 @@ PanelWindow {
     // The back sheet takes each new theme, so the sheet on screen never rebuilds its shader.
     property Item front: sheetA
     readonly property Item back: front === sheetA ? sheetB : sheetA
-    // The outgoing theme's motion picks the transition, or Hi-Fi's sweep when Hi-Fi is either side; "" while none runs.
+    // The transition H.switchKind picks for the pair; "" while none runs.
     property string kind: ""
     property bool waiting: false
     // When the last transition ended, in ms since the epoch, so a check can time a switch from its command without polling.
@@ -98,10 +98,12 @@ PanelWindow {
         if (!waiting || !back.ready)
             return;
         waiting = false;
-        if (kind === "cut")
-            finish();
+        // A kind with no animation here, cut among them, swaps at once.
+        const animation = ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep })[kind];
+        if (animation)
+            animation.start();
         else
-            ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep })[kind].start();
+            finish();
     }
 
     // What each sheet that shows a passage draws, the one on screen first.

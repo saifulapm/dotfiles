@@ -29,9 +29,11 @@ export function tuningScale(tokens, width, at) {
   return { ticks, pointer: { x, width: 2, color: c.danger } };
 }
 
-// The paper switch: Hi-Fi's dial sweep whenever Hi-Fi is either side, so every other pair keeps the outgoing theme's own motion.
+// The paper switch: the incoming theme's own when it is Hi-Fi's dial sweep or Frost's frost, then the outgoing theme's when it is one of those two, so every other pair keeps the outgoing theme's own motion.
 export function switchKind(outgoing, incoming) {
-  if (outgoing.primitive.motion === 'dial' || incoming.primitive.motion === 'dial') return 'sweep';
+  const own = { dial: 'sweep', ease: 'frost' };
+  if (own[incoming.primitive.motion]) return own[incoming.primitive.motion];
+  if (own[outgoing.primitive.motion]) return own[outgoing.primitive.motion];
   return { snappy: 'slide', spring: 'zoom', linear: 'scan' }[outgoing.primitive.motion] ?? 'cut';
 }
 
