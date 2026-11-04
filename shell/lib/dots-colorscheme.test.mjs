@@ -87,9 +87,9 @@ test('a switch stamps its start, and its end after the last reload returns', (t)
   t.after(() => rmSync(state, { recursive: true, force: true }));
   const bin = join(state, 'bin');
   mkdirSync(bin);
-  writeFileSync(join(bin, 'gsettings'), '#!/bin/bash\nsleep 0.2\n', { mode: 0o755 });
   const env = Object.assign(isolated(state), { PATH: `${bin}:${process.env.PATH}` });
   assert.equal(spawnSync(dots, ['colorscheme', 'artboard'], { env }).status, 0);
+  writeFileSync(join(bin, 'gsettings'), '#!/bin/bash\nsleep 0.1\n', { mode: 0o755 });
   const t0 = Date.now() - 500;
   const r = spawnSync(dots, ['colorscheme', 'artboard'], { env: Object.assign(env, { DOTS_SWITCH_T0: String(t0) }), encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
@@ -97,8 +97,8 @@ test('a switch stamps its start, and its end after the last reload returns', (t)
   assert.equal(s.from, 'artboard');
   assert.equal(s.to, 'artboard');
   assert.equal(s.start, t0);
-  // Three gsettings calls of 200 ms each run before the end is taken.
-  assert.ok(s.end - s.start >= 1100, `end ${s.end - s.start} ms after start`);
+  // Three gsettings calls of 100 ms each run before the end is taken.
+  assert.ok(s.end - s.start >= 780, `end ${s.end - s.start} ms after start`);
   assert.ok(s.end <= Date.now());
   assert.equal(s.ms, s.end - s.start);
 });
@@ -117,7 +117,7 @@ test('a switch tells GTK light for a light colorscheme and dark for a dark one',
   assert.equal(scheme(), 'set org.gnome.desktop.interface color-scheme prefer-dark');
 });
 
-test('dots theme is gone: it names dots colorscheme and changes nothing', (t) => {
+test('the theme command is gone: it names dots colorscheme and changes nothing', (t) => {
   const state = mkdtempSync(join(tmpdir(), 'dots-old-'));
   t.after(() => rmSync(state, { recursive: true, force: true }));
   const r = spawnSync(dots, ['theme', 'artboard'], { env: isolated(state), encoding: 'utf8' });

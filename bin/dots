@@ -193,7 +193,7 @@ main() {
   case ${1:-} in
     install) install ;;
     colorscheme) colorscheme "${2:-}" ;;
-    theme) die "dots theme is gone; use dots colorscheme <name>" ;;
+    theme) die "the theme command is gone; use dots colorscheme <name>" ;;
     # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
     awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;
     dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
