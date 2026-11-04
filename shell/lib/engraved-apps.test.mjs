@@ -8,7 +8,7 @@ import { words } from './newtab.mjs';
 
 const render = new URL('./theme-render.mjs', import.meta.url).pathname;
 
-// The fragments dots theme writes, read back from a scratch state dir.
+// The fragments dots colorscheme writes, read back from a scratch state dir.
 function fragments(t, name) {
   const state = mkdtempSync(join(tmpdir(), 'dots-engraved-'));
   t.after(() => rmSync(state, { recursive: true, force: true }));

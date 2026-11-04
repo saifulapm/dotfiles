@@ -1,4 +1,4 @@
-// zathurarc keeps v1's behaviour and includes the fragment dots theme renders, by an absolute path, since a relative one resolves beside the config file.
+// zathurarc keeps v1's behaviour and includes the fragment dots colorscheme renders, by an absolute path, since a relative one resolves beside the config file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

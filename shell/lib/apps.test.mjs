@@ -207,7 +207,7 @@ test('a running fish takes the new colours at its next prompt', (t) => {
   execFileSync('mkdir', ['-p', out]);
   writeFileSync(join(out, 'colors.fish'), renderFish(paper));
   const config = new URL('../../home/dot_config/fish/config.fish', import.meta.url).pathname;
-  // One fish: the config at start, then a new colours file and a prompt, as after dots theme.
+  // One fish: the config at start, then a new colours file and a prompt, as after dots colorscheme.
   const script = `source ${config}; echo $fish_color_normal; echo '${renderFish(blueprint).replace(/'/g, "\\'")}' > ${out}/colors.fish; emit fish_prompt; echo $fish_color_normal`;
   const seen = execFileSync('fish', ['--no-config', '-c', script], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' }).trim().split('\n');
   assert.deepEqual(seen, [paper.color.ink.slice(1).toLowerCase(), 'd6f4f8']);

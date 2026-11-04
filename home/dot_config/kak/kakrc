@@ -28,5 +28,5 @@ hook global WinSetOption filetype= %{
 # ---------------
 # Colorscheme
 # ---------------
-# dots theme renders the dots scheme and sends this line again to running sessions.
+# dots colorscheme renders the dots scheme and sends this line again to running sessions.
 colorscheme dots

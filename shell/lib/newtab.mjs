@@ -1,4 +1,4 @@
-// The words of Chromium's new-tab page; dots theme copies this file into the page's extension, so it imports nothing.
+// The words of Chromium's new-tab page; dots colorscheme copies this file into the page's extension, so it imports nothing.
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];

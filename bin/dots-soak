@@ -11,6 +11,8 @@ live_pid=$(systemctl --user show -p MainPID --value dots-shell.service)
 live_theme=$(<"$live_theme_file") || exit 2
 [[ $live_pid =~ ^[1-9][0-9]*$ && -n $live_theme ]] || { echo "soak: cannot read the live shell's PID and theme, so it cannot be guarded" >&2; exit 2; }
 
+# The nested session starts in a colorscheme, so the picker lists the schemes the soak cycles through.
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
 csv=${DOTS_SOAK_CSV:-$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/dots-soak.XXXXXX.csv")}
@@ -45,7 +47,7 @@ mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
 theme=$(shell_status | jq -r .theme)
 # A theme shown once keeps its shaders, so every theme is shown before the first sample and minute 5 is a warm baseline.
 for t in "${names[@]}" "$theme"; do
-  "$(dirname "$0")/dots" theme "$t" >/dev/null || die "dots theme $t failed"
+  "$(dirname "$0")/dots" colorscheme "$t" >/dev/null || die "dots colorscheme $t failed"
   until_ok 3000 status_has ".theme == \"$t\"" || die "the shell never reported $t"
   sleep 1
 done
@@ -66,7 +68,7 @@ for ((m = 1; m <= minutes; m++)); do
   if ((m % 5 == 0)); then
     for i in "${!names[@]}"; do [[ ${names[i]} == "$theme" ]] && break; done
     theme=${names[(i + 1) % ${#names[@]}]}
-    "$(dirname "$0")/dots" theme "$theme" >/dev/null || die "dots theme $theme failed"
+    "$(dirname "$0")/dots" colorscheme "$theme" >/dev/null || die "dots colorscheme $theme failed"
     until_ok 3000 status_has ".theme == \"$theme\"" || die "the shell never reported $theme"
   fi
   sleep "$step_s"

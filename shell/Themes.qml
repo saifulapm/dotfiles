@@ -73,9 +73,9 @@ Item {
     }
 
     function apply() {
-        // dots theme measures the switch from this key press, not from its own start.
+        // dots colorscheme measures the switch from this key press, not from its own start.
         dotsTheme.environment = { DOTS_SWITCH_T0: String(Date.now()) };
-        dotsTheme.command = [Quickshell.shellDir + "/../bin/dots", "theme", selected];
+        dotsTheme.command = [Quickshell.shellDir + "/../bin/dots", "colorscheme", selected];
         dotsTheme.running = true;
         close();
     }
@@ -108,7 +108,7 @@ Item {
         id: dotsTheme
         stderr: StdioCollector {
             onStreamFinished: if (text)
-                console.warn("dots theme: " + text)
+                console.warn("dots colorscheme: " + text)
         }
     }
 

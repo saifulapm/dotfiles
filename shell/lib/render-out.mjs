@@ -75,7 +75,7 @@ export function renderOutputs(theme, list, label) {
     'claude.json': renderClaude(theme),
     'pi.json': renderPi(theme),
     'amx.toml': renderAmx(theme),
-    // dots theme writes a failed switch's reason here after the fallback render; any render clears it.
+    // dots colorscheme writes a failed switch's reason here and keeps the scheme it had; any render clears it.
     notice: '',
     'themes.json': JSON.stringify(list, null, 2) + '\n',
   };

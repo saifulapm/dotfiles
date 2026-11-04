@@ -1,4 +1,4 @@
-# dots theme renders the current theme to ~/.config/helix/themes/dots.toml and sends running editors USR1 to reread it.
+# dots colorscheme renders the current theme to ~/.config/helix/themes/dots.toml and sends running editors USR1 to reread it.
 theme = "dots"
 
 [editor]

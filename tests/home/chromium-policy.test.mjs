@@ -38,8 +38,8 @@ test('a machine without Chromium gets no policy', () => {
   assert.equal(existsSync(policy), false);
 });
 
-// A colour policy, which an older dots theme wrote, blocks the theme extension that now carries the theme.
-test('the colour policy an older dots theme wrote is removed', () => {
+// A colour policy, which an older theme switch wrote, blocks the theme extension that now carries the theme.
+test('the colour policy an older theme switch wrote is removed', () => {
   const { r, policy } = apply({ chromium: true, stale: true });
   assert.equal(r.status, 0, r.stderr);
   assert.equal(existsSync(join(policy, '../color.json')), false);

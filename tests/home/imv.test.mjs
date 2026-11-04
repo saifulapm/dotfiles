@@ -1,4 +1,4 @@
-// imv's config is a link to the one dots theme renders, since imv has no include.
+// imv's config is a link to the one dots colorscheme renders, since imv has no include.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

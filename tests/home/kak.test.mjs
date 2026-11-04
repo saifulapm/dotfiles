@@ -35,7 +35,7 @@ before(() => {
     { encoding: 'utf8', env },
   );
   assert.equal(applied.status, 0, applied.stderr);
-  // The colorscheme file kakrc loads is the one dots theme renders.
+  // The colorscheme file kakrc loads is the one dots colorscheme renders.
   const theme = spawnSync('node', [join(repo, 'shell/lib/theme-render.mjs'), 'paper'], { encoding: 'utf8', env });
   assert.equal(theme.status, 0, theme.stderr);
 });

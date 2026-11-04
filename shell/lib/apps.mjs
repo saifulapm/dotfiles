@@ -391,7 +391,7 @@ export function renderMpv(t) {
   return mpvOptions(t).map(([k, v]) => `${k}="${v}"`).join('\n') + '\n';
 }
 
-// The same options as IPC commands, one per line, which dots theme sends each open player.
+// The same options as IPC commands, one per line, which dots colorscheme sends each open player.
 export function renderMpvIpc(t) {
   const cmd = ([k, v]) => (k === 'script-opts-append' ? ['change-list', 'script-opts', 'append', v] : ['set_property', k, v]);
   return mpvOptions(t).map((o) => JSON.stringify({ command: cmd(o) })).join('\n') + '\n';
@@ -414,7 +414,7 @@ export function renderZathura(t) {
   return lines.join('\n') + '\n';
 }
 
-// imv has no include, so this is its whole config, v1's trash binds with it; dots theme changes an open window's background, and the overlay takes its colours at imv's next start.
+// imv has no include, so this is its whole config, v1's trash binds with it; dots colorscheme changes an open window's background, and the overlay takes its colours at imv's next start.
 export function renderImv(t) {
   const c = t.color;
   const [ink, paper, surface] = [c.ink, c.paper, c.surface].map((x) => lower(x).slice(1));

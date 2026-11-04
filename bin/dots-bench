@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # The shell times itself: a qs ipc round trip costs tens of ms, too much to time a 16 ms open from here.
 {
+# The nested session starts in a colorscheme, so the picker lists the schemes the switches go through.
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
 idle_s=${DOTS_BENCH_IDLE_S:-60}
@@ -101,7 +103,7 @@ theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
 selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
 switched_to() { jq -e --arg t "$1" --arg was "$2" '.to == $t and (tojson != $was)' "$switch_json" >/dev/null 2>&1; }
 
-# Through the switcher as a person would, so the time runs from the Enter key to dots theme's last reload.
+# Through the switcher as a person would, so the time runs from the Enter key to dots colorscheme's last reload.
 switch_once() {
   local to=$1 was from delta key
   was=$(jq -c . "$switch_json" 2>/dev/null)
@@ -166,7 +168,7 @@ for to in $(node "$(dirname "$0")/../shell/lib/bench.mjs" cycle "$start" "${name
   ms=$(switch_once "$to") || exit 1
   echo "     switch to $to: $ms ms" >&2
   ((ms > switch_max)) && switch_max=$ms
-  # The paper's own transition runs up to 300 ms after dots theme returns.
+  # The paper's own transition runs up to 300 ms after dots colorscheme returns.
   sleep 0.4
 done
 
@@ -226,8 +228,8 @@ bench_app deen.qml dots-deen deen
 deen_first_frame=$app_first_frame deen_rss_kib=$app_rss_kib deen_left=$app_left
 bench_app files.qml dots-files files
 
-"$(dirname "$0")/dots" theme blueprint >/dev/null || die "dots theme blueprint failed"
-until_ok 3000 status_has '.theme == "blueprint"' || die "the shell never reported blueprint"
+"$(dirname "$0")/dots" colorscheme gruvbox-dark >/dev/null || die "dots colorscheme gruvbox-dark failed"
+until_ok 3000 status_has '.theme == "gruvbox-dark"' || die "the shell never reported gruvbox-dark"
 # The paper's transition ends 300 ms after the call; idle starts after it.
 sleep 1
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")

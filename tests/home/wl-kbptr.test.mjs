@@ -1,4 +1,4 @@
-// wl-kbptr's config is a link to the one dots theme renders, so each run draws in the current theme.
+// wl-kbptr's config is a link to the one dots colorscheme renders, so each run draws in the current theme.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

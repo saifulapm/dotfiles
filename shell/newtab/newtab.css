@@ -1,4 +1,4 @@
-/* Chromium's new-tab page as the boards draw it; theme.css, which dots theme renders, sets the colours, fonts and paper. */
+/* Chromium's new-tab page as the boards draw it; theme.css, which dots colorscheme renders, sets the colours, fonts and paper. */
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
 body { display: flex; justify-content: center; padding: 86px 16px 32px; color: var(--ink); font-family: var(--ui), monospace; }

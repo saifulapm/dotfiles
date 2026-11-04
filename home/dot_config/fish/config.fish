@@ -21,7 +21,7 @@ fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Codes/dotfiles/bin
 set -gx PATH $PATH node_modules/.bin vendor/bin
 
 set -g __dots_colors_file (set -q XDG_STATE_HOME; and echo $XDG_STATE_HOME; or echo ~/.local/state)/dots/theme-out/colors.fish
-# dots theme rewrites the colours file, so each prompt re-reads it once its text changes.
+# dots colorscheme rewrites the colours file, so each prompt re-reads it once its text changes.
 function __dots_colors --on-event fish_prompt
     test -r $__dots_colors_file; or return
     set -l text (string collect <$__dots_colors_file 2>/dev/null); or return
