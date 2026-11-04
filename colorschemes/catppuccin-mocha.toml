@@ -1,0 +1,34 @@
+# Board colours for the UI and code; the ANSI 16 are catppuccin/foot's (themes/catppuccin-mocha.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Mocha" base08, 0B, 09, 0F.
+[meta]
+name = "catppuccin-mocha"
+title = "Catppuccin Mocha"
+family = "Catppuccin"
+variant = "dark"
+source = "https://github.com/catppuccin/palette"
+licence = "MIT"
+
+[color]
+paper = "#11111B"
+surface = "#1E1E2E"
+ink = "#CDD6F4"
+muted = "#A6ADC8"
+line = "#313244"
+accent = "#89B4FA"
+danger = "#F38BA8"
+ok = "#A6E3A1"
+ansi = [
+  "#45475A", "#F38BA8", "#A6E3A1", "#F9E2AF", "#89B4FA", "#F5C2E7", "#94E2D5", "#BAC2DE",
+  "#585B70", "#F38BA8", "#A6E3A1", "#F9E2AF", "#89B4FA", "#F5C2E7", "#94E2D5", "#A6ADC8",
+]
+
+[syntax]
+keyword = "#CBA6F7"
+function = "#89B4FA"
+string = "#A6E3A1"
+type = "#F9E2AF"
+value = "#FAB387"
+variable = "#CDD6F4"
+attribute = "#FAB387"
+meta = "#F2CDCD"
+builtin = "#F38BA8"
+comment = "#9399B2"

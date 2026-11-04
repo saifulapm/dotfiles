@@ -1,0 +1,34 @@
+# Board colours for the UI and code; the ANSI 16 are morhetz/gruvbox's (g:terminal_color_N in colors/gruvbox.vim), danger, ok, attribute and meta the tinted-theming base16 "Gruvbox dark, medium" base08, 0B, 09, 0F.
+[meta]
+name = "gruvbox-dark"
+title = "Gruvbox Dark"
+family = "Gruvbox"
+variant = "dark"
+source = "https://github.com/morhetz/gruvbox"
+licence = "MIT"
+
+[color]
+paper = "#1D2021"
+surface = "#282828"
+ink = "#EBDBB2"
+muted = "#A89984"
+line = "#3C3836"
+accent = "#83A598"
+danger = "#FB4934"
+ok = "#B8BB26"
+ansi = [
+  "#282828", "#CC241D", "#98971A", "#D79921", "#458588", "#B16286", "#689D6A", "#A89984",
+  "#928374", "#FB4934", "#B8BB26", "#FABD2F", "#83A598", "#D3869B", "#8EC07C", "#EBDBB2",
+]
+
+[syntax]
+keyword = "#FB4934"
+function = "#B8BB26"
+string = "#B8BB26"
+type = "#FABD2F"
+value = "#D3869B"
+variable = "#83A598"
+attribute = "#FE8019"
+meta = "#D65D0E"
+builtin = "#FE8019"
+comment = "#928374"
