@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots theme frost plays the frost switch, and its motion lasts at most 300 ms by the shell's own start and end stamps, three times out of three; leaving Frost plays it too.
+# dots theme frost plays the frost switch, and its motion lasts at most 300 ms by the shell's own start and end stamps, three times out of three; leaving Frost plays it too, and between Hi-Fi and Frost the incoming theme's switch plays.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -48,6 +48,21 @@ check "paper to frost: status reports transition frost ($kind)" test "$kind" = f
 sleep 1
 kind=$(kind_of_switch blueprint)
 check "frost to blueprint: status reports transition frost ($kind)" test "$kind" = frost
+
+# Between Hi-Fi and Frost the incoming theme's switch plays, never both and never a cut; other pairs keep their own.
+sleep 1
+kind_of_switch frost >/dev/null
+sleep 1
+kind=$(kind_of_switch hi-fi)
+check "frost to hi-fi: status reports transition sweep ($kind)" test "$kind" = sweep
+sleep 1
+kind=$(kind_of_switch frost)
+check "hi-fi to frost: status reports transition frost ($kind)" test "$kind" = frost
+sleep 1
+kind_of_switch paper >/dev/null
+sleep 1
+kind=$(kind_of_switch blueprint)
+check "paper to blueprint: status reports transition slide ($kind)" test "$kind" = slide
 
 errors=$(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -E 'Failed to load|ShaderEffect|QShader|\.qsb|Paper.qml')
 [ -n "$errors" ] && echo "$errors"
