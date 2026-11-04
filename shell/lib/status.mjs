@@ -11,6 +11,6 @@ export function processAgeMs(uptime, selfStat) {
   return Math.round(parseFloat(uptime) * 100 - starttime) * 10;
 }
 
-export function statusJson({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs, transition, transitionEndedAt, pointer }) {
-  return JSON.stringify({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs, transition, transitionEndedAt, pointer });
+export function statusJson({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs, transition, transitionStartedAt, transitionEndedAt, pointer }) {
+  return JSON.stringify({ theme, outputs, loaded, sync, rssKiB, timers, firstFrameMs, transition, transitionStartedAt, transitionEndedAt, pointer });
 }

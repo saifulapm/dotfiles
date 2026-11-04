@@ -1,9 +1,11 @@
 import Quickshell
+import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
 import QtQuick.Effects
 import "." as Root
 import "lib/hifi.mjs" as H
+import "lib/frost-switch.mjs" as F
 
 // The shader has no time uniform, so the paper never redraws unless the theme or the output changes.
 PanelWindow {
@@ -20,17 +22,29 @@ PanelWindow {
     // The transition H.switchKind picks for the pair; "" while none runs.
     property string kind: ""
     property bool waiting: false
-    // When the last transition ended, in ms since the epoch, so a check can time a switch from its command without polling.
+    // When the last transition began to play and when it ended, in ms since the epoch, so a check can time a switch without polling.
+    property real startedAt: 0
     property real endedAt: 0
     // How far through its 220 ms the sweep is, 0 to 1; the pointer and the lamps' warmth follow from it.
     property real sweepTime: 0
     readonly property var swept: H.sweepAt(sweepTime)
     // The sweep pointer's x as a fraction of the width; null while no sweep runs.
     readonly property var pointer: kind === "sweep" ? swept.pointer : null
+    // How far through its 280 ms the frost switch is, 0 to 1; the frost's reach and the swap follow from it.
+    property real frostTime: 0
+    readonly property var frosted: F.frostAt(frostTime)
+    // The theme the frost is drawn from: Frost, whichever side of the switch it is on.
+    readonly property var frostTokens: [front.tokens, back.tokens].find(t => t?.primitive.motion === "ease") ?? null
 
     onSweptChanged: {
         if (kind === "sweep")
             Root.State.warmth = Math.max(Root.State.warmth, swept.warmth);
+    }
+
+    // Under full frost the outgoing sheet goes, so the melt shows the new theme.
+    onFrostedChanged: {
+        if (kind === "frost" && frosted.swapped)
+            front.visible = false;
     }
 
     // Emitted once, when this window's first frame reaches the compositor.
@@ -69,6 +83,7 @@ PanelWindow {
             zoom.stop();
             scan.stop();
             sweep.stop();
+            frost.stop();
             finish();
         }
         // The first tokens, or the same theme again, replace the paper with no transition.
@@ -82,6 +97,7 @@ PanelWindow {
             sweepTime = 0;
             Root.State.warmth = 0;
         }
+        frostTime = 0;
         // The back sheet waits off screen or under the front one, so its shader rebuild never shows.
         back.offset = kind === "slide" ? height : 0;
         back.z = kind === "slide" ? 1 : 0;
@@ -99,7 +115,8 @@ PanelWindow {
             return;
         waiting = false;
         // A kind with no animation here, cut among them, swaps at once.
-        const animation = ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep })[kind];
+        const animation = ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep, frost: frost })[kind];
+        startedAt = Date.now();
         if (animation)
             animation.start();
         else
@@ -172,6 +189,30 @@ PanelWindow {
             width: paper.width
             height: 2
             color: paper.front.tokens?.color.accent ?? "transparent"
+        }
+
+        // Frost's switch frost, loaded only while it plays, so a resting paper holds no extra shader.
+        Loader {
+            z: 2
+            anchors.fill: parent
+            active: paper.kind === "frost" && frostShader.url !== ""
+
+            sourceComponent: ShaderEffect {
+                blending: true
+                fragmentShader: frostShader.url
+                property size outputSize: Qt.size(width, height)
+                property color ink: paper.frostTokens?.color.ink ?? "transparent"
+                property real reach: paper.frosted.reach
+            }
+        }
+
+        // A missing .qsb crashes qs, so the frost gets its shader only once this read of it succeeds; without it the switch still swaps at 180 ms.
+        FileView {
+            id: frostShader
+            property string url: ""
+            path: paper.theme.dir ? paper.theme.dir + "/shaders/frost-switch.frag.qsb" : ""
+            onPathChanged: url = ""
+            onLoaded: url = "file://" + path
         }
 
         // Hi-Fi's tuning pointer, in Hi-Fi's danger red whichever side of the switch Hi-Fi is on.
@@ -270,6 +311,17 @@ PanelWindow {
         from: 0
         to: 1
         duration: 220 * Root.State.slowdown
+        onFinished: paper.finish()
+    }
+
+    // Frost: the frost grows in from the edges, the theme swaps under it, and it melts back.
+    NumberAnimation {
+        id: frost
+        target: paper
+        property: "frostTime"
+        from: 0
+        to: 1
+        duration: F.FROST_SWITCH.ms * Root.State.slowdown
         onFinished: paper.finish()
     }
 
