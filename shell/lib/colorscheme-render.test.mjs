@@ -80,3 +80,37 @@ test('a file the check refuses exits 1 with its reason and writes nothing', (t) 
   assert.match(shaped.stderr, /^colorscheme shaped: \[niri\]/);
   assert.deepEqual(readdirSync(state), []);
 });
+
+const saved = (t, content) => {
+  const state = scratch(t);
+  if (content !== null) {
+    mkdirSync(join(state, 'dots'));
+    writeFileSync(join(state, 'dots/theme'), content);
+  }
+  const r = spawnSync('node', [cli, '--saved'], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' });
+  const shell = JSON.parse(readFileSync(join(state, 'dots/theme-out/shell.json'), 'utf8'));
+  return { r, shell, file: readFileSync(join(state, 'dots/theme'), 'utf8') };
+};
+
+test('--saved turns an old theme name into artboard and saves it', (t) => {
+  const { r, shell, file } = saved(t, 'frost\n');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(file, 'artboard\n');
+  assert.equal(shell.name, 'artboard');
+});
+
+test('--saved with no saved file or an empty one renders and saves artboard', (t) => {
+  for (const content of [null, '']) {
+    const { r, shell, file } = saved(t, content);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(file, 'artboard\n');
+    assert.equal(shell.name, 'artboard');
+  }
+});
+
+test('--saved renders a saved colorscheme and leaves the file as it was', (t) => {
+  const { r, shell, file } = saved(t, 'artboard');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(file, 'artboard');
+  assert.equal(shell.name, 'artboard');
+});

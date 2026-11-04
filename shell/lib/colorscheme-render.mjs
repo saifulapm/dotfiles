@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// node shell/lib/colorscheme-render.mjs <name>: renders colorschemes/<name>.toml, worn on the one design, into $XDG_STATE_HOME/dots/theme-out/.
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+// node shell/lib/colorscheme-render.mjs <name>|--saved: renders colorschemes/<name>.toml, worn on the one design, into $XDG_STATE_HOME/dots/theme-out/.
+import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { parseToml } from './toml.mjs';
 import { qtTokens } from './theme.mjs';
 import { validateColorscheme, designOf, DEFAULT } from './colorscheme.mjs';
@@ -9,9 +11,20 @@ import { renderOutputs } from './render-out.mjs';
 const dir = new URL('../../colorschemes/', import.meta.url).pathname;
 const load = (name) => designOf(validateColorscheme(parseToml(readFileSync(`${dir}${name}.toml`, 'utf8'))));
 
-const name = process.argv[2] ?? '';
+const valid = (n) => /^[a-z0-9][a-z0-9_-]{0,31}$/.test(n) && existsSync(`${dir}${n}.toml`);
+// --saved renders the saved name; one that is no colorscheme (an old theme name, or none) becomes the default and is saved after the render.
+const state = join(process.env.XDG_STATE_HOME || join(homedir(), '.local/state'), 'dots');
+const asked = process.argv[2] === '--saved';
+let name = process.argv[2] ?? '';
+let remap = false;
+if (asked) {
+  const file = join(state, 'theme');
+  name = existsSync(file) ? readFileSync(file, 'utf8').trim() : '';
+  remap = !valid(name);
+  if (remap) name = DEFAULT;
+}
 // The reason after the colon is what the island shows.
-if (!/^[a-z0-9][a-z0-9_-]{0,31}$/.test(name) || !existsSync(`${dir}${name}.toml`)) {
+if (!valid(name)) {
   console.error(`colorscheme ${name}: no such colorscheme`);
   process.exit(1);
 }
@@ -33,3 +46,7 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith('.toml')).sort()) {
 }
 list.sort((a, b) => (b.name === DEFAULT) - (a.name === DEFAULT));
 renderOutputs(theme, list, `colorscheme ${name}`);
+if (remap) {
+  mkdirSync(state, { recursive: true, mode: 0o700 });
+  writeFileSync(join(state, 'theme'), `${name}\n`);
+}
