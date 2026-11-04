@@ -1,0 +1,34 @@
+# Artboard's own colours, kept from the theme it was; the code colours are GitHub Light's (Primer).
+[meta]
+name = "artboard"
+title = "Artboard"
+family = "Artboard"
+variant = "light"
+source = "https://github.com/saifulapm/dotfiles"
+licence = "MIT"
+
+[color]
+paper = "#E4E6EA"
+surface = "#FFFFFF"
+ink = "#15171B"
+muted = "#57606A"
+line = "#D0D7DE"
+accent = "#3D5AFE"
+danger = "#CF222E"
+ok = "#1A7F37"
+ansi = [
+  "#15171B", "#CF222E", "#1A7F37", "#9A6700", "#3D5AFE", "#8250DF", "#1B7C83", "#6E7781",
+  "#57606A", "#A40E26", "#116329", "#7D4E00", "#0969DA", "#6639BA", "#3192AA", "#8C959F",
+]
+
+[syntax]
+keyword = "#CF222E"
+function = "#8250DF"
+string = "#0A3069"
+type = "#953800"
+value = "#0550AE"
+variable = "#15171B"
+attribute = "#116329"
+meta = "#0550AE"
+builtin = "#0550AE"
+comment = "#6E7781"
