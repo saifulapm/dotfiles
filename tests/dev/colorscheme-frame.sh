@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Under a colorscheme two tiled foots sit on the paper framed square in 1 px, ink on the focused one and line on the other, with no pixel darker than the paper within 20 px outside either frame; run with `DOTS_DEV_SCHEME= DOTS_DEV_THEME=artboard` (the old Artboard's soft shadow) it must fail.
+# Under a colorscheme two tiled foots sit on the paper framed square in 1 px, ink on the focused one and line on the other, with no pixel darker than the paper within 20 px outside either frame; the old Artboard's shadow (#15171B2E, softness 40, y 18) put into niri.kdl after the switch fails the last check.
 {
 export DOTS_DEV_SCHEME=${DOTS_DEV_SCHEME-gruvbox-dark}
 source "$(dirname "$0")/lib.sh"
@@ -67,7 +67,7 @@ read_frames() {
       // The four sides at their middles, then two corners, which a rounded frame leaves to the paper.
       const edges = [at(a, y), at(b, y), at(x, top), at(x, bottom), at(a, top), at(b, bottom)].map(name);
       const dark = Math.min(darkest(w, (xx) => at(xx, y), a, b), darkest(h, (yy) => at(x, yy), top, bottom));
-      return { x: [a, b], y: [top, bottom], edges, darker: dark < lum(paper) - 2 };
+      return { x: [a, b], y: [top, bottom], edges, darker: dark < lum(paper) - 0.5 };
     });
     console.log(JSON.stringify(out));
   ' "$shot" "$XDG_STATE_HOME/dots/theme-out/shell.json"

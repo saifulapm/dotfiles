@@ -22,5 +22,23 @@ for i in 1 2 3 4 5; do
   until_ok 3000 eval "shell_status | jq -e '.theme == \"$to\" and .transition == \"\"' >/dev/null"
 done
 
+# Two switches at once take turns on the lock, and the desktop ends wholly in the one that ran last.
+"$repo/bin/dots" colorscheme gruvbox-dark >/dev/null &
+first=$!
+"$repo/bin/dots" colorscheme rose-pine-dawn >/dev/null &
+second=$!
+wait "$first"
+rc1=$?
+wait "$second"
+rc2=$?
+check "two switches at once both exit 0 (got $rc1 and $rc2)" test "$rc1$rc2" = 00
+last=$(<"$XDG_STATE_HOME/dots/theme")
+check "the saved scheme is one of the two ($last)" eval '[ "$last" = gruvbox-dark ] || [ "$last" = rose-pine-dawn ]'
+paper=$(sed -n 's/^paper = "\(#[0-9A-F]*\)"$/\1/p' "$repo/colorschemes/$last.toml")
+check "the shell tokens name $last" jq -e --arg t "$last" '.name == $t' "$XDG_STATE_HOME/dots/theme-out/shell.json"
+check "niri's paper is $last's $paper" grep -q "background-color \"$paper\"" "$XDG_STATE_HOME/dots/theme-out/niri.kdl"
+until_ok 3000 eval "shell_status | jq -e '.theme == \"$last\" and .transition == \"\"' >/dev/null"
+check "the shell ends in $last" eval "shell_status | jq -e '.theme == \"$last\"' >/dev/null"
+
 exit $((fails > 0))
 }
