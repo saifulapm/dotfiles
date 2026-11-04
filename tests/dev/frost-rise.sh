@@ -24,12 +24,20 @@ if [ -n "${DOTS_MOTION_SLOWDOWN:-}" ]; then
   press
   while (($(now_ms) - t0 < 400)); do sleep 0.005; done
   mid=$(launcher_state)
+  # 2 s in the ease-out has the glass at about 95 % of its fade, past the 85 % alpha it rests at.
+  while (($(now_ms) - t0 < 2000)); do sleep 0.005; done
+  late=$(launcher_state)
   until_ok 8000 state_is '.open and .settled'
   rest=$(launcher_state)
   echo "     mid-open field y $(jq .fieldBox.y <<<"$mid") card $(jq -c .cardBox <<<"$mid"); at rest field y $(jq .fieldBox.y <<<"$rest") card $(jq -c .cardBox <<<"$rest")"
   mid_is() { jq -en --argjson m "$mid" --argjson r "$rest" "$1" >/dev/null; }
   check "slowed: mid-open the launcher is still opening" mid_is '$m.open and ($m.settled | not)'
   check "slowed: mid-open the content is drawn between 0 and 4 px below its rest" mid_is '($m.fieldBox.y - $r.fieldBox.y) as $d | $d > 0 and $d < 4'
+  # The glass fill's alpha from its #AARRGGBB, or 1 for #RRGGBB.
+  alpha_of() { jq -r '.glassFill | if length == 9 then (.[1:3] | ascii_downcase | explode | map(if . >= 97 then . - 87 else . - 48 end) | .[0] * 16 + .[1]) / 255 else 1 end' <<<"$1"; }
+  late_a=$(alpha_of "$late") rest_a=$(alpha_of "$rest")
+  echo "     glass alpha 2 s in $late_a ($(jq -r .glassFill <<<"$late")), at rest $rest_a"
+  check "slowed: 2 s into the open the glass ($late_a) is no more solid than at rest ($rest_a) and not clear" node -e 'const [l, r] = process.argv.slice(1).map(Number); process.exit(l > 0 && l <= r ? 0 : 1)' "$late_a" "$rest_a"
   check "slowed: mid-open the card's drawn box is at rest" mid_is '[$m.cardBox.x - $r.cardBox.x, $m.cardBox.y - $r.cardBox.y, $m.cardBox.w - $r.cardBox.w, $m.cardBox.h - $r.cardBox.h] | map(fabs < 0.5) | all'
   wtype -k Escape
   until_ok 6000 state_is '.open == false and .drawing == false'

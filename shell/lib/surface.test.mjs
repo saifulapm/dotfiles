@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens, qtTokens } from './theme.mjs';
-import { surfaceStyle, marginStyle, restyled } from './surface.mjs';
+import { surfaceStyle, marginStyle, restyled, fadedColor } from './surface.mjs';
 
 const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
 const paper = load('paper');
@@ -190,4 +190,15 @@ test('a restyle swaps the fill, text, frame and shadow colour it names and keeps
   assert.deepEqual([r.fill, r.text, r.frame, r.corner, r.shadow.color, r.shadow.alpha], ['F', 'b', { width: 1.5, color: 'R' }, base.corner, 'G', 0.35]);
   const h = restyled(Object.assign({ handles: false }, base), { handles: true, handleFill: 'W' });
   assert.deepEqual([h.handles, h.handleFill], [true, 'W']);
+});
+
+test('a fading colour scales its own alpha, so glass never draws more solid than at rest', () => {
+  // Frost's glass rests at D9 (0.85) and its edge at 24 (0.14), in Qt's #AARRGGBB.
+  assert.equal(fadedColor('#D93B4252', 0.5), '#6D3B4252');
+  assert.equal(fadedColor('#24ECEFF4', 0.5), '#12ECEFF4');
+  assert.equal(fadedColor('#3B4252', 0.5), '#803B4252');
+  assert.equal(fadedColor('#D93B4252', 0), '#003B4252');
+  // At rest and for transparent the colour is left as it is, never turned into black.
+  assert.equal(fadedColor('#D93B4252', 1), '#D93B4252');
+  assert.equal(fadedColor('transparent', 0.5), 'transparent');
 });

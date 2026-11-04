@@ -111,3 +111,11 @@ export function restyled(style, swap) {
     handleFill: swap.handleFill ?? style.handleFill,
   });
 }
+
+// A colour as a surface fades in by f, 0 to 1: its own alpha scaled, so a glass that rests half clear never draws more solid on the way; transparent and any colour at rest are left as they are.
+export function fadedColor(c, f) {
+  const m = f >= 1 ? null : /^#([0-9A-Fa-f]{2})?([0-9A-Fa-f]{6})$/.exec(c);
+  if (!m) return c;
+  const a = Math.round((m[1] ? parseInt(m[1], 16) : 255) * Math.max(0, f));
+  return `#${a.toString(16).padStart(2, '0').toUpperCase()}${m[2]}`;
+}

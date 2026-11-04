@@ -42,9 +42,9 @@ Item {
 
     scale: pose.scale
 
-    // A colour as the fill fades in; at rest it is left alone, since Qt.alpha would make transparent opaque black.
+    // A colour as the fill fades in, its own alpha scaled, so Frost's half-clear glass and edge never draw more solid than at rest.
     function faded(c) {
-        return pose.fill < 1 ? Qt.alpha(c, pose.fill) : c;
+        return S.fadedColor(c, pose.fill);
     }
 
     // The card as drawn this frame, moved and scaled by its motion, in the window's pixels.
