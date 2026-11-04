@@ -78,7 +78,7 @@ reload_kak() {
   done
 }
 
-# helix rereads its config, and with it the dots theme file, on USR1.
+# helix rereads its config, and with it the theme file dots renders, on USR1.
 reload_helix() {
   local pid
   for pid in $(session_pids hx); do
