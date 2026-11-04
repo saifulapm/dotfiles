@@ -1,4 +1,4 @@
-# Board colours for the UI and code; the ANSI 16 are Primer's (@primer/primitives 11.10.0 light.css), danger, ok, attribute and meta its tinted-theming base16 "Github" base08, 0B, 09, 0F.
+# Board colours for the UI and code; the ANSI 16 are Primer's (@primer/primitives 11.10.0 light.css), danger and ok its fgColor-danger and fgColor-success, attribute and meta the tinted-theming base16 "Github" base09 and 0F.
 [meta]
 name = "github-light"
 title = "GitHub Light"
@@ -14,8 +14,8 @@ ink = "#1F2328"
 muted = "#59636E"
 line = "#D1D9E0"
 accent = "#0969DA"
-danger = "#CF222E"
-ok = "#116329"
+danger = "#D1242F"
+ok = "#1A7F37"
 ansi = [
   "#1F2328", "#CF222E", "#116329", "#4D2D00", "#0969DA", "#8250DF", "#1B7C83", "#59636E",
   "#393F46", "#A40E26", "#1A7F37", "#633C01", "#218BFF", "#A475F9", "#3192AA", "#818B98",
