@@ -15,9 +15,8 @@ function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'dots-mpv-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   for (const d of ['bin/dots', 'shell/lib', 'shell/newtab', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
-  const art = readFileSync(join(repo, 'colorschemes/artboard.toml'), 'utf8');
-  writeFileSync(join(root, 'colorschemes/night.toml'), art.replace('name = "artboard"', 'name = "night"').replace('variant = "light"', 'variant = "dark"')
-    .replace('paper = "#E4E6EA"', 'paper = "#0D1117"').replace('surface = "#FFFFFF"', 'surface = "#161B22"').replace('ink = "#15171B"', 'ink = "#E6EDF3"'));
+  // A dark scheme under its own name; Artboard's light colours on a dark surface would fail the colorscheme check.
+  writeFileSync(join(root, 'colorschemes/night.toml'), readFileSync(join(repo, 'colorschemes/github-dark.toml'), 'utf8').replace('name = "github-dark"', 'name = "night"'));
   const state = join(root, 'state');
   mkdirSync(state);
   return { dots: join(root, 'bin/dots'), state };
@@ -73,7 +72,7 @@ test('a switch recolours every open mpv within a second, and each socket goes wh
   const socks = players.map((p) => join(state, `mpv-${p.pid}.sock`));
   assert.ok(await until(() => socks.every((s) => existsSync(s)), 5000), 'both players opened their sockets');
   assert.equal(spawnSync(dots, ['colorscheme', 'night'], { env: isolated(state) }).status, 0);
-  for (const s of socks) assert.equal((await mpvAsk(s, ['get_property', 'osd-color'])).toLowerCase(), '#ffe6edf3');
+  for (const s of socks) assert.equal((await mpvAsk(s, ['get_property', 'osd-color'])).toLowerCase(), '#fff0f6fc');
   const t0 = Date.now();
   assert.equal(spawnSync(dots, ['colorscheme', 'artboard'], { env: isolated(state) }).status, 0);
   for (const s of socks) {
@@ -104,7 +103,7 @@ test('a socket left by a killed mpv is removed by the next switch, which still r
   assert.ok(await until(() => existsSync(liveSock), 5000));
   assert.equal(spawnSync(dots, ['colorscheme', 'night'], { env: isolated(state) }).status, 0);
   assert.equal(existsSync(deadSock), false);
-  assert.equal((await mpvAsk(liveSock, ['get_property', 'osd-color'])).toLowerCase(), '#ffe6edf3');
+  assert.equal((await mpvAsk(liveSock, ['get_property', 'osd-color'])).toLowerCase(), '#fff0f6fc');
   assert.equal(readFileSync(join(state, 'dots/theme-out/notice'), 'utf8'), 'colorscheme night: gsettings did not reload\n');
 });
 
