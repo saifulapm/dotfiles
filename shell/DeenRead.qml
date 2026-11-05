@@ -493,6 +493,15 @@ FocusScope {
                                 required property int index
                                 readonly property bool current: page.cursor.a === ayahRow.index + 1 && page.cursor.i === index + 1
 
+                                // A click on a word moves the cursor there and plays it, as Enter does.
+                                Click {
+                                    name: "deen-read-word:" + (ayahRow.index + 1) + ":" + (wordBox.index + 1)
+                                    onTapped: {
+                                        page.moveTo({ a: ayahRow.index + 1, i: wordBox.index + 1 });
+                                        page.hearWord();
+                                    }
+                                }
+
                                 function drawn() {
                                     return {
                                         ar: wordArabic.text,
@@ -779,6 +788,15 @@ FocusScope {
                     required property var modelData
                     required property int index
                     readonly property bool current: index === page.pickAt
+
+                    // A click on a surah opens it, as Enter does.
+                    Click {
+                        name: "deen-read-pick:" + pickRow.index
+                        onTapped: {
+                            page.pickAt = pickRow.index;
+                            page.pick();
+                        }
+                    }
 
                     function drawn() {
                         return {

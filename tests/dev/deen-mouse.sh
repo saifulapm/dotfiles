@@ -84,6 +84,29 @@ check "a click on the ninth collection lists its books as Enter does ($(hadith '
   hadith_is '.level == "books" and .heading == "চল্লিশ হাদীসে কুদসী"'
 check "it asked deen for Qudsi's books" calls_has 'hadith books qudsi'
 
+read_is() { deen_state | jq -e ".read | $1" >/dev/null 2>&1; }
+read_show() { deen_state | jq -c ".read | $1"; }
+at=$(deen_spot deen-tab:read)
+# shellcheck disable=SC2086
+point click $at
+until_ok 3000 read_is '.ayat > 0 and .ayah.words[0].boxed'
+check "a click on the Read tab opens Read ($(deen_state | jq -c .tab))" deen_is '.tab == "read"'
+at=$(deen_spot deen-read-word:1:2)
+# shellcheck disable=SC2086
+point click $at
+until_ok 3000 calls_has 'audio 1:1:2'
+check "a click on 1:1's second word boxes it and asks for its audio, as Enter does ($(read_show .bar.line))" \
+  bash -c "grep -qx 'audio 1:1:2' '$calls' && timeout 0.5 qs ipc -p '$deen_qml' call deen state | jq -e '.read.ayah.words[1].boxed' >/dev/null"
+wtype s
+until_ok 2000 read_is '.picker.open and .picker.focused'
+wtype 36
+until_ok 2000 read_is '.picker.text == "36" and .picker.rows[0].n == "36"'
+at=$(deen_spot deen-read-pick:0)
+# shellcheck disable=SC2086
+point click $at
+until_ok 3000 read_is '.ayat == 83'
+check "a click on Ya-Sin in the picker opens it, as Enter does ($(read_show '[.heading, .ayat, .picker.open]'))" read_is '.ayat == 83 and (.picker.open | not)'
+
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Deen's log has no QML errors${errs:+: $(head -c 300 <<<"$errs")}" test -z "$errs"
 
