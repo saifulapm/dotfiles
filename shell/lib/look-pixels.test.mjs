@@ -4,8 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 // A look check that reads only the shell's state passed while the text drew in its own fill (m71) and cream on cream (m73), so each theme step must also read the screen.
 const dir = new URL('../../tests/dev/', import.meta.url).pathname;
-// The old theme names stay until the last check that switches to one is gone.
-const THEMES = 'artboard|catppuccin-mocha|github-light|gruvbox-dark|rose-pine-dawn|paper|blueprint|hi-fi|frost';
+const THEMES = 'artboard|catppuccin-mocha|github-light|gruvbox-dark|rose-pine-dawn';
 
 // The functions a script defines, each with its whole body: a one-liner, or the lines up to the closing brace at the start of a line.
 function functions(lines) {
