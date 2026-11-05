@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { schemeTokens } from './colorscheme-file.mjs';
-import { launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
+import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
@@ -25,12 +25,12 @@ test("the launcher draws Artboard's board: a search glyph, an Apps pill, icon ti
   });
 });
 
-test("a dark scheme's pill word and lit detail take the deep text and the ink, and its keys and rules its own tokens", () => {
+test("a dark scheme's lit row and pill draw in its own tint, its words moved toward the ink until they read, and its keys and rules its own tokens", () => {
   const g = look('gruvbox-dark');
-  assert.deepEqual([g.label.color, g.cursor.detail, g.cursor.fill, g.cursor.text], ['#2638C9', '#EBDBB2', '#EEF1FF', '#2638C9']);
+  assert.deepEqual([g.label.color, g.cursor.detail, g.cursor.fill, g.cursor.text], ['#8DAA9B', '#AFA089', '#353A38', '#8DAA9B']);
   assert.deepEqual([g.name.color, g.detail.color, g.rule.color, g.chip.key, g.keyChip.cursorFill], ['#EBDBB2', '#A89984', '#3C3836', '#EBDBB2', '#282828']);
   const r = look('rose-pine-dawn');
-  assert.deepEqual([r.label.color, r.cursor.detail, r.keyChip.cursorFill], ['#907AA9', '#797593', '#FAF4ED']);
+  assert.deepEqual([r.label.color, r.cursor.detail, r.keyChip.cursorFill], ['#6B608A', '#666285', '#FAF4ED']);
 });
 
 test('every mode is named in the plain voice', () => {
@@ -92,17 +92,20 @@ test('a name cannot reorder itself with bidi controls, so it draws in the order 
 
 const island = (name) => islandLook(schemeTokens(name));
 
-test("the notification has a 40 px rounded tile, the app and now muted, and a 15 px bold summary, in every scheme", () => {
+test("the notification has a 40 px rounded tile, the app and now in the island's head tone, and a 15 px bold summary, in every scheme", () => {
+  assert.deepEqual(data(island('artboard')), {
+    width: 440,
+    age: 'now',
+    pad: { x: 16, top: 14, bottom: 14 },
+    head: { font: 'Maple Mono', size: 12, spacing: 0, color: '#A3A9B4' },
+    summary: { font: 'Maple Mono', size: 15, weight: 600, spacing: 0, color: '#FFFFFF' },
+    body: { font: 'Maple Mono', size: 13, color: '#C9CED6' },
+    tile: { size: 40, radius: 12, fill: '#2B2F36' },
+  });
   for (const n of SCHEMES) {
-    assert.deepEqual(data(island(n)), {
-      width: 440,
-      age: 'now',
-      pad: { x: 16, top: 14, bottom: 14 },
-      head: { font: 'Maple Mono', size: 12, spacing: 0, color: '#A3A9B4' },
-      summary: { font: 'Maple Mono', size: 15, weight: 600, spacing: 0, color: '#FFFFFF' },
-      body: { font: 'Maple Mono', size: 13, color: '#C9CED6' },
-      tile: { size: 40, radius: 12, fill: '#2B2F36' },
-    }, n);
+    const tones = plainTones(schemeTokens(n)).island;
+    const l = island(n);
+    assert.deepEqual([l.head.color, l.summary.color, l.body.color, l.tile.fill, l.width, l.tile.size], [tones.head, tones.summary, tones.body, tones.tile, 440, 40], n);
   }
   const a = island('artboard');
   assert.deepEqual([a.appText('Chromium'), a.glyph('chromium'), a.glyph(''), a.summaryText('Download complete')], ['Chromium', 'C', '•', 'Download complete']);
@@ -145,16 +148,18 @@ test('the OSD lights a twentieth for every 5 %, rounded, and clamps', () => {
   assert.deepEqual([0, 62, 100, 140, -3].map((v) => osd('artboard').litCount(v)), [0, 12, 20, 20, 0]);
 });
 
-test('the OSD is one rounded #6C83FF bar on #2B2F36 with the value beside it, for volume and brightness alike', () => {
+test("the OSD is one rounded bar in the scheme's bar tone on its island tile, with the value beside it, for volume and brightness alike", () => {
+  assert.deepEqual(data(osd('artboard')), {
+    width: 300,
+    height: 40,
+    bars: 'round',
+    lit: { color: '#6C83FF' },
+    unlit: { color: '#2B2F36' },
+    value: { font: 'Maple Mono', size: 13, weight: 600, color: '' },
+  });
   for (const n of SCHEMES) {
-    assert.deepEqual(data(osd(n)), {
-      width: 300,
-      height: 40,
-      bars: 'round',
-      lit: { color: '#6C83FF' },
-      unlit: { color: '#2B2F36' },
-      value: { font: 'Maple Mono', size: 13, weight: 600, color: '' },
-    }, n);
+    const t = plainTones(schemeTokens(n));
+    assert.deepEqual([osd(n).lit.color, osd(n).unlit.color, osd(n).bars], [t.bar, t.island.tile, 'round'], n);
   }
   assert.deepEqual([osd('artboard').valueText(62), osd('artboard').valueText(5)], ['62', '5']);
 });
@@ -179,7 +184,7 @@ const list = (name) => listLook(schemeTokens(name));
 test("a list surface's heading is the pill word, and its current tab the launcher's pill", () => {
   assert.deepEqual([list('artboard').heading('control', 'audio'), list('artboard').heading('notifications', '')], ['Control', 'Notifications']);
   assert.deepEqual(list('artboard').tab, { fill: '#EEF1FF', text: '#3D5AFE', radius: 8 });
-  assert.deepEqual(list('gruvbox-dark').tab, { fill: '#EEF1FF', text: '#2638C9', radius: 8 });
+  assert.deepEqual(list('gruvbox-dark').tab, { fill: '#353A38', text: '#8DAA9B', radius: 8 });
   assert.equal(list('artboard').tabText('Wi-Fi'), 'Wi-Fi');
 });
 

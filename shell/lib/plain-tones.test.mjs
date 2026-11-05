@@ -10,15 +10,22 @@ import { surfaceStyle } from './surface.mjs';
 const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
 const artboard = schemeTokens('artboard');
 
-test("the plain voice's board colours are Artboard's for every scheme, and before the tokens load", () => {
+test("Artboard keeps its own board colours, before the tokens load too; every other scheme mixes its from its tokens", () => {
   const tones = { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' } };
-  for (const n of SCHEMES) assert.deepEqual(plainTones(schemeTokens(n)), tones, n);
+  assert.deepEqual(plainTones(artboard), tones);
   assert.deepEqual(plainTones(null), tones);
+  const mocha = schemeTokens('catppuccin-mocha');
+  const m = plainTones(mocha);
+  assert.deepEqual([m.card, m.strong, m.online, m.outline, m.island.summary], [mocha.color.surface, mocha.color.ink, mocha.color.ok, mocha.color.muted, mocha.color.ink]);
+  for (const n of SCHEMES.slice(1)) assert.notEqual(plainTones(schemeTokens(n)).tint, tones.tint, n);
 });
 
-test("the lit row is the tint with deep text, in the launcher and every list", () => {
+test("the lit row is the scheme's tint with its deep text, in the launcher and every list", () => {
   for (const look of [launcherLook, listLook]) {
-    for (const n of SCHEMES) assert.deepEqual([look(schemeTokens(n)).cursor.fill, look(schemeTokens(n)).cursor.text], ['#EEF1FF', '#2638C9'], n);
+    for (const n of SCHEMES) {
+      const t = plainTones(schemeTokens(n));
+      assert.deepEqual([look(schemeTokens(n)).cursor.fill, look(schemeTokens(n)).cursor.text], [t.tint, t.deep], n);
+    }
   }
   assert.equal(launcherLook(artboard).name.font, 'Maple Mono');
   assert.equal(launcherLook(artboard).keyChip.fill, '#F2F3F6');
@@ -48,7 +55,7 @@ test('no file in shell/ names an Artboard light colour outside the plain table',
   for (const p of walk(join(root, 'shell'))) {
     let text = readFileSync(p, 'utf8');
     if (p.endsWith('shell/lib/voice.mjs')) {
-      const without = text.replace(/^const PLAIN = \{[\s\S]*?^\};$/m, '');
+      const without = text.replace(/^const ARTBOARD = \{[\s\S]*?^\};$/m, '');
       table = without !== text;
       text = without;
     }
@@ -69,12 +76,29 @@ test("Artboard's island note reads at 4.5:1 or more against the island's own fil
   assert.deepEqual(ratios, [7.6, 17.94, 11.35]);
 });
 
-test("Artboard's lit row reads its detail at 4.5:1, and its mode pill its word", () => {
-  const l = launcherLook(artboard);
-  const detail = contrast(solid(l.cursor.detail), solid(l.cursor.fill));
-  const pill = contrast(solid(l.label.color), solid(l.label.fill));
-  assert.ok(detail >= 4.5, `detail ${l.cursor.detail} on ${l.cursor.fill}: ${detail.toFixed(2)}`);
-  assert.ok(pill >= 4.5, `pill ${l.label.color} on ${l.label.fill}: ${pill.toFixed(2)}`);
+test("every scheme's island note, lease and toast read at 4.5:1 or more against the island's own fill", () => {
+  for (const n of SCHEMES) {
+    const t = schemeTokens(n);
+    const fill = solid(surfaceStyle(t, 'island').fill);
+    const note = islandLook(t);
+    for (const part of ['head', 'summary', 'body']) {
+      const ratio = contrast(solid(note[part].color), fill);
+      assert.ok(ratio >= 4.5, `${n} ${part} ${note[part].color} on ${fill}: ${ratio.toFixed(2)}`);
+    }
+  }
+});
+
+// Muted words are the scheme's own token, which only ink is held to 4.5:1 against, so they are not checked here.
+test("every scheme's lit row reads its text and detail at 4.5:1, its mode pill its word, and its key chips their keys", () => {
+  for (const n of SCHEMES) {
+    const t = schemeTokens(n);
+    const l = launcherLook(t);
+    const pairs = { text: [l.cursor.text, l.cursor.fill], detail: [l.cursor.detail, l.cursor.fill], pill: [l.label.color, l.label.fill], chipKey: [l.chip.key, l.chip.fill], tileName: [t.color.ink, plainTones(t).field] };
+    for (const [what, [fg, bg]] of Object.entries(pairs)) {
+      const ratio = contrast(solid(fg), solid(bg));
+      assert.ok(ratio >= 4.5, `${n} ${what} ${fg} on ${bg}: ${ratio.toFixed(2)}`);
+    }
+  }
 });
 
 // A plain branch's white is Artboard's card; on a dark scheme it is a light slab, so it reads the table's card.

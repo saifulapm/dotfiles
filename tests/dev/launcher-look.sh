@@ -110,5 +110,16 @@ fill=$(near "$(fill_geo)" 30 30 46 3)
 check "the card is filled with Mocha's surface #1E1E2E ($fill of 64 px)" test "$fill" -eq 64
 close_launcher
 
+# A dark scheme's lit row is its own tint, mixed from its surface and accent, never Artboard's light #EEF1FF (m80 walk 0JG8TBA8).
+open_launcher
+wtype fo
+until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
+check "mocha: the cursor row's fill is its tint #2D334B ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#2d334b"'
+tint=$(near "$(cursor_geo -70 4 8 8)" 45 51 75 3)
+check "mocha: inside the cursor row reads #2D334B on screen ($tint of 64 px)" test "$tint" -eq 64
+light=$(near "$(cursor_geo 0 0 400 20)" 238 241 255 6)
+check "mocha: no pixel of the cursor row is Artboard's #EEF1FF ($light px)" test "$light" -eq 0
+close_launcher
+
 exit $((fails > 0))
 }

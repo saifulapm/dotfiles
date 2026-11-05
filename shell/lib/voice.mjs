@@ -3,6 +3,8 @@
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
 import { captureText } from './island.mjs';
+import { mix } from './notes-look.mjs';
+import { contrast } from './theme.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
 
@@ -11,11 +13,47 @@ const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'c
 // The keys a mode's rows take: reminder's delete, and clipboard's Shift+Enter, which copies a clip without pasting it.
 const MODE_KEYS = { reminder: [['d', 'delete']], clipboard: [['⇧↵', 'copy']] };
 
-// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text, a card, and the island's text and tile on its slab. Every scheme draws Artboard's.
-const PLAIN = {
+// Artboard's board colours, which no token carries and no mix of its tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text, a card, and the island's text and tile on its slab.
+const ARTBOARD = {
   tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' },
 };
-export const plainTones = () => PLAIN;
+
+// A colour moved toward another, a step at a time, until it reads at 4.5:1 on its ground; a scheme's ink always does on its surface, so the walk ends.
+export function readable(fg, bg, toward) {
+  for (let share = 0; share <= 1; share = Math.round((share + 0.05) * 100) / 100) {
+    const c = share ? mix(fg, toward, share).toUpperCase() : fg;
+    if (contrast(c, bg) >= 4.5) return c;
+  }
+  return toward;
+}
+
+// The same tones for any other scheme, mixed from its own tokens, so a dark scheme's lit row and island read in its colours, not Artboard's light ones.
+function derived(c, mode) {
+  const up = (h) => h.toUpperCase();
+  const tint = up(mix(c.surface, c.accent, 0.14));
+  // The island is an ink slab on a light scheme and the surface on a dark one, as surface.mjs draws it.
+  const fill = mode === 'dark' ? c.surface : c.ink;
+  const text = mode === 'dark' ? c.ink : c.paper;
+  return {
+    tint,
+    deep: readable(c.accent, tint, c.ink),
+    tile: up(mix(c.surface, c.ink, 0.06)),
+    field: up(mix(c.surface, c.ink, 0.04)),
+    thumb: up(mix(c.surface, c.ink, 0.09)),
+    rule: up(mix(c.surface, c.ink, 0.12)),
+    bar: up(mix(c.accent, c.surface, 0.2)),
+    online: c.ok,
+    outline: c.muted,
+    warn: readable(c.danger, c.surface, c.ink),
+    warnChip: up(mix(c.surface, c.danger, 0.1)),
+    strong: c.ink,
+    card: c.surface,
+    island: { head: readable(up(mix(text, fill, 0.35)), fill, text), body: readable(up(mix(text, fill, 0.18)), fill, text), summary: text, tile: up(mix(fill, text, 0.14)) },
+  };
+}
+
+// The board colours of a scheme: Artboard's own, before the tokens load too, else mixed from the scheme's.
+export const plainTones = (tokens) => (!tokens || tokens.name === 'artboard' ? ARTBOARD : derived(tokens.color, tokens.mode));
 
 // An open can come before the theme's tokens load; until then the shell draws the plain look in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '' } };
@@ -33,8 +71,9 @@ export const line = (s) => same(s).replace(/\s+/g, ' ').trim();
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  // A dark theme's accent and muted fall under 4.5:1 on its tint, so its pill word and lit detail take the deep text and the ink.
-  const dark = tokens?.mode === 'dark';
+  // The pill word and the lit row's detail sit on the tint, so each moves toward the ink until it reads there.
+  const tones = plainTones(tokens);
+  const onTint = (fg) => (tokens ? readable(fg, tones.tint, c.ink) : fg);
   const legend = (mode) => ({
     keys: (mode === 'apps' ? PREFIXES : MODE_KEYS[mode] ?? []).map(([key, word]) => ({ key, word })),
     tail: 'j/k · ↵ · esc',
@@ -54,15 +93,15 @@ export function launcherLook(tokens) {
     pendingHead: (n) => ({ text: `Pending · ${n}`, right: '' }),
     prompt: { text: '', color: c.muted },
     query: { font: t.ui, size: 20 },
-    label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: PLAIN.tint, color: dark ? PLAIN.deep : c.accent },
+    label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: tones.tint, color: onTint(c.accent) },
     name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
     detail: { font: t.ui, size: 12, italic: false, color: c.muted },
-    cursor: { fill: PLAIN.tint, text: PLAIN.deep, detail: dark ? c.ink : c.muted, radius: 10, weight: 600, badge: '↵' },
+    cursor: { fill: tones.tint, text: tones.deep, detail: onTint(c.muted), radius: 10, weight: 600, badge: '↵' },
     rule: { color: c.line, dashed: false },
     small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
-    tile: { size: 32, radius: 9, fill: PLAIN.tile },
-    chip: { fill: PLAIN.tile, key: c.ink },
-    keyChip: { fill: PLAIN.tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: PLAIN.deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0 },
+    tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
+    chip: { fill: plainTones(tokens).tile, key: c.ink },
+    keyChip: { fill: plainTones(tokens).tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: plainTones(tokens).deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0 },
   };
 }
 
@@ -77,10 +116,10 @@ export function islandLook(tokens) {
     width: 440,
     age: 'now',
     pad: { x: 16, top: 14, bottom: 14 },
-    head: { font: t.ui, size: 12, spacing: 0, color: PLAIN.island.head },
-    summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: PLAIN.island.summary },
-    body: { font: t.ui, size: 13, color: PLAIN.island.body },
-    tile: { size: 40, radius: 12, fill: PLAIN.island.tile },
+    head: { font: t.ui, size: 12, spacing: 0, color: plainTones(tokens).island.head },
+    summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: plainTones(tokens).island.summary },
+    body: { font: t.ui, size: 13, color: plainTones(tokens).island.body },
+    tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
   };
 }
 
@@ -108,27 +147,27 @@ export function leaseLook(tokens) {
       height: 40,
       pad: 16,
       gap: 10,
-      mark: { shape: 'dot', size: 8, color: tokens ? PLAIN.bar : c.accent },
+      mark: { shape: 'dot', size: 8, color: tokens ? plainTones(tokens).bar : c.accent },
       label: Object.assign(text(13, ''), { text: '' }),
-      who: Object.assign(text(13, tokens ? PLAIN.island.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
-      time: text(13, tokens ? PLAIN.island.summary : '', { weight: 500 }),
+      who: Object.assign(text(13, tokens ? plainTones(tokens).island.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
+      time: text(13, tokens ? plainTones(tokens).island.summary : '', { weight: 500 }),
     },
-    warning: { label: '', time: PLAIN.warn, chip: PLAIN.warnChip, ring: PLAIN.warnChip, mark: PLAIN.warn },
+    warning: { label: '', time: plainTones(tokens).warn, chip: plainTones(tokens).warnChip, ring: plainTones(tokens).warnChip, mark: plainTones(tokens).warn },
     card: {
       width: 440,
       // The board draws the open card as a selected frame, named Island beside its corner.
       box: tokens ? { frame: { width: 1.5, color: c.accent } } : null,
       label: 'Island',
-      ink: tokens ? PLAIN.island.summary : '',
+      ink: tokens ? plainTones(tokens).island.summary : '',
       head: 'Agent · lease',
-      headColor: tokens ? PLAIN.island.head : c.muted,
+      headColor: tokens ? plainTones(tokens).island.head : c.muted,
       who: line,
       unlocked: (hhmm) => `unlocked ${hhmm}`,
-      unlockedColor: tokens ? PLAIN.island.body : c.muted,
+      unlockedColor: tokens ? plainTones(tokens).island.body : c.muted,
       left: 'left',
-      tile: tokens ? PLAIN.island.tile : c.muted,
+      tile: tokens ? plainTones(tokens).island.tile : c.muted,
       bar: 'round',
-      barFill: tokens ? PLAIN.bar : c.accent,
+      barFill: tokens ? plainTones(tokens).bar : c.accent,
       keys: [['↵', 'lock now'], ['esc', 'close']],
     },
   };
@@ -147,7 +186,7 @@ export function sendingLook(tokens) {
     mark: { shape: 'upload', size: 16, color: '' },
     parts: [{ font: t.ui, size: 13, color: '', weight: 500, spacing: 0, name: true, text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` }],
     pct: null,
-    bar: { at: 'inline', height: 6, radius: 3, track: tokens ? PLAIN.island.tile : c.muted, fill: tokens ? PLAIN.bar : c.accent },
+    bar: { at: 'inline', height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
   };
 }
 
@@ -161,11 +200,11 @@ export function downloadingLook(tokens) {
     height: 76,
     pad: 16,
     gap: 6,
-    tile: { size: 40, radius: 12, fill: PLAIN.island.tile },
-    head: Object.assign(text(12, PLAIN.island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
+    tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
+    head: Object.assign(text(12, plainTones(tokens).island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
     line: text(15, '', { weight: 700 }),
-    bar: { height: 4, radius: 2, track: PLAIN.island.tile, fill: PLAIN.bar },
-    chip: { fill: PLAIN.warnChip, color: PLAIN.warn, radius: 8, padX: 8, padY: 2 },
+    bar: { height: 4, radius: 2, track: plainTones(tokens).island.tile, fill: plainTones(tokens).bar },
+    chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
     failure: { mark: null, color: '', box: null },
   };
 }
@@ -180,7 +219,7 @@ export function chipLook(tokens) {
   const label = (files) => line(chipLabel(files));
   const name = (files) => (files.length === 1 ? line(files[0].slice(files[0].lastIndexOf('/') + 1)).replace(CONTROLS, '') : label(files));
   const place = (fill, frame, text, grip, glyph, pad, radius) => ({ fill, frame, text, grip, glyph, pad, radius });
-  const row = place(PLAIN.tile, PLAIN.tile, c.muted, PLAIN.outline, c.muted, [5, 8, 5, 8], 8);
+  const row = place(plainTones(tokens).tile, plainTones(tokens).tile, c.muted, plainTones(tokens).outline, c.muted, [5, 8, 5, 8], 8);
   return {
     label,
     name,
@@ -192,11 +231,11 @@ export function chipLook(tokens) {
     glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
     // The toast's chip sits in a column beside the card.
     toastPlace: 'column',
-    toast: place(PLAIN.island.tile, PLAIN.island.tile, PLAIN.island.body, PLAIN.island.head, PLAIN.island.summary, [8, 10, 8, 10], 10),
+    toast: place(plainTones(tokens).island.tile, plainTones(tokens).island.tile, plainTones(tokens).island.body, plainTones(tokens).island.head, plainTones(tokens).island.summary, [8, 10, 8, 10], 10),
     row,
     cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
-    empty: { color: PLAIN.bar, width: 1.5, content: false },
-    drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: PLAIN.deep, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10 },
+    empty: { color: plainTones(tokens).bar, width: 1.5, content: false },
+    drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: plainTones(tokens).deep, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10 },
   };
 }
 
@@ -210,8 +249,8 @@ export function osdLook(tokens) {
     width: 300,
     height: 40,
     bars: 'round',
-    lit: { color: tokens ? PLAIN.bar : c.accent },
-    unlit: { color: tokens ? PLAIN.island.tile : c.muted },
+    lit: { color: tokens ? plainTones(tokens).bar : c.accent },
+    unlit: { color: tokens ? plainTones(tokens).island.tile : c.muted },
     value: { font: t.ui, size: 13, weight: 600, color: '' },
   };
 }
@@ -220,7 +259,7 @@ export function osdLook(tokens) {
 export function clockLook(tokens) {
   const t = (tokens || UNTHEMED).type;
   const text = (font, size, extra) => Object.assign({ font, size, weight: 400, spacing: 0, color: '' }, extra);
-  const head = PLAIN.island.head;
+  const head = plainTones(tokens).island.head;
   return {
     gridWidth: 224,
     gap: 22,
@@ -235,7 +274,7 @@ export function clockLook(tokens) {
     city: same,
     offsetText: same,
     dayText: same,
-    rule: { color: PLAIN.island.tile },
+    rule: { color: plainTones(tokens).island.tile },
     grid: {
       weekStart: 0,
       weekdays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
@@ -245,8 +284,8 @@ export function clockLook(tokens) {
       rowGap: 0,
       gap: 6,
       title: { parts: (g) => [`${g.month} ${g.year}`], left: text(t.ui, 15, { weight: 500 }) },
-      weekday: text(t.mono, 11, { color: PLAIN.island.head }),
-      day: text(t.mono, 12, { color: PLAIN.island.body }),
+      weekday: text(t.mono, 11, { color: plainTones(tokens).island.head }),
+      day: text(t.mono, 12, { color: plainTones(tokens).island.body }),
       today: { w: 28, h: 24, radius: 8, inverted: true, fill: '', border: 0, borderColor: '', weight: 700 },
     },
   };
