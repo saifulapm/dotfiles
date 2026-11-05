@@ -2,7 +2,6 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Effects
 import "." as Root
 import "lib/voice.mjs" as L
 import "lib/pass.mjs" as P
@@ -38,8 +37,6 @@ Item {
 
     readonly property string bin: Quickshell.shellDir + "/../bin/dots-pass"
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while Pass draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var found: P.passRows(entries, query)
@@ -253,8 +250,7 @@ Item {
             query: query,
             listed: listed,
             count: found.length,
-            countText: (look.label.kind === "header" ? headerCount : chipCount).text,
-            heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
+            heading: pill.text,
             // Each row as drawn: its runs' text and which are underlined, and its tag.
             rows: rows.map((r, i) => {
                 const item = rowRepeater.itemAt(i);
@@ -280,7 +276,6 @@ Item {
             settled: motion.settled,
             drawing: pass.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             keyboard: pass.Window.active
         });
     }
@@ -421,68 +416,13 @@ Item {
             width: parent.width
             spacing: 0
 
-            // Blueprint names the surface and counts its matches on a line of their own above the query.
-            RowLayout {
-                visible: look.label.kind === "header"
-                Layout.fillWidth: true
-                Layout.leftMargin: 22
-                Layout.rightMargin: 22
-                Layout.topMargin: 12
-
-                Text {
-                    id: header
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    text: look.heading("pass", "store")
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-                Text {
-                    id: headerCount
-                    textFormat: Text.PlainText
-                    text: look.count(found.length)
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-            }
-
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: look.voice === "plain" ? 18 : look.voice === "bracket" ? 22 : 20
+                Layout.leftMargin: 18
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: look.voice === "plain" ? 16 : look.voice === "bracket" ? 8 : 18
-                Layout.bottomMargin: look.voice === "plain" ? 16 : 14
-                spacing: look.voice === "caps" ? 14 : look.voice === "bracket" ? 10 : 12
-
-                Rectangle {
-                    visible: look.label.kind === "chip"
-                    implicitWidth: chip.implicitWidth + 14
-                    implicitHeight: chip.implicitHeight + 6
-                    color: look.label.fill
-                    Text {
-                        id: chip
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: look.heading("pass", "")
-                        color: look.label.color
-                        font.family: fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
-                    }
-                }
-
-                Text {
-                    visible: look.prompt.text !== ""
-                    textFormat: Text.PlainText
-                    text: look.prompt.text
-                    color: look.prompt.color
-                    font.family: look.query.font
-                    font.pixelSize: look.query.size
-                }
+                Layout.topMargin: 16
+                Layout.bottomMargin: 16
+                spacing: 12
 
                 TextInput {
                     id: input
@@ -492,7 +432,6 @@ Item {
                     font.pixelSize: look.query.size
                     clip: true
                     focus: true
-                    cursorDelegate: look.caret === "block" ? blockCaret : null
                     Keys.onPressed: event => {
                         const ctrl = event.modifiers & Qt.ControlModifier;
                         if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
@@ -511,19 +450,7 @@ Item {
                     }
                 }
 
-                Text {
-                    id: chipCount
-                    visible: look.label.kind === "chip"
-                    textFormat: Text.PlainText
-                    text: look.count(found.length)
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-
                 Rectangle {
-                    visible: look.label.kind === "pill"
                     implicitWidth: pill.implicitWidth + 18
                     implicitHeight: pill.implicitHeight + 6
                     radius: 8
@@ -638,8 +565,8 @@ Item {
                 Column {
                     id: list
                     y: 8
-                    // Paper's rows run edge to edge; the others sit inset as tiles.
-                    x: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                    // The rows sit inset as tiles.
+                    x: 8
                     width: parent.width - 2 * x
 
                     // An empty store, or nothing matched, shows the keys that still work.
@@ -682,30 +609,19 @@ Item {
                                 return otpTag.visible ? otpTag.text : "";
                             }
                             width: list.width
-                            implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
+                            implicitHeight: row.implicitHeight + 20
                             radius: look.cursor.radius
                             color: isCurrent ? look.cursor.fill : "transparent"
 
                             RowLayout {
                                 id: row
                                 anchors.fill: parent
-                                anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                                anchors.leftMargin: 12
                                 anchors.rightMargin: anchors.leftMargin
-                                spacing: look.voice === "plain" ? 12 : 14
+                                spacing: 12
 
-                                Text {
-                                    visible: look.slot !== "icon"
-                                    textFormat: Text.PlainText
-                                    text: look.slot === "number" ? look.number(index) : "▸"
-                                    color: look.slot === "number" ? (isCurrent ? look.cursor.text : c.muted) : isCurrent ? look.cursor.marker : "transparent"
-                                    font.family: look.slot === "number" ? look.name.font : fonts.ui
-                                    font.pixelSize: look.slot === "number" ? 13 : 15
-                                    font.bold: look.slot === "number" && isCurrent
-                                }
-
-                                // Artboard's tile holds the entry's first letter.
+                                // The tile holds the entry's first letter.
                                 Rectangle {
-                                    visible: look.slot === "icon"
                                     implicitWidth: look.tile.size
                                     implicitHeight: look.tile.size
                                     radius: look.tile.radius
@@ -879,14 +795,14 @@ Item {
 
             Rule {}
 
-            // The key strip as the launcher's legend draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key strip as the launcher's legend draws it, each pair in a chip.
             Flow {
                 Layout.fillWidth: true
-                Layout.leftMargin: look.voice === "plain" ? 14 : look.voice === "bracket" ? 22 : 20
+                Layout.leftMargin: 14
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: look.voice === "plain" ? 10 : 12
-                Layout.bottomMargin: look.voice === "bracket" ? 14 : Layout.topMargin
-                spacing: look.legend("").chips ? 8 : 14
+                Layout.topMargin: 10
+                Layout.bottomMargin: Layout.topMargin
+                spacing: 8
 
                 Repeater {
                     id: keyRepeater
@@ -897,15 +813,15 @@ Item {
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
-                        height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+                        width: pair.implicitWidth + 14
+                        height: pair.implicitHeight + 6
                         radius: 6
                         color: look.chip.fill
 
                         Row {
                             id: pair
                             anchors.centerIn: parent
-                            spacing: look.legend("").chips ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText
@@ -934,36 +850,10 @@ Item {
         }
     }
 
-    // Blueprint's caret: a glowing accent block the height of the query.
-    Component {
-        id: blockCaret
-
-        Rectangle {
-            width: 11
-            height: input.font.pixelSize
-            color: look.prompt.color
-            // Qt hides only its own caret when the query loses focus, so a delegate follows cursorVisible itself.
-            visible: input.cursorVisible
-
-            RectangularShadow {
-                anchors.fill: parent
-                z: -1
-                blur: 9.6
-                color: Qt.alpha(look.prompt.color, 0.8)
-            }
-        }
-    }
-
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }

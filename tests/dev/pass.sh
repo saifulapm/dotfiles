@@ -36,7 +36,7 @@ check "before any decrypt no entry carries the OTP tag: listing never decrypts" 
 
 wtype ghb
 until_ok 2000 state_is '.query == "ghb"'
-check "ghb leaves one row, web/github.com, and the count says 1 ($(pass_state | jq -c '[.count, .rows[0]]'))" state_is '.count == 1 and .rows[0].name == "web/github.com" and .countText == "1 FOUND"'
+check "ghb leaves one row, web/github.com, and the count says 1 ($(pass_state | jq -c '[.count, .rows[0]]'))" state_is '.count == 1 and .rows[0].name == "web/github.com"'
 check "its matched letters are underlined" state_is '.rows[0].underlined == "ghb"'
 
 wtype -k Return
@@ -171,7 +171,7 @@ wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 wtype d
 until_ok 2000 state_is '.mode == "delete"'
-check "d asks on one line ($(pass_state | jq -c .deleteLine))" state_is '.deleteLine == "Delete web/linear.app?  Y YES · N NO"'
+check "d asks on one line ($(pass_state | jq -c .deleteLine))" state_is '.deleteLine == "Delete web/linear.app?  y yes · n no"'
 wtype y
 gone() { ! pass ls 2>/dev/null | grep -q linear.app; }
 until_ok 8000 gone
@@ -206,20 +206,13 @@ check "the island says the code was saved ($(island_text))" bash -c '[ "$(timeou
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 
-# Each theme draws the board's key strip; the list unloads 30 s after it closes.
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "artboard|↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc" "blueprint|[↵] COPY · [O] OTP · [S] SHOW · [N] NEW · [E] EDIT · [D] DELETE · [Q] QR · [ESC]" "paper|↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC" "hi-fi|↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC"; do
-  IFS='|' read -r name hint <<<"$t"
-  in_theme "$name"
-  niri msg action spawn -- dots-call pass toggle
-  until_ok 3000 state_is '.open and .settled'
-  check "$name: the key strip reads $hint ($(pass_state | jq -c .hint))" state_is ".hint == \"$hint\""
-  # Hi-Fi draws Blueprint's strip without its marks; the entries are the store's own names, none with a bracket.
-  [ "$name" = hi-fi ] && check "hi-fi: nothing Pass reports holds a bracket ($(pass_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(pass_state | marked)" ]'
-  wtype -k Escape
-  until_ok 3000 state_is '.drawing == false'
-done
+# Pass draws the board's key strip; the list unloads 30 s after it closes.
+hint="↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc"
+niri msg action spawn -- dots-call pass toggle
+until_ok 3000 state_is '.open and .settled'
+check "the key strip reads $hint ($(pass_state | jq -c .hint))" state_is ".hint == \"$hint\""
+wtype -k Escape
+until_ok 3000 state_is '.drawing == false'
 until_ok 33000 state_is '.loaded == false'
 check "Pass unloads 30 s after it closes" state_is '.loaded == false'
 

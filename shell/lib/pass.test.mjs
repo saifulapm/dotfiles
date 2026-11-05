@@ -1,11 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
+import { schemeTokens } from './colorscheme-file.mjs';
 import { parseEntries, passRows, segments, passKeys, copiedText, failedText, pathTag, deleteText, changedText, LENGTH, qrInfo } from './pass.mjs';
-
-const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const listed = 'web/github.com\t1\nmail/icloud\t0\nweb/gitlab.com\t0\nnote\t0\n';
 
 test("dots-pass list's lines become entries with their folder, leaf and OTP tag, in its order", () => {
@@ -60,11 +57,9 @@ test("a name's bidi controls never reach the drawn row", () => {
   ]);
 });
 
-test("the key strip reads the board's keys in each theme's voice", () => {
-  const strip = (name) => passKeys(listLook(theme(name))).map((k) => `${k.key} ${k.word}`.trim()).join(' · ');
-  assert.equal(strip('artboard'), '↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc');
-  assert.equal(strip('paper'), '↵ COPY · O OTP · S SHOW · N NEW · E EDIT · D DELETE · Q QR · ESC');
-  assert.equal(strip('blueprint'), '[↵] COPY · [O] OTP · [S] SHOW · [N] NEW · [E] EDIT · [D] DELETE · [Q] QR · [ESC]');
+test("the key strip reads the board's keys in plain words", () => {
+  const strip = passKeys(listLook(schemeTokens('artboard'))).map((k) => `${k.key} ${k.word}`.trim()).join(' · ');
+  assert.equal(strip, '↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc');
 });
 
 test("the island's notice says what was copied, and a failure says why in one line", () => {
@@ -85,10 +80,9 @@ test('a new password starts at 24 characters, from 8 to 128', () => {
   assert.deepEqual(LENGTH, { start: 24, min: 8, max: 128 });
 });
 
-test("the delete question names the entry on one line, with the theme's y and n", () => {
-  const artboard = listLook(theme('artboard'));
+test('the delete question names the entry on one line, with y and n', () => {
+  const artboard = listLook(schemeTokens('artboard'));
   assert.deepEqual(deleteText(artboard, 'web/linear\n.app'), { question: 'Delete web/linear .app?', keys: [{ key: 'y', word: 'yes' }, { key: 'n', word: 'no' }] });
-  assert.deepEqual(deleteText(listLook(theme('blueprint')), 'x').keys, [{ key: '[Y]', word: 'YES' }, { key: '[N]', word: 'NO' }]);
 });
 
 test("the island's word after a change: done, saved but not pushed, or why not", () => {
