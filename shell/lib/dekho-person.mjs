@@ -1,4 +1,4 @@
-// The Person page's words and choices: life years, credits split by role, and each board's wording.
+// The Person page's words and choices: life years, credits split by role, and the board's wording.
 import { stars } from './dekho.mjs';
 import { oneLine } from './picker.mjs';
 

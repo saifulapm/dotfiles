@@ -83,7 +83,7 @@ export function starting(events) {
   };
 }
 
-// The words each board writes on the release list, Starting and no releases.
+// The words the board writes on the release list, Starting and no releases.
 export function releasesText() {
   return {
     release: 'Release',
