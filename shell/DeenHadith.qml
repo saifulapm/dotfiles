@@ -885,6 +885,14 @@ FocusScope {
                                         }
                                     }
                                 }
+
+                                Click {
+                                    name: "deen-hadith-row:" + row.index
+                                    onTapped: {
+                                        page.levels = H.withCursor(page.levels, row.index);
+                                        page.enter();
+                                    }
+                                }
                             }
                         }
                     }

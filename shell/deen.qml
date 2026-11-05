@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import "services" as Services
 import "lib/deen.mjs" as D
+import "lib/click.mjs" as C
 import "lib/status.mjs" as Status
 import "lib/voice.mjs" as L
 
@@ -97,6 +98,11 @@ ShellRoot {
 
     IpcHandler {
         target: "deen"
+
+        // Where a click area is in the window, {x, y, w, h}, or null when none by that name is drawn.
+        function box(name: string): string {
+            return C.boxJson(win.contentItem, name);
+        }
 
         function state(): string {
             procStatus.reload();
@@ -229,6 +235,11 @@ ShellRoot {
                             font.family: win.bodyFont
                             font.pixelSize: 13
                             font.weight: tabItem.current ? Font.Medium : Font.Normal
+                        }
+
+                        Click {
+                            name: "deen-tab:" + tabItem.modelData
+                            onTapped: app.tab = tabItem.modelData
                         }
                     }
                 }

@@ -309,6 +309,14 @@ FocusScope {
                             font.pixelSize: 14
                             font.weight: row.current ? Font.Medium : Font.Normal
                         }
+
+                        Click {
+                            name: "deen-duas-row:" + row.index
+                            onTapped: {
+                                page.cursor = row.index;
+                                page.openAt(page.shown[row.index]);
+                            }
+                        }
                     }
                 }
             }
