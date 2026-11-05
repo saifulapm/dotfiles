@@ -13,13 +13,13 @@ state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_c() { niri msg action spawn -- dots-call control toggle; }
 control_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-# The Audio tab's left padding, left of its text, drawn in ink only while Control shows on audio.
+# The Audio tab's left padding, left of its text, drawn in the pill's tint only while Control shows on audio.
 tab_rgb() {
   local geo
   geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) - 339),\(.y + 186) 5x16"')
   grim -s 1 -t ppm -g "$geo" - | mean_rgb
 }
-tab_is_ink() { local r g b; read -r r g b < <(tab_rgb); ((r < 60 && g < 60 && b < 60)); }
+tab_is_tint() { local r g b; read -r r g b < <(tab_rgb); ((r > 230 && r < 246 && g > 233 && g < 249 && b > 247)); }
 section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 volume_is() { [ "$(wpctl get-volume @DEFAULT_AUDIO_SINK@)" = "$1" ]; }
 # Presses j until the row titled $1 is selected.
@@ -41,7 +41,7 @@ wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
 wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 mod_c
-control_shown() { section_is audio && state_is .settled && control_focus Exclusive && tab_is_ink; }
+control_shown() { section_is audio && state_is .settled && control_focus Exclusive && tab_is_tint; }
 until_ok 3000 control_shown
 check "Mod+C shows Control on audio with exclusive keyboard" control_shown
 check "state lists the six sections in order" state_is '.sections == ["audio","wifi","bluetooth","power","display","route"]'
@@ -82,7 +82,7 @@ check "state reports dots-null-2 as the default sink" state_is '.defaultSink == 
 echo "     state: $(control_state)"
 
 wtype -k Escape
-control_gone() { state_is '.open == false and .drawing == false' && control_focus None && ! tab_is_ink; }
+control_gone() { state_is '.open == false and .drawing == false' && control_focus None && ! tab_is_tint; }
 until_ok 2000 control_gone
 check "Esc closes Control and releases the keyboard" control_gone
 
