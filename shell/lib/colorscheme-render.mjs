@@ -3,13 +3,11 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { parseToml } from './toml.mjs';
 import { qtTokens } from './theme.mjs';
-import { validateColorscheme, designOf, DEFAULT } from './colorscheme.mjs';
+import { DEFAULT } from './colorscheme.mjs';
+import { SCHEMES as dir, loadScheme as load } from './colorscheme-file.mjs';
 import { renderOutputs } from './render-out.mjs';
 
-const dir = new URL('../../colorschemes/', import.meta.url).pathname;
-const load = (name) => designOf(validateColorscheme(parseToml(readFileSync(`${dir}${name}.toml`, 'utf8'))));
 
 const valid = (n) => /^[a-z0-9][a-z0-9_-]{0,31}$/.test(n) && existsSync(`${dir}${n}.toml`);
 // --saved renders the saved name; one that is no colorscheme (an old theme name, or none) becomes the default and is saved after the render.
