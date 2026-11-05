@@ -13,12 +13,8 @@ FocusScope {
     readonly property var c: deen.c
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
-    readonly property string voice: deen.voice
-    readonly property bool caps: voice === "caps"
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
     readonly property var words: M.words
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
 
     // The deck as M.openDeck shapes it, null before the first answer; failed is true when the last answer was no deck.
     property var session: null
@@ -182,18 +178,17 @@ FocusScope {
                 textFormat: Text.PlainText
                 text: page.session ? page.words.due(page.session.left) : ""
                 color: c.ink ?? "black"
-                font.family: (caps ? fonts.display : page.bodyFont) ?? ""
-                font.pixelSize: caps ? 25 : plain ? 20 : 18
-                font.weight: caps ? Font.Normal : Font.Bold
+                font.family: page.bodyFont
+                font.pixelSize: 20
+                font.weight: Font.Bold
             }
             Text {
                 id: lineText
                 textFormat: Text.PlainText
                 text: !page.session ? "" : page.head ? page.words.line(page.session.fresh, 1, page.session.left) : page.words.quiet
                 color: c.muted ?? "gray"
-                font.family: (plain ? fonts.ui : fonts.mono) ?? ""
+                font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: bracket ? 0.7 : 0
             }
             Item {
                 Layout.fillWidth: true
@@ -215,10 +210,10 @@ FocusScope {
                 anchors.bottomMargin: 20
                 width: Math.min(571, parent.width - 40)
                 visible: page.status === "card"
-                radius: plain ? 14 : 0
-                color: plain ? (page.revealed ? c.surface : look.tile.fill) ?? "white" : "transparent"
-                border.width: plain ? (page.revealed ? 1.5 : 0) : caps && page.revealed ? 2 : 1
-                border.color: (plain ? c.accent : bracket ? (page.revealed ? c.accent : c.line) : page.revealed ? c.ink : c.muted) ?? "gray"
+                radius: 14
+                color: (page.revealed ? c.surface : look.tile.fill) ?? "white"
+                border.width: page.revealed ? 1.5 : 0
+                border.color: c.accent ?? "gray"
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -230,21 +225,20 @@ FocusScope {
 
                         Rectangle {
                             id: badgeBox
-                            implicitWidth: badgeText.implicitWidth + (plain ? 18 : bracket ? 0 : 14)
-                            implicitHeight: badgeText.implicitHeight + (plain ? 6 : bracket ? 0 : 4)
-                            radius: plain ? 8 : 0
-                            color: (plain ? look.label.fill : caps ? c.ink : "transparent") ?? "transparent"
+                            implicitWidth: badgeText.implicitWidth + 18
+                            implicitHeight: badgeText.implicitHeight + 6
+                            radius: 8
+                            color: look.label.fill ?? "transparent"
 
                             Text {
                                 id: badgeText
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: page.words.badge(page.revealed)
-                                color: (plain ? c.accent : bracket ? c.accent : c.surface) ?? "black"
-                                font.family: (plain ? fonts.ui : fonts.mono) ?? ""
-                                font.pixelSize: plain ? 12 : 10
-                                font.weight: plain ? Font.Medium : bracket ? Font.Bold : Font.Normal
-                                font.letterSpacing: plain ? 0 : bracket ? 1.2 : 1.4
+                                color: c.accent ?? "black"
+                                font.family: page.bodyFont
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
                             }
                         }
                         Item {
@@ -260,7 +254,6 @@ FocusScope {
                             color: c.muted ?? "gray"
                             font.family: deen.bengali
                             font.pixelSize: 12
-                            font.letterSpacing: bracket ? 0.7 : 0
                         }
                     }
 
@@ -317,7 +310,7 @@ FocusScope {
                         wrapMode: Text.WordWrap
                         color: c.ink ?? "black"
                         font.family: page.bodyFont
-                        font.pixelSize: plain ? 14 : 13
+                        font.pixelSize: 14
                     }
                     // The pronunciation shows with the meaning, once space reveals the ayah, so the cue does not read the rest out.
                     Text {
@@ -355,34 +348,32 @@ FocusScope {
                     Rectangle {
                         id: hintBox
                         visible: !page.revealed
-                        implicitWidth: hintRow.implicitWidth + (plain ? 14 : 0)
-                        implicitHeight: hintRow.implicitHeight + (plain ? 6 : 0)
+                        implicitWidth: hintRow.implicitWidth + 14
+                        implicitHeight: hintRow.implicitHeight + 6
                         radius: 6
-                        color: plain ? look.tile.fill : "transparent"
+                        color: look.tile.fill
 
                         Row {
                             id: hintRow
                             anchors.centerIn: parent
-                            spacing: bracket ? 8 : 6
+                            spacing: 6
 
                             Text {
                                 id: hintKey
                                 textFormat: Text.PlainText
                                 text: page.words.hintKey
-                                color: (bracket ? c.accent : c.ink) ?? "black"
-                                font.family: (plain ? fonts.ui : fonts.mono) ?? ""
+                                color: c.ink ?? "black"
+                                font.family: page.bodyFont
                                 font.pixelSize: 12
-                                font.weight: plain ? Font.Medium : Font.Bold
-                                font.letterSpacing: bracket ? 0.7 : 0
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: hintWord
                                 textFormat: Text.PlainText
                                 text: page.words.hintWord
                                 color: c.ink ?? "black"
-                                font.family: (plain ? fonts.ui : fonts.mono) ?? ""
+                                font.family: page.bodyFont
                                 font.pixelSize: 12
-                                font.letterSpacing: bracket ? 0.7 : 0
                             }
                         }
                     }
@@ -397,9 +388,8 @@ FocusScope {
                             textFormat: Text.PlainText
                             text: page.words.ask
                             color: c.muted ?? "gray"
-                            font.family: (plain ? fonts.ui : fonts.mono) ?? ""
-                            font.pixelSize: plain ? 11 : 10
-                            font.letterSpacing: plain ? 0 : 1.4
+                            font.family: page.bodyFont
+                            font.pixelSize: 11
                         }
                         RowLayout {
                             Layout.fillWidth: true
@@ -435,10 +425,9 @@ FocusScope {
                                     Layout.fillWidth: true
                                     Layout.preferredWidth: 1
                                     implicitHeight: rateColumn.implicitHeight + 20
-                                    radius: plain ? 12 : 0
-                                    color: plain ? look.tile.fill : "transparent"
-                                    border.width: plain ? 0 : 1
-                                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+                                    radius: 12
+                                    color: look.tile.fill
+                                    border.width: 0
 
                                     ColumnLayout {
                                         id: rateColumn
@@ -451,7 +440,7 @@ FocusScope {
                                             textFormat: Text.PlainText
                                             text: String(rateTile.index + 1)
                                             color: c.ink ?? "black"
-                                            font.family: (plain ? fonts.ui : fonts.mono) ?? ""
+                                            font.family: page.bodyFont
                                             font.pixelSize: 16
                                             font.weight: Font.Bold
                                         }
@@ -462,7 +451,7 @@ FocusScope {
                                             text: page.words.grades[rateTile.index]
                                             color: c.ink ?? "black"
                                             font.family: page.bodyFont
-                                            font.pixelSize: plain ? 13 : 12
+                                            font.pixelSize: 13
                                         }
                                         Text {
                                             id: rateNext
@@ -470,9 +459,8 @@ FocusScope {
                                             textFormat: Text.PlainText
                                             text: page.head ? M.nextText(page.head.next[rateTile.gradeName]) : ""
                                             color: c.muted ?? "gray"
-                                            font.family: (plain ? fonts.ui : fonts.mono) ?? ""
-                                            font.pixelSize: bracket ? 10 : 11
-                                            font.letterSpacing: bracket ? 1.4 : 0
+                                            font.family: page.bodyFont
+                                            font.pixelSize: 11
                                         }
                                     }
                                 }
@@ -499,7 +487,7 @@ FocusScope {
                     wrapMode: Text.WordWrap
                     color: c.ink ?? "black"
                     font.family: page.bodyFont
-                    font.pixelSize: plain ? 14 : 13
+                    font.pixelSize: 14
                 }
             }
             Text {
@@ -511,7 +499,7 @@ FocusScope {
                 visible: page.unsaved
                 textFormat: Text.PlainText
                 text: page.words.unsaved
-                color: (bracket ? c.danger : c.accent) ?? "red"
+                color: c.accent ?? "red"
                 font.family: page.bodyFont
                 font.pixelSize: 12
             }
@@ -525,22 +513,22 @@ FocusScope {
         }
     }
 
-    // A dashed box for a word still to recite: Paper's square, Artboard's rounded, Blueprint's thinner.
+    // A rounded dashed box for a word still to recite.
     component Blank: Shape {
         id: blank
 
         preferredRendererType: Shape.GeometryRenderer
 
         ShapePath {
-            strokeColor: (page.bracket ? page.c.muted : page.plain ? page.c.line : page.c.muted) ?? "gray"
-            strokeWidth: page.bracket ? 1 : 1.5
+            strokeColor: page.c.line ?? "gray"
+            strokeWidth: 1.5
             strokeStyle: ShapePath.DashLine
             dashPattern: [4, 3]
             fillColor: "transparent"
 
             PathSvg {
                 path: {
-                    const r = page.plain ? 10 : 0;
+                    const r = 10;
                     const w = blank.width - 1;
                     const h = blank.height - 1;
                     return "M " + (r + 0.5) + " 0.5 L " + (w - r) + " 0.5 Q " + w + " 0.5 " + w + " " + (r + 0.5) + " L " + w + " " + (h - r) + " Q " + w + " " + h + " " + (w - r) + " " + h + " L " + (r + 0.5) + " " + h + " Q 0.5 " + h + " 0.5 " + (h - r) + " L 0.5 " + (r + 0.5) + " Q 0.5 0.5 " + (r + 0.5) + " 0.5 Z";

@@ -21,7 +21,6 @@ ShellRoot {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var tones: L.plainTones(theme.tokens)
-    readonly property string voice: look.voice
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property string bengali: D.bengaliFamily
 
@@ -107,7 +106,6 @@ ShellRoot {
                 heading: headingText.text,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
-                voice: app.voice,
                 arabic: app.arabic,
                 read: readPage.state(),
                 memorise: memorisePage.state(),
@@ -121,10 +119,7 @@ ShellRoot {
     FloatingWindow {
         id: win
 
-        readonly property bool plain: app.voice === "plain"
-        readonly property bool bracket: app.voice === "bracket"
-        readonly property bool caps: app.voice === "caps"
-        readonly property string bodyFont: (bracket ? app.fonts.mono : app.fonts.ui) ?? ""
+        readonly property string bodyFont: app.fonts.ui ?? ""
 
         title: "Deen"
         implicitWidth: 1200
@@ -145,32 +140,29 @@ ShellRoot {
             anchors.fill: parent
             spacing: 0
 
-            // The App's name and the open section, as each board heads its window.
+            // The App's name in a tinted pill and the open section.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: win.plain ? 52 : implicitHeight
-                Layout.leftMargin: win.plain ? 18 : 14
-                Layout.rightMargin: win.plain ? 18 : 14
-                Layout.topMargin: win.plain ? 0 : 12
-                Layout.bottomMargin: win.plain ? 0 : 12
-                spacing: win.plain ? 12 : 10
+                Layout.preferredHeight: 52
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                spacing: 12
 
                 Rectangle {
-                    implicitWidth: nameText.implicitWidth + (win.plain ? 18 : 0)
-                    implicitHeight: nameText.implicitHeight + (win.plain ? 6 : 0)
+                    implicitWidth: nameText.implicitWidth + 18
+                    implicitHeight: nameText.implicitHeight + 6
                     radius: 8
-                    color: win.plain ? app.look.label.fill : "transparent"
+                    color: app.look.label.fill
 
                     Text {
                         id: nameText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: win.caps ? "DEEN" : "Deen"
-                        color: (win.plain ? app.look.label.color : app.c.muted) ?? "gray"
-                        font.family: win.bracket ? app.fonts.mono ?? "" : win.bodyFont
-                        font.pixelSize: win.plain ? 12 : 10
-                        font.weight: win.plain ? Font.Medium : Font.Normal
-                        font.letterSpacing: win.plain ? 0 : 1.4
+                        text: "Deen"
+                        color: app.look.label.color ?? "gray"
+                        font.family: win.bodyFont
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
                     }
                 }
                 Text {
@@ -178,9 +170,9 @@ ShellRoot {
                     textFormat: Text.PlainText
                     text: D.tabName(app.tab)
                     color: app.c.ink ?? "black"
-                    font.family: (win.caps ? app.fonts.display : win.bodyFont) ?? ""
-                    font.pixelSize: win.caps ? 18 : win.plain ? 14 : 12
-                    font.weight: win.caps ? Font.Normal : Font.Bold
+                    font.family: win.bodyFont
+                    font.pixelSize: 14
+                    font.weight: Font.Bold
                 }
                 Item {
                     Layout.fillWidth: true
@@ -188,18 +180,15 @@ ShellRoot {
             }
             Rule {
                 Layout.fillWidth: true
-                dashed: win.bracket
-                color: (win.caps ? app.c.ink : app.c.line) ?? "gray"
+                color: app.c.line ?? "gray"
             }
 
             // The five sections; Tab moves to the next.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: win.plain ? 48 : implicitHeight
+                Layout.preferredHeight: 48
                 Layout.leftMargin: 14
                 Layout.rightMargin: 14
-                Layout.topMargin: win.plain ? 0 : 8
-                Layout.bottomMargin: win.plain ? 0 : 8
                 spacing: 6
 
                 Repeater {
@@ -228,19 +217,18 @@ ShellRoot {
                         }
                         implicitWidth: tabText.implicitWidth + 28
                         implicitHeight: tabText.implicitHeight + 12
-                        radius: win.plain ? 10 : 0
-                        color: current ? (win.plain ? app.look.label.fill : win.bracket ? app.c.accent : app.c.ink) ?? "black" : "transparent"
+                        radius: 10
+                        color: current ? app.look.label.fill ?? "black" : "transparent"
 
                         Text {
                             id: tabText
                             anchors.centerIn: parent
                             textFormat: Text.PlainText
                             text: app.look.tabText(D.tabName(tabItem.modelData))
-                            color: (tabItem.current ? (win.plain ? app.look.label.color : app.c.surface) : app.c.muted) ?? "gray"
+                            color: (tabItem.current ? app.look.label.color : app.c.muted) ?? "gray"
                             font.family: win.bodyFont
-                            font.pixelSize: win.plain ? 13 : win.bracket ? 11 : 10.5
-                            font.weight: tabItem.current && !win.caps ? (win.plain ? Font.Medium : Font.Bold) : Font.Normal
-                            font.letterSpacing: win.plain ? 0 : 1.4
+                            font.pixelSize: 13
+                            font.weight: tabItem.current ? Font.Medium : Font.Normal
                         }
                     }
                 }
@@ -251,15 +239,13 @@ ShellRoot {
                     textFormat: Text.PlainText
                     text: app.look.keys([["tab", "next section"]]).map(k => k.key + " " + k.word)[0]
                     color: app.c.muted ?? "gray"
-                    font.family: win.bracket ? app.fonts.mono ?? "" : win.bodyFont
-                    font.pixelSize: win.bracket ? 10 : 11
-                    font.letterSpacing: win.bracket ? 1.4 : 0
+                    font.family: win.bodyFont
+                    font.pixelSize: 11
                 }
             }
             Rule {
                 Layout.fillWidth: true
-                dashed: win.bracket
-                color: (win.caps ? app.c.ink : app.c.line) ?? "gray"
+                color: app.c.line ?? "gray"
             }
 
             // Each page fills the rest and draws its own keys; Tab and Esc reach the frame from any page that leaves them.
@@ -323,21 +309,8 @@ ShellRoot {
         }
     }
 
-    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    // A one-pixel rule.
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
     }
 }

@@ -2,7 +2,6 @@ import Quickshell
 import QtQuick
 import QtQuick.Layouts
 import "lib/deen-prayer.mjs" as P
-import "lib/voice.mjs" as V
 
 // Deen's Prayer: a day's five prayers on the left, the next one's countdown, the city and the method on the right.
 FocusScope {
@@ -14,11 +13,7 @@ FocusScope {
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
     readonly property var tones: deen.tones
-    readonly property string voice: deen.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
 
     // DOTS_DEEN_NOW pins the minute for a check; without it the clock runs.
     readonly property var pinned: P.parseNow(Quickshell.env("DOTS_DEEN_NOW"))
@@ -93,9 +88,7 @@ FocusScope {
             keys: keyStrip.drawn(),
             look: {
                 headlineFont: headlineText.font.family,
-                headlineSize: headlineText.font.pixelSize,
-                dividerDashed: divider.dashed,
-                ruleDashed: noteRule.dashed
+                headlineSize: headlineText.font.pixelSize
             }
         };
     }
@@ -190,10 +183,9 @@ FocusScope {
                         }
                         Layout.fillWidth: true
                         implicitHeight: rowLine.implicitHeight + 32
-                        radius: plain ? 14 : 0
-                        color: dark ? ((bracket ? c.accent : c.ink) ?? "black") : plain ? tones.field : "transparent"
-                        border.width: plain || dark ? 0 : 1
-                        border.color: (bracket ? c.line : c.ink) ?? "gray"
+                        radius: 14
+                        color: dark ? (c.ink ?? "black") : tones.field
+                        border.width: 0
 
                         RowLayout {
                             id: rowLine
@@ -209,29 +201,27 @@ FocusScope {
                                 textFormat: Text.PlainText
                                 text: row.modelData.name
                                 color: row.ink
-                                font.family: (row.dark && caps ? fonts.display : page.bodyFont) ?? ""
-                                font.pixelSize: row.dark ? (caps ? 25 : plain ? 20 : 18) : (plain ? 18 : bracket ? 16 : 17)
-                                font.weight: row.dark ? (caps ? Font.Normal : Font.Bold) : Font.Medium
+                                font.family: page.bodyFont
+                                font.pixelSize: row.dark ? 20 : 18
+                                font.weight: row.dark ? Font.Bold : Font.Medium
                             }
                             Rectangle {
                                 id: tagBox
                                 visible: row.modelData.tag !== ""
-                                implicitWidth: tagText.implicitWidth + (row.dark && !bracket ? (plain ? 16 : 12) : 0)
-                                implicitHeight: tagText.implicitHeight + (row.dark && !bracket ? (plain ? 4 : 2) : 0)
-                                radius: plain ? 8 : 0
-                                color: row.dark && !bracket ? c.surface ?? "white" : "transparent"
+                                implicitWidth: tagText.implicitWidth + (row.dark ? 16 : 0)
+                                implicitHeight: tagText.implicitHeight + (row.dark ? 4 : 0)
+                                radius: 8
+                                color: row.dark ? c.surface ?? "white" : "transparent"
 
                                 Text {
                                     id: tagText
                                     anchors.centerIn: parent
                                     textFormat: Text.PlainText
-                                    text: bracket && row.dark ? V.mark(look.engraved, look.tabText(row.modelData.tag)) : row.modelData.tag
-                                    color: (row.dark ? (bracket ? c.surface : c.ink) : c.muted) ?? "gray"
+                                    text: row.modelData.tag
+                                    color: (row.dark ? c.ink : c.muted) ?? "gray"
                                     font.family: page.bodyFont
-                                    font.pixelSize: plain ? 11 : 10
-                                    font.weight: bracket && row.dark ? Font.Bold : plain && row.dark ? Font.Medium : Font.Normal
-                                    font.letterSpacing: caps ? 1.4 : bracket ? 1.2 : 0
-                                    font.capitalization: caps ? Font.AllUppercase : Font.MixedCase
+                                    font.pixelSize: 11
+                                    font.weight: row.dark ? Font.Medium : Font.Normal
                                 }
                             }
                             Item {
@@ -242,9 +232,9 @@ FocusScope {
                                 textFormat: Text.PlainText
                                 text: row.modelData.time
                                 color: row.ink
-                                font.family: (bracket ? fonts.mono : page.bodyFont) ?? ""
+                                font.family: page.bodyFont
                                 font.pixelSize: row.dark ? 22 : 20
-                                font.weight: row.dark && !caps ? Font.Bold : row.dark ? Font.Medium : Font.Normal
+                                font.weight: row.dark ? Font.Bold : Font.Normal
                             }
                         }
                     }
@@ -253,26 +243,11 @@ FocusScope {
                     Layout.fillHeight: true
                 }
             }
-            Item {
+            Rectangle {
                 id: divider
-                property bool dashed: bracket
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    visible: !divider.dashed
-                    color: c.line ?? "gray"
-                }
-                Dashed {
-                    visible: divider.dashed
-                    x: 1
-                    width: divider.height
-                    height: 1
-                    rotation: 90
-                    transformOrigin: Item.TopLeft
-                    color: c.line ?? "gray"
-                }
+                color: c.line ?? "gray"
             }
             ColumnLayout {
                 Layout.fillWidth: true
@@ -290,9 +265,9 @@ FocusScope {
                     text: "Prayer times need the network once a month"
                     wrapMode: Text.Wrap
                     color: c.ink ?? "black"
-                    font.family: (caps ? fonts.display : page.bodyFont) ?? ""
-                    font.pixelSize: caps ? 25 : plain ? 20 : 16
-                    font.weight: caps ? Font.Normal : Font.Bold
+                    font.family: page.bodyFont
+                    font.pixelSize: 20
+                    font.weight: Font.Bold
                 }
                 Text {
                     id: retryText
@@ -320,8 +295,7 @@ FocusScope {
                             visible: !page.today || page.upcoming !== null
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: plain ? 11 : 10
-                            font.letterSpacing: plain ? 0 : 1.4
+                            font.pixelSize: 11
                         }
                         Text {
                             id: headlineText
@@ -332,10 +306,10 @@ FocusScope {
                             elide: Text.ElideRight
                             maximumLineCount: 1
                             color: c.ink ?? "black"
-                            font.family: (caps ? fonts.display : page.bodyFont) ?? ""
-                            font.pixelSize: caps ? 50 : plain ? 38 : 36
-                            font.weight: caps ? Font.Normal : Font.Bold
-                            font.letterSpacing: plain ? -0.76 : 0
+                            font.family: page.bodyFont
+                            font.pixelSize: 38
+                            font.weight: Font.Bold
+                            font.letterSpacing: -0.76
                         }
                         Text {
                             id: atText
@@ -360,7 +334,7 @@ FocusScope {
                             maximumLineCount: 1
                             color: c.ink ?? "black"
                             font.family: page.bodyFont
-                            font.pixelSize: plain ? 16 : bracket ? 14 : 15
+                            font.pixelSize: 16
                         }
                         Text {
                             id: dateText
@@ -370,7 +344,6 @@ FocusScope {
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: bracket ? 0.72 : 0
                         }
                     }
                     ColumnLayout {
@@ -378,21 +351,12 @@ FocusScope {
                         spacing: 4
 
                         Item {
-                            id: noteRule
-                            property bool dashed: bracket
                             Layout.fillWidth: true
                             Layout.preferredHeight: 17
 
                             Rectangle {
                                 width: parent.width
                                 height: 1
-                                visible: !noteRule.dashed
-                                color: c.line ?? "gray"
-                            }
-                            Dashed {
-                                width: parent.width
-                                height: 1
-                                visible: noteRule.dashed
                                 color: c.line ?? "gray"
                             }
                         }
@@ -400,23 +364,21 @@ FocusScope {
                             id: asrText
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: bracket ? "ASR: HANAFI (SHADOW TWICE ITS LENGTH)" : "Asr: Hanafi (shadow twice its length)"
+                            text: "Asr: Hanafi (shadow twice its length)"
                             wrapMode: Text.Wrap
                             color: c.ink ?? "black"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: bracket ? 0.72 : 0
                         }
                         Text {
                             id: methodText
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: page.day ? (bracket ? P.methodLine(page.day.method, page.day.cached).toUpperCase() : P.methodLine(page.day.method, page.day.cached)) : ""
+                            text: page.day ? P.methodLine(page.day.method, page.day.cached) : ""
                             wrapMode: Text.Wrap
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: bracket ? 0.72 : 0
                         }
                     }
                 }

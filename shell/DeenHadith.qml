@@ -4,7 +4,6 @@ import QtQuick
 import QtQuick.Layouts
 import "lib/deen.mjs" as D
 import "lib/deen-hadith.mjs" as H
-import "lib/voice.mjs" as V
 
 // Deen's Hadith: the corpus saved on this machine browsed by collection, book and narration, or searched, a list on the left and the open narration on the right; until the corpus is here, the download Deen started when it opened.
 FocusScope {
@@ -15,12 +14,7 @@ FocusScope {
     readonly property var c: deen.c
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
-    readonly property string voice: deen.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
-    readonly property string headFont: (caps ? fonts.display : bodyFont) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
     readonly property var tones: deen.tones
     readonly property string tint: tones.tint ?? "transparent"
     readonly property string deep: tones.deep ?? "gray"
@@ -51,10 +45,6 @@ FocusScope {
     readonly property var hit: here.level === "narration" ? H.listHit(listing.data, listing.data.hadiths[cursor]) : here.level === "search" && hits.length > 0 ? hits[Math.min(cursor, hits.length - 1)] : null
     readonly property var opened: hit ? H.pane(hit) : null
     readonly property var shown: H.progress(download)
-
-    function say(s) {
-        return bracket ? String(s).toUpperCase() : s;
-    }
 
     function checkStatus() {
         deen.api(["hadith", "status"], answer => {
@@ -292,7 +282,6 @@ FocusScope {
                     fill: String(card.color),
                     border: card.border.width,
                     titleColor: String(cardTitle.color),
-                    ruleDashed: meanwhileRule.dashed,
                     titleFont: cardTitle.font.family
                 }
             },
@@ -328,7 +317,6 @@ FocusScope {
             look: {
                 fieldRadius: fieldBox.radius,
                 fieldBorder: fieldBox.border.width,
-                paneRuleDashed: paneRule.dashed,
                 titleFont: detailTitle.font.family
             },
             keys: keyStrip.drawn()
@@ -411,18 +399,17 @@ FocusScope {
                     textFormat: Text.PlainText
                     text: "Hadith"
                     color: page.c.ink ?? "black"
-                    font.family: page.headFont
-                    font.pixelSize: page.caps ? 25 : page.plain ? 20 : 18
-                    font.weight: page.caps ? Font.Normal : Font.Bold
+                    font.family: page.bodyFont
+                    font.pixelSize: 20
+                    font.weight: Font.Bold
                 }
                 Text {
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: page.say("search is off until the corpus is on this machine; after that it works offline")
+                    text: "search is off until the corpus is on this machine; after that it works offline"
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
                     font.pixelSize: 12
-                    font.letterSpacing: page.bracket ? 0.72 : 0
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -437,10 +424,10 @@ FocusScope {
                 Layout.leftMargin: 20
                 Layout.topMargin: 12
                 Layout.bottomMargin: 20
-                radius: page.plain ? 14 : 0
-                color: page.plain && failed ? page.tones.field : page.plain ? page.tones.card : "transparent"
-                border.width: page.plain ? (failed ? 0 : 1.5) : page.caps && !failed ? 2 : 1
-                border.color: (page.plain || page.bracket && !failed ? page.c.accent : page.bracket ? page.c.line : failed ? page.c.muted : page.c.ink) ?? "black"
+                radius: 14
+                color: failed ? page.tones.field : page.tones.card
+                border.width: failed ? 0 : 1.5
+                border.color: page.c.accent ?? "black"
 
                 ColumnLayout {
                     anchors.fill: parent
@@ -451,22 +438,20 @@ FocusScope {
                         Layout.fillWidth: true
 
                         Rectangle {
-                            implicitWidth: cardLabel.implicitWidth + (page.bracket ? 0 : page.plain ? 18 : 14)
-                            implicitHeight: cardLabel.implicitHeight + (page.bracket ? 0 : page.plain ? 6 : 4)
-                            radius: page.plain ? 8 : 0
-                            color: page.plain ? page.tint : page.caps ? page.c.ink ?? "black" : "transparent"
+                            implicitWidth: cardLabel.implicitWidth + 18
+                            implicitHeight: cardLabel.implicitHeight + 6
+                            radius: 8
+                            color: page.tint
 
                             Text {
                                 id: cardLabel
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
-                                readonly property string words: card.failed ? "2 · if it fails" : "1 · downloading"
-                                text: page.bracket ? V.mark(page.look.engraved, words.toUpperCase()) : page.caps ? words.toUpperCase() : words
-                                color: (page.plain || page.bracket ? page.c.accent : page.c.surface) ?? "white"
+                                text: card.failed ? "2 · if it fails" : "1 · downloading"
+                                color: page.c.accent ?? "white"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 12 : 10
-                                font.weight: page.plain ? Font.Medium : page.bracket ? Font.Bold : Font.Normal
-                                font.letterSpacing: page.plain ? 0 : 1.3
+                                font.pixelSize: 12
+                                font.weight: Font.Medium
                             }
                         }
                         Item {
@@ -475,11 +460,10 @@ FocusScope {
                         Text {
                             textFormat: Text.PlainText
                             visible: !card.failed
-                            text: page.say("first open only")
+                            text: "first open only"
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: page.bracket ? 0.72 : 0
                         }
                     }
 
@@ -488,10 +472,10 @@ FocusScope {
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
                         text: card.failed ? "The download did not finish" : page.download.phase === "converting" ? "Putting the corpus together" : "Getting the hadith corpus"
-                        color: (page.plain && card.failed ? page.tones.warn : page.c.ink) ?? "black"
-                        font.family: page.headFont
-                        font.pixelSize: page.caps ? 25 : page.plain ? 18 : 16
-                        font.weight: page.caps ? Font.Normal : Font.Bold
+                        color: (card.failed ? page.tones.warn : page.c.ink) ?? "black"
+                        font.family: page.bodyFont
+                        font.pixelSize: 18
+                        font.weight: Font.Bold
                         wrapMode: Text.Wrap
                     }
 
@@ -504,8 +488,8 @@ FocusScope {
                         Rectangle {
                             Layout.fillWidth: true
                             implicitHeight: 8
-                            radius: page.plain ? 4 : 0
-                            color: (page.plain ? page.tones.rule : page.bracket ? page.c.line : "#E8DEC6") ?? "gray"
+                            radius: 4
+                            color: page.tones.rule ?? "gray"
 
                             Rectangle {
                                 width: parent.width * (page.download.phase === "converting" ? 1 : page.shown.fraction)
@@ -524,7 +508,6 @@ FocusScope {
                                 color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
-                                font.letterSpacing: page.bracket ? 0.72 : 0
                             }
                             Item {
                                 Layout.fillWidth: true
@@ -532,11 +515,10 @@ FocusScope {
                             Text {
                                 id: barSize
                                 textFormat: Text.PlainText
-                                text: page.say(page.shown.size)
+                                text: page.shown.size
                                 color: page.c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
-                                font.letterSpacing: page.bracket ? 0.72 : 0
                             }
                         }
                     }
@@ -547,9 +529,9 @@ FocusScope {
                         visible: card.failed
                         textFormat: Text.PlainText
                         text: H.failText(page.download)
-                        color: (page.plain ? page.tones.strong : page.c.ink) ?? "black"
-                        font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                        font.pixelSize: page.plain ? 14 : 13
+                        color: page.tones.strong ?? "black"
+                        font.family: page.bodyFont
+                        font.pixelSize: 14
                         lineHeight: 1.5
                         wrapMode: Text.Wrap
                     }
@@ -570,14 +552,14 @@ FocusScope {
                             host: page
                             visible: !card.failed && page.shown.speed !== ""
                             label: "speed"
-                            value: page.say(page.shown.speed)
+                            value: page.shown.speed
                         }
                         Pair {
                             id: leftRow
                             host: page
                             visible: !card.failed && page.shown.left !== ""
                             label: "left"
-                            value: page.say(page.shown.left)
+                            value: page.shown.left
                         }
                         Pair {
                             id: savedRow
@@ -594,20 +576,17 @@ FocusScope {
                         spacing: 8
 
                         Rule {
-                            id: meanwhileRule
                             Layout.fillWidth: true
                             Layout.bottomMargin: 6
-                            dashed: page.bracket
-                            color: (page.plain ? page.tones.rule : page.c.line) ?? "gray"
+                            color: page.tones.rule ?? "gray"
                         }
                         Text {
                             id: meanwhileHead
                             textFormat: Text.PlainText
-                            text: page.plain ? "Meanwhile" : "MEANWHILE"
+                            text: "Meanwhile"
                             color: page.c.muted ?? "gray"
-                            font.family: page.bracket ? page.fonts.mono ?? "" : page.bodyFont
-                            font.pixelSize: page.plain ? 11 : 10
-                            font.letterSpacing: page.plain ? 0 : 1.4
+                            font.family: page.bodyFont
+                            font.pixelSize: 11
                         }
                         Row {
                             id: meanwhileLine
@@ -627,8 +606,8 @@ FocusScope {
                                     textFormat: Text.PlainText
                                     text: modelData[0]
                                     color: page.c.ink ?? "black"
-                                    font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                                    font.pixelSize: page.plain ? 14 : 13
+                                    font.family: page.bodyFont
+                                    font.pixelSize: 14
                                     font.weight: modelData[1] ? Font.Bold : Font.Normal
                                 }
                             }
@@ -638,8 +617,8 @@ FocusScope {
                             textFormat: Text.PlainText
                             text: "Hadith search waits for the download."
                             color: page.c.muted ?? "gray"
-                            font.family: page.bracket ? page.fonts.ui ?? "" : page.bodyFont
-                            font.pixelSize: page.plain ? 14 : 13
+                            font.family: page.bodyFont
+                            font.pixelSize: 14
                         }
                     }
 
@@ -668,10 +647,10 @@ FocusScope {
                                 function drawn() {
                                     return keyName.text + " " + keyWord.text;
                                 }
-                                implicitWidth: keyRow.implicitWidth + (page.plain ? 14 : 0)
-                                implicitHeight: keyRow.implicitHeight + (page.plain ? 6 : 0)
+                                implicitWidth: keyRow.implicitWidth + 14
+                                implicitHeight: keyRow.implicitHeight + 6
                                 radius: 6
-                                color: page.plain ? page.tile : "transparent"
+                                color: page.tile
 
                                 Row {
                                     id: keyRow
@@ -681,21 +660,19 @@ FocusScope {
                                     Text {
                                         id: keyName
                                         textFormat: Text.PlainText
-                                        text: page.bracket ? V.mark(page.look.engraved, modelData[0].toUpperCase()) : modelData[0]
-                                        color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                                        text: modelData[0]
+                                        color: page.c.ink ?? "black"
                                         font.family: page.bodyFont
                                         font.pixelSize: 12
-                                        font.weight: page.plain ? Font.Medium : Font.Bold
-                                        font.letterSpacing: page.bracket ? 0.72 : 0
+                                        font.weight: Font.Medium
                                     }
                                     Text {
                                         id: keyWord
                                         textFormat: Text.PlainText
-                                        text: page.say(modelData[1]) + (index < cardKeyList.count - 1 && !page.plain ? " ·" : "")
+                                        text: modelData[1]
                                         color: page.c.ink ?? "black"
                                         font.family: page.bodyFont
                                         font.pixelSize: 12
-                                        font.letterSpacing: page.bracket ? 0.72 : 0
                                     }
                                 }
                             }
@@ -724,15 +701,15 @@ FocusScope {
                     Layout.margins: 12
                     spacing: 10
 
-                    // Search's field: Paper's two-pixel accent box, Artboard's rounded outline, Blueprint's one-pixel accent box.
+                    // Search's field: a rounded accent outline.
                     Rectangle {
                         id: fieldBox
                         Layout.fillWidth: true
                         visible: page.here.level === "search"
-                        implicitHeight: page.plain ? 44 : 42
-                        radius: page.plain ? 14 : 0
+                        implicitHeight: 44
+                        radius: 14
                         color: "transparent"
-                        border.width: page.caps ? 2 : page.plain ? 1.5 : 1
+                        border.width: 1.5
                         border.color: page.c.accent ?? "red"
 
                         TextInput {
@@ -747,7 +724,7 @@ FocusScope {
                             selectionColor: page.c.accent ?? "red"
                             selectedTextColor: page.c.surface ?? "white"
                             font.family: page.bodyFont
-                            font.pixelSize: page.plain ? 15 : 14
+                            font.pixelSize: 15
                             onTextEdited: debounce.restart()
                             Keys.onPressed: event => {
                                 if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Down) {
@@ -764,22 +741,21 @@ FocusScope {
                             anchors.right: parent.right
                             anchors.rightMargin: 14
                             anchors.verticalCenter: parent.verticalCenter
-                            implicitWidth: countText.implicitWidth + (page.plain ? 14 : 0)
-                            implicitHeight: countText.implicitHeight + (page.plain ? 4 : 0)
+                            implicitWidth: countText.implicitWidth + 14
+                            implicitHeight: countText.implicitHeight + 4
                             radius: 6
                             visible: countText.text !== ""
-                            color: page.plain ? page.tint : "transparent"
+                            color: page.tint
 
                             Text {
                                 id: countText
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
-                                text: page.asked.trim() === "" ? "" : page.say(H.resultsText(page.total))
-                                color: (page.plain ? page.deep : page.c.muted) ?? "gray"
+                                text: page.asked.trim() === "" ? "" : H.resultsText(page.total)
+                                color: page.deep ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.bracket ? 10 : 11
-                                font.weight: page.plain ? Font.Medium : Font.Normal
-                                font.letterSpacing: page.bracket ? 1.4 : 0
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
                             }
                         }
                     }
@@ -795,8 +771,7 @@ FocusScope {
                         text: page.here.level === "collections" ? page.look.tabText(H.heading(page.levels)) : H.heading(page.levels)
                         color: page.c.muted ?? "gray"
                         font.family: page.here.level === "collections" ? page.bodyFont : page.deen.bengali
-                        font.pixelSize: page.plain ? 12 : 11
-                        font.letterSpacing: page.here.level === "collections" && !page.plain ? 1.4 : 0
+                        font.pixelSize: 12
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
@@ -876,7 +851,7 @@ FocusScope {
                                 }
                                 width: ListView.view.width
                                 height: 34
-                                radius: page.plain ? page.look.cursor.radius : 0
+                                radius: page.look.cursor.radius
                                 color: on ? page.look.cursor.fill ?? "black" : "transparent"
 
                                 RowLayout {
@@ -905,9 +880,8 @@ FocusScope {
                                             maximumLineCount: 1
                                             color: (row.on ? (face === "bn" || face === "en" ? page.look.cursor.text : page.look.cursor.detail) : face === "bn" || face === "en" ? page.c.ink : page.c.muted) ?? "black"
                                             font.family: face === "bn" || face === "ref" ? page.deen.bengali : page.bodyFont
-                                            font.pixelSize: face === "mark" ? (page.plain ? 11 : 10) : face === "count" ? 12 : page.plain ? 14 : 13
-                                            font.letterSpacing: face === "mark" && !page.plain ? 1.4 : 0
-                                            font.weight: row.on && !page.bracket && face !== "mark" ? Font.Medium : Font.Normal
+                                            font.pixelSize: face === "mark" ? 11 : face === "count" ? 12 : 14
+                                            font.weight: row.on && face !== "mark" ? Font.Medium : Font.Normal
                                         }
                                     }
                                 }
@@ -916,20 +890,11 @@ FocusScope {
                     }
                 }
 
-                // The pane's left rule, dashed under Blueprint.
-                Item {
+                // The pane's left rule.
+                Rule {
                     Layout.fillHeight: true
                     implicitWidth: 1
-
-                    Rule {
-                        id: paneRule
-                        width: parent.height
-                        rotation: 90
-                        transformOrigin: Item.TopLeft
-                        x: 1
-                        dashed: page.bracket
-                        color: (page.caps ? page.c.ink : page.c.line) ?? "gray"
-                    }
+                    color: page.c.line ?? "gray"
                 }
 
                 // The open narration as Duas draws a dua: its Arabic, its Bangla meaning, or the English marked where it has none, and its Bangla reference.
@@ -959,8 +924,8 @@ FocusScope {
                                 text: page.opened ? page.opened.title : ""
                                 color: page.c.ink ?? "black"
                                 font.family: page.deen.bengali
-                                font.pixelSize: page.caps ? 25 : page.plain ? 20 : 18
-                                font.weight: page.caps ? Font.Normal : Font.Bold
+                                font.pixelSize: 20
+                                font.weight: Font.Bold
                                 elide: Text.ElideRight
                                 maximumLineCount: 1
                             }
@@ -1001,8 +966,7 @@ FocusScope {
                                     text: page.look.tabText(page.opened && page.opened.english ? "English" : "Meaning")
                                     color: page.c.muted ?? "gray"
                                     font.family: page.bodyFont
-                                    font.pixelSize: page.plain ? 11 : 10
-                                    font.letterSpacing: page.plain ? 0 : 1.4
+                                    font.pixelSize: 11
                                 }
                                 Text {
                                     id: meaningText
@@ -1012,7 +976,7 @@ FocusScope {
                                     wrapMode: Text.Wrap
                                     color: page.c.ink ?? "black"
                                     font.family: page.opened && page.opened.english ? page.bodyFont : page.deen.bengali
-                                    font.pixelSize: page.plain ? 16 : page.bracket ? 14 : 15
+                                    font.pixelSize: 16
                                     lineHeight: 1.4
                                 }
                                 Text {
@@ -1020,11 +984,10 @@ FocusScope {
                                     Layout.fillWidth: true
                                     visible: !!page.opened && page.opened.by !== ""
                                     textFormat: Text.PlainText
-                                    text: page.opened ? page.say("Narrated by " + page.opened.by) : ""
+                                    text: page.opened ? "Narrated by " + page.opened.by : ""
                                     color: page.c.muted ?? "gray"
                                     font.family: page.bodyFont
                                     font.pixelSize: 12
-                                    font.letterSpacing: page.bracket ? 0.72 : 0
                                     wrapMode: Text.Wrap
                                 }
                             }
@@ -1038,8 +1001,7 @@ FocusScope {
                                     text: page.look.tabText("Source")
                                     color: page.c.muted ?? "gray"
                                     font.family: page.bodyFont
-                                    font.pixelSize: page.plain ? 11 : 10
-                                    font.letterSpacing: page.plain ? 0 : 1.4
+                                    font.pixelSize: 11
                                 }
                                 Text {
                                     id: referenceText
@@ -1049,7 +1011,7 @@ FocusScope {
                                     wrapMode: Text.Wrap
                                     color: page.c.ink ?? "black"
                                     font.family: page.deen.bengali
-                                    font.pixelSize: page.plain ? 14 : 13
+                                    font.pixelSize: 14
                                 }
                             }
                         }
@@ -1062,25 +1024,23 @@ FocusScope {
         Rule {
             Layout.fillWidth: true
             visible: page.ready
-            dashed: page.bracket
-            color: (page.caps ? page.c.ink : page.c.line) ?? "gray"
+            color: page.c.line ?? "gray"
         }
         RowLayout {
             Layout.fillWidth: true
             Layout.preferredHeight: 34
-            Layout.leftMargin: page.plain ? 20 : 16
-            Layout.rightMargin: page.plain ? 20 : 16
+            Layout.leftMargin: 20
+            Layout.rightMargin: 20
             visible: page.ready
             spacing: 18
 
             Text {
                 id: footText
                 textFormat: Text.PlainText
-                text: page.say(page.narrations ? "offline · " + page.narrations + " narrations" : "offline")
+                text: page.narrations ? "offline · " + page.narrations + " narrations" : "offline"
                 color: page.c.ink ?? "black"
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.72 : 0
             }
             Text {
                 id: copiedText
@@ -1111,11 +1071,10 @@ FocusScope {
 
         Text {
             textFormat: Text.PlainText
-            text: parent.host.say(parent.label)
+            text: parent.label
             color: parent.host.c.muted ?? "gray"
             font.family: parent.host.bodyFont
             font.pixelSize: 12
-            font.letterSpacing: parent.host.bracket ? 0.72 : 0
         }
         Item {
             Layout.fillWidth: true
@@ -1126,11 +1085,10 @@ FocusScope {
             color: parent.host.c.ink ?? "black"
             font.family: parent.host.bodyFont
             font.pixelSize: 12
-            font.letterSpacing: parent.host.bracket ? 0.72 : 0
         }
     }
 
-    // A grade: Paper's ruled box in caps, Artboard's grey chip, Blueprint's bracketed accent caps.
+    // A grade as a grey chip, or a card-coloured one on the cursor's row.
     component Grade: Rectangle {
         id: grade
         required property var host
@@ -1139,44 +1097,29 @@ FocusScope {
         function drawn() {
             return gradeText.text;
         }
-        implicitWidth: gradeText.implicitWidth + (grade.host.bracket ? 0 : grade.host.plain ? 16 : 12)
-        implicitHeight: gradeText.implicitHeight + (grade.host.bracket ? 0 : grade.host.plain ? 4 : 2)
-        radius: grade.host.plain ? 8 : 0
-        color: grade.host.plain ? (on ? grade.host.tones.card : grade.host.tile) : "transparent"
-        border.width: grade.host.caps ? 1 : 0
-        border.color: (on ? grade.host.c.surface : grade.host.c.ink) ?? "black"
+        implicitWidth: gradeText.implicitWidth + 16
+        implicitHeight: gradeText.implicitHeight + 4
+        radius: 8
+        color: on ? grade.host.tones.card : grade.host.tile
+        border.width: 0
 
         Text {
             id: gradeText
             anchors.centerIn: parent
-            width: Math.min(implicitWidth, grade.width - (grade.host.bracket ? 0 : grade.host.plain ? 16 : 12))
+            width: Math.min(implicitWidth, grade.width - 16)
             textFormat: Text.PlainText
-            text: grade.host.bracket ? V.mark(grade.host.look.engraved, grade.words.toUpperCase()) : grade.host.caps && !grade.on ? grade.words.toUpperCase() : grade.words
-            color: (grade.host.plain ? (grade.on ? grade.host.deep : grade.host.c.ink) : grade.on ? grade.host.c.surface : grade.host.bracket ? grade.host.c.accent : grade.host.c.ink) ?? "black"
+            text: grade.words
+            color: (grade.on ? grade.host.deep : grade.host.c.ink) ?? "black"
             font.family: grade.host.bodyFont
-            font.pixelSize: grade.host.plain || grade.on && grade.host.caps ? 11 : 10
-            font.weight: grade.host.plain ? Font.Medium : grade.host.bracket ? Font.Bold : Font.Normal
-            font.letterSpacing: grade.host.plain || grade.on && grade.host.caps ? 0 : 1.2
+            font.pixelSize: 11
+            font.weight: Font.Medium
             elide: Text.ElideRight
             maximumLineCount: 1
         }
     }
 
-    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    // A one-pixel rule.
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
     }
 }

@@ -15,11 +15,7 @@ FocusScope {
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
     readonly property var tones: deen.tones
-    readonly property string voice: deen.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
     // The check puts a logging stub here, as no machine running it should make a sound.
     readonly property string player: Quickshell.env("DOTS_DEEN_MPV") || "mpv"
 
@@ -43,10 +39,6 @@ FocusScope {
     readonly property var lengths: surah ? surah.words.map(w => w.length) : []
     readonly property var focused: surah ? surah.words[cursor.a - 1][cursor.i - 1] : null
     readonly property var matches: R.surahsMatching(surahs, field.text)
-
-    // The boxed word as each board draws it: Paper's red rule on cream, Artboard's accent line on its tint, Blueprint's thin accent line.
-    readonly property color boxFill: caps ? "#F3E6CF" : plain ? look.label.fill : "transparent"
-    readonly property real boxBorder: caps ? 2 : plain ? 1.5 : 1
 
     function openSurah(n) {
         deen.api(["api", "surah", String(n)], answer => {
@@ -314,8 +306,8 @@ FocusScope {
                 text: page.surah ? D.oneLine(R.headingText(page.surah.surah)) : ""
                 color: page.c.ink ?? "black"
                 font.family: page.deen.bengali
-                font.pixelSize: page.caps ? 25 : page.plain ? 20 : 18
-                font.weight: page.caps ? Font.Normal : Font.Bold
+                font.pixelSize: 20
+                font.weight: Font.Bold
             }
             Text {
                 id: arabicName
@@ -332,7 +324,6 @@ FocusScope {
                 color: page.c.muted ?? "gray"
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
             }
             Item {
                 Layout.fillWidth: true
@@ -356,12 +347,11 @@ FocusScope {
                         function drawn() {
                             return hintKey.text + " " + hintWord.text;
                         }
-                        implicitWidth: hintPair.implicitWidth + (page.bracket ? 0 : 14)
-                        implicitHeight: hintPair.implicitHeight + (page.bracket ? 0 : 6)
-                        radius: page.plain ? 6 : 0
-                        color: page.plain ? page.look.tile.fill : "transparent"
-                        border.width: page.caps ? 1 : 0
-                        border.color: page.c.ink ?? "black"
+                        implicitWidth: hintPair.implicitWidth + 14
+                        implicitHeight: hintPair.implicitHeight + 6
+                        radius: 6
+                        color: page.look.tile.fill
+                        border.width: 0
 
                         Row {
                             id: hintPair
@@ -372,21 +362,18 @@ FocusScope {
                                 id: hintKey
                                 textFormat: Text.PlainText
                                 text: modelData.key
-                                color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                                color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 11 : 10
-                                font.weight: page.plain ? Font.Medium : page.bracket ? Font.Bold : Font.Normal
-                                font.letterSpacing: page.plain ? 0 : 1.2
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: hintWord
                                 textFormat: Text.PlainText
                                 text: modelData.word
-                                color: (page.plain ? page.c.muted : page.bracket ? page.c.accent : page.c.ink) ?? "gray"
+                                color: page.c.muted ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 11 : 10
-                                font.weight: page.bracket ? Font.Bold : Font.Normal
-                                font.letterSpacing: page.plain ? 0 : 1.2
+                                font.pixelSize: 11
                             }
                         }
                     }
@@ -456,25 +443,23 @@ FocusScope {
                             pronBottom: ayahPron.y + ayahPron.height,
                             inkTop: baseline + ink.y,
                             inkBottom: baseline + (ayahBn.lineCount - 1) * lineHeight + ink.y + ink.height,
-                            ruleDashed: ayahDash.visible,
-                            ruleColor: String(ayahDash.visible ? ayahDash.color : ayahRule.color)
+                            ruleColor: String(ayahRule.color)
                         };
                     }
 
                     width: ayahList.width
                     height: Math.max(26, wordFlow.implicitHeight) + 9 + (ayahPron.visible ? ayahPron.anchors.topMargin + ayahPron.height : 0) + (ayahBn.visible ? ayahBn.anchors.topMargin + ayahBn.height : 0)
 
-                    // Paper squares the number in grey, Artboard rounds it on a tile, Blueprint squares it in its rule colour.
+                    // The ayah's number, round on a tile.
                     Rectangle {
                         id: numberBox
                         x: 14
                         anchors.verticalCenter: wordFlow.verticalCenter
                         width: 26
                         height: 26
-                        radius: page.plain ? 13 : 0
-                        color: page.plain ? page.look.tile.fill : "transparent"
-                        border.width: page.plain ? 0 : 1
-                        border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
+                        radius: 13
+                        color: page.look.tile.fill
+                        border.width: 0
 
                         Text {
                             id: ayahNumber
@@ -483,7 +468,7 @@ FocusScope {
                             text: String(ayahRow.index + 1)
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: page.bracket ? 10 : 11
+                            font.pixelSize: 11
                         }
                     }
 
@@ -536,9 +521,9 @@ FocusScope {
 
                                 width: Math.max(wordArabic.implicitWidth, wordPron.width, wordBn.width) + 24
                                 height: wordColumn.implicitHeight + 16
-                                radius: page.plain ? 10 : 0
-                                color: current ? page.boxFill : "transparent"
-                                border.width: current ? page.boxBorder : 0
+                                radius: 10
+                                color: current ? page.look.label.fill : "transparent"
+                                border.width: current ? 1.5 : 0
                                 border.color: page.c.accent ?? "red"
 
                                 Column {
@@ -564,7 +549,7 @@ FocusScope {
                                         text: D.oneLine(wordBox.modelData.bn_pron)
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: (wordBox.current && page.plain ? page.look.cursor.text : page.c.muted) ?? "gray"
+                                        color: (wordBox.current ? page.look.cursor.text : page.c.muted) ?? "gray"
                                         font.family: page.deen.bengali
                                         font.pixelSize: 13
                                     }
@@ -577,7 +562,7 @@ FocusScope {
                                         text: D.oneLine(wordBox.modelData.bn)
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: (wordBox.current && page.plain ? page.look.cursor.text : page.c.muted) ?? "gray"
+                                        color: (wordBox.current ? page.look.cursor.text : page.c.muted) ?? "gray"
                                         font.family: page.deen.bengali
                                         font.pixelSize: 13
                                     }
@@ -599,7 +584,7 @@ FocusScope {
                         wrapMode: Text.WordWrap
                         color: page.c.muted ?? "gray"
                         font.family: page.deen.bengali
-                        font.pixelSize: page.caps ? 16 : 15
+                        font.pixelSize: 15
                     }
                     Text {
                         id: ayahBn
@@ -613,7 +598,7 @@ FocusScope {
                         wrapMode: Text.WordWrap
                         color: page.c.ink ?? "black"
                         font.family: page.deen.bengali
-                        font.pixelSize: page.caps ? 16 : 15
+                        font.pixelSize: 15
                     }
                     TextMetrics {
                         id: bnInk
@@ -626,22 +611,13 @@ FocusScope {
                         anchors.bottom: parent.bottom
                         width: parent.width
                         height: 1
-                        visible: !page.bracket
-                        color: page.plain ? page.tones.rule : "#D8CDB6"
-                    }
-                    Dashed {
-                        id: ayahDash
-                        anchors.bottom: parent.bottom
-                        width: parent.width
-                        height: 1
-                        visible: page.bracket
-                        color: page.c.line ?? "gray"
+                        color: page.tones.rule
                     }
                 }
             }
         }
 
-        // The boxed word, its pronunciation and meaning, and where it stands; Paper rules it in ink, Artboard fills it grey, Blueprint rules it in its accent.
+        // The boxed word, its pronunciation and meaning, and where it stands, on a grey field.
         Rectangle {
             id: bar
             Layout.fillWidth: true
@@ -651,10 +627,9 @@ FocusScope {
             Layout.bottomMargin: 14
             visible: !!page.focused && !page.noData
             implicitHeight: barRow.implicitHeight + 24
-            radius: page.plain ? 12 : 0
-            color: page.plain ? page.tones.field : "transparent"
-            border.width: page.plain ? 0 : 1
-            border.color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+            radius: 12
+            color: page.tones.field
+            border.width: 0
 
             RowLayout {
                 id: barRow
@@ -684,7 +659,7 @@ FocusScope {
                         maximumLineCount: 1
                         color: page.c.ink ?? "black"
                         font.family: page.deen.bengali
-                        font.pixelSize: page.plain ? 15 : 14
+                        font.pixelSize: 15
                     }
                     Text {
                         id: barBn
@@ -695,7 +670,7 @@ FocusScope {
                         maximumLineCount: 1
                         color: page.c.ink ?? "black"
                         font.family: page.deen.bengali
-                        font.pixelSize: page.plain ? 15 : 14
+                        font.pixelSize: 15
                         font.weight: Font.Medium
                     }
                     Text {
@@ -708,7 +683,6 @@ FocusScope {
                         color: page.c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: 12
-                        font.letterSpacing: page.bracket ? 0.7 : 0
                     }
                 }
                 Text {
@@ -717,8 +691,7 @@ FocusScope {
                     text: page.note ? D.oneLine(page.note) : R.hearHint
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
-                    font.pixelSize: page.bracket ? 10 : 11
-                    font.letterSpacing: page.bracket ? 1.4 : 0
+                    font.pixelSize: 11
                 }
             }
         }
@@ -739,10 +712,10 @@ FocusScope {
         y: 40
         width: Math.min(640, parent.width - 36)
         height: Math.min(parent.height - 80, pickColumn.implicitHeight)
-        radius: page.plain ? 14 : 0
+        radius: 14
         color: page.c.surface ?? "white"
         border.width: 1
-        border.color: (page.plain ? page.c.line : page.bracket ? page.c.accent : page.c.ink) ?? "black"
+        border.color: page.c.line ?? "black"
         clip: true
 
         ColumnLayout {
@@ -782,7 +755,7 @@ FocusScope {
                     anchors.fill: parent
                     visible: field.text === ""
                     textFormat: Text.PlainText
-                    text: page.plain ? "Surah number or name" : page.look.tabText("surah number or name")
+                    text: "Surah number or name"
                     color: page.c.muted ?? "gray"
                     font: field.font
                 }
@@ -790,7 +763,7 @@ FocusScope {
             Rectangle {
                 Layout.fillWidth: true
                 implicitHeight: 1
-                color: (page.caps ? page.c.ink : page.c.line) ?? "gray"
+                color: page.c.line ?? "gray"
             }
             ListView {
                 id: pickList

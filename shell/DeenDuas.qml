@@ -14,11 +14,7 @@ FocusScope {
     readonly property var fonts: deen.fonts
     readonly property var look: deen.look
     readonly property var tones: deen.tones
-    readonly property string voice: deen.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
 
     property bool asked: false
     property bool failed: false
@@ -124,7 +120,6 @@ FocusScope {
                 fieldRadius: fieldBox.radius,
                 fieldFill: fieldBox.color.a > 0 ? String(fieldBox.color) : "",
                 fieldBorder: fieldBox.border.width,
-                dividerDashed: divider.dashed,
                 italic: pronText.font.italic
             }
         };
@@ -180,11 +175,10 @@ FocusScope {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 10
-                    height: plain ? 38 : 36
-                    radius: plain ? 12 : 0
-                    color: plain ? tones.field : "transparent"
-                    border.width: plain ? 0 : 1
-                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+                    height: 38
+                    radius: 12
+                    color: tones.field
+                    border.width: 0
 
                     TextInput {
                         id: field
@@ -198,7 +192,7 @@ FocusScope {
                         selectionColor: c.accent ?? "red"
                         selectedTextColor: c.surface ?? "white"
                         font.family: page.bodyFont
-                        font.pixelSize: plain ? 13 : 12
+                        font.pixelSize: 13
                         onTextChanged: {
                             page.cursor = 0;
                             list.positionViewAtBeginning();
@@ -226,12 +220,12 @@ FocusScope {
                     Rectangle {
                         id: hint
                         anchors.right: parent.right
-                        anchors.rightMargin: plain ? 9 : 12
+                        anchors.rightMargin: 9
                         anchors.verticalCenter: parent.verticalCenter
-                        implicitWidth: hintText.implicitWidth + (plain ? 14 : 0)
-                        implicitHeight: hintText.implicitHeight + (plain ? 4 : 0)
+                        implicitWidth: hintText.implicitWidth + 14
+                        implicitHeight: hintText.implicitHeight + 4
                         radius: 6
-                        color: plain ? tones.card : "transparent"
+                        color: tones.card
 
                         Text {
                             id: hintText
@@ -240,9 +234,8 @@ FocusScope {
                             text: look.keyText("/")
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: bracket ? 10 : 11
-                            font.weight: plain ? Font.Medium : Font.Normal
-                            font.letterSpacing: bracket ? 1.4 : 0
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
                         }
                     }
                 }
@@ -259,8 +252,7 @@ FocusScope {
                     text: page.book ? look.tabText(U.heading(page.book.count)) : ""
                     color: c.muted ?? "gray"
                     font.family: page.bodyFont
-                    font.pixelSize: plain ? 11 : 10
-                    font.letterSpacing: plain ? 0 : 1.4
+                    font.pixelSize: 11
                 }
                 ListView {
                     id: list
@@ -298,7 +290,7 @@ FocusScope {
                         }
                         width: ListView.view.width
                         height: 34
-                        radius: plain ? look.cursor.radius : 0
+                        radius: look.cursor.radius
                         color: current ? look.cursor.fill : "transparent"
 
                         Text {
@@ -314,32 +306,17 @@ FocusScope {
                             maximumLineCount: 1
                             color: (row.current ? look.cursor.text : c.ink) ?? "black"
                             font.family: deen.bengali
-                            font.pixelSize: plain ? 14 : 13
-                            font.weight: row.current && !bracket ? Font.Medium : Font.Normal
+                            font.pixelSize: 14
+                            font.weight: row.current ? Font.Medium : Font.Normal
                         }
                     }
                 }
             }
-            Item {
+            Rectangle {
                 id: divider
-                property bool dashed: bracket
                 Layout.preferredWidth: 1
                 Layout.fillHeight: true
-
-                Rectangle {
-                    anchors.fill: parent
-                    visible: !divider.dashed
-                    color: (caps ? c.ink : c.line) ?? "gray"
-                }
-                Dashed {
-                    visible: divider.dashed
-                    x: 1
-                    width: divider.height
-                    height: 1
-                    rotation: 90
-                    transformOrigin: Item.TopLeft
-                    color: c.line ?? "gray"
-                }
+                color: c.line ?? "gray"
             }
             Flickable {
                 id: pane
@@ -372,8 +349,8 @@ FocusScope {
                             maximumLineCount: 1
                             color: c.ink ?? "black"
                             font.family: deen.bengali
-                            font.pixelSize: caps ? 25 : plain ? 20 : 18
-                            font.weight: caps ? Font.Normal : Font.Bold
+                            font.pixelSize: 20
+                            font.weight: Font.Bold
                         }
                         Text {
                             id: headText
@@ -382,7 +359,6 @@ FocusScope {
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: bracket ? 0.72 : 0
                         }
                     }
                     Text {
@@ -416,8 +392,7 @@ FocusScope {
                                 text: look.tabText("Pronunciation")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: plain ? 11 : 10
-                                font.letterSpacing: plain ? 0 : 1.4
+                                font.pixelSize: 11
                             }
                             Text {
                                 id: pronText
@@ -427,7 +402,7 @@ FocusScope {
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
                                 font.family: deen.bengali
-                                font.pixelSize: plain ? 16 : bracket ? 14 : 15
+                                font.pixelSize: 16
                             }
                         }
                         ColumnLayout {
@@ -441,8 +416,7 @@ FocusScope {
                                 text: look.tabText(page.openDua && page.openDua.meaningEnglish ? "English" : "Meaning")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: plain ? 11 : 10
-                                font.letterSpacing: plain ? 0 : 1.4
+                                font.pixelSize: 11
                             }
                             Text {
                                 id: meaningText
@@ -452,7 +426,7 @@ FocusScope {
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
                                 font.family: page.openDua && page.openDua.meaningEnglish ? page.bodyFont : deen.bengali
-                                font.pixelSize: plain ? 16 : bracket ? 14 : 15
+                                font.pixelSize: 16
                             }
                         }
                         ColumnLayout {
@@ -465,8 +439,7 @@ FocusScope {
                                 text: look.tabText(page.openDua && page.openDua.sourceEnglish ? "English" : "Source")
                                 color: c.muted ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: plain ? 11 : 10
-                                font.letterSpacing: plain ? 0 : 1.4
+                                font.pixelSize: 11
                             }
                             Text {
                                 id: sourceText
@@ -476,7 +449,7 @@ FocusScope {
                                 wrapMode: Text.Wrap
                                 color: c.ink ?? "black"
                                 font.family: page.openDua && page.openDua.sourceEnglish ? page.bodyFont : deen.bengali
-                                font.pixelSize: plain ? 14 : 13
+                                font.pixelSize: 14
                             }
                         }
                     }

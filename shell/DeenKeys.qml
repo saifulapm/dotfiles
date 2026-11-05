@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 
-// The keys along a Deen page's foot, as each board strips them: Paper's tracked caps, Artboard's grey chips, Blueprint's bracketed accent keys; pairs are [key, word].
+// The keys along a Deen page's foot as grey chips; pairs are [key, word].
 ColumnLayout {
     id: strip
 
@@ -9,10 +9,7 @@ ColumnLayout {
     property var pairs: []
 
     readonly property var c: deen.c
-    readonly property string voice: deen.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property string bodyFont: (bracket ? deen.fonts.mono : deen.fonts.ui) ?? ""
+    readonly property string bodyFont: deen.fonts.ui ?? ""
 
     function drawn() {
         const out = [];
@@ -26,29 +23,19 @@ ColumnLayout {
 
     spacing: 0
 
-    Item {
+    Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !strip.bracket
-            color: (strip.voice === "caps" ? strip.c.ink : strip.c.line) ?? "gray"
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: strip.bracket
-            color: strip.c.line ?? "gray"
-        }
+        color: strip.c.line ?? "gray"
     }
 
     Flow {
         Layout.fillWidth: true
-        Layout.leftMargin: strip.plain ? 14 : 16
-        Layout.rightMargin: strip.plain ? 14 : 16
-        Layout.topMargin: strip.plain ? 10 : 11
-        Layout.bottomMargin: strip.plain ? 10 : 11
-        spacing: strip.plain ? 8 : 16
+        Layout.leftMargin: 14
+        Layout.rightMargin: 14
+        Layout.topMargin: 10
+        Layout.bottomMargin: 10
+        spacing: 8
 
         Repeater {
             id: keyList
@@ -60,25 +47,24 @@ ColumnLayout {
                 function drawn() {
                     return [keyName.text, keyWord.text];
                 }
-                implicitWidth: keyPair.implicitWidth + (strip.plain ? 14 : 0)
-                implicitHeight: keyPair.implicitHeight + (strip.plain ? 6 : 0)
+                implicitWidth: keyPair.implicitWidth + 14
+                implicitHeight: keyPair.implicitHeight + 6
                 radius: 6
-                color: strip.plain ? strip.deen.look.tile.fill : "transparent"
+                color: strip.deen.look.tile.fill
 
                 Row {
                     id: keyPair
                     anchors.centerIn: parent
-                    spacing: strip.bracket ? 8 : 6
+                    spacing: 6
 
                     Text {
                         id: keyName
                         textFormat: Text.PlainText
                         text: modelData.key
-                        color: (strip.bracket ? strip.c.accent : strip.c.ink) ?? "black"
+                        color: strip.c.ink ?? "black"
                         font.family: strip.bodyFont
-                        font.pixelSize: strip.voice === "caps" ? 10 : 11
-                        font.weight: strip.plain ? Font.Medium : Font.Bold
-                        font.letterSpacing: strip.voice === "caps" ? 1 : strip.bracket ? 1.5 : 0
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
                     }
                     Text {
                         id: keyWord
@@ -86,8 +72,7 @@ ColumnLayout {
                         text: modelData.word
                         color: strip.c.muted ?? "gray"
                         font.family: strip.bodyFont
-                        font.pixelSize: strip.voice === "caps" ? 10 : 11
-                        font.letterSpacing: strip.voice === "caps" ? 1 : strip.bracket ? 1.5 : 0
+                        font.pixelSize: 11
                     }
                 }
             }
