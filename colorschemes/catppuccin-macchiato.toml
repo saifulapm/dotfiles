@@ -1,0 +1,34 @@
+# UI and code colours are catppuccin/palette's Macchiato (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-macchiato.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Macchiato" base08, 0B, 09, 0F.
+[meta]
+name = "catppuccin-macchiato"
+title = "Catppuccin Macchiato"
+family = "Catppuccin"
+variant = "dark"
+source = "https://github.com/catppuccin/palette"
+licence = "MIT"
+
+[color]
+paper = "#181926"
+surface = "#24273A"
+ink = "#CAD3F5"
+muted = "#A5ADCB"
+line = "#363A4F"
+accent = "#8AADF4"
+danger = "#ED8796"
+ok = "#A6DA95"
+ansi = [
+  "#494D64", "#ED8796", "#A6DA95", "#EED49F", "#8AADF4", "#F5BDE6", "#8BD5CA", "#B8C0E0",
+  "#5B6078", "#ED8796", "#A6DA95", "#EED49F", "#8AADF4", "#F5BDE6", "#8BD5CA", "#A5ADCB",
+]
+
+[syntax]
+keyword = "#C6A0F6"
+function = "#8AADF4"
+string = "#A6DA95"
+type = "#EED49F"
+value = "#F5A97F"
+variable = "#CAD3F5"
+attribute = "#F5A97F"
+meta = "#F0C6C6"
+builtin = "#ED8796"
+comment = "#939AB7"

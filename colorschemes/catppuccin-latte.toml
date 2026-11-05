@@ -1,0 +1,34 @@
+# UI and code colours are catppuccin/palette's Latte (palette.json); the ANSI 16 are catppuccin/foot's (themes/static/catppuccin-latte.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Latte" base08, 0B, 09, 0F.
+[meta]
+name = "catppuccin-latte"
+title = "Catppuccin Latte"
+family = "Catppuccin"
+variant = "light"
+source = "https://github.com/catppuccin/palette"
+licence = "MIT"
+
+[color]
+paper = "#DCE0E8"
+surface = "#EFF1F5"
+ink = "#4C4F69"
+muted = "#6C6F85"
+line = "#CCD0DA"
+accent = "#1E66F5"
+danger = "#D20F39"
+ok = "#40A02B"
+ansi = [
+  "#5C5F77", "#D20F39", "#40A02B", "#DF8E1D", "#1E66F5", "#EA76CB", "#179299", "#ACB0BE",
+  "#6C6F85", "#D20F39", "#40A02B", "#DF8E1D", "#1E66F5", "#EA76CB", "#179299", "#BCC0CC",
+]
+
+[syntax]
+keyword = "#8839EF"
+function = "#1E66F5"
+string = "#40A02B"
+type = "#DF8E1D"
+value = "#FE640B"
+variable = "#4C4F69"
+attribute = "#FE640B"
+meta = "#DD7878"
+builtin = "#D20F39"
+comment = "#7C7F93"

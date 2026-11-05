@@ -1,0 +1,34 @@
+# UI and code colours are catppuccin/palette's Frappé (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-frappe.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Frappe" base08, 0B, 09, 0F.
+[meta]
+name = "catppuccin-frappe"
+title = "Catppuccin Frappé"
+family = "Catppuccin"
+variant = "dark"
+source = "https://github.com/catppuccin/palette"
+licence = "MIT"
+
+[color]
+paper = "#232634"
+surface = "#303446"
+ink = "#C6D0F5"
+muted = "#A5ADCE"
+line = "#414559"
+accent = "#8CAAEE"
+danger = "#E78284"
+ok = "#A6D189"
+ansi = [
+  "#51576D", "#E78284", "#A6D189", "#E5C890", "#8CAAEE", "#F4B8E4", "#81C8BE", "#B5BFE2",
+  "#626880", "#E78284", "#A6D189", "#E5C890", "#8CAAEE", "#F4B8E4", "#81C8BE", "#A5ADCE",
+]
+
+[syntax]
+keyword = "#CA9EE6"
+function = "#8CAAEE"
+string = "#A6D189"
+type = "#E5C890"
+value = "#EF9F76"
+variable = "#C6D0F5"
+attribute = "#EF9F76"
+meta = "#EEBEBE"
+builtin = "#E78284"
+comment = "#949CBB"
