@@ -1,0 +1,34 @@
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Light", as ayu-theme/ayu-colors computes most of its own (themes/light.yaml); paper is that file's surface.sunk and accent its common.accent.tint.
+[meta]
+name = "ayu-light"
+title = "Ayu Light"
+family = "Ayu"
+variant = "light"
+source = "https://github.com/ayu-theme/ayu-colors"
+licence = "MIT"
+
+[color]
+paper = "#EBEEF0"
+surface = "#F8F9FA"
+ink = "#5C6166"
+muted = "#8A9199"
+line = "#D2D4D8"
+accent = "#F29718"
+danger = "#F07171"
+ok = "#6CBF49"
+ansi = [
+  "#F8F9FA", "#F07171", "#6CBF49", "#F2AE49", "#399EE6", "#A37ACC", "#4CBF99", "#5C6166",
+  "#A0A6AC", "#F07171", "#6CBF49", "#F2AE49", "#399EE6", "#A37ACC", "#4CBF99", "#404447",
+]
+
+[syntax]
+keyword = "#A37ACC"
+function = "#399EE6"
+string = "#6CBF49"
+type = "#F2AE49"
+value = "#FA8D3E"
+variable = "#F07171"
+attribute = "#FA8D3E"
+meta = "#E6BA7E"
+builtin = "#4CBF99"
+comment = "#A0A6AC"

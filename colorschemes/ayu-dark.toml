@@ -1,0 +1,34 @@
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Dark" (paper its base10), as ayu-theme/ayu-colors computes its own (themes/dark.yaml); accent is that file's common.accent.tint.
+[meta]
+name = "ayu-dark"
+title = "Ayu Dark"
+family = "Ayu"
+variant = "dark"
+source = "https://github.com/ayu-theme/ayu-colors"
+licence = "MIT"
+
+[color]
+paper = "#0A0D13"
+surface = "#0B0E14"
+ink = "#E6E1CF"
+muted = "#BFBDB6"
+line = "#202229"
+accent = "#E6B450"
+danger = "#F07178"
+ok = "#AAD94C"
+ansi = [
+  "#0B0E14", "#F07178", "#AAD94C", "#FFB454", "#59C2FF", "#D2A6FF", "#95E6CB", "#E6E1CF",
+  "#3E4B59", "#F07178", "#AAD94C", "#FFB454", "#59C2FF", "#D2A6FF", "#95E6CB", "#F2F0E7",
+]
+
+[syntax]
+keyword = "#D2A6FF"
+function = "#59C2FF"
+string = "#AAD94C"
+type = "#FFB454"
+value = "#FF8F40"
+variable = "#F07178"
+attribute = "#FF8F40"
+meta = "#E6B450"
+builtin = "#95E6CB"
+comment = "#3E4B59"

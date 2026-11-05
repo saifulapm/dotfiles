@@ -1,0 +1,34 @@
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Mirage", as ayu-theme/ayu-colors computes most of its own (themes/mirage.yaml); paper is that file's surface.sunk and accent its common.accent.tint.
+[meta]
+name = "ayu-mirage"
+title = "Ayu Mirage"
+family = "Ayu"
+variant = "dark"
+source = "https://github.com/ayu-theme/ayu-colors"
+licence = "MIT"
+
+[color]
+paper = "#181C26"
+surface = "#1F2430"
+ink = "#CCCAC2"
+muted = "#707A8C"
+line = "#323844"
+accent = "#FFCC66"
+danger = "#F28779"
+ok = "#D5FF80"
+ansi = [
+  "#1F2430", "#F28779", "#D5FF80", "#FFD173", "#73D0FF", "#D4BFFF", "#95E6CB", "#CCCAC2",
+  "#4A5059", "#F28779", "#D5FF80", "#FFD173", "#73D0FF", "#D4BFFF", "#95E6CB", "#F3F4F5",
+]
+
+[syntax]
+keyword = "#D4BFFF"
+function = "#73D0FF"
+string = "#D5FF80"
+type = "#FFD173"
+value = "#FFAD66"
+variable = "#F28779"
+attribute = "#FFAD66"
+meta = "#F27983"
+builtin = "#95E6CB"
+comment = "#4A5059"
