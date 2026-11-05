@@ -528,13 +528,18 @@ Item {
                             }
 
                             // As in the toast: a file notification drags from its chip, one with no file drags its body.
-                            MouseArea {
+                            Root.DragOut {
                                 id: rowArea
                                 property bool onChip: false
-                                objectName: "click:notif-row:" + item.index
+                                readonly property var payload: Lib.dragPayload(item.modelData.entry)
+                                name: "notif-row:" + item.index
                                 anchors.fill: parent
                                 cursorShape: Qt.PointingHandCursor
-                                drag.target: rowOffer
+                                offering: onChip || payload.mime === "text/plain"
+                                mime: ({ [payload.mime]: payload.data })
+                                image: payload.mime === "text/uri-list" ? rowFace.url : ""
+                                // The full-output mask drops while a row drags, so the drop reaches the window under the centre.
+                                onDraggingChanged: centre.dragging = dragging
                                 // A press and release with no drag does what Enter does on this row.
                                 onClicked: {
                                     centre.selected = item.index;
@@ -546,20 +551,6 @@ Item {
                                     if (onChip)
                                         rowFace.grab();
                                 }
-                            }
-
-                            Item {
-                                id: rowOffer
-                                readonly property var payload: Lib.dragPayload(item.modelData.entry)
-                                Drag.active: rowArea.drag.active && (rowArea.onChip || payload.mime === "text/plain")
-                                Drag.dragType: Drag.Automatic
-                                Drag.supportedActions: Qt.CopyAction
-                                Drag.mimeData: ({ [payload.mime]: payload.data })
-                                Drag.imageSource: payload.mime === "text/uri-list" ? rowFace.url : ""
-                                Drag.hotSpot.x: -14
-                                Drag.hotSpot.y: -18
-                                Drag.onDragStarted: centre.dragging = true
-                                Drag.onDragFinished: centre.dragging = false
                             }
 
                             Item {

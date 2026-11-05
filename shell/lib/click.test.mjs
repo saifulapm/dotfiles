@@ -47,3 +47,9 @@ test('a press is on the card when any item under it, however deep, is a card', (
   card.visible = false;
   assert.equal(onCard(over, 120, 115), false);
 });
+
+test('a drag out of the shell is a DragOut, so no other file carries its own drag offer', () => {
+  // files.qml keeps its own until m83-mouse-files rewrites its drag.
+  const offers = files.filter((f) => readFileSync(join(shell, f), 'utf8').includes('Drag.dragType'));
+  assert.deepEqual(offers.sort(), ['DragOut.qml', 'files.qml']);
+});

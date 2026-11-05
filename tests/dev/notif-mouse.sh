@@ -48,6 +48,24 @@ kill "$sender" 2>/dev/null
 wait "$sender" 2>/dev/null
 sender=
 
+# A press that moves a few pixels and lets go short of the drag threshold is a click, not a drop.
+: >"$out"
+notify-send -a T -A default=Open -A later=Later jittered >"$out" &
+sender=$!
+until_ok 2000 centre_is '.count == 2'
+until_ok 15000 island_rest
+open_centre
+read -r jx jy < <(shell_spot notif-row:0)
+point press "$jx" "$jy"
+point move "$((jx + 4))" "$((jy + 3))" 2
+point release
+until_ok 2000 printed default
+check "a press moved 4 px and let go short of the drag threshold runs the row as a click ($(cat "$out"))" printed default
+until_ok 2000 closed
+kill "$sender" 2>/dev/null
+wait "$sender" 2>/dev/null
+sender=
+
 timeout 0.5 qs ipc call notifs clear >/dev/null
 for i in $(seq 1 20); do notify-send -a bulk "bulk $i"; done
 until_ok 5000 centre_is '.count == 20'
