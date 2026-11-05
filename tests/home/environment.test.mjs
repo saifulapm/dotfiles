@@ -1,8 +1,8 @@
-// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags and OAuth client, the ssh-agent socket, the Android SDK and mise's shims.
+// environment.d gives the systemd user manager Electron's Wayland hint, Chromium's flags and OAuth client, the ssh-agent socket, the Android SDK, mise's shims and Claude Code's presence marker.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, mkdirSync, copyFileSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, copyFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -52,13 +52,28 @@ test('the user manager finds mise\'s deno through its shims, after every other d
 test('the environment.d generator expands every file', { skip: !existsSync(generator) }, () => {
   const home = mkdtempSync(join(tmpdir(), 'envd-'));
   mkdirSync(join(home, 'environment.d'));
-  for (const f of ['40-wayland.conf', '60-chromium.conf', '65-ssh-agent.conf', '70-android.conf', '75-mise.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
+  for (const f of ['40-wayland.conf', '60-chromium.conf', '65-ssh-agent.conf', '70-android.conf', '75-mise.conf', '80-claude-presence.conf']) copyFileSync(join(dir, f), join(home, 'environment.d', f));
   const out = execFileSync(generator, { env: { XDG_CONFIG_HOME: home, XDG_RUNTIME_DIR: '/run/user/1000', HOME: home, PATH: '/usr/bin' }, encoding: 'utf8' });
   assert.match(out, /^ELECTRON_OZONE_PLATFORM_HINT=wayland$/m);
   assert.match(out, /^SSH_AUTH_SOCK=\/run\/user\/1000\/ssh-agent\.socket$/m);
+  assert.match(out, /^CLAUDE_CLIENT_PRESENCE_FILE=\/run\/user\/1000\/dots-present$/m);
   assert.match(out, new RegExp(`^ANDROID_HOME=${home}/Android/Sdk$`, 'm'));
   assert.match(out, new RegExp(`^PATH=${home}/\\.cargo/bin:/usr/bin:${home}/\\.local/bin:${home}/Android/Sdk/platform-tools:${home}/Android/Sdk/cmdline-tools/latest/bin:${home}/Android/Sdk/emulator:${home}/\\.local/share/mise/shims$`, 'm'));
   assert.match(out, /^CHROMIUM_USER_FLAGS=.*--force-color-profile=srgb.*AimEnabled/m);
   assert.match(out, /^GOOGLE_DEFAULT_CLIENT_ID=77185425430\.apps\.googleusercontent\.com$/m);
   assert.match(out, new RegExp(`^CHROMIUM_USER_FLAGS=.* --load-extension=${home}/\\.local/state/dots/theme-out/chromium-theme,${home}/\\.local/state/dots/theme-out/chromium-newtab"?$`, 'm'));
+});
+
+// Claude Code sends a Remote Control session's push to the phone only while this file is missing; the shell keeps it while someone is at the screen, and a shell whose unit stopped can no longer say so.
+test('the user manager, fish and the shell\'s unit name one presence marker in the runtime dir', (t) => {
+  assert.match(read('80-claude-presence.conf'), /^CLAUDE_CLIENT_PRESENCE_FILE=\$\{XDG_RUNTIME_DIR\}\/dots-present$/m);
+  const home = mkdtempSync(join(tmpdir(), 'presence-'));
+  t.after(() => rmSync(home, { recursive: true, force: true }));
+  const fish = execFileSync('fish', ['--no-config', '-c', `source ${join(repo, 'home/dot_config/fish/config.fish')}; echo $CLAUDE_CLIENT_PRESENCE_FILE`], {
+    env: { HOME: home, XDG_RUNTIME_DIR: '/run/user/1000', XDG_STATE_HOME: join(home, 'state'), PATH: process.env.PATH },
+    encoding: 'utf8',
+  });
+  assert.equal(fish.trim(), '/run/user/1000/dots-present');
+  const unit = readFileSync(join(repo, 'home/dot_config/systemd/user/dots-shell.service'), 'utf8');
+  assert.match(unit, /^ExecStopPost=\/usr\/bin\/rm -f %t\/dots-present$/m);
 });

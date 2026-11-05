@@ -14,6 +14,8 @@ set -gx GOPATH ~/.local/share/go
 set -gx GOBIN $GOPATH/bin
 set -gx PNPM_HOME ~/.local/share/pnpm
 set -gx ANDROID_HOME ~/Android/Sdk
+# A login over SSH never reads environment.d, whose 80-claude-presence.conf names the same file.
+set -gx CLAUDE_CLIENT_PRESENCE_FILE $XDG_RUNTIME_DIR/dots-present
 
 # fish_add_path skips a directory that does not exist, so a machine without the tool gets nothing.
 fish_add_path -g ~/.local/bin ~/.config/composer/vendor/bin ~/Codes/dotfiles/bin ~/.cargo/bin $PNPM_HOME $PNPM_HOME/bin $GOBIN $ANDROID_HOME/platform-tools $ANDROID_HOME/cmdline-tools/latest/bin $ANDROID_HOME/emulator ~/.local/share/mise/shims

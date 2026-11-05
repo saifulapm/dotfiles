@@ -15,3 +15,5 @@ Environment=QT_QPA_PLATFORMTHEME=
 Environment=QSG_RENDER_LOOP=basic
 # Text falls back only to the themes' faces, never to the system sans (shell/fonts.conf).
 Environment=FONTCONFIG_FILE=%h/.config/quickshell/fonts.conf
+# The shell keeps this marker while someone is at the screen, and the phone gets no push while it stands; a shell that stopped can no longer say so.
+ExecStopPost=/usr/bin/rm -f %t/dots-present

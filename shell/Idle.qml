@@ -20,6 +20,8 @@ Scope {
     // The local hub rings a question here only while neither of v1's qshell flags it reads (workflow's hub/src/presence.rs) has stood 5 minutes; an agent's lease counts as locked, since no one is at the screen.
     readonly property string flags: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/qshell"
     readonly property bool away: lock.secure || lock.leased
+    // Claude Code sends Remote Control sessions' pushes to the phone only while this file is missing, so it stands while neither dimmed nor away; environment.d names it in the runtime dir, and with none named nothing is written.
+    readonly property string presence: Quickshell.env("CLAUDE_CLIENT_PRESENCE_FILE") || ""
 
     // One writer at a time, so a dim lifted at once cannot have its rm land before its create; a flag keeps its first time, which the hub reads as how long it has stood. The command is built here, since a change handler runs before a binding on the same change would update.
     function writeFlags() {
@@ -27,7 +29,7 @@ Scope {
             flagWriter.dirty = true;
             return;
         }
-        flagWriter.command = ["sh", "-c", flagWriter.script, "sh", flags, dimmed ? "1" : "0", away ? "1" : "0"];
+        flagWriter.command = ["sh", "-c", flagWriter.script, "sh", flags, dimmed ? "1" : "0", away ? "1" : "0", presence, dimmed || away ? "0" : "1"];
         flagWriter.running = true;
     }
 
@@ -39,7 +41,7 @@ Scope {
         id: flagWriter
         property bool dirty: false
         // v1's stay-awake flag would hold the hub at watching through any idle; v2's stay awake removes the steps instead, so the idle flag already reads right.
-        readonly property string script: 'mkdir -p "$1" && rm -f "$1/stay-awake" || exit 1; set_flag() { if [ "$2" = 1 ]; then [ -e "$1" ] || : >"$1"; else rm -f "$1"; fi; }; set_flag "$1/idle" "$2"; set_flag "$1/locked" "$3"'
+        readonly property string script: 'mkdir -p "$1" && rm -f "$1/stay-awake" || exit 1; set_flag() { if [ "$2" = 1 ]; then [ -e "$1" ] || : >"$1"; else rm -f "$1"; fi; }; set_flag "$1/idle" "$2"; set_flag "$1/locked" "$3"; [ -z "$4" ] || set_flag "$4" "$5"'
         onExited: {
             if (!dirty)
                 return;
