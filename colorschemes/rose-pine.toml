@@ -1,0 +1,34 @@
+# UI and code colours are rose-pine/neovim's main palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as main's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine" base08, 0B, 09, 0F.
+[meta]
+name = "rose-pine"
+title = "Rosé Pine"
+family = "Rosé Pine"
+variant = "dark"
+source = "https://github.com/rose-pine/neovim"
+licence = "MIT"
+
+[color]
+paper = "#16141F"
+surface = "#191724"
+ink = "#E0DEF4"
+muted = "#908CAA"
+line = "#403D52"
+accent = "#C4A7E7"
+danger = "#EB6F92"
+ok = "#31748F"
+ansi = [
+  "#26233A", "#EB6F92", "#31748F", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
+  "#6E6A86", "#EB6F92", "#31748F", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
+]
+
+[syntax]
+keyword = "#31748F"
+function = "#EBBCBA"
+string = "#F6C177"
+type = "#9CCFD8"
+value = "#EBBCBA"
+variable = "#E0DEF4"
+attribute = "#F6C177"
+meta = "#524F67"
+builtin = "#EB6F92"
+comment = "#6E6A86"

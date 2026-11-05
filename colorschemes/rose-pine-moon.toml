@@ -1,0 +1,34 @@
+# UI and code colours are rose-pine/neovim's moon palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as moon's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine-moon.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine Moon" base08, 0B, 09, 0F.
+[meta]
+name = "rose-pine-moon"
+title = "Rosé Pine Moon"
+family = "Rosé Pine"
+variant = "dark"
+source = "https://github.com/rose-pine/neovim"
+licence = "MIT"
+
+[color]
+paper = "#1F1D30"
+surface = "#232136"
+ink = "#E0DEF4"
+muted = "#908CAA"
+line = "#44415A"
+accent = "#C4A7E7"
+danger = "#EB6F92"
+ok = "#3E8FB0"
+ansi = [
+  "#393552", "#EB6F92", "#3E8FB0", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
+  "#6E6A86", "#EB6F92", "#3E8FB0", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
+]
+
+[syntax]
+keyword = "#3E8FB0"
+function = "#EA9A97"
+string = "#F6C177"
+type = "#9CCFD8"
+value = "#EA9A97"
+variable = "#E0DEF4"
+attribute = "#F6C177"
+meta = "#56526E"
+builtin = "#EB6F92"
+comment = "#6E6A86"
