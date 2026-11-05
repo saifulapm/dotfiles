@@ -1,0 +1,17 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "asahi-va-driver") }}
+# Fedora's libva-v4l2-request 1.0 cannot drive the Macs' decoder; this fork can, and mpv and Chromium reach it through VA-API.
+if ! grep -Faqs 'apple,' /proc/device-tree/compatible || systemd-detect-virt -q --container; then
+  log "asahi-va-driver: not an Apple machine"
+  exit 0
+fi
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/asahi-va-driver-$pin_version
+meson setup "$src/build" "$src" --prefix=/usr --buildtype=plain --wrap-mode=nodownload >/dev/null || die "asahi-va-driver: meson setup failed"
+meson compile -C "$src/build" >/dev/null || die "asahi-va-driver: build failed"
+# Before 2.0 the driver was v4l2_request_drv_video.so behind an asahi_drv_video.so link; an install through that link would write the old name, so both go first.
+root rm -f /usr/lib64/dri/asahi_drv_video.so /usr/lib64/dri/v4l2_request_drv_video.so || die "asahi-va-driver: could not remove the old driver"
+root meson install -C "$src/build" --no-rebuild >/dev/null || die "asahi-va-driver: install failed"
+pin_done

@@ -149,7 +149,7 @@ url = "https://github.com/AsahiLinux/avd-fw/releases/download/v{version}/avd-fw-
 sha256 = "668dd16aee983f111644925a6cccc25ab5dd5107c25d6fd77e05795ae559ef91"
 
 [[pin]]
-name = "libva-v4l2-request"
+name = "asahi-va-driver"
 version = "0e54d318004e204d2f73818c96e89c4642178351"
 repo = "AsahiLinux/asahi-va-driver"
 track = "commit"

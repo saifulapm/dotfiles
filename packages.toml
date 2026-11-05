@@ -530,12 +530,12 @@ why = "kak-mail renders HTML mail with it"
 [[package]]
 name = "meson"
 arch = "all"
-why = "builds the wlvncc pin, and the libva-v4l2-request and scrcpy pins on the Macs"
+why = "builds the wlvncc pin, and the asahi-va-driver and scrcpy pins on the Macs"
 
 [[package]]
 name = "ninja-build"
 arch = "all"
-why = "meson's build backend for the wlvncc, libva-v4l2-request and scrcpy pins"
+why = "meson's build backend for the wlvncc, asahi-va-driver and scrcpy pins"
 
 [[package]]
 name = "arm-none-eabi-gcc-cs"
@@ -545,17 +545,17 @@ why = "arm-none-eabi-gcc, which builds Asahi's AVD firmware"
 [[package]]
 name = "libva-devel"
 arch = "aarch64"
-why = "builds the libva-v4l2-request pin on the Macs"
+why = "builds the asahi-va-driver pin on the Macs"
 
 [[package]]
 name = "libdrm-devel"
 arch = "all"
-why = "builds the wlvncc pin, and the libva-v4l2-request pin on the Macs"
+why = "builds the wlvncc pin, and the asahi-va-driver pin on the Macs"
 
 [[package]]
 name = "kernel-headers"
 arch = "aarch64"
-why = "builds the libva-v4l2-request pin on the Macs"
+why = "builds the asahi-va-driver pin on the Macs"
 
 [[package]]
 name = "binutils"
