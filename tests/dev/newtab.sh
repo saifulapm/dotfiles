@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ctrl+T in Chromium opens the theme's new-tab page: its paper, the date, a field that takes the keys typed first, and the six most visited sites.
+# Ctrl+T in Chromium opens the new-tab page: one card on the colourscheme's paper, the date, a field that takes the keys typed first, and the six most visited sites.
 {
 # The nested session puts a stand-in chromium-browser first on its PATH, so the real one is found before lib.sh joins it.
 real_chromium=$(command -v chromium-browser) || { echo "FAIL no chromium-browser on PATH"; exit 1; }
@@ -11,13 +11,14 @@ out=$XDG_STATE_HOME/dots/theme-out
 rgb() { printf '%d %d %d' "0x${1:1:2}" "0x${1:3:2}" "0x${1:5:2}"; }
 token() { jq -r ".color.$1" "$out/shell.json"; }
 near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
-# The median of a 17x17 square per channel at the centre of the page as Chromium draws it, which skips Blueprint's grid lines and Paper's grain specks.
-page_centre() {
-  local w h
+# The median of a 17x17 square per channel at the page's left edge ("paper") or just inside the card's left edge ("card") as Chromium draws it, which skips the paper's dots.
+page_median() {
+  local x y
   rm -f "$work/page.png"
   cdp shot newtab.html "$work/page.png" || return 1
-  read -r w h < <(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0:s=' ' "$work/page.png")
-  ffmpeg -loglevel error -i "$work/page.png" -vf "crop=17:17:$((w / 2 - 8)):$((h / 2 - 8)),format=rgb24" -f image2pipe -vcodec ppm - | node -e '
+  IFS=, read -r x y < <(cdp eval newtab.html "(() => { const r = document.querySelector(\"main\").getBoundingClientRect(); return Math.round(r.left) + 8 + \",\" + Math.round(r.top + r.height / 2 - 8); })()" | tr -d '"')
+  [ "$1" = paper ] && x=16
+  ffmpeg -loglevel error -i "$work/page.png" -vf "crop=17:17:$x:$y,format=rgb24" -f image2pipe -vcodec ppm - | node -e '
     const b = require("fs").readFileSync(0);
     const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
     const px = b.subarray(head[0].length), ch = [[], [], []];
@@ -25,9 +26,10 @@ page_centre() {
     console.log(ch.map((c) => c.sort((x, y) => x - y)[c.length >> 1]).join(" "));
   '
 }
-centre_is() { local r g b; read -r r g b < <(page_centre); read -r -a want <<<"$(rgb "$1")"; near "$r" "${want[0]}" && near "$g" "${want[1]}" && near "$b" "${want[2]}"; }
+# Whether the median at $1 is the colour $2.
+colour_is() { local r g b; read -r r g b < <(page_median "$1"); read -r -a want <<<"$(rgb "$2")"; near "$r" "${want[0]}" && near "$g" "${want[1]}" && near "$b" "${want[2]}"; }
 
-# Every font Chromium drew the element's text in is the family, at any weight: Artboard's 600 draws as Maple Mono SemiBold.
+# Every font Chromium drew the element's text in is the family, at any weight: a 600 draws as Maple Mono SemiBold.
 drawn_in() { local f; f=$(cdp fonts newtab.html "$1") && [ -n "$f" ] && ! tr ',' '\n' <<<"$f" | grep -qvE "^$2( |$)"; }
 
 # The contrast of row 1's tile letter against its fill, or the row's when the tile has none, with row 1 focused.
@@ -43,14 +45,8 @@ tile_contrast='(() => {
   return ratio;
 })()'
 
-# The day and date each voice writes for today, as the boards draw them.
-date_line() {
-  case $1 in
-    paper) LC_ALL=C date '+%A %-d %B %Y' | sed 's/^[A-Za-z]*/\U&/' ;;
-    blueprint | hi-fi) LC_ALL=C date '+%A %Y-%m-%d' | sed 's/^[A-Za-z]*/\U&/' ;;
-    artboard) LC_ALL=C date '+%A %-d %B %Y' ;;
-  esac
-}
+# The day and date for today, as the page writes them.
+date_line() { LC_ALL=C date '+%A %-d %B %Y'; }
 
 # Seven local pages to visit, so the list has one more site than it shows.
 names=(Alpha Bravo Charlie Delta Echo Foxtrot Golf)
@@ -124,12 +120,11 @@ mkdir -p "$(dirname "$store")"
 node --input-type=module -e "const G = await import('$repo/shell/lib/goals.mjs'); console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'Ship the new tab', Date.now() + 86400000, Date.now(), 'g0')))" >"$store"
 
 # A fresh profile has no history, so its list reads one empty line and draws no row.
-legacy_theme paper
 chromium fresh
 new_tab
 until_ok 10000 ready
 check "a fresh profile's list reads $(page 'document.querySelector(".empty")?.textContent') on one line, with no row" \
-  is '!document.querySelector(".row") && document.querySelector(".empty").textContent === "NOTHING VISITED YET" && document.querySelector(".empty").getClientRects().length === 1 && document.querySelector(".empty").offsetHeight < 40'
+  is '!document.querySelector(".row") && document.querySelector(".empty").textContent === "Nothing visited yet" && document.querySelector(".empty").getClientRects().length === 1 && document.querySelector(".empty").offsetHeight < 40'
 quit_chromium
 
 # Seven sites visited 7, 6, 5 ... 1 times from the address bar, so the list reads Alpha to Foxtrot in that order.
@@ -147,45 +142,45 @@ echo "     top sites after seeding: $(cdp eval newtab.html 'new Promise((r) => c
 sleep 12
 quit_chromium
 
-for theme in paper blueprint artboard hi-fi; do
-  legacy_theme "$theme"
-  chromium seeded
-  # The keys typed after Ctrl+T must reach the page's field, not the address bar.
-  new_tab fedora
-  until_ok 10000 ready || { echo "     not ready: $(cdp urls | tr '\n' ' ')"; grim -s 1 "${DOTS_CHECK_SHOTS:-/tmp}/newtab-$theme-notready.png"; }
-  until_ok 3000 centre_is "$(token paper)"
-  check "$theme: Ctrl+T draws $theme's paper $(token paper) at the page's centre ($(page_centre))" centre_is "$(token paper)"
-  check "$theme: the keys typed after Ctrl+T are in the page's field ($(page 'document.getElementById("q").value'))" is 'document.getElementById("q").value === "fedora" && document.activeElement.id === "q" && document.hasFocus()'
-  check "$theme: the list reads the six most visited sites, numbered ($(page '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ")'))" \
-    is '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ") === "1 Alpha, 2 Bravo, 3 Charlie, 4 Delta, 5 Echo, 6 Foxtrot"'
-  check "$theme: the date reads $(page '[document.getElementById("day").textContent, document.getElementById("date").textContent].join(" ")') in $theme's voice" \
-    is "[document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line "$theme")'"
-  check "$theme: Chromium draws the date in $theme's $(jq -r .type.display "$out/shell.json") ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "$(jq -r .type.display "$out/shell.json")"
-  # A focused row turns its colours over, and its tile's letter must still read: at least 3:1 against what is behind it.
-  check "$theme: the focused row's tile letter reads ($(page "$tile_contrast" | cut -c1-5):1)" is "$tile_contrast >= 3"
-  check "$theme: no text on the page names the goal" is '!/goal|ship the new tab/i.test(document.body.innerText)'
-  # Hi-Fi says Blueprint's keys without their marks; Blueprint keeps them.
-  case $theme in
-    blueprint) check "blueprint: the keys read in brackets ($(page 'document.querySelector(".keys").innerText'))" is '/\[↵\]/.test(document.querySelector(".keys").innerText)' ;;
-    hi-fi) check "hi-fi: no text on the page holds a bracket ($(page 'document.querySelector(".keys").innerText'))" is '!/[[\]]/.test(document.body.innerText)' ;;
-  esac
-  wtype -k Return
-  until_ok 10000 searched
-  check "$theme: Enter searches the default engine for fedora ($(cdp urls | grep -m1 'q=fedora' | cut -c1-60))" until_ok 3000 searched
-  quit_chromium
-done
+chromium seeded
+# The keys typed after Ctrl+T must reach the page's field, not the address bar.
+new_tab fedora
+until_ok 10000 ready || { echo "     not ready: $(cdp urls | tr '\n' ' ')"; grim -s 1 "${DOTS_CHECK_SHOTS:-/tmp}/newtab-notready.png"; }
+until_ok 3000 colour_is paper "$(token paper)"
+check "Ctrl+T draws the paper $(token paper) at the page's edge ($(page_median paper))" colour_is paper "$(token paper)"
+check "and the card's surface $(token surface) just inside the card ($(page_median card))" colour_is card "$(token surface)"
+check "the card is rounded 14 px with no shadow, and the rows and key chips are rounded" \
+  is 'getComputedStyle(document.querySelector("main")).borderRadius === "14px" && getComputedStyle(document.querySelector("main")).boxShadow === "none" && getComputedStyle(document.querySelector(".row")).borderRadius === "10px" && getComputedStyle(document.querySelector(".keys span")).borderRadius === "6px"'
+check "the page's stylesheets name no box-shadow" \
+  is '![...document.styleSheets].some((s) => [...s.cssRules].some((r) => /box-shadow/.test(r.cssText)))'
+check "the keys typed after Ctrl+T are in the page's field ($(page 'document.getElementById("q").value'))" is 'document.getElementById("q").value === "fedora" && document.activeElement.id === "q" && document.hasFocus()'
+check "the list reads the six most visited sites, numbered ($(page '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ")'))" \
+  is '[...document.querySelectorAll(".row")].map((r) => r.querySelector(".n").textContent + " " + r.querySelector(".title").textContent).join(", ") === "1 Alpha, 2 Bravo, 3 Charlie, 4 Delta, 5 Echo, 6 Foxtrot"'
+check "the date reads $(page '[document.getElementById("day").textContent, document.getElementById("date").textContent].join(" ")')" \
+  is "[document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line)'"
+check "Chromium draws the date in $(jq -r .type.display "$out/shell.json") ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "$(jq -r .type.display "$out/shell.json")"
+# A focused row turns its colours over, and its tile's letter must still read: at least 3:1 against what is behind it.
+check "the focused row's tile letter reads ($(page "$tile_contrast" | cut -c1-5):1)" is "$tile_contrast >= 3"
+check "no text on the page names the goal" is '!/goal|ship the new tab/i.test(document.body.innerText)'
+check "the keys read as lower-case chips ($(page 'document.querySelector(".keys").innerText'))" is '/↵/.test(document.querySelector(".keys").innerText) && !/[[\]]/.test(document.body.innerText)'
+wtype -k Return
+until_ok 10000 searched
+check "Enter searches the default engine for fedora ($(cdp urls | grep -m1 'q=fedora' | cut -c1-60))" until_ok 3000 searched
+quit_chromium
 
-# A switch takes effect at Chromium's next start: Artboard's Chromium quits, the switch to paper, and the next start draws Paper.
-legacy_theme paper
+# A switch takes effect at Chromium's next start: the switch to a dark scheme, and the next start draws its paper and surface.
+"$repo/bin/dots" colorscheme catppuccin-mocha >/dev/null
+until_ok 8000 bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".theme == \"catppuccin-mocha\" and .transition == \"\"" >/dev/null'
 chromium seeded
 new_tab
 until_ok 10000 ready
-until_ok 3000 centre_is "$(token paper)"
-check "after a switch to paper and a restart, Ctrl+T draws Paper's paper ($(page_centre))" centre_is "$(token paper)"
-check "and Paper's date, $(date_line paper), in $(cdp fonts newtab.html '#date')" \
-  is "document.documentElement.dataset.theme === 'paper' && [document.getElementById('day').textContent, document.getElementById('date').textContent].join(' ') === '$(date_line paper)'"
-check "and its date face is Instrument Serif as drawn ($(cdp fonts newtab.html '#date'))" drawn_in '#date' "Instrument Serif"
+until_ok 3000 colour_is paper "$(token paper)"
+check "after a switch to catppuccin-mocha and a restart, Ctrl+T draws its paper $(token paper) ($(page_median paper))" colour_is paper "$(token paper)"
+check "and its surface $(token surface) inside the card ($(page_median card))" colour_is card "$(token surface)"
+check "and the page names the scheme ($(page 'document.documentElement.dataset.theme'))" is "document.documentElement.dataset.theme === 'catppuccin-mocha'"
 quit_chromium
+"$repo/bin/dots" colorscheme artboard >/dev/null
+until_ok 8000 bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".theme == \"artboard\" and .transition == \"\"" >/dev/null'
 
 # Started with no address, as a person opens it, Chromium makes its first tab its own new-tab page even with the extension installed; the extension's worker sends that tab to the theme's page.
 launch seeded
@@ -229,7 +224,7 @@ check "at 390 px no title is narrower than its address (title/address: $(cdp nar
   bash -c "node '$repo/tests/dev/cdp.mjs' $dport narrow newtab.html 390 '[...document.querySelectorAll(\".row\")].every((r) => r.querySelector(\".title\").clientWidth >= r.querySelector(\".address\").clientWidth)' | grep -qx true"
 quit_chromium
 
-# The address and the digit keys, once, in the last theme.
+# The address and the digit keys, once.
 chromium seeded
 new_tab
 until_ok 10000 ready
