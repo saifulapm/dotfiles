@@ -5,6 +5,7 @@ import QtQuick
 import QtQuick.Layouts
 import "services" as Services
 import "lib/click.mjs" as C
+import "lib/dekho.mjs" as D
 import "lib/files.mjs" as F
 import "lib/picker.mjs" as P
 import "lib/status.mjs" as Status
@@ -74,7 +75,7 @@ ShellRoot {
     property var dragRows: []
     readonly property var dragPaths: dragRows.map(r => pathOf(r))
     property url chipUrl: ""
-    property bool dragging: false
+    readonly property bool dragging: dragArea.dragging
     // False from leaving a folder until its rows are listed, so no key acts on the last folder's rows.
     property bool listed: false
     // A folder changed while it was being listed is listed again.
@@ -449,6 +450,31 @@ ShellRoot {
         const paths = F.dragPaths(rows, marked, folder, row);
         dragRows = rows.filter(r => paths.indexOf(pathOf(r)) >= 0);
         dragChip.grabToImage(r => app.chipUrl = r.url);
+    }
+
+    // No click acts on a row while a question, a field or a card holds the keys, nor before the folder's rows land.
+    readonly property bool rowsClickable: listed && !ops.failed && asking === "" && !finding && !jumping && !renaming && !openWith.visible && !share.shown
+
+    // A click on row i selects as a file manager's does: alone, from the cursor with Shift, one more or less with Ctrl.
+    function clickRow(i, mods) {
+        if (i < 0 || !rowsClickable)
+            return;
+        const s = F.clicked(rows, marked, selected, i, {
+            ctrl: (mods & Qt.ControlModifier) !== 0,
+            shift: (mods & Qt.ShiftModifier) !== 0
+        }, F.toggleMark);
+        side = "list";
+        selected = s.selected;
+        marked = s.marked;
+    }
+
+    // A double click opens row i as Enter does.
+    function openRow(i) {
+        if (i < 0 || !rowsClickable)
+            return;
+        side = "list";
+        selected = i;
+        choose();
     }
 
     // The cursor row as drawn, for checks that read the window rather than the data.
@@ -1066,20 +1092,31 @@ ShellRoot {
                         }
                     }
 
-                    // The mouse is for dragging: a press on a row readies the drag, crossing the threshold starts it.
-                    MouseArea {
+                    // A click selects, a double click opens, and a press moved past 6 px drags the selection out; a press while a question, a field or a card holds the keys is let go.
+                    DragOut {
                         id: dragArea
+                        name: "files-rows"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        drag.target: dragOffer
+                        drag.threshold: 6
+                        mime: ({
+                                "text/uri-list": F.uriList(app.dragPaths)
+                            })
+                        image: app.chipUrl
+                        function rowAt(mouse) {
+                            return rowList.indexAt(mouse.x, mouse.y + rowList.contentY);
+                        }
                         onPressed: mouse => {
-                            const i = rowList.indexAt(mouse.x, mouse.y + rowList.contentY);
-                            if (i < 0) {
+                            const i = rowAt(mouse);
+                            if (i < 0 || !app.rowsClickable) {
                                 mouse.accepted = false;
                                 return;
                             }
                             app.pressRow(app.rows[i]);
                         }
+                        onClicked: mouse => app.clickRow(rowAt(mouse), mouse.modifiers)
+                        onDoubleClicked: mouse => app.openRow(rowAt(mouse))
+                        onWheel: event => rowList.contentY = D.wheeled(rowList.contentY, event.angleDelta.y, rowList.contentHeight, rowList.height)
 
                     ListView {
                         id: rowList
@@ -1638,7 +1675,7 @@ ShellRoot {
                     app.hoverDrop(p.y);
                 else
                     app.dropAt = -1;
-                app.dropping = p !== null && app.dropPaths.length > 0 && (drag.source !== dragOffer || app.dropAt >= 0);
+                app.dropping = p !== null && app.dropPaths.length > 0 && (drag.source !== dragArea.drag.target || app.dropAt >= 0);
             }
             onEntered: drag => {
                 app.dropPaths = F.dropPaths(drag.urls.map(u => String(u)));
@@ -1654,7 +1691,7 @@ ShellRoot {
                 app.dropAt = -1;
             }
             onDropped: drop => {
-                if (inList(drop) && app.dropInto(F.dropPaths(drop.urls.map(u => String(u))), drop.source === dragOffer))
+                if (inList(drop) && app.dropInto(F.dropPaths(drop.urls.map(u => String(u))), drop.source === dragArea.drag.target))
                     drop.accept(Qt.CopyAction);
                 app.dropping = false;
                 app.dropAt = -1;
@@ -1804,22 +1841,6 @@ ShellRoot {
                     font.pixelSize: 11
                 }
             }
-        }
-
-        // What a row's MouseArea drags: the platform drag carries the files' URIs into any app, foot among them.
-        Item {
-            id: dragOffer
-            Drag.active: dragArea.drag.active
-            Drag.dragType: Drag.Automatic
-            Drag.supportedActions: Qt.CopyAction
-            Drag.mimeData: ({
-                    "text/uri-list": F.uriList(app.dragPaths)
-                })
-            Drag.imageSource: app.chipUrl
-            Drag.hotSpot.x: -14
-            Drag.hotSpot.y: -18
-            Drag.onDragStarted: app.dragging = true
-            Drag.onDragFinished: app.dragging = false
         }
 
         // Out of sight: the drag image, a chip reading "3 files" with its count badge, is grabbed from here.
