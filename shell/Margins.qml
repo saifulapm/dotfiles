@@ -9,7 +9,7 @@ import "lib/idle.mjs" as Idle
 import "lib/surface.mjs" as S
 import "lib/voice.mjs" as V
 
-// Each margin sits over an ink hairline that stops 8 px short of the island, when the theme's frame is drawn in ink.
+// The margins are text alone on the paper, either side of the island.
 PanelWindow {
     id: root
 
@@ -222,24 +222,6 @@ PanelWindow {
             text: root.voice.date(root.clock.now)
             color: root.voice.dateColor ?? "black"
         }
-    }
-
-    Rectangle {
-        x: 32
-        y: 40
-        visible: root.look.rules
-        width: Math.max(0, root.lineEnd - 32)
-        height: 1
-        color: root.theme.color.ink ?? "black"
-    }
-
-    Rectangle {
-        x: root.width - 32 - width
-        y: 40
-        visible: root.look.rules
-        width: Math.max(0, root.lineEnd - 32)
-        height: 1
-        color: root.theme.color.ink ?? "black"
     }
 
     Item {

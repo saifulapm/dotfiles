@@ -67,7 +67,7 @@ until_ok 3000 status_theme artboard
 on_drawn 2026-11-03 '.ref == "সূরা আশ-শারহ ৯৪:৬"'
 check "the passage draws 94:6's Arabic in $arabic, its pronunciation, meaning and reference upright in $bengali, no Latin ($(drawn '[.family, .bn]'))" \
   drawn_is '.family.ar == $arabic and .ar != "" and .bn_pron != "" and .bn == "নিশ্চয় কষ্টের সাথেই স্বস্তি আছে।" and '"$in_bangla"
-check "it labels it Ayah over the card in Maple Mono ($(passage | jq -c '[.label, .drawn[0][0].label, .drawn[0][0].family.label]'))" \
+check "it labels it Ayah above its lines in Maple Mono ($(passage | jq -c '[.label, .drawn[0][0].label, .drawn[0][0].family.label]'))" \
   passage_is '.label == "Ayah" and .drawn[0][0].label == "Ayah" and .drawn[0][0].family.label == "Maple Mono"'
 check "the block sits centred on the output ($(drawn .box), output $out)" centred
 shot artboard-ayah

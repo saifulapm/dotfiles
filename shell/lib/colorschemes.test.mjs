@@ -58,10 +58,10 @@ for (const [name, want] of Object.entries(BOARD)) {
     for (const [k, v] of Object.entries(want.syntax)) assert.equal(doc.syntax[k], v, `syntax.${k}`);
   });
 
-  test(`${name} renders a 1px ink and line frame, no shadow, and its mode`, (t) => {
+  test(`${name} renders a 1px line frame on every window, no shadow, and its mode`, (t) => {
     const out = render(t, name);
     const kdl = readFileSync(join(out, 'niri.kdl'), 'utf8').replace(/\s+/g, ' ');
-    assert.ok(kdl.includes(`border { on width 1 active-color "${want.color.ink}" inactive-color "${want.color.line}" }`), kdl);
+    assert.ok(kdl.includes(`border { on width 1 active-color "${want.color.line}" inactive-color "${want.color.line}" }`), kdl);
     assert.ok(kdl.includes('shadow { off }'));
     assert.equal(JSON.parse(readFileSync(join(out, 'shell.json'), 'utf8')).mode, want.variant);
   });

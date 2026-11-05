@@ -124,7 +124,6 @@ export function look(tokens) {
     label: { font: t.ui, size: 18, color: c.accent },
     ar: { size: 74 },
     en: { font: t.ui, size: 29, height: 1.55 },
-    rule: { color: c.line },
     ref: { font: t.ui, size: 19, color: c.muted },
     pron: { font: bengaliFamily, size: 24, height: 1.6, color: c.muted },
     bn: { font: bengaliFamily, size: 30, height: 1.6 },

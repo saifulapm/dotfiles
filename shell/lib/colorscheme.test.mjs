@@ -51,9 +51,9 @@ test('every scheme wears the one design: dots in line, square, ink frame, no sha
   assert.doesNotThrow(() => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } })));
 });
 
-test('niri frames the focused window in ink and the rest in line, 1 px, square, with no ring and no shadow', () => {
+test('niri frames every window in line, focused or not, 1 px, square, with no ring and no shadow', () => {
   const kdl = renderNiri(designOf(validateColorscheme(artboard())));
-  assert.match(kdl, /border \{\n\s+on\n\s+width 1\n\s+active-color "#15171B"\n\s+inactive-color "#D0D7DE"\n\s+\}/);
+  assert.match(kdl, /border \{\n\s+on\n\s+width 1\n\s+active-color "#D0D7DE"\n\s+inactive-color "#D0D7DE"\n\s+\}/);
   assert.match(kdl, /focus-ring \{\n\s+off\n\s+\}/);
   assert.match(kdl, /shadow \{\n\s+off\n\s+\}/);
   assert.match(kdl, /geometry-corner-radius 0\n/);

@@ -105,7 +105,9 @@ const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).joi
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
-  const border = `border {\n        on\n        width ${n.border}\n        active-color "${c.ink}"\n        inactive-color "${n.border_inactive ?? c.muted}"\n    }`;
+  // The focused window wears the same quiet frame as the rest.
+  const frame = n.border_inactive ?? c.muted;
+  const border = `border {\n        on\n        width ${n.border}\n        active-color "${frame}"\n        inactive-color "${frame}"\n    }`;
   // Tabs take the focus colour and the inactive frame's colour.
   const tabs = n.tab_position
     ? [

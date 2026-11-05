@@ -1,5 +1,4 @@
 import QtQuick
-import "." as Root
 import "lib/passage.mjs" as P
 import "lib/deen.mjs" as D
 
@@ -57,30 +56,22 @@ Item {
         // A passage taller than the paper less 96 px each side, the island's and the margins' room, draws smaller as a whole.
         scale: Math.min(1, (words.height - 192) / height)
 
-        // A selected artboard, the card ringed in the accent with its four handles.
-        Root.Surface {
-            anchors.fill: parent
-            tokens: words.tokens
-            role: "card"
-            restyle: ({ frame: { width: 2, color: words.tokens.color.accent } })
-        }
-
-        Text {
-            id: frameLabel
-            y: -height - 13
-            textFormat: Text.PlainText
-            text: words.voiced.label
-            color: words.look.label.color
-            font.family: words.look.label.font
-            font.pixelSize: words.look.label.size
-        }
-
+        // No card: the words sit on the paper itself, the kind first.
         Column {
             id: stack
             x: words.side
             y: words.look.pad[0]
             width: block.width - 2 * words.side
             spacing: words.look.gap
+
+            Text {
+                id: frameLabel
+                textFormat: Text.PlainText
+                text: words.voiced.label
+                color: words.look.label.color
+                font.family: words.look.label.font
+                font.pixelSize: words.look.label.size
+            }
 
             Text {
                 id: arText
@@ -141,12 +132,6 @@ Item {
                 // A fixed pitch, as the boards' CSS line-height, so a glyph from a fallback face such as ﷺ opens no line wider.
                 lineHeightMode: Text.FixedHeight
                 lineHeight: words.look.en.size * words.look.en.height
-            }
-
-            Rectangle {
-                width: stack.width
-                height: 1
-                color: words.look.rule.color
             }
 
             Text {

@@ -27,9 +27,8 @@ test('before the tokens load a surface draws nothing', () => {
   assert.deepEqual(surfaceStyle(null, 'card'), { fill: 'transparent', text: 'transparent', frame: { width: 0, color: 'transparent' }, wash: 0 });
 });
 
-test('margins are the ui face at 12 px as written, over ink rules', () => {
-  assert.deepEqual(marginStyle(artboard), { font: 'Maple Mono', size: 12, caps: false, tracking: 0, rules: true });
-  assert.equal(marginStyle(null).rules, false);
+test('margins are the ui face at 12 px as written, with no rules under them', () => {
+  assert.deepEqual(marginStyle(artboard), { font: 'Maple Mono', size: 12, caps: false, tracking: 0 });
 });
 
 test('a restyle swaps the fill, text and frame it names and keeps the rest (m21 lease warning)', () => {

@@ -49,7 +49,7 @@ check "the switch names no app that missed it ($(cat "$XDG_STATE_HOME/dots/theme
 switch_ms=$(jq -r .ms "$XDG_STATE_HOME/dots/theme-switch.json")
 check "theme-switch.json records artboard to catppuccin-mocha in ${switch_ms} ms" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.from == "artboard" and .to == "catppuccin-mocha" and .ms <= 300'
 kdl=$XDG_STATE_HOME/dots/theme-out/niri.kdl
-check "niri's fragment has Catppuccin Mocha's ink border" grep -q 'active-color "#CDD6F4"' "$kdl"
+check "niri's fragment frames the focused window in Catppuccin Mocha's line" grep -q 'active-color "#313244"' "$kdl"
 check "every window survives with its id ($before)" test "$(windows)" = "$before"
 
 # A start stamp that is not a time in ms is ignored, never evaluated.
@@ -60,7 +60,7 @@ DOTS_SWITCH_T0=1000000000000 "$repo/bin/dots" colorscheme catppuccin-mocha
 check "a stamp from 2001 is not taken" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "catppuccin-mocha" and .ms >= 0 and .ms <= 300'
 DOTS_SWITCH_T0=9999999999999 "$repo/bin/dots" colorscheme artboard
 check "nor one from 2286" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "artboard" and .ms >= 0 and .ms <= 300'
-check "after artboard the fragment's border is Artboard's ink" grep -q 'active-color "#15171B"' "$kdl"
+check "after artboard the focused window's frame is Artboard's line" grep -q 'active-color "#D0D7DE"' "$kdl"
 check "GTK prefers light with artboard ($(gtk_scheme))" test "$(gtk_scheme)" = "'prefer-light'"
 until_ok 1000 foot_is 255 255 255
 check "foot is back on Artboard's surface" foot_is 255 255 255

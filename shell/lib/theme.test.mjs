@@ -57,11 +57,11 @@ test('rendered tokens check out, and a bad colour in them is refused by name', (
   assert.throws(() => checkTokens({ ...t, color: { ...t.color, paper: 'notacolor' } }), /color\.paper/);
 });
 
-test('the niri fragment sets the paper as background, frames windows 1 px in ink and the line colour, square, with no ring or shadow', () => {
+test('the niri fragment sets the paper as background, frames every window 1 px in the line colour, focused or not, square, with no ring or shadow', () => {
   const kdl = renderNiri(artboard);
   assert.match(kdl, /background-color "#E4E6EA"/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, new RegExp(`border \\{\\s*on\\s*width 1\\s*active-color "#15171B"\\s*inactive-color "${artboard.color.line}"`));
+  assert.match(kdl, new RegExp(`border \\{\\s*on\\s*width 1\\s*active-color "${artboard.color.line}"\\s*inactive-color "${artboard.color.line}"`));
   assert.match(kdl, /shadow \{\s*off\s*\}/);
   assert.match(kdl, /geometry-corner-radius 0/);
 });
