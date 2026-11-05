@@ -4,7 +4,7 @@ import QtQuick.Shapes
 import "lib/youtube-queue.mjs" as Q
 import "lib/youtube.mjs" as YT
 
-// The YouTube window as each theme's board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
+// The YouTube window as its board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
 Rectangle {
     id: board
 
@@ -12,12 +12,8 @@ Rectangle {
 
     readonly property var c: yt.c
     readonly property var look: yt.look
-    readonly property string voice: yt.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
-    readonly property string bodyFont: (bracket ? yt.fonts.mono : yt.fonts.ui) ?? ""
-    readonly property color ruleColor: (caps ? c.ink : c.line) ?? "gray"
+    readonly property string bodyFont: yt.fonts.ui ?? ""
+    readonly property color ruleColor: c.line ?? "gray"
     readonly property bool fieldFocused: field.activeFocus
     readonly property bool nameFocused: nameInput.activeFocus
     readonly property string queryText: field.text
@@ -26,17 +22,16 @@ Rectangle {
     // A failed search's list is its error block.
     readonly property bool failing: yt.view === "search" && yt.failed !== null
 
-    // The boards' download arrow into a tray, on Artboard's grey tile; on a lit row Paper's and Blueprint's take the row's light colour.
+    // The download arrow into a tray, on a grey tile.
     component DownloadMark: Rectangle {
         id: mark
-        property bool lit: false
         // A ShapePath is no Item and has no parent of its own, so it reads the stroke from here by id.
-        readonly property color ink: lit && !board.plain ? board.c.surface ?? "white" : board.look.mark.stroke || (board.c.ink ?? "black")
+        readonly property color ink: board.look.mark.stroke || (board.c.ink ?? "black")
         anchors.centerIn: parent
-        width: board.look.mark.tile ? board.look.mark.tile.width : board.look.mark.size
-        height: board.look.mark.tile ? board.look.mark.tile.height : board.look.mark.size
-        radius: board.look.mark.tile ? board.look.mark.tile.radius : 0
-        color: board.look.mark.tile ? board.look.mark.tile.color : "transparent"
+        width: board.look.mark.tile.width
+        height: board.look.mark.tile.height
+        radius: board.look.mark.tile.radius
+        color: board.look.mark.tile.color
 
         Shape {
             anchors.centerIn: parent
@@ -126,8 +121,6 @@ Rectangle {
 
     function state() {
         const sidebar = [];
-        if (libraryLabel.visible)
-            sidebar.push(libraryLabel.text);
         for (let i = 0; i < placeList.count; i++)
             sidebar.push(placeList.itemAt(i).drawn());
         sidebar.push(playlistsLabel.text);
@@ -181,7 +174,6 @@ Rectangle {
                 bottom: rowList.indexAt(1, rowList.contentY + rowList.height - 2)
             },
             failed: failPane.visible ? {
-                kicker: kickerText.text,
                 head: failHead.text,
                 fix: fixText.text,
                 retry: retryKey.text + " " + retryWord.text,
@@ -199,7 +191,6 @@ Rectangle {
                 frameRadius: board.radius,
                 fieldRadius: fieldBox.radius,
                 searchIcon: String(searchIcon.color),
-                ruleDashed: headRule.dashed,
                 placeholder: placeholderText.text,
                 hint: hintText.text,
                 chips: Array.from({
@@ -218,8 +209,8 @@ Rectangle {
         };
     }
 
-    // Artboard's window is rounded as niri rounds its geometry; Paper and Blueprint are square.
-    radius: plain ? 14 : 0
+    // The window is rounded as niri rounds its geometry.
+    radius: 14
     color: c.surface ?? "white"
     clip: true
 
@@ -315,33 +306,33 @@ Rectangle {
         anchors.fill: parent
         spacing: 0
 
-        // The title strip: the App's label, the view's name, and how it opened; Artboard pills the label in its accent and the note in grey.
+        // The title strip: the App's label, the view's name, and how it opened; the label is pilled in the accent and the note in grey.
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: plain ? 52 : -1
-            Layout.leftMargin: plain ? 18 : 14
-            Layout.rightMargin: plain ? 18 : 14
-            Layout.topMargin: plain ? 0 : 12
-            Layout.bottomMargin: plain ? 0 : 12
-            spacing: plain ? 12 : 10
+            Layout.preferredHeight: 52
+            Layout.leftMargin: 18
+            Layout.rightMargin: 18
+            Layout.topMargin: 0
+            Layout.bottomMargin: 0
+            spacing: 12
 
             Rectangle {
                 id: labelPill
-                implicitWidth: labelText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: labelText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: labelText.implicitWidth + 18
+                implicitHeight: labelText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.tint.tint : "transparent"
+                color: look.tint.tint
 
                 Text {
                     id: labelText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: look.title.label
-                    color: (plain ? c.accent : c.muted) ?? "gray"
+                    color: c.accent ?? "gray"
                     font.family: board.bodyFont
-                    font.pixelSize: plain ? 12 : 10
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: plain ? 0 : 1.4
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                    font.letterSpacing: 0
                 }
             }
             Text {
@@ -353,17 +344,17 @@ Rectangle {
                 color: c.ink ?? "black"
                 font.family: look.viewFont ?? ""
                 font.pixelSize: look.viewSize
-                font.weight: caps ? Font.Normal : Font.Bold
+                font.weight: Font.Bold
             }
             Item {
                 Layout.fillWidth: true
             }
             Rectangle {
                 id: fromPill
-                implicitWidth: fromText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: fromText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: fromText.implicitWidth + 18
+                implicitHeight: fromText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.tint.tile : "transparent"
+                color: look.tint.tile
 
                 Text {
                     id: fromText
@@ -372,17 +363,15 @@ Rectangle {
                     text: look.title.from
                     color: c.muted ?? "gray"
                     font.family: board.bodyFont
-                    font.pixelSize: bracket ? 10 : 11
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: bracket ? 1.4 : 0
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
+                    font.letterSpacing: 0
                 }
             }
         }
 
         Rule {
-            id: headRule
             Layout.fillWidth: true
-            dashed: look.ruleDashed
             color: board.ruleColor
         }
 
@@ -398,29 +387,11 @@ Rectangle {
                 Layout.fillHeight: true
                 color: "transparent"
 
-                FocusMark {
-                    shown: board.yt.focusAt === "sidebar"
-                }
-
                 ColumnLayout {
                     anchors.fill: parent
                     anchors.margins: 8
-                    anchors.topMargin: plain ? 4 : 8
+                    anchors.topMargin: 4
                     spacing: 0
-
-                    Text {
-                        id: libraryLabel
-                        visible: text !== ""
-                        Layout.leftMargin: 12
-                        Layout.topMargin: 6
-                        Layout.bottomMargin: 6
-                        textFormat: Text.PlainText
-                        text: look.library
-                        color: c.muted ?? "gray"
-                        font.family: board.bodyFont
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
-                    }
 
                     Repeater {
                         id: placeList
@@ -434,15 +405,15 @@ Rectangle {
 
                     Text {
                         id: playlistsLabel
-                        Layout.leftMargin: plain ? 10 : 12
-                        Layout.topMargin: plain ? 12 : 12
-                        Layout.bottomMargin: plain ? 2 : 6
+                        Layout.leftMargin: 10
+                        Layout.topMargin: 12
+                        Layout.bottomMargin: 2
                         textFormat: Text.PlainText
                         text: look.playlists
                         color: c.muted ?? "gray"
                         font.family: board.bodyFont
-                        font.pixelSize: plain ? 11 : 10
-                        font.letterSpacing: plain ? 0.66 : 1.4
+                        font.pixelSize: 11
+                        font.letterSpacing: 0.66
                     }
 
                     // The Playlists scroll beneath PLAYLISTS once they outgrow the sidebar, keeping the chosen one, its question and the name field in view.
@@ -461,16 +432,15 @@ Rectangle {
                             width: listScroll.width
                             spacing: 0
 
-                            // n makes one, while there is none: Paper's italic serif, Artboard's key chip, Blueprint's plain line.
+                            // n makes one, while there is none: its key on a chip.
                             Row {
                                 id: noneLine
                                 visible: board.yt.lists.length === 0
                                 Layout.leftMargin: 10
                                 Layout.topMargin: 8
-                                spacing: plain ? 8 : 0
+                                spacing: 8
 
                                 Rectangle {
-                                    visible: plain
                                     implicitWidth: noneKey.implicitWidth + 14
                                     implicitHeight: noneKey.implicitHeight + 6
                                     radius: 6
@@ -480,7 +450,7 @@ Rectangle {
                                         id: noneKey
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
-                                        text: plain ? look.noPlaylists.split(" ")[0] : ""
+                                        text: look.noPlaylists.split(" ")[0]
                                         color: c.ink ?? "black"
                                         font.family: board.bodyFont
                                         font.pixelSize: 12
@@ -491,11 +461,10 @@ Rectangle {
                                     id: noneRest
                                     anchors.verticalCenter: parent.verticalCenter
                                     textFormat: Text.PlainText
-                                    text: plain ? look.noPlaylists.split(" ").slice(1).join(" ") : look.noPlaylists
+                                    text: look.noPlaylists.split(" ").slice(1).join(" ")
                                     color: c.muted ?? "gray"
-                                    font.family: caps ? look.viewFont ?? "" : board.bodyFont
-                                    font.pixelSize: caps ? 17 : 12
-                                    font.italic: caps
+                                    font.family: board.bodyFont
+                                    font.pixelSize: 12
                                 }
                             }
 
@@ -516,11 +485,11 @@ Rectangle {
                                 visible: board.yt.naming !== ""
                                 Layout.fillWidth: true
                                 Layout.topMargin: 4
-                                implicitHeight: plain ? 36 : 32
-                                radius: plain ? 10 : 0
-                                color: plain ? look.tint.field : "transparent"
-                                border.width: plain ? 1.5 : 1
-                                border.color: (caps ? c.ink : c.accent) ?? "black"
+                                implicitHeight: 36
+                                radius: 10
+                                color: look.tint.field
+                                border.width: 1.5
+                                border.color: c.accent ?? "black"
 
                                 TextInput {
                                     id: nameInput
@@ -572,12 +541,11 @@ Rectangle {
                                 }, (_, i) => confirmKeys.itemAt(i).text)) : null;
                             }
 
-                            // The question's frame and Blueprint's warning mark, as drawn.
+                            // The question's frame, as drawn.
                             function askedLook() {
                                 return confirmBox.visible ? {
                                     border: String(confirmBox.border.color),
-                                    cut: confirmText.truncated,
-                                    mark: confirmMark.visible ? confirmMark.text : ""
+                                    cut: confirmText.truncated
                                 } : null;
                             }
 
@@ -586,26 +554,9 @@ Rectangle {
 
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: plain ? 38 : 34
-                            radius: plain ? 10 : 0
-                            color: !chosen || bracket ? "transparent" : plain ? look.tint.tint : look.tint.chosen
-                            border.width: chosen && bracket ? 1 : 0
-                            border.color: c.accent ?? "cyan"
-
-                            // Blueprint fills the chosen view with its accent at a tenth.
-                            Rectangle {
-                                visible: place.chosen && bracket
-                                anchors.fill: parent
-                                color: c.accent ?? "cyan"
-                                opacity: 0.1
-                            }
-                            // Paper marks the chosen view with a 2 px ink bar at its left.
-                            Rectangle {
-                                visible: place.chosen && caps
-                                width: 2
-                                height: parent.height
-                                color: c.ink ?? "black"
-                            }
+                            implicitHeight: 38
+                            radius: 10
+                            color: !chosen ? "transparent" : look.tint.tint
 
                             RowLayout {
                                 anchors.fill: parent
@@ -614,10 +565,10 @@ Rectangle {
                                 spacing: 10
 
                                 Rectangle {
-                                    implicitWidth: plain ? 28 : 16
-                                    implicitHeight: plain ? 28 : 16
+                                    implicitWidth: 28
+                                    implicitHeight: 28
                                     radius: 9
-                                    color: !plain ? "transparent" : place.chosen ? c.surface ?? "white" : look.tint.tile
+                                    color: place.chosen ? c.surface ?? "white" : look.tint.tile
 
                                     FilesIcon {
                                         anchors.centerIn: parent
@@ -626,7 +577,7 @@ Rectangle {
                                                 saved: "M4.5 2.5h7v11L8 10.8l-3.5 2.7z",
                                                 history: "M8 2.5a5.5 5.5 0 1 0 0 11a5.5 5.5 0 1 0 0-11 M8 5v3.2l2 1.3"
                                             })[place.modelData.key] ?? "M3 4.5h10 M3 8h10 M3 11.5h6"
-                                        color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
+                                        color: (place.chosen ? look.tint.deep : c.ink) ?? "gray"
                                     }
                                 }
                                 Text {
@@ -636,20 +587,18 @@ Rectangle {
                                     text: place.modelData.name
                                     elide: Text.ElideRight
                                     maximumLineCount: 1
-                                    color: (place.chosen ? (plain ? look.tint.deep : bracket ? c.accent : c.ink) : plain ? c.ink : c.muted) ?? "gray"
+                                    color: (place.chosen ? look.tint.deep : c.ink) ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 13
-                                    font.weight: !place.chosen ? Font.Normal : bracket ? Font.Bold : Font.Medium
+                                    font.weight: !place.chosen ? Font.Normal : Font.Medium
                                 }
                                 // The Playlist a snapshot just made, until it is opened.
                                 Rectangle {
                                     visible: place.modelData.key === "pl:" + board.yt.freshId
                                     implicitWidth: freshMark.implicitWidth + 8
                                     implicitHeight: freshMark.implicitHeight + 2
-                                    radius: plain ? 4 : 0
-                                    color: plain ? look.tint.tint : "transparent"
-                                    border.width: plain ? 0 : 1
-                                    border.color: c.accent ?? "red"
+                                    radius: 4
+                                    color: look.tint.tint
 
                                     Text {
                                         id: freshMark
@@ -658,24 +607,24 @@ Rectangle {
                                         text: look.fresh
                                         color: c.accent ?? "red"
                                         font.family: board.bodyFont
-                                        font.pixelSize: plain ? 10 : 9
-                                        font.weight: bracket ? Font.Bold : Font.Medium
-                                        font.letterSpacing: plain ? 0 : 1.26
+                                        font.pixelSize: 10
+                                        font.weight: Font.Medium
+                                        font.letterSpacing: 0
                                     }
                                 }
                                 Text {
                                     id: placeCount
                                     textFormat: Text.PlainText
                                     text: place.countText
-                                    color: (place.chosen && plain ? look.tint.deep : place.chosen && bracket ? c.accent : c.muted) ?? "gray"
+                                    color: (place.chosen ? look.tint.deep : c.muted) ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 11
-                                    font.letterSpacing: bracket ? 0.66 : 0
+                                    font.letterSpacing: 0
                                 }
                             }
                         }
 
-                        // x asks under the row: Paper's box ruled in its accent, Artboard's orange card, Blueprint's amber box with its mark.
+                        // x asks under the row, on an orange card.
                         Rectangle {
                             id: confirmBox
                             visible: place.chosen && board.yt.confirming
@@ -683,10 +632,10 @@ Rectangle {
                             Layout.topMargin: 4
                             Layout.bottomMargin: 6
                             implicitHeight: confirmColumn.implicitHeight + 18
-                            radius: plain ? 10 : 0
-                            color: (plain ? look.tint.errFill : caps ? c.surface : "transparent") ?? "transparent"
-                            border.width: plain ? 0 : 1
-                            border.color: (bracket ? look.tint.warn : c.accent) ?? "red"
+                            radius: 10
+                            color: look.tint.errFill ?? "transparent"
+                            border.width: 0
+                            border.color: c.accent ?? "red"
 
                             Column {
                                 id: confirmColumn
@@ -699,32 +648,21 @@ Rectangle {
                                 Row {
                                     spacing: 6
 
-                                    // Blueprint warns with an amber ! before the question.
-                                    Text {
-                                        id: confirmMark
-                                        visible: bracket
-                                        textFormat: Text.PlainText
-                                        text: "!"
-                                        color: look.tint.warn ?? "orange"
-                                        font.family: board.bodyFont
-                                        font.pixelSize: 12
-                                        font.weight: Font.Bold
-                                    }
                                     Text {
                                         id: confirmText
-                                        width: confirmColumn.width - (confirmMark.visible ? confirmMark.implicitWidth + 6 : 0)
+                                        width: confirmColumn.width
                                         textFormat: Text.PlainText
                                         text: board.yt.playlist ? look.confirm.question(board.yt.playlist.name, board.yt.playlist.count) : ""
                                         // The name is cut already, so the question wraps, anywhere a long word needs, and is never elided before its count.
                                         wrapMode: Text.WrapAtWordBoundaryOrAnywhere
-                                        color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                        color: look.tint.errInk ?? "black"
                                         font.family: board.bodyFont
-                                        font.pixelSize: bracket ? 12 : 11
-                                        font.weight: plain ? Font.Bold : Font.Normal
+                                        font.pixelSize: 11
+                                        font.weight: Font.Bold
                                     }
                                 }
                                 Row {
-                                    spacing: plain ? 6 : 14
+                                    spacing: 6
 
                                     Repeater {
                                         id: confirmKeys
@@ -732,12 +670,11 @@ Rectangle {
 
                                         Rectangle {
                                             required property var modelData
-                                            required property int index
                                             readonly property string text: modelData.key + " " + modelData.word
-                                            implicitWidth: confirmRow.implicitWidth + (plain ? 14 : 0)
-                                            implicitHeight: confirmRow.implicitHeight + (plain ? 6 : 0)
+                                            implicitWidth: confirmRow.implicitWidth + 14
+                                            implicitHeight: confirmRow.implicitHeight + 6
                                             radius: 6
-                                            color: plain ? c.surface ?? "white" : "transparent"
+                                            color: c.surface ?? "white"
 
                                             Row {
                                                 id: confirmRow
@@ -747,19 +684,19 @@ Rectangle {
                                                 Text {
                                                     textFormat: Text.PlainText
                                                     text: modelData.key
-                                                    color: (plain ? look.tint.errInk : bracket || index === 0 ? c.accent : c.ink) ?? "black"
+                                                    color: look.tint.errInk ?? "black"
                                                     font.family: board.bodyFont
                                                     font.pixelSize: 11
                                                     font.weight: Font.Bold
-                                                    font.letterSpacing: bracket ? 1.54 : 0
+                                                    font.letterSpacing: 0
                                                 }
                                                 Text {
                                                     textFormat: Text.PlainText
                                                     text: modelData.word
-                                                    color: (plain ? look.tint.errInk : c.ink) ?? "black"
+                                                    color: look.tint.errInk ?? "black"
                                                     font.family: board.bodyFont
                                                     font.pixelSize: 11
-                                                    font.letterSpacing: bracket ? 1.54 : 0
+                                                    font.letterSpacing: 0
                                                 }
                                             }
                                         }
@@ -775,7 +712,6 @@ Rectangle {
 
             VRule {
                 Layout.fillHeight: true
-                dashed: look.ruleDashed
                 color: board.ruleColor
             }
 
@@ -785,42 +721,34 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
 
-                FocusMark {
-                    shown: board.yt.focusAt !== "sidebar"
-                }
-
                 ColumnLayout {
                     id: listColumn
                     anchors.fill: parent
                     // The list beside a delete question dims until it is answered.
-                    opacity: board.yt.confirming || board.yt.picking ? (plain ? 0.45 : 0.4) : 1
-                    anchors.leftMargin: bracket ? 8 : 18
-                    anchors.rightMargin: bracket ? 8 : 18
-                    anchors.topMargin: bracket ? 8 : 0
+                    opacity: board.yt.confirming || board.yt.picking ? 0.45 : 1
+                    anchors.leftMargin: 18
+                    anchors.rightMargin: 18
+                    anchors.topMargin: 0
                     spacing: 0
 
-                    // The field: Paper's ruled box, Artboard's filled pill, Blueprint's box in its line colour.
+                    // The field: a filled pill.
                     Rectangle {
                         id: fieldBox
                         visible: board.yt.view === "search"
                         Layout.fillWidth: true
-                        Layout.topMargin: plain ? 12 : bracket ? 6 : 14
-                        Layout.leftMargin: bracket ? 4 : 0
-                        Layout.rightMargin: bracket ? 4 : 0
-                        implicitHeight: plain ? 44 : 40
+                        Layout.topMargin: 12
+                        implicitHeight: 44
                         radius: look.fieldRadius
-                        color: plain ? look.tint.field : "transparent"
-                        border.width: plain ? 0 : 1
-                        border.color: (bracket ? c.line : c.muted) ?? "gray"
+                        color: look.tint.field
 
                         FilesIcon {
                             id: searchIcon
                             anchors.left: parent.left
-                            anchors.leftMargin: plain ? 16 : 14
+                            anchors.leftMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
                             path: "M11.5 7A4.5 4.5 0 1 1 2.5 7A4.5 4.5 0 1 1 11.5 7M10.5 10.5L14 14"
                             stroke: 1.4
-                            color: (plain ? c.muted : bracket ? c.accent : c.ink) ?? "black"
+                            color: c.muted ?? "black"
                         }
                         TextInput {
                             id: field
@@ -834,7 +762,7 @@ Rectangle {
                             selectionColor: c.accent ?? "red"
                             selectedTextColor: c.surface ?? "white"
                             font.family: board.bodyFont
-                            font.pixelSize: caps ? 15 : 14
+                            font.pixelSize: 14
                             // Esc leaves the field for the list; Enter searches.
                             Keys.onEscapePressed: board.yt.focusPane("list")
                             onAccepted: board.yt.search()
@@ -852,12 +780,12 @@ Rectangle {
                         Rectangle {
                             id: hint
                             anchors.right: parent.right
-                            anchors.rightMargin: plain ? 16 : 14
+                            anchors.rightMargin: 16
                             anchors.verticalCenter: parent.verticalCenter
-                            implicitWidth: hintText.implicitWidth + (plain ? 14 : 0)
-                            implicitHeight: hintText.implicitHeight + (plain ? 4 : 0)
+                            implicitWidth: hintText.implicitWidth + 14
+                            implicitHeight: hintText.implicitHeight + 4
                             radius: 6
-                            color: plain ? c.surface ?? "white" : "transparent"
+                            color: c.surface ?? "white"
 
                             Text {
                                 id: hintText
@@ -866,9 +794,9 @@ Rectangle {
                                 text: look.hint
                                 color: c.muted ?? "gray"
                                 font.family: board.bodyFont
-                                font.pixelSize: bracket ? 10 : 11
-                                font.weight: plain ? Font.Medium : Font.Normal
-                                font.letterSpacing: bracket ? 1.4 : 0
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
+                                font.letterSpacing: 0
                             }
                         }
                     }
@@ -876,30 +804,19 @@ Rectangle {
                     // The type filter: the chip of the type Enter searches for is on, and h and l move it.
                     RowLayout {
                         visible: board.yt.view === "search"
-                        Layout.topMargin: bracket ? 6 : 10
-                        Layout.leftMargin: bracket ? 4 : 0
+                        Layout.topMargin: 10
                         spacing: 8
 
-                        Text {
-                            visible: text !== ""
-                            Layout.rightMargin: 6
-                            textFormat: Text.PlainText
-                            text: look.typeLabel
-                            color: c.muted ?? "gray"
-                            font.family: board.bodyFont
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.4
-                        }
                         Rectangle {
-                            implicitWidth: chipRow.implicitWidth + (plain ? 6 : 0)
-                            implicitHeight: chipRow.implicitHeight + (plain ? 6 : 0)
+                            implicitWidth: chipRow.implicitWidth + 6
+                            implicitHeight: chipRow.implicitHeight + 6
                             radius: 11
-                            color: plain ? look.tint.tile : "transparent"
+                            color: look.tint.tile
 
                             Row {
                                 id: chipRow
                                 anchors.centerIn: parent
-                                spacing: plain ? 2 : 8
+                                spacing: 2
 
                                 Repeater {
                                     id: chipList
@@ -911,23 +828,21 @@ Rectangle {
                                         required property int index
                                         readonly property bool chosen: index === board.yt.types.indexOf(board.yt.type)
                                         readonly property string text: chipText.text
-                                        implicitWidth: chipText.implicitWidth + (bracket ? 20 : 24)
+                                        implicitWidth: chipText.implicitWidth + 24
                                         implicitHeight: chipText.implicitHeight + 8
-                                        radius: plain ? 8 : 0
-                                        color: !chosen ? "transparent" : plain ? c.surface ?? "white" : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
-                                        border.width: plain ? 0 : 1
-                                        border.color: (chosen ? (bracket ? c.accent : c.ink) : bracket ? c.line : c.muted) ?? "gray"
+                                        radius: 8
+                                        color: !chosen ? "transparent" : c.surface ?? "white"
 
                                         Text {
                                             id: chipText
                                             anchors.centerIn: parent
                                             textFormat: Text.PlainText
                                             text: chip.modelData
-                                            color: (chip.chosen ? (plain ? look.tint.deep : c.surface) : c.muted) ?? "gray"
+                                            color: (chip.chosen ? look.tint.deep : c.muted) ?? "gray"
                                             font.family: board.bodyFont
-                                            font.pixelSize: plain ? 12 : 11
-                                            font.weight: chip.chosen && plain ? Font.Medium : chip.chosen && bracket ? Font.Bold : Font.Normal
-                                            font.letterSpacing: bracket ? 1.54 : 0
+                                            font.pixelSize: 12
+                                            font.weight: chip.chosen ? Font.Medium : Font.Normal
+                                            font.letterSpacing: 0
                                         }
                                     }
                                 }
@@ -935,53 +850,39 @@ Rectangle {
                         }
                     }
 
-                    // The list's head: RESULTS and their count on Search, the view's name elsewhere; Paper's empty views draw none, and only Blueprint heads a failed search, with no count.
+                    // The list's head: Results and their count on Search, the view's name elsewhere; a failed search draws none.
                     RowLayout {
-                        visible: (board.yt.view === "search" || board.yt.playlist !== null || !caps) && (!board.failing || bracket)
+                        visible: !board.failing
                         Layout.fillWidth: true
-                        Layout.topMargin: plain ? 8 : 10
+                        Layout.topMargin: 8
                         Layout.preferredHeight: 26
-                        Layout.leftMargin: caps ? 0 : 12
-                        Layout.rightMargin: caps ? 0 : 12
+                        Layout.leftMargin: 12
+                        Layout.rightMargin: 12
                         spacing: 6
 
-                        Text {
-                            visible: bracket
-                            textFormat: Text.PlainText
-                            text: "◆"
-                            color: c.accent ?? "cyan"
-                            font.family: board.bodyFont
-                            font.pixelSize: 11
-                        }
                         Text {
                             id: resultsHead
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            // An opened playlist or channel, or a Playlist, heads its rows with its own name; a Playlist's is Paper's serif, Artboard's bold, Blueprint's as typed.
-                            text: board.yt.view === "search" ? (board.yt.opened ? board.yt.opened.title : look.results) : board.yt.playlist ? board.yt.playlist.name : bracket ? look.title.view(board.yt.view).toUpperCase() : look.title.view(board.yt.view)
+                            // An opened playlist or channel, or a Playlist, heads its rows with its own name.
+                            text: board.yt.view === "search" ? (board.yt.opened ? board.yt.opened.title : look.results) : board.yt.playlist ? board.yt.playlist.name : look.title.view(board.yt.view)
                             elide: Text.ElideRight
                             maximumLineCount: 1
-                            color: (board.yt.playlist && !bracket || plain && board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
-                            font.family: board.yt.playlist && caps ? look.viewFont ?? "" : board.bodyFont
-                            font.pixelSize: board.yt.playlist && caps ? 18 : plain && board.yt.view !== "search" ? 16 : caps ? 10 : 11
-                            font.weight: plain && board.yt.view !== "search" ? Font.Bold : Font.Normal
-                            font.letterSpacing: plain || board.yt.playlist && caps ? 0 : bracket ? 1.54 : 1.4
+                            color: (board.yt.playlist || board.yt.view !== "search" ? c.ink : c.muted) ?? "gray"
+                            font.family: board.bodyFont
+                            font.pixelSize: board.yt.view !== "search" ? 16 : 11
+                            font.weight: board.yt.view !== "search" ? Font.Bold : Font.Normal
+                            font.letterSpacing: 0
                         }
                         Text {
                             id: resultsCount
                             textFormat: Text.PlainText
-                            text: board.failing ? "—" : board.yt.snapshot && board.yt.view === "search" ? YT.readingText(board.yt.snapshot) : board.yt.playlist ? YT.count(board.yt.playlist.count) + " · " + YT.span(board.yt.playlist.secs) : plain && board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
+                            text: board.failing ? "—" : board.yt.snapshot && board.yt.view === "search" ? YT.readingText(board.yt.snapshot) : board.yt.playlist ? YT.count(board.yt.playlist.count) + " · " + YT.span(board.yt.playlist.secs) : board.yt.view !== "search" ? board.yt.rows.length + " videos" : board.yt.listCount
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
-                            font.pixelSize: caps ? 10 : 11
-                            font.letterSpacing: plain ? 0 : bracket ? 1.54 : 1.4
+                            font.pixelSize: 11
+                            font.letterSpacing: 0
                         }
-                    }
-                    Rule {
-                        visible: !plain && (board.yt.view === "search" || board.yt.playlist !== null || !caps) && (!board.failing || bracket)
-                        Layout.fillWidth: true
-                        dashed: look.ruleDashed
-                        color: (caps ? look.tint.rule : c.line) ?? "gray"
                     }
 
                     // The rows the list draws; a later search fills them.
@@ -1004,8 +905,6 @@ Rectangle {
                             required property var modelData
                             required property int index
                             readonly property bool lit: index === board.yt.cursor && board.yt.focusAt === "list"
-                            // The channel and duration on the lit row: Paper's light ink, Blueprint's dark surface, Artboard's grey as on any row.
-                            readonly property color litMuted: (caps ? look.tint.onInk : plain ? c.muted : c.surface) ?? "gray"
                             // A file on disk for this video, and its last download's failure, from the App's download index.
                             readonly property bool saved: rowItem.modelData.kind === "video" && board.yt.hasFile(rowItem.modelData.id)
                             readonly property var failure: rowItem.modelData.kind === "video" ? board.yt.downloadFailed(rowItem.modelData.id) : null
@@ -1022,29 +921,21 @@ Rectangle {
                                     channelElided: channelText.truncated,
                                     channelColor: String(channelText.color),
                                     mark: rowItem.saved,
-                                    markInk: String((look.mark.at === "end" ? endMark : beforeMark).ink),
+                                    markInk: String(beforeMark.ink),
                                     duration: durationText.text,
                                     thumb: picture.drawn()
                                 };
                             }
                             width: ListView.view.width
-                            height: plain ? 54 : bracket ? 55 : 52
+                            height: 54
                             opacity: modelData.unavailable && !lit ? 0.6 : 1
                             radius: look.rowRadius
-                            color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
-                            // Artboard outlines the lit row in its accent.
-                            border.width: lit && plain ? 1.5 : 0
+                            color: !lit ? "transparent" : look.tint.tint
+                            // The lit row is outlined in the accent.
+                            border.width: lit ? 1.5 : 0
                             border.color: c.accent ?? "blue"
 
-                            // Paper marks the lit row with a 3 px accent bar at its left.
-                            Rectangle {
-                                visible: rowItem.lit && caps
-                                width: 3
-                                height: parent.height
-                                color: c.accent ?? "red"
-                            }
-
-                            // The boards' columns: the thumbnail, the title over the channel, the download mark's slot, the duration, and Paper's 16 px end.
+                            // The columns: the thumbnail, the title over the channel, the download mark's slot and the duration.
                             RowLayout {
                                 anchors.fill: parent
                                 anchors.leftMargin: 12
@@ -1055,28 +946,25 @@ Rectangle {
                                 Text {
                                     id: numberText
                                     visible: board.yt.playlist !== null
-                                    Layout.preferredWidth: plain ? 22 : 24
-                                    horizontalAlignment: plain ? Text.AlignHCenter : Text.AlignRight
+                                    Layout.preferredWidth: 22
+                                    horizontalAlignment: Text.AlignHCenter
                                     textFormat: Text.PlainText
                                     text: visible ? String(rowItem.index + 1) : ""
-                                    color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
+                                    color: c.muted ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 12
                                 }
                                 YouTubeThumb {
                                     id: picture
-                                    implicitWidth: caps ? 72 : 80
-                                    implicitHeight: caps ? 40 : 45
+                                    implicitWidth: 80
+                                    implicitHeight: 45
                                     source: board.yt.thumbSource(rowItem.modelData.thumb)
-                                    kind: caps ? "hatched" : plain ? "tile" : "crossed"
-                                    radius: plain ? 8 : 0
-                                    fill: (caps ? c.surface : plain ? look.tint.thumb : "transparent") ?? "transparent"
-                                    stroke: (caps ? look.tint.rule : bracket && rowItem.lit ? c.surface : c.line) ?? "gray"
-                                    edge: (caps ? c.muted : bracket && rowItem.lit ? c.surface : c.line) ?? "gray"
+                                    radius: 8
+                                    fill: look.tint.thumb ?? "transparent"
                                 }
                                 ColumnLayout {
                                     Layout.fillWidth: true
-                                    spacing: caps ? 3 : 4
+                                    spacing: 4
 
                                     Text {
                                         id: titleText
@@ -1086,10 +974,10 @@ Rectangle {
                                         text: rowItem.modelData.unavailable ? look.unavailable(rowItem.modelData.unavailable) : rowItem.modelData.title
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: (rowItem.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
+                                        color: (rowItem.lit ? look.tint.deep : c.ink) ?? "black"
                                         font.family: board.bodyFont
-                                        font.pixelSize: plain ? 14 : 13
-                                        font.weight: plain && !rowItem.lit ? Font.Normal : bracket && rowItem.lit ? Font.Bold : Font.Medium
+                                        font.pixelSize: 14
+                                        font.weight: !rowItem.lit ? Font.Normal : Font.Medium
                                     }
                                     Text {
                                         id: channelText
@@ -1098,54 +986,41 @@ Rectangle {
                                         text: rowItem.failure ? look.retry(rowItem.failure.reason) : rowItem.modelData.channel
                                         elide: Text.ElideRight
                                         maximumLineCount: 1
-                                        color: rowItem.lit ? rowItem.litMuted : rowItem.failure ? look.retryColor : c.muted ?? "gray"
+                                        color: rowItem.lit ? c.muted ?? "gray" : rowItem.failure ? look.retryColor : c.muted ?? "gray"
                                         font.family: board.bodyFont
                                         font.pixelSize: 11
-                                        font.letterSpacing: bracket ? 0.66 : 0
+                                        font.letterSpacing: 0
                                     }
                                 }
                                 Item {
-                                    visible: !caps
-                                    implicitWidth: plain ? 22 : 16
+                                    implicitWidth: 22
                                     implicitHeight: 20
 
                                     DownloadMark {
                                         id: beforeMark
-                                        visible: rowItem.saved && look.mark.at === "before"
-                                        lit: rowItem.lit
+                                        visible: rowItem.saved
                                     }
                                 }
                                 Text {
                                     id: durationText
                                     // A playlist's count may run wider than a duration, 1,234 videos.
-                                    Layout.preferredWidth: Math.max(bracket ? 76 : 64, implicitWidth)
+                                    Layout.preferredWidth: Math.max(64, implicitWidth)
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
                                     text: rowItem.modelData.unavailable ? "—" : rowItem.modelData.duration
-                                    color: rowItem.lit ? rowItem.litMuted : c.muted ?? "gray"
+                                    color: c.muted ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 12
-                                    font.letterSpacing: bracket ? 0.72 : 0
+                                    font.letterSpacing: 0
                                     font.features: {
                                         "tnum": 1
-                                    }
-                                }
-                                Item {
-                                    visible: caps
-                                    implicitWidth: 16
-                                    implicitHeight: 16
-
-                                    DownloadMark {
-                                        id: endMark
-                                        visible: rowItem.saved && look.mark.at === "end"
-                                        lit: rowItem.lit
                                     }
                                 }
                             }
                         }
                     }
 
-                    // A failed search, as the error boards draw it: Paper's ruled box under its kicker, Artboard's orange card, Blueprint's amber box; each holds the headline, the CLI's fix line, try again, and yt-dlp's raw line in small mono.
+                    // A failed search draws an orange card: the headline, the CLI's fix line, try again, and yt-dlp's raw line in small mono.
                     Item {
                         id: failPane
                         visible: board.failing
@@ -1156,15 +1031,13 @@ Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
-                            anchors.topMargin: caps ? 22 : plain ? 14 : 4
-                            anchors.leftMargin: bracket ? 4 : 0
-                            anchors.rightMargin: bracket ? 4 : 0
-                            implicitHeight: failColumn.implicitHeight + (caps ? 46 : 44)
-                            radius: plain ? 14 : 0
-                            color: plain ? look.tint.errFill : "transparent"
-                            // Artboard outlines the block in its accent while the list has focus, as it outlines a lit row.
-                            border.width: plain ? (board.yt.focusAt === "list" ? 1.5 : 0) : 1
-                            border.color: (plain ? c.accent : caps ? c.ink : look.tint.warn) ?? "gray"
+                            anchors.topMargin: 14
+                            implicitHeight: failColumn.implicitHeight + 44
+                            radius: 14
+                            color: look.tint.errFill
+                            // The block is outlined in the accent while the list has focus, as a lit row is.
+                            border.width: board.yt.focusAt === "list" ? 1.5 : 0
+                            border.color: c.accent ?? "gray"
 
                             ColumnLayout {
                                 id: failColumn
@@ -1173,16 +1046,16 @@ Rectangle {
                                 anchors.top: parent.top
                                 anchors.margins: 24
                                 anchors.topMargin: 22
-                                spacing: bracket ? 14 : 12
+                                spacing: 12
 
                                 Row {
                                     spacing: 12
 
                                     Rectangle {
-                                        implicitWidth: plain ? 22 : 18
-                                        implicitHeight: plain ? 22 : 18
-                                        radius: plain ? 11 : 0
-                                        color: (plain ? look.tint.errInk : caps ? c.ink : look.tint.warn) ?? "red"
+                                        implicitWidth: 22
+                                        implicitHeight: 22
+                                        radius: 11
+                                        color: look.tint.errInk ?? "red"
 
                                         Text {
                                             anchors.centerIn: parent
@@ -1190,41 +1063,20 @@ Rectangle {
                                             text: "!"
                                             color: c.surface ?? "white"
                                             font.family: board.bodyFont
-                                            font.pixelSize: plain ? 13 : caps ? 11 : 10
+                                            font.pixelSize: 13
                                             font.weight: Font.Bold
                                         }
                                     }
                                     Text {
-                                        id: kickerText
-                                        visible: caps
+                                        id: failHead
                                         anchors.verticalCenter: parent.verticalCenter
                                         textFormat: Text.PlainText
-                                        text: board.yt.failed ? look.failed.kicker(board.yt.failed) : ""
-                                        color: c.muted ?? "gray"
+                                        text: look.failed.head
+                                        color: look.tint.errInk ?? "black"
                                         font.family: board.bodyFont
-                                        font.pixelSize: 10
-                                        font.letterSpacing: 1.4
-                                    }
-                                    Text {
-                                        visible: !caps
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        textFormat: Text.PlainText
-                                        text: failHead.text
-                                        color: (plain ? look.tint.errInk : c.ink) ?? "black"
-                                        font.family: board.bodyFont
-                                        font.pixelSize: plain ? 18 : 16
+                                        font.pixelSize: 18
                                         font.weight: Font.Bold
                                     }
-                                }
-                                // Paper sets the headline on its own line in its serif; the others draw it beside the mark above.
-                                Text {
-                                    id: failHead
-                                    visible: caps
-                                    textFormat: Text.PlainText
-                                    text: look.failed.head
-                                    color: c.ink ?? "black"
-                                    font.family: look.viewFont ?? ""
-                                    font.pixelSize: 25
                                 }
                                 Text {
                                     id: fixText
@@ -1232,98 +1084,73 @@ Rectangle {
                                     textFormat: Text.PlainText
                                     text: board.yt.failed ? board.yt.failed.error : ""
                                     wrapMode: Text.Wrap
-                                    color: (plain ? look.tint.errText : c.ink) ?? "black"
+                                    color: look.tint.errText ?? "black"
                                     font.family: board.bodyFont
-                                    font.pixelSize: plain ? 14 : 13
+                                    font.pixelSize: 14
                                 }
-                                Item {
-                                    implicitWidth: retryBox.width + (caps ? 3 : 0)
-                                    implicitHeight: retryBox.height + (caps ? 3 : 0)
+                                Rectangle {
+                                    id: retryBox
+                                    implicitWidth: retryRow.implicitWidth + 18
+                                    implicitHeight: retryRow.implicitHeight + 6
+                                    radius: 6
+                                    color: c.surface ?? "transparent"
 
-                                    // Paper's button casts a hard 3 px accent shadow.
-                                    Rectangle {
-                                        visible: caps
-                                        x: 3
-                                        y: 3
-                                        width: retryBox.width
-                                        height: retryBox.height
-                                        color: c.accent ?? "red"
-                                    }
-                                    Rectangle {
-                                        id: retryBox
-                                        width: retryRow.implicitWidth + (caps ? 28 : plain ? 18 : 0)
-                                        height: retryRow.implicitHeight + (caps ? 16 : plain ? 6 : 0)
-                                        radius: plain ? 6 : 0
-                                        color: (caps ? c.ink : plain ? c.surface : "transparent") ?? "transparent"
+                                    Row {
+                                        id: retryRow
+                                        anchors.centerIn: parent
+                                        spacing: 4
 
-                                        Row {
-                                            id: retryRow
-                                            anchors.centerIn: parent
-                                            spacing: bracket ? 8 : 4
-
-                                            Text {
-                                                id: retryKey
-                                                textFormat: Text.PlainText
-                                                text: look.failed.key
-                                                color: (caps ? c.surface : bracket ? c.accent : c.ink) ?? "black"
-                                                font.family: board.bodyFont
-                                                font.pixelSize: plain ? 12 : 13
-                                                font.weight: Font.Bold
-                                            }
-                                            Text {
-                                                id: retryWord
-                                                textFormat: Text.PlainText
-                                                text: look.failed.word
-                                                color: (caps ? c.surface : c.ink) ?? "black"
-                                                font.family: board.bodyFont
-                                                font.pixelSize: plain ? 12 : 13
-                                            }
+                                        Text {
+                                            id: retryKey
+                                            textFormat: Text.PlainText
+                                            text: look.failed.key
+                                            color: c.ink ?? "black"
+                                            font.family: board.bodyFont
+                                            font.pixelSize: 12
+                                            font.weight: Font.Bold
+                                        }
+                                        Text {
+                                            id: retryWord
+                                            textFormat: Text.PlainText
+                                            text: look.failed.word
+                                            color: c.ink ?? "black"
+                                            font.family: board.bodyFont
+                                            font.pixelSize: 12
                                         }
                                     }
                                 }
-                                // yt-dlp's own line: Paper's tinted strip with an accent edge, the others under a rule.
+                                // yt-dlp's own line, under a rule.
                                 Rectangle {
                                     id: rawBox
                                     visible: rawText.text !== ""
                                     Layout.fillWidth: true
                                     Layout.topMargin: 4
-                                    implicitHeight: rawText.implicitHeight + (caps ? 20 : 12)
-                                    color: caps ? look.tint.chosen : "transparent"
+                                    implicitHeight: rawText.implicitHeight + 12
+                                    color: "transparent"
 
-                                    Rectangle {
-                                        visible: caps
-                                        width: 2
-                                        height: parent.height
-                                        color: c.accent ?? "red"
-                                    }
                                     Rule {
-                                        visible: !caps
                                         width: parent.width
-                                        dashed: bracket
-                                        color: plain ? Qt.rgba(180 / 255, 56 / 255, 11 / 255, 0.22) : c.line ?? "gray"
+                                        color: Qt.rgba(180 / 255, 56 / 255, 11 / 255, 0.22)
                                     }
                                     Text {
                                         id: rawText
                                         anchors.left: parent.left
                                         anchors.right: parent.right
                                         anchors.bottom: parent.bottom
-                                        anchors.leftMargin: caps ? 12 : 0
-                                        anchors.rightMargin: caps ? 12 : 0
-                                        anchors.bottomMargin: caps ? 10 : 0
                                         textFormat: Text.PlainText
                                         text: board.yt.failed ? board.yt.failed.raw : ""
                                         wrapMode: Text.WrapAnywhere
                                         color: c.muted ?? "gray"
                                         font.family: board.yt.fonts.mono ?? ""
                                         font.pixelSize: 11
-                                        font.letterSpacing: bracket ? 0.44 : 0
+                                        font.letterSpacing: 0
                                     }
                                 }
                             }
                         }
                     }
 
-                    // An empty view names the key that fills it: Paper's serif headline at the top, Artboard's and Blueprint's centred lines.
+                    // An empty view names the key that fills it, in centred lines.
                     Item {
                         id: emptyBlock
                         visible: board.emptyText !== null && board.yt.rows.length === 0
@@ -1331,41 +1158,41 @@ Rectangle {
                         Layout.fillHeight: true
 
                         Column {
-                            x: caps ? 22 : (parent.width - width) / 2
-                            y: caps ? 64 : (parent.height - 80 - height) / 2
+                            x: (parent.width - width) / 2
+                            y: (parent.height - 80 - height) / 2
                             spacing: 10
 
                             Text {
                                 id: emptyHead
                                 visible: text !== ""
-                                anchors.horizontalCenter: caps ? undefined : parent.horizontalCenter
+                                anchors.horizontalCenter: parent.horizontalCenter
                                 textFormat: Text.PlainText
                                 text: board.emptyText ? board.emptyText.head : ""
-                                color: (bracket ? c.ink : c.muted) ?? "gray"
-                                font.family: caps ? look.viewFont ?? "" : board.bodyFont
-                                font.pixelSize: caps ? 25 : 16
-                                font.weight: bracket ? Font.Medium : Font.Normal
+                                color: c.muted ?? "gray"
+                                font.family: board.bodyFont
+                                font.pixelSize: 16
+                                font.weight: Font.Normal
                             }
                             Row {
-                                anchors.horizontalCenter: caps ? undefined : parent.horizontalCenter
+                                anchors.horizontalCenter: parent.horizontalCenter
                                 spacing: emptyKey.text ? 6 : 0
 
                                 Rectangle {
                                     visible: emptyKey.text !== ""
-                                    implicitWidth: emptyKey.implicitWidth + (plain ? 14 : 0)
-                                    implicitHeight: emptyKey.implicitHeight + (plain ? 6 : 0)
+                                    implicitWidth: emptyKey.implicitWidth + 14
+                                    implicitHeight: emptyKey.implicitHeight + 6
                                     radius: 6
-                                    color: plain ? look.tint.tile : "transparent"
+                                    color: look.tint.tile
 
                                     Text {
                                         id: emptyKey
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
                                         text: board.emptyText ? board.emptyText.key : ""
-                                        color: (bracket ? c.accent : c.ink) ?? "black"
+                                        color: c.ink ?? "black"
                                         font.family: board.bodyFont
                                         font.pixelSize: 13
-                                        font.weight: plain ? Font.Medium : Font.Bold
+                                        font.weight: Font.Medium
                                     }
                                 }
                                 Text {
@@ -1386,16 +1213,15 @@ Rectangle {
 
         Rule {
             Layout.fillWidth: true
-            dashed: look.ruleDashed
             color: board.ruleColor
         }
 
         // The now-playing line: empty while the Queue is stopped, with the repeat state at its right.
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: plain ? 40 : bracket ? 34 : 38
-            Layout.leftMargin: plain ? 18 : 16
-            Layout.rightMargin: plain ? 18 : 16
+            Layout.preferredHeight: 40
+            Layout.leftMargin: 18
+            Layout.rightMargin: 18
             spacing: 10
 
             Text {
@@ -1415,25 +1241,24 @@ Rectangle {
                 text: look.repeat(board.yt.queue.loop)
                 color: c.muted ?? "gray"
                 font.family: board.bodyFont
-                font.pixelSize: plain ? 12 : 11
-                font.letterSpacing: bracket ? 1.54 : 0
+                font.pixelSize: 12
+                font.letterSpacing: 0
             }
         }
 
         Rule {
             Layout.fillWidth: true
-            dashed: look.ruleDashed
             color: board.ruleColor
         }
 
-        // The keys, as each board strips them: Paper's tracked caps, Artboard's grey chips, Blueprint's bracketed accent keys.
+        // The keys, each on a grey chip.
         Flow {
             Layout.fillWidth: true
-            Layout.leftMargin: plain ? 14 : 16
-            Layout.rightMargin: plain ? 14 : 16
-            Layout.topMargin: plain ? 10 : 11
-            Layout.bottomMargin: plain ? 10 : 11
-            spacing: plain ? 8 : 16
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            Layout.topMargin: 10
+            Layout.bottomMargin: 10
+            spacing: 8
 
             Repeater {
                 id: legendList
@@ -1445,25 +1270,25 @@ Rectangle {
                     function drawn() {
                         return keyName.text + " " + keyWord.text;
                     }
-                    implicitWidth: keyPair.implicitWidth + (plain ? 14 : 0)
-                    implicitHeight: keyPair.implicitHeight + (plain ? 6 : 0)
+                    implicitWidth: keyPair.implicitWidth + 14
+                    implicitHeight: keyPair.implicitHeight + 6
                     radius: 6
-                    color: plain ? look.tint.tile : "transparent"
+                    color: look.tint.tile
 
                     Row {
                         id: keyPair
                         anchors.centerIn: parent
-                        spacing: bracket ? 8 : 6
+                        spacing: 6
 
                         Text {
                             id: keyName
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: (bracket ? c.accent : c.ink) ?? "black"
+                            color: c.ink ?? "black"
                             font.family: board.bodyFont
-                            font.pixelSize: caps ? 10 : 11
-                            font.weight: plain ? Font.Medium : Font.Bold
-                            font.letterSpacing: caps ? 1 : bracket ? 1.54 : 0
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
+                            font.letterSpacing: 0
                         }
                         Text {
                             id: keyWord
@@ -1471,8 +1296,8 @@ Rectangle {
                             text: modelData.word
                             color: c.muted ?? "gray"
                             font.family: board.bodyFont
-                            font.pixelSize: caps ? 10 : 11
-                            font.letterSpacing: caps ? 1 : bracket ? 1.54 : 0
+                            font.pixelSize: 11
+                            font.letterSpacing: 0
                         }
                     }
                 }
@@ -1480,7 +1305,7 @@ Rectangle {
         }
     }
 
-    // A snapshot's toast above the now-playing line: Paper's ink box with its hard accent shadow, Artboard's white card, Blueprint's box in its accent.
+    // A snapshot's toast above the now-playing line, on a white card.
     Rectangle {
         id: toastBox
         visible: board.yt.toast !== ""
@@ -1489,20 +1314,10 @@ Rectangle {
         y: board.height - height - 104
         width: toastRow.implicitWidth + 30
         height: toastRow.implicitHeight + 20
-        radius: plain ? 12 : 0
-        color: (caps ? c.ink : c.surface) ?? "black"
-        border.width: bracket ? 1 : plain ? 1 : 0
-        border.color: (bracket ? c.accent : c.line) ?? "gray"
-
-        Rectangle {
-            visible: caps
-            z: -1
-            x: 3
-            y: 3
-            width: parent.width
-            height: parent.height
-            color: c.accent ?? "red"
-        }
+        radius: 12
+        color: c.surface ?? "black"
+        border.width: 1
+        border.color: c.line ?? "gray"
 
         Row {
             id: toastRow
@@ -1512,18 +1327,18 @@ Rectangle {
             Text {
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: caps ? "■" : "✓"
+                text: "✓"
                 color: c.accent ?? "red"
                 font.family: board.bodyFont
-                font.pixelSize: caps ? 9 : 12
+                font.pixelSize: 12
             }
             Text {
                 id: toastText
                 textFormat: Text.PlainText
                 text: board.yt.toast
-                color: (caps ? c.surface : c.ink) ?? "black"
+                color: c.ink ?? "black"
                 font.family: board.bodyFont
-                font.pixelSize: plain ? 13 : 12
+                font.pixelSize: 13
             }
         }
     }
@@ -1534,29 +1349,18 @@ Rectangle {
         return row ? row.mapToItem(board, 0, row.height).y : 200;
     }
 
-    // p's picker over the dimmed list, under the cursor's row: Paper's hard-shadowed box, Artboard's rounded card outlined in its accent, Blueprint's box in its accent.
+    // p's picker over the dimmed list, under the cursor's row: a rounded card outlined in the accent.
     Rectangle {
         id: picker
         visible: board.yt.picking !== null
         x: sidebarPane.width + 120
         y: Math.max(60, Math.min(board.pickAt, board.height - height - 90))
-        width: bracket ? 440 : 360
+        width: 360
         height: pickColumn.implicitHeight
-        radius: plain ? 14 : 0
+        radius: 14
         color: c.surface ?? "white"
-        border.width: caps || plain ? 1.5 : 1
-        border.color: (caps ? c.ink : c.accent) ?? "black"
-
-        // Paper's 6 px hard shadow.
-        Rectangle {
-            visible: caps
-            z: -1
-            x: 6
-            y: 6
-            width: parent.width
-            height: parent.height
-            color: c.ink ?? "black"
-        }
+        border.width: 1.5
+        border.color: c.accent ?? "black"
 
         Column {
             id: pickColumn
@@ -1569,21 +1373,21 @@ Rectangle {
                 spacing: 12
 
                 Rectangle {
-                    implicitWidth: pickChip.implicitWidth + (bracket ? 0 : 14)
-                    implicitHeight: pickChip.implicitHeight + (bracket ? 0 : 4)
-                    radius: plain ? 8 : 0
-                    color: (plain ? look.tint.tint : caps ? c.ink : "transparent") ?? "transparent"
+                    implicitWidth: pickChip.implicitWidth + 14
+                    implicitHeight: pickChip.implicitHeight + 4
+                    radius: 8
+                    color: look.tint.tint ?? "transparent"
 
                     Text {
                         id: pickChip
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: look.pick.chip
-                        color: (plain || bracket ? c.accent : c.surface) ?? "black"
+                        color: c.accent ?? "black"
                         font.family: board.bodyFont
-                        font.pixelSize: bracket || caps ? 10 : 12
-                        font.weight: bracket ? Font.Bold : Font.Medium
-                        font.letterSpacing: bracket || caps ? 1.4 : 0
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        font.letterSpacing: 0
                     }
                 }
                 Text {
@@ -1594,22 +1398,21 @@ Rectangle {
                     elide: Text.ElideRight
                     maximumLineCount: 1
                     color: c.ink ?? "black"
-                    font.family: caps ? look.viewFont ?? "" : board.bodyFont
-                    font.pixelSize: caps ? 20 : bracket ? 12 : 14
-                    font.weight: plain ? Font.Bold : Font.Normal
+                    font.family: board.bodyFont
+                    font.pixelSize: 14
+                    font.weight: Font.Bold
                 }
             }
             Rule {
                 width: parent.width
-                dashed: look.ruleDashed
-                color: (caps ? look.tint.rule : c.line) ?? "gray"
+                color: c.line ?? "gray"
             }
 
             // One row per Playlist with its count; the one holding the video says so; past eight they scroll, the lit one kept in view.
             Flickable {
                 id: pickScroll
                 width: parent.width
-                height: Math.min(pickList.implicitHeight, (plain ? 38 : 36) * 8)
+                height: Math.min(pickList.implicitHeight, 38 * 8)
                 clip: true
                 interactive: false
                 contentWidth: width
@@ -1634,18 +1437,18 @@ Rectangle {
                                 return [pickName.text, pickCount.text].concat(pickHas.visible ? [pickHas.text] : []).join(" ");
                             }
 
-                            x: plain ? 8 : 0
-                            width: picker.width - (plain ? 16 : 0)
-                            height: plain ? 38 : 36
-                            radius: plain ? 10 : 0
-                            color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
-                            border.width: lit && plain ? 1.5 : 0
+                            x: 8
+                            width: picker.width - 16
+                            height: 38
+                            radius: 10
+                            color: !lit ? "transparent" : look.tint.tint
+                            border.width: lit ? 1.5 : 0
                             border.color: c.accent ?? "blue"
 
                             RowLayout {
                                 anchors.fill: parent
-                                anchors.leftMargin: plain ? 12 : 16
-                                anchors.rightMargin: plain ? 12 : 16
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
                                 spacing: 10
 
                                 Text {
@@ -1655,16 +1458,16 @@ Rectangle {
                                     text: pickRow.modelData.name
                                     elide: Text.ElideRight
                                     maximumLineCount: 1
-                                    color: (pickRow.lit ? (plain ? look.tint.deep : c.surface) : pickRow.holds ? c.muted : c.ink) ?? "black"
+                                    color: (pickRow.lit ? look.tint.deep : pickRow.holds ? c.muted : c.ink) ?? "black"
                                     font.family: board.bodyFont
-                                    font.pixelSize: plain ? 14 : 13
-                                    font.weight: pickRow.lit && bracket ? Font.Bold : Font.Medium
+                                    font.pixelSize: 14
+                                    font.weight: Font.Medium
                                 }
                                 Text {
                                     id: pickCount
                                     textFormat: Text.PlainText
                                     text: String(pickRow.modelData.count)
-                                    color: (pickRow.lit && !plain ? c.surface : c.muted) ?? "gray"
+                                    color: c.muted ?? "gray"
                                     font.family: board.bodyFont
                                     font.pixelSize: 11
                                 }
@@ -1675,10 +1478,8 @@ Rectangle {
                                     visible: pickRow.holds
                                     implicitWidth: pickHas.implicitWidth + 12
                                     implicitHeight: pickHas.implicitHeight + 4
-                                    radius: plain ? 6 : 0
-                                    color: plain ? look.tint.tile : "transparent"
-                                    border.width: plain ? 0 : 1
-                                    border.color: (bracket ? c.line : c.muted) ?? "gray"
+                                    radius: 6
+                                    color: look.tint.tile
 
                                     Text {
                                         id: pickHas
@@ -1687,8 +1488,8 @@ Rectangle {
                                         text: look.pick.already
                                         color: c.muted ?? "gray"
                                         font.family: board.bodyFont
-                                        font.pixelSize: plain ? 11 : 9
-                                        font.letterSpacing: plain ? 0 : 1.26
+                                        font.pixelSize: 11
+                                        font.letterSpacing: 0
                                     }
                                 }
                             }
@@ -1698,23 +1499,22 @@ Rectangle {
             }
             Rule {
                 width: parent.width
-                dashed: look.ruleDashed
-                color: (caps ? look.tint.rule : c.line) ?? "gray"
+                color: c.line ?? "gray"
             }
             // The last place: n, or Enter on it, names a new Playlist for the video.
             Rectangle {
                 readonly property bool lit: board.yt.picking !== null && board.yt.picking.cursor === board.yt.lists.length
-                x: plain ? 8 : 0
-                width: picker.width - (plain ? 16 : 0)
-                height: plain ? 38 : 36
-                radius: plain ? 10 : 0
-                color: !lit ? "transparent" : plain ? look.tint.tint : bracket ? c.accent ?? "cyan" : c.ink ?? "black"
-                border.width: lit && plain ? 1.5 : 0
+                x: 8
+                width: picker.width - 16
+                height: 38
+                radius: 10
+                color: !lit ? "transparent" : look.tint.tint
+                border.width: lit ? 1.5 : 0
                 border.color: c.accent ?? "blue"
 
                 Row {
                     anchors.left: parent.left
-                    anchors.leftMargin: plain ? 12 : 16
+                    anchors.leftMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 10
 
@@ -1722,7 +1522,7 @@ Rectangle {
                         id: pickNewKey
                         textFormat: Text.PlainText
                         text: look.pick.newKey
-                        color: (parent.parent.lit ? (plain ? look.tint.deep : c.surface) : bracket ? c.accent : c.ink) ?? "black"
+                        color: (parent.parent.lit ? look.tint.deep : c.ink) ?? "black"
                         font.family: board.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Bold
@@ -1731,7 +1531,7 @@ Rectangle {
                         id: pickNewWord
                         textFormat: Text.PlainText
                         text: look.pick.newWord
-                        color: (parent.parent.lit ? (plain ? look.tint.deep : c.surface) : c.ink) ?? "black"
+                        color: (parent.parent.lit ? look.tint.deep : c.ink) ?? "black"
                         font.family: board.bodyFont
                         font.pixelSize: 13
                     }
@@ -1739,8 +1539,7 @@ Rectangle {
             }
             Rule {
                 width: parent.width
-                dashed: look.ruleDashed
-                color: (caps ? c.ink : c.line) ?? "gray"
+                color: c.line ?? "gray"
             }
             Flow {
                 width: parent.width
@@ -1758,61 +1557,21 @@ Rectangle {
                         text: modelData.key + " " + modelData.word
                         color: c.muted ?? "gray"
                         font.family: board.bodyFont
-                        font.pixelSize: plain ? 11 : 10
-                        font.letterSpacing: plain ? 0 : 1.4
+                        font.pixelSize: 11
+                        font.letterSpacing: 0
                     }
                 }
             }
         }
     }
 
-    // Paper marks the pane with focus by a 2 px accent line along its top.
-    component FocusMark: Rectangle {
-        property bool shown: false
-        visible: shown && board.caps
-        width: parent.width
-        height: 2
-        color: board.c.accent ?? "red"
-    }
-
-    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    // A one-pixel rule.
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
     }
 
-    // The sidebar's edge: a one-pixel column, the dashed one a turned rule.
-    component VRule: Item {
-        id: vrule
-        property bool dashed: false
-        property color color: "black"
+    // The sidebar's edge: a one-pixel column.
+    component VRule: Rectangle {
         implicitWidth: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !vrule.dashed
-            color: vrule.color
-        }
-        Dashed {
-            visible: vrule.dashed
-            x: 1
-            width: vrule.height
-            height: 1
-            rotation: 90
-            transformOrigin: Item.TopLeft
-            color: vrule.color
-        }
     }
 }

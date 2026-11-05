@@ -1,9 +1,6 @@
-// How the YouTube App reads under a token set, as the three themes' YouTube boards draw it: the title strip, the sidebar, the field and chips, the legend, the empty views and the error block.
-import { listLook, mark, plainTones } from './voice.mjs';
+// How the YouTube App reads under a token set, as its board draws it: the title strip, the sidebar, the field and chips, the legend, the empty views and the error block.
+import { listLook, plainTones } from './voice.mjs';
 import { EMPTY, count } from './youtube.mjs';
-
-// The boards' tints that no token carries: Paper's chosen place, row rule and light ink on a lit row, and Blueprint's warning amber. The plain voice's tint, field, tiles, thumbnail and error block come from the theme's plain tones; one set for all voices, as a theme switch can draw a voice's branch before its look lands.
-const TINT = { chosen: '#EFE6D2', rule: '#D8CDB6', onInk: '#D9CFBB', warn: '#FFB547' };
 
 const SEARCH_KEYS = [['j/k', 'move'], ['↵', 'play video'], ['m', 'play audio'], ['a', 'add to queue'], ['s', 'save'], ['p', 'add to playlist'], ['d/D', 'download audio/video'], ['/', 'search'], ['tab', 'sidebar'], ['esc', 'back']];
 // A Playlist's keys play it whole; x and Shift+J/K act on the item under the cursor.
@@ -23,59 +20,47 @@ const PLACES = [
 
 export function youtubeLook(tokens) {
   const l = listLook(tokens);
+  // The board's tint, field, tiles, thumbnail and error block, which no token carries.
   const tones = plainTones(tokens);
-  const tint = Object.assign({}, TINT, { tint: tones.tint, deep: tones.deep, tile: tones.tile, field: tones.field, thumb: tones.thumb, errFill: tones.warnChip, errInk: tones.warn, errText: tones.strong });
-  const voice = l.voice;
-  const plain = voice === 'plain';
-  const bracket = voice === 'bracket';
-  const m = (s) => mark(l.engraved, s);
-  // Blueprint marks each shifted key and spaces the slash in its download pair.
-  const SHIFTED = { [m('S')]: m('⇧S'), [m('D/D')]: m('D/⇧D') };
-  const DOWNLOAD = { key: m('D/⇧D'), word: 'DOWNLOAD AUDIO / VIDEO' };
-  const fonts = (tokens && tokens.type) || { display: '', ui: '' };
+  const tint = { tint: tones.tint, deep: tones.deep, tile: tones.tile, field: tones.field, thumb: tones.thumb, errFill: tones.warnChip, errInk: tones.warn, errText: tones.strong };
+  const fonts = (tokens && tokens.type) || { ui: '' };
   return Object.assign(l, {
     title: {
-      label: plain ? 'YouTube' : 'YOUTUBE',
-      from: bracket ? 'FROM THE LAUNCHER' : 'from the launcher',
+      label: 'YouTube',
+      from: 'from the launcher',
       view: (v) => (PLACES.find((p) => p.view === v) || PLACES[0]).name,
     },
-    viewFont: voice === 'caps' ? fonts.display : fonts.ui,
-    viewSize: voice === 'caps' ? 18 : plain ? 14 : 12,
+    viewFont: fonts.ui,
+    viewSize: 14,
     places: PLACES,
-    library: bracket ? 'LIBRARY' : '',
     playlists: 'PLAYLISTS',
     noPlaylists: EMPTY.playlists,
     placeholder: 'Search YouTube',
     namePlaceholder: 'Playlist name',
     unavailable: (why) => `Video unavailable · ${why}`,
     toast: { saved: (n) => `Saved as a playlist · ${count(n)}` },
-    // A snapshot's new Playlist, marked in the sidebar: Paper sets it in caps as its board's CSS does.
-    fresh: plain ? 'new' : 'NEW',
-    // p's picker: Paper and Artboard head it with the key, Blueprint with PLAYLISTS; Paper's badge is set in caps as its board's CSS sets it.
+    // A snapshot's new Playlist, marked in the sidebar.
+    fresh: 'new',
+    // p's picker, headed with its key.
     pick: {
       title: (t) => `Add "${t}" to`,
-      chip: bracket ? 'PLAYLISTS' : voice === 'caps' ? 'P' : 'p',
-      already: bracket ? 'ALREADY IN ✓' : voice === 'caps' ? 'ALREADY IN' : 'already in',
-      newKey: bracket ? m('N') : 'n',
+      chip: 'p',
+      already: 'already in',
+      newKey: 'n',
       newWord: 'new playlist',
       keys: l.keys([['j/k', 'move'], ['↵', 'add'], ['n', 'new'], ['esc', 'cancel']]),
     },
-    hint: bracket ? m('/') : '/',
-    typeLabel: plain ? '' : 'TYPE',
-    chips: ['Videos', 'Playlists', 'Channels'].map((w) => (bracket ? w.toUpperCase() : w)),
-    results: plain ? 'Results' : 'RESULTS',
+    hint: '/',
+    chips: ['Videos', 'Playlists', 'Channels'],
+    results: 'Results',
     // The now-playing line's right side, as the Queue's loop-playlist reads.
-    repeat: (on) => (bracket ? (on ? 'REPEAT ON' : 'REPEAT OFF') : on ? 'repeat on' : 'repeat off'),
+    repeat: (on) => (on ? 'repeat on' : 'repeat off'),
     // A failed search's list is its error block, so only try again and the moves away act on it.
     legend(view, failed, focus, opened) {
       if (focus === 'sidebar') return l.keys(SIDEBAR_KEYS);
       if (view === 'search' && !failed && opened === 'playlist') return l.keys(OPENED_KEYS);
-      if (view === 'playlist') {
-        const keys = l.keys(PLAYLIST_KEYS);
-        return bracket ? keys.map((k) => Object.assign({}, k, { key: SHIFTED[k.key] || k.key })) : keys;
-      }
-      const keys = l.keys(view !== 'search' ? EMPTY_KEYS : failed ? FAILED_KEYS : SEARCH_KEYS);
-      return bracket ? keys.map((k) => (k.word === 'DOWNLOAD AUDIO/VIDEO' ? DOWNLOAD : k)) : keys;
+      if (view === 'playlist') return l.keys(PLAYLIST_KEYS);
+      return l.keys(view !== 'search' ? EMPTY_KEYS : failed ? FAILED_KEYS : SEARCH_KEYS);
     },
     empty(view) {
       if (view === 'saved') return { head: EMPTY.saved.head, key: EMPTY.saved.key, rest: EMPTY.saved.rest };
@@ -86,27 +71,22 @@ export function youtubeLook(tokens) {
     },
     failed: {
       head: "YouTube didn't give results",
-      key: bracket ? m('↵') : '↵',
+      key: '↵',
       word: 'try again',
-      // Paper's board heads a stale yt-dlp's block YOUTUBE CHANGED; the other kinds' boards draw no such line.
-      kicker: (f) => (voice === 'caps' && f.kind === 'extraction' && f.error.startsWith('yt-dlp ') ? 'YOUTUBE CHANGED' : ''),
     },
-    // x on a Playlist asks under its row; Paper's and Artboard's keys keep their case, as their boards draw them.
+    // x on a Playlist asks under its row.
     confirm: {
       // A name past 40 characters is cut, so the question still ends with what it deletes.
       question: (name, n) => `Delete ${name.length > 40 ? name.slice(0, 39) + '…' : name} and its ${count(n)}?`,
-      keys: bracket ? l.keys([['y', 'delete'], ['esc', 'keep']]) : [{ key: 'y', word: 'delete' }, { key: 'esc', word: 'keep' }],
+      keys: [{ key: 'y', word: 'delete' }, { key: 'esc', word: 'keep' }],
     },
-    // The download mark beside a row's duration: Paper's sits in its 16 px end, the others in the slot before the duration.
-    mark: plain
-      ? { at: 'before', size: 12, stroke: tint.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: tint.tile } }
-      : { at: bracket ? 'before' : 'end', size: 14, stroke: (tokens && (bracket ? tokens.color.accent : tokens.color.ink)) || '', width: bracket ? 1.5 : 1.3, tile: null },
+    // The download mark in the slot before a row's duration, on a grey tile.
+    mark: { size: 12, stroke: tint.deep, width: 2, tile: { width: 22, height: 20, radius: 6, color: tint.tile } },
     // A row whose download failed says why in its channel line, and Enter tries again (ruling DS2ESKWX).
-    retry: (reason) => (bracket ? `DOWNLOAD FAILED · ${reason} · ${m('↵')} RETRY` : `download failed · ${reason} · ↵ retry`),
-    retryColor: plain ? tint.errInk : bracket ? TINT.warn : (tokens && tokens.color.danger) || '',
-    fieldRadius: plain ? 14 : 0,
-    rowRadius: plain ? 10 : 0,
-    ruleDashed: bracket,
+    retry: (reason) => `download failed · ${reason} · ↵ retry`,
+    retryColor: tint.errInk,
+    fieldRadius: 14,
+    rowRadius: 10,
     tint,
   });
 }

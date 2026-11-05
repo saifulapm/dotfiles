@@ -22,7 +22,7 @@ export const connectLines = () => [
   JSON.stringify({ command: ['get_property', ITEMS], request_id: ITEMS_REQUEST }),
 ];
 
-// mpv knows only the URL or file that plays, so channel and seconds come from the item stored under its video id; a file names it in brackets before its extension.
+// mpv knows only the URL or file that plays, so channel and seconds come from the item stored under its video id; a file names it between [ and ] before its extension.
 function current(state) {
   const m = /[?&]v=([A-Za-z0-9_-]{11})/.exec(state.path) || /\[([A-Za-z0-9_-]{11})\]\.[A-Za-z0-9]+$/.exec(state.path);
   const item = m && isObject(state.items[m[1]]) ? state.items[m[1]] : {};

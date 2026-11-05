@@ -76,7 +76,6 @@ ShellRoot {
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: Y.youtubeLook(theme.tokens)
-    readonly property string voice: look.voice
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
@@ -775,8 +774,7 @@ ShellRoot {
                 queue: app.queue,
                 error: app.failed,
                 firstFrameMs: app.firstFrameMs,
-                rssKiB: Status.rssKiB(procStatus.text()),
-                voice: app.voice
+                rssKiB: Status.rssKiB(procStatus.text())
             }, board.state()));
         }
     }
