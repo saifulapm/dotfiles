@@ -23,8 +23,7 @@ press() {
   for _ in $(seq "$n"); do wtype "$key"; done
 }
 
-# Artboard draws the tallest sidebar rows, and 45 outgrow the nested session's 1415 px window.
-legacy_theme artboard >/dev/null
+# 45 sidebar rows outgrow the nested session's 1415 px window.
 until_ok 3000 status_theme artboard
 
 mkdir -p "$(dirname "$store")"

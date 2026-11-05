@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# d and D download a row's audio or video through dots-youtube-get, one at a time in youtube-get-dev, into the scratch music and video folders; the island shows each, the row then draws the download mark in each theme, a second d starts nothing, a failed row offers Enter to retry, D on a Playlist takes every item not yet downloaded and counts them in the island, and closing the App leaves the queue running.
+# d and D download a row's audio or video through dots-youtube-get, one at a time in youtube-get-dev, into the scratch music and video folders; the island shows each, the row then draws the download mark, a second d starts nothing, a failed row offers Enter to retry, D on a Playlist takes every item not yet downloaded and counts them in the island, and closing the App leaves the queue running.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -44,8 +44,7 @@ launch() {
 
 systemctl --user stop youtube-get-dev youtube-audio 'youtube-video-*' 2>/dev/null
 rm -f "$get_log" "$index" "$DOTS_DEV_DIR/youtube-get-fail" "$DOTS_DEV_DIR/youtube-get.json"
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 # Focus: four videos with a private one second.
 item() { jq -c --arg id "$1" --argjson pos "$2" '.rows[] | select(.id == $id) | {id, title, channel, duration, thumb, pos: $pos, addedAt: 1, updatedAt: 1, deleted: false}' "$repo/dev/youtube/search.json"; }
@@ -74,14 +73,9 @@ check "and its audio is in the music folder" has "$music/*fakeVid0001*.opus"
 check "fetched as bestaudio with the cover and tags embedded" grep -q -- '-f bestaudio -x --embed-thumbnail --embed-metadata' "$get_log"
 check "the island leaves the download once the queue is done" until_ok 3000 bash -c '! timeout 0.5 qs ipc call island state | jq -e ".mode == \"downloading\"" >/dev/null'
 
-for theme in artboard blueprint paper; do
-  legacy_theme "$theme" >/dev/null
-  until_ok 3000 status_theme "$theme"
-  check "$theme: the downloaded row draws its mark, and only it ($(yt_state | jq -c '[.drawn[0:3][].mark]'))" yt_is '.drawn[0].mark and (.drawn[1].mark | not)'
-  # The cursor's row is lit: Paper's ink and Blueprint's accent fill it, so its mark takes the surface colour; Artboard's light tint keeps the blue.
-  case $theme in paper) ink='#faf6ec' ;; blueprint) ink='#0a1526' ;; artboard) ink='#2638c9' ;; esac
-  check "$theme: the lit row's mark draws in $ink ($(yt_state | jq -c '[.cursor, .drawn[0].markInk]'))" yt_is --arg ink "$ink" '.cursor == 0 and .drawn[0].markInk == $ink'
-done
+check "the downloaded row draws its mark, and only it ($(yt_state | jq -c '[.drawn[0:3][].mark]'))" yt_is '.drawn[0].mark and (.drawn[1].mark | not)'
+# The cursor's row is lit with a light tint, so its mark keeps the deep blue.
+check "the lit row's mark draws in #2638c9 ($(yt_state | jq -c '[.cursor, .drawn[0].markInk]'))" yt_is '.cursor == 0 and .drawn[0].markInk == "#2638c9"'
 
 before=$(gets)
 wtype d
@@ -101,10 +95,10 @@ check "a failure reads ↓ failed · <title> · HTTP 403 in the island ($(island
 failed_row() { yt_is '.drawn[2].channel == "download failed · HTTP 403 · ↵ retry"'; }
 until_ok 3000 failed_row
 check "and the row says so with Enter to retry ($(yt_state | jq -c '.drawn[2] | {channel, channelColor}'))" failed_row
-# The lit row draws its channel line in the row's light ink, so the colour is read from the row below.
+# The lit row draws its channel line muted, so the colour is read from the row below.
 wtype j
 until_ok 1000 yt_is '.cursor == 3'
-check "off the cursor it reads in Paper's danger colour ($(yt_state | jq -c '.drawn[2].channelColor'))" yt_is '.drawn[2].channelColor == "#c8381e"'
+check "off the cursor it reads in the warning colour ($(yt_state | jq -c '.drawn[2].channelColor'))" yt_is '.drawn[2].channelColor == "#b4380b"'
 wtype k
 until_ok 1000 yt_is '.cursor == 2'
 rm -f "$DOTS_DEV_DIR/youtube-get-fail"

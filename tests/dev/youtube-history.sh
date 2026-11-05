@@ -28,8 +28,7 @@ rows_are() { yt_is --argjson ids "$1" '[.rows[].id] == $ids'; }
 
 systemctl --user stop youtube-audio 'youtube-video-*' 2>/dev/null
 rm -f "$history"
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work/data XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 open_app() {
   niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"

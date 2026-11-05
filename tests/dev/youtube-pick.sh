@@ -21,8 +21,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 sidebar_has() { yt_is --arg s "$1" '.look.sidebar | index($s) != null'; }
 titles_are() { yt_is --argjson t "$1" '[.drawn[].title] == $t'; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 # Focus already holds Feather; Gym is empty.
 feather=$(jq -c '.rows[] | select(.id == "fakeVid0002") | {id, title, channel, duration, thumb, pos: 1, addedAt: 1, updatedAt: 1, deleted: false}' "$repo/dev/youtube/search.json")
@@ -58,9 +57,9 @@ until_ok 1000 yt_is '.cursor == 1'
 wtype p
 until_ok 1000 yt_is '.picker != null'
 check "p on Feather opens the picker over the dimmed list, Focus marked already in ($(yt_state | jq -c '.picker | {title, rows, fresh}'))" \
-  yt_is '.picker.title == ["P", "Add \"Feather (feat. Cise Starr & Akin)\" to"] and .picker.rows == ["Focus 1 ALREADY IN", "Gym 0"] and .picker.fresh == "n new playlist" and .dimmed'
+  yt_is '.picker.title == ["p", "Add \"Feather (feat. Cise Starr & Akin)\" to"] and .picker.rows == ["Focus 1 already in", "Gym 0"] and .picker.fresh == "n new playlist" and .dimmed'
 check "its cursor starts on Gym, the first that lacks it, and its legend is its own ($(yt_state | jq -c '.picker | {lit, keys, below}'))" \
-  yt_is '.picker.lit == 1 and .picker.keys == ["J/K MOVE", "↵ ADD", "N NEW", "ESC CANCEL"] and .picker.below'
+  yt_is '.picker.lit == 1 and .picker.keys == ["j/k move", "↵ add", "n new", "esc cancel"] and .picker.below'
 wtype k
 until_ok 1000 yt_is '.picker.lit == 0'
 wtype -k Return

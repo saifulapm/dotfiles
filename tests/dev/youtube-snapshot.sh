@@ -23,8 +23,7 @@ sidebar_has() { yt_is --arg s "$1" '.look.sidebar | index($s) != null'; }
 # The head's count while the snapshot reads, caught between its first and last page.
 reading_midway() { yt_is '.look.results[1] | test("^reading [12]00 of 300$")'; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_MACHINE=ytcheck DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work/data XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 open_app() {
@@ -43,12 +42,12 @@ paste_list() {
 open_app
 paste_list PLfakeList0002
 check "the pasted playlist opens its 300 items, s naming save as a playlist ($(yt_state | jq -c '[.opened.title, (.rows | length), .look.legend[1]]'))" \
-  yt_is '.opened.title == "Lofi Archive" and (.rows | length) == 300 and .look.legend[1] == "S SAVE AS A PLAYLIST"'
+  yt_is '.opened.title == "Lofi Archive" and (.rows | length) == 300 and .look.legend[1] == "s save as a playlist"'
 wtype s
 until_ok 3000 reading_midway
 check "while it reads, the head reads reading <n> of 300 ($(yt_state | jq -c '.look.results'))" reading_midway
-until_ok 4000 sidebar_has "Lofi Archive NEW 300"
-check "then a Playlist named after it sits in the sidebar with 300, marked new ($(yt_state | jq -c '.look.sidebar'))" sidebar_has "Lofi Archive NEW 300"
+until_ok 4000 sidebar_has "Lofi Archive new 300"
+check "then a Playlist named after it sits in the sidebar with 300, marked new ($(yt_state | jq -c '.look.sidebar'))" sidebar_has "Lofi Archive new 300"
 check "and the toast reads Saved as a playlist · 300 videos ($(yt_state | jq -c .toast))" yt_is '.toast == "Saved as a playlist · 300 videos"'
 check "and the head reads the playlist's own count again ($(yt_state | jq -c '.look.results'))" yt_is '.look.results == ["Lofi Archive", "300 videos"]'
 same_order() {
@@ -69,7 +68,7 @@ check "each once, the snapshot asking again for none ($(grep '^thumbs ' "$calls"
 touch "$DOTS_DEV_DIR/youtube-grow"
 paste_list PLfakeList0002
 check "opened again the original lists 301 ($(yt_state | jq -c '.rows | length'))" yt_is '(.rows | length) == 301'
-check "and the snapshot still reads 300 ($(yt_state | jq -c '.look.sidebar'))" sidebar_has "Lofi Archive NEW 300"
+check "and the snapshot still reads 300 ($(yt_state | jq -c '.look.sidebar'))" sidebar_has "Lofi Archive new 300"
 rm -f "$DOTS_DEV_DIR/youtube-grow"
 
 # Opening the new Playlist takes its mark away.
@@ -95,9 +94,9 @@ until_ok 1000 yt_is '.focus == "list"'
 wtype l
 until_ok 3000 yt_is '.type == "playlists" and .rows[0].title == "Modal Soul"'
 wtype s
-until_ok 3000 sidebar_has "Modal Soul NEW 14"
+until_ok 3000 sidebar_has "Modal Soul new 14"
 check "s on the Modal Soul row saves its 14 as a Playlist, the results still listed ($(yt_state | jq -c '[.look.sidebar, .opened]'))" \
-  yt_is '(.look.sidebar | index("Modal Soul NEW 14")) != null and .opened == null and .type == "playlists"'
+  yt_is '(.look.sidebar | index("Modal Soul new 14")) != null and .opened == null and .type == "playlists"'
 
 # 5000 items: the App answers while they read, and every one is saved.
 paste_list PLfakeList5000
@@ -115,7 +114,7 @@ done
 echo "state call ms during the 5000 read: ${took[*]}"
 slowest=$(printf '%s\n' "${took[@]}" | sort -n | tail -1)
 check "while 5000 items read, the App answers every state call in under 1 s (slowest $slowest ms)" test "$slowest" -lt 1000
-big_saved() { yt_is '.look.sidebar[-1] == "Five thousand NEW 5000" and .toast == "Saved as a playlist · 5,000 videos"'; }
+big_saved() { yt_is '.look.sidebar[-1] == "Five thousand new 5000" and .toast == "Saved as a playlist · 5,000 videos"'; }
 until_ok 15000 big_saved
 # A state holding 5000 rows runs to 660 KB, and one qs ipc answer in three that size reads short, so even this check polls.
 check "and the snapshot reaches 5000" until_ok 2000 big_saved
@@ -123,7 +122,7 @@ check "and the snapshot reaches 5000" until_ok 2000 big_saved
 # A snapshot keeps an unavailable item with its mark, so it draws without the network.
 paste_list PLfakeList0003
 wtype s
-until_ok 4000 sidebar_has "Mixed tape NEW 4"
+until_ok 4000 sidebar_has "Mixed tape new 4"
 kept_mark() { jq -e '.playlists | to_entries[] | select(.value.name == "Mixed tape") | .value.items.fakeGone001.unavailable == "made private"' "$store" >/dev/null 2>&1; }
 until_ok 2000 kept_mark
 check "a snapshot of Mixed tape keeps its private item marked made private" kept_mark

@@ -19,8 +19,7 @@ yt_up() { [ "$(yt_windows)" = 1 ] && yt_is '.firstFrameMs != null'; }
 yt_gone() { [ "$(yt_windows)" = 0 ]; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 # Focus holds three videos whose positions put the last added first; Gym is empty; the third's name is what a careless paste could type.
 long=$'Low\nTide\u202e '"$(printf 'x%.0s' $(seq 300))"
@@ -69,7 +68,7 @@ wtype -k Return
 until_ok 1000 yt_is '.focus == "list"'
 check "Enter on Focus in the sidebar moves to its list" yt_is '.focus == "list" and .view == "playlist" and .cursor == 0'
 check "where the legend names the whole-playlist keys ($(yt_state | jq -c '.look.legend[0:3]'))" \
-  yt_is '.look.legend[0:3] == ["↵ PLAY AS VIDEO", "M PLAY IN QUEUE", "S SHUFFLE"]'
+  yt_is '.look.legend[0:3] == ["↵ play as video", "m play in queue", "S shuffle"]'
 wtype -k Escape
 until_ok 1000 yt_is '.view == "search"'
 check "Esc in a Playlist goes back to Search" yt_is '.view == "search"'
@@ -78,7 +77,7 @@ check "Esc in a Playlist goes back to Search" yt_is '.view == "search"'
 wtype -k Tab
 until_ok 1000 yt_is '.focus == "sidebar"'
 check "with the sidebar focused the legend names n, e, x, open and list ($(yt_state | jq -c .look.legend))" \
-  yt_is '.look.legend == ["N NEW", "E RENAME", "X DELETE", "↵ OPEN", "TAB LIST"]'
+  yt_is '.look.legend == ["n new", "e rename", "x delete", "↵ open", "tab list"]'
 wtype n
 until_ok 1000 yt_is '.focus == "name" and .naming == "new" and .nameField == ""'
 wtype Focus
@@ -102,14 +101,6 @@ wtype x
 until_ok 1000 yt_is '.confirming'
 check "x asks Delete Deep focus and its 0 videos? under its row, the list beside dimmed ($(yt_state | jq -c '[.confirm, .dimmed]'))" \
   yt_is '.confirm == ["Delete Deep focus and its 0 videos?", "y delete", "esc keep"] and .dimmed'
-check "Paper frames the question in its red accent ($(yt_state | jq -c .confirmLook))" yt_is '.confirmLook == {"border": "#c8381e", "cut": false, "mark": ""}'
-legacy_theme blueprint >/dev/null
-until_ok 3000 status_theme blueprint
-blueprint_frame() { yt_is '.confirmLook == {"border": "#ffb547", "cut": false, "mark": "!"}'; }
-until_ok 3000 blueprint_frame
-check "Blueprint frames it in amber with its ! mark ($(yt_state | jq -c .confirmLook))" blueprint_frame
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
 wtype j
 sleep 0.3
 check "while it asks, j moves nothing" yt_is --arg id "$made" '.playlistId == $id and .confirming'
@@ -127,9 +118,7 @@ gone_in_store() { jq -e --arg id "$made" '.playlists[$id].deleted == true' "$sto
 until_ok 2000 gone_in_store
 check "and the store keeps it as a tombstone" gone_in_store
 
-# The long name's question, in Blueprint's wider face, draws whole: its name cut, its count kept.
-legacy_theme blueprint >/dev/null
-until_ok 3000 status_theme blueprint
+# The long name's question draws whole: its name cut, its count kept.
 wtype x
 until_ok 1000 yt_is '.confirming'
 long_asked() { yt_is '(.confirm[0] | endswith("… and its 0 videos?")) and .confirmLook.cut == false'; }
@@ -137,8 +126,6 @@ until_ok 2000 long_asked
 check "x on the 300-character Playlist asks a question drawn whole, ending and its 0 videos? ($(yt_state | jq -c '[.confirm[0], .confirmLook]'))" long_asked
 wtype -k Escape
 until_ok 1000 yt_is '.confirming == false'
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
 
 # A blank name makes nothing, and Esc leaves the field making nothing.
 wtype n

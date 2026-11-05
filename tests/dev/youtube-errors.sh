@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A failed YouTube search shows the error boards' block in the list, the CLI's own fix line and yt-dlp's raw line under YouTube didn't give results, never an empty list, and Enter on it searches again; the real CLI with no deno on hand answers the runtime line before yt-dlp runs.
+# A failed YouTube search shows the error block in the list, the CLI's own fix line and yt-dlp's raw line under YouTube didn't give results, never an empty list, and Enter on it searches again; the real CLI with no deno on hand answers the runtime line before yt-dlp runs.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -23,8 +23,7 @@ searches() { grep -c '^search nujabes videos 0$' "$calls" 2>/dev/null; }
 searched() { [ "$(searches)" = "$1" ]; }
 fails_with() { yt_is --arg e "$1" '.failed.fix == $e'; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -45,7 +44,7 @@ check "runtime: the list holds the error block, not rows ($(yt_state | jq -c '{f
   yt_is --arg e "$runtime" '.failed.head == "YouTube didn'"'"'t give results" and .failed.fix == $e and .failed.retry == "↵ try again" and .failed.raw == "" and .drawn == [] and .focus == "list"'
 check "runtime: the state names the failure's kind ($(yt_state | jq -c .error))" yt_is '.error.kind == "runtime"'
 check "runtime: the legend reads try again first ($(yt_state | jq -c '.look.legend'))" \
-  yt_is '.look.legend == ["↵ TRY AGAIN", "/ SEARCH", "TAB SIDEBAR", "ESC BACK"]'
+  yt_is '.look.legend == ["↵ try again", "/ search", "tab sidebar", "esc back"]'
 
 echo extraction >"$DOTS_DEV_DIR/youtube-fail"
 wtype -k Return
@@ -53,19 +52,18 @@ until_ok 3000 fails_with "$extraction"
 check "extraction: Enter on the block searched again ($(searches))" searched 2
 check "extraction: the fix line sits above yt-dlp's raw line in small mono ($(yt_state | jq -c .failed))" \
   yt_is --arg e "$extraction" '.failed.fix == $e and .failed.raw == "ERROR: [youtube] Sign in to confirm you'"'"'re not a bot" and .failed.rawFont == "Maple Mono" and .failed.rawSize == 11 and .failed.rawBelow'
-check "extraction: Paper heads the block YOUTUBE CHANGED ($(yt_state | jq -c .failed.kicker))" yt_is '.failed.kicker == "YOUTUBE CHANGED"'
 
 echo network >"$DOTS_DEV_DIR/youtube-fail"
 wtype -k Return
 until_ok 3000 fails_with "$network"
 check "network: the block reads the no-network line with try again, never an empty list ($(yt_state | jq -c '{failed, drawn: (.drawn | length)}'))" \
-  yt_is --arg e "$network" '.failed.fix == $e and .failed.retry == "↵ try again" and .failed.head == "YouTube didn'"'"'t give results" and .failed.kicker == "" and .drawn == []'
+  yt_is --arg e "$network" '.failed.fix == $e and .failed.retry == "↵ try again" and .failed.head == "YouTube didn'"'"'t give results" and .drawn == []'
 
 rm -f "$DOTS_DEV_DIR/youtube-fail"
 wtype -k Return
 until_ok 3000 yt_is '(.rows | length) == 20'
 check "with the fail file gone, Enter on the block searched again and lists 20 rows ($(searches) searches, $(yt_state | jq -c '{n: (.drawn | length), failed, legend: .look.legend[0]}'))" \
-  yt_is '(.drawn | length) == 20 and .failed == null and .error == null and .look.legend[0] == "J/K MOVE"'
+  yt_is '(.drawn | length) == 20 and .failed == null and .error == null and .look.legend[0] == "j/k move"'
 check "4 searches in all" searched 4
 
 wtype -k Escape

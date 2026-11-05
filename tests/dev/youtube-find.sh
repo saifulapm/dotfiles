@@ -34,8 +34,7 @@ exec "$repo/bin/dev-fake-youtube" "\$@"
 EOF
 chmod +x "$slow"
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_MACHINE=ytcheck DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -57,7 +56,7 @@ until_ok 3000 yt_is '.rows | length == 3'
 check "Enter searches playlists ($(calls_text))" logged "search nujabes playlists 0"
 check "each playlist row draws its count where a video draws its duration ($(yt_state | jq -c '[.drawn[] | [.title, .duration]]'))" \
   yt_is '[.rows[].kind] == ["playlist", "playlist", "playlist"] and [.drawn[].duration] == ["14 videos", "300 videos", ""] and [.drawn[].title] == ["Modal Soul", "Lofi Archive", "Private Mix"]'
-check "the list head counts the 3 rows ($(yt_state | jq -c .look.results))" yt_is '.look.results == ["RESULTS", "3"]'
+check "the list head counts the 3 rows ($(yt_state | jq -c .look.results))" yt_is '.look.results == ["Results", "3"]'
 wtype j
 wtype j
 sleep 0.3
@@ -163,7 +162,7 @@ check "m, a and s act on uploads as on search rows ($(yt_state | jq -c '.look.si
 wtype -k Escape
 until_ok 1000 yt_is '.opened == null'
 check "Esc returns to the channel results on the channel's row ($(yt_state | jq -c '{n: (.rows | length), cursor, head: .look.results}'))" \
-  yt_is '(.rows | length) == 3 and .rows[0].kind == "channel" and .cursor == 0 and .look.results == ["RESULTS", "3"]'
+  yt_is '(.rows | length) == 3 and .rows[0].kind == "channel" and .cursor == 0 and .look.results == ["Results", "3"]'
 wtype j
 wtype -k Return
 until_ok 3000 yt_is '.opened.id == "UCfakeChan00000000000002" and .paging.loading == false'
@@ -211,7 +210,7 @@ watch='https://www.youtube.com/watch?v=fakeVid0003&list=PLfakeList0001&t=30'
 paste_enter "$watch"
 until_ok 3000 yt_is '(.rows | length) == 1 and .rows[0].id == "fakeVid0003"'
 check "a watch URL with list= and t= resolves to its video, the only row, not the playlist ($(calls_text))" \
-  yt_is '(.rows | length) == 1 and .rows[0].id == "fakeVid0003" and .opened == null and .look.results == ["RESULTS", "1"]'
+  yt_is '(.rows | length) == 1 and .rows[0].id == "fakeVid0003" and .opened == null and .look.results == ["Results", "1"]'
 check "and asks for no search and no playlist ($(calls_text))" \
   bash -c "tail -n 2 '$calls' | grep -qxF 'resolve $watch' && [ \"\$(grep -c '^playlist PLfakeList0001' '$calls')\" = 1 ]"
 wtype -k Return
@@ -244,7 +243,7 @@ until_ok 3000 logged "search https://vimeo.com/123 playlists 0"
 check "another site's URL is searched as text, with no resolve ($(calls_text))" \
   bash -c "! grep -q '^resolve https://vimeo' '$calls'"
 until_ok 3000 yt_is '.opened == null'
-check "its results replace the opened channel ($(yt_state | jq -c '{opened, head: .look.results}'))" yt_is '.opened == null and .look.results[0] == "RESULTS"'
+check "its results replace the opened channel ($(yt_state | jq -c '{opened, head: .look.results}'))" yt_is '.opened == null and .look.results[0] == "Results"'
 
 wtype -k Escape
 until_ok 3000 yt_gone

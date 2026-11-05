@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enter in the YouTube App's field searches through DOTS_YOUTUBE and lists its 20 rows, each title one plain line, each thumbnail decoded at no more than twice its drawn size or, with none on disk, its theme's placeholder; a later search's answer wins over an earlier one still running.
+# Enter in the YouTube App's field searches through DOTS_YOUTUBE and lists its 20 rows, each title one plain line, each thumbnail decoded at no more than twice its drawn size or, with none on disk, a grey tile; a later search's answer wins over an earlier one still running.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -35,8 +35,7 @@ exec "$repo/bin/dev-fake-youtube" "\$@"
 EOF
 chmod +x "$slow"
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_YOUTUBE=$slow DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -51,8 +50,8 @@ wtype -k Return
 until_ok 3000 yt_is '.rows | length == 20'
 check "Enter asked the CLI for search nujabes videos 0 ($(calls_text))" logged "search nujabes videos 0"
 check "focus moved to the list on row 0 ($(yt_state | jq -c '{focus, cursor}'))" yt_is '.focus == "list" and .cursor == 0'
-check "20 rows are drawn under RESULTS 20 ($(yt_state | jq -c '{n: (.drawn | length), results: .look.results}'))" \
-  yt_is '(.drawn | length) == 20 and .look.results == ["RESULTS", "20"] and ([.drawn[].id] == [.rows[].id])'
+check "20 rows are drawn under Results 20 ($(yt_state | jq -c '{n: (.drawn | length), results: .look.results}'))" \
+  yt_is '(.drawn | length) == 20 and .look.results == ["Results", "20"] and ([.drawn[].id] == [.rows[].id])'
 check "row 3 draws as one line with no newline, U+202E or ESC ($(yt_state | jq -c '.drawn[3] | {title, titleLines, channel}'))" \
   yt_is '.drawn[3] | .title == "Low Tide Radio" and .titleLines == 1 and .channel == "lofi archive" and (.title | test("[\n‮\u001b]") | not)'
 check "row 5's 300-character title and channel each draw on one elided line ($(yt_state | jq -c '.drawn[5] | {titleLines, titleElided, channelElided}'))" \
@@ -63,10 +62,10 @@ until_ok 3000 thumbs_shown
 check "within 3 s every row but fakeVid0008 shows its thumbnail ($(yt_state | jq -c '[.drawn[] | select(.thumb.shown)] | length'))" thumbs_shown
 check "each thumbnail is its row's file ($(yt_state | jq -c '[.drawn[] | select(.thumb.shown) | .thumb.file][0:2]'))" \
   yt_is 'all(.drawn[] | select(.thumb.shown); .thumb.file == .id + ".jpg")'
-check "fakeVid0008 has no file and keeps Paper's hatched placeholder ($(yt_state | jq -c '.drawn[7] | {id, thumb}'))" \
-  yt_is '.look.viewFont == "Instrument Serif" and (.drawn[7] | .id == "fakeVid0008" and .thumb.shown == false and .thumb.placeholder == "hatched")'
-check "each shown thumbnail decodes at no more than twice its drawn 72x40 ($(yt_state | jq -c '.drawn[0].thumb | {width, height, decodedWidth, decodedHeight}'))" \
-  yt_is '[.drawn[] | select(.thumb.shown) | .thumb] | length == 19 and all(.width == 72 and .height == 40 and .decodedWidth > 0 and .decodedHeight > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height)'
+check "fakeVid0008 has no file and keeps the grey tile ($(yt_state | jq -c '.drawn[7] | {id, thumb}'))" \
+  yt_is '.drawn[7] | .id == "fakeVid0008" and .thumb.shown == false and .thumb.placeholder == "tile"'
+check "each shown thumbnail decodes at no more than twice its drawn 80x45 ($(yt_state | jq -c '.drawn[0].thumb | {width, height, decodedWidth, decodedHeight}'))" \
+  yt_is '[.drawn[] | select(.thumb.shown) | .thumb] | length == 19 and all(.width == 80 and .height == 45 and .decodedWidth > 0 and .decodedHeight > 0 and .decodedWidth <= 2 * .width and .decodedHeight <= 2 * .height)'
 page_ids=$(jq -r '[.rows[0:20][].thumb] | join(" ")' "$repo/dev/youtube/search.json")
 check "the App asked thumbs once, for the page's 20 ids ($(grep -c '^thumbs ' "$calls" 2>/dev/null))" \
   test "$(grep '^thumbs ' "$calls" 2>/dev/null)" = "thumbs $page_ids"

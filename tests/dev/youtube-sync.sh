@@ -21,8 +21,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 saved_count() { yt_is --arg s "Saved $1" '.look.sidebar[1] == $s'; }
 store_ids() { jq -e --arg p "$1" --argjson ids "$2" '.playlists[$p].items | keys == $ids' "$store" >/dev/null 2>&1; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
 item() { jq -c --arg id "$1" --argjson pos "$2" '.rows[] | select(.id == $id) | {id, title, channel, duration, thumb, pos: $pos, addedAt: 1, updatedAt: 1, deleted: false}' "$repo/dev/youtube/search.json"; }
 mkdir -p "$(dirname "$store")"

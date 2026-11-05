@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# YouTube is an App: its desktop entry starts its own qs process with one window on Search, drawn as each theme's board draws it, its keys move between the field, the list and the sidebar, and Esc on Search ends the process.
+# YouTube is an App: its desktop entry starts its own qs process with one window on Search, drawn as its board draws it, its keys move between the field, the list and the sidebar, and Esc on Search ends the process.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -17,8 +17,6 @@ yt_gone() { [ "$(yt_windows)" = 0 ]; }
 no_yt_process() { [ -z "$(session_qs_pids "-p $yt_qml")" ]; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 # The nested shell scans the temp data dir's entries, so the repo's entry goes there for the launcher to list.
 cp "$entry" "$DOTS_DEV_DIR/data/applications/youtube.desktop"
@@ -78,42 +76,15 @@ check "k goes back up to Search, which draws no empty text ($(yt_state | jq -c '
 wtype -k Tab
 until_ok 1000 yt_is '.focus == "list"'
 
-# Each board's own detail, read back from the drawn items while the window stays open.
-in_theme paper
-until_ok 3000 yt_is '.voice == "caps"'
-check "paper: a small caps label over a serif view name, from the launcher at its right ($(yt_state | jq -c '.look | {title, viewFont}'))" \
-  yt_is '.look.title == ["YOUTUBE", "Search", "from the launcher"] and .look.viewFont == "Instrument Serif"'
-check "paper: the legend reads in tracked caps ($(yt_state | jq -c '.look.legend[0:3]'))" \
-  yt_is '.look.legend == ["J/K MOVE", "↵ PLAY VIDEO", "M PLAY AUDIO", "A ADD TO QUEUE", "S SAVE", "P ADD TO PLAYLIST", "D/D DOWNLOAD AUDIO/VIDEO", "/ SEARCH", "TAB SIDEBAR", "ESC BACK"]'
-check "paper: a square frame and ruled field, solid rules, an empty now-playing line with repeat off ($(yt_state | jq -c '.look | {frameRadius, fieldRadius, ruleDashed, nowPlaying, chips}'))" \
-  yt_is '.look.frameRadius == 0 and .look.fieldRadius == 0 and .look.ruleDashed == false and .look.nowPlaying == ["", "repeat off"] and .look.chips == ["Videos", "Playlists", "Channels"] and .look.placeholder == "Search YouTube"'
-check "paper: the sidebar lists Search, Saved and History, PLAYLISTS and n makes one ($(yt_state | jq -c '.look.sidebar'))" \
-  yt_is '.look.sidebar == ["Search", "Saved 0", "History 0", "PLAYLISTS", "n makes one"]'
-in_theme artboard
-until_ok 3000 yt_is '.voice == "plain"'
-check "artboard: a YouTube pill beside a bold view name and a from the launcher pill ($(yt_state | jq -c '.look | {title, viewFont, viewBold, pills}'))" \
+# The board's own detail, read back from the drawn items while the window stays open.
+check "a YouTube pill beside a bold view name and a from the launcher pill ($(yt_state | jq -c '.look | {title, viewFont, viewBold, pills}'))" \
   yt_is '.look.title == ["YouTube", "Search", "from the launcher"] and .look.viewFont == "Maple Mono" and .look.viewBold and .look.pills == [true, true]'
-check "artboard: the legend reads in lower case chips ($(yt_state | jq -c '.look.legend[0:3]'))" \
+check "the legend reads in lower case chips ($(yt_state | jq -c '.look.legend[0:3]'))" \
   yt_is '.look.legend == ["j/k move", "↵ play video", "m play audio", "a add to queue", "s save", "p add to playlist", "d/D download audio/video", "/ search", "tab sidebar", "esc back"]'
-check "artboard: the frame and field are rounded 14 px and the rules are solid ($(yt_state | jq -c '.look | {frameRadius, fieldRadius, ruleDashed, results}'))" \
-  yt_is '.look.frameRadius == 14 and .look.fieldRadius == 14 and .look.ruleDashed == false and .look.results == ["Results", "0"]'
-in_theme blueprint
-until_ok 3000 yt_is '.voice == "bracket"'
-check "blueprint: YOUTUBE, a bold view name and FROM THE LAUNCHER ($(yt_state | jq -c '.look | {title, viewBold}'))" \
-  yt_is '.look.title == ["YOUTUBE", "Search", "FROM THE LAUNCHER"] and .look.viewBold and .look.pills == [false, false]'
-check "blueprint: the legend reads [KEY] WORD in upper case ($(yt_state | jq -c '.look.legend[0:3]'))" \
-  yt_is '.look.legend == ["[J/K] MOVE", "[↵] PLAY VIDEO", "[M] PLAY AUDIO", "[A] ADD TO QUEUE", "[S] SAVE", "[P] ADD TO PLAYLIST", "[D/⇧D] DOWNLOAD AUDIO / VIDEO", "[/] SEARCH", "[TAB] SIDEBAR", "[ESC] BACK"]'
-check "blueprint: square corners, dashed rules, caps chips and REPEAT OFF ($(yt_state | jq -c '.look | {frameRadius, fieldRadius, ruleDashed, chips, nowPlaying, hint}'))" \
-  yt_is '.look.frameRadius == 0 and .look.fieldRadius == 0 and .look.ruleDashed and .look.chips == ["VIDEOS", "PLAYLISTS", "CHANNELS"] and .look.nowPlaying == ["", "REPEAT OFF"] and .look.hint == "[/]"'
-check "blueprint: the sidebar opens with LIBRARY over Search ($(yt_state | jq -c '.look.sidebar[0:2]'))" \
-  yt_is '.look.sidebar[0:2] == ["LIBRARY", "Search"]'
-
-no_marks() { [ -z "$(yt_state | marked)" ]; }
-in_theme hi-fi
-until_ok 3000 no_marks
-check "hi-fi: the legend reads Blueprint's keys without their brackets ($(yt_state | jq -c '.look.legend[0:3]'))" \
-  yt_is '.look.legend == ["J/K MOVE", "↵ PLAY VIDEO", "M PLAY AUDIO", "A ADD TO QUEUE", "S SAVE", "P ADD TO PLAYLIST", "D/⇧D DOWNLOAD AUDIO / VIDEO", "/ SEARCH", "TAB SIDEBAR", "ESC BACK"] and .look.hint == "/"'
-check "hi-fi: nothing in the state holds a bracket ($(yt_state | marked | head -3 | paste -sd'|'))" no_marks
+check "the frame and field are rounded 14 px, with an empty now-playing line and repeat off ($(yt_state | jq -c '.look | {frameRadius, fieldRadius, results, nowPlaying, chips}'))" \
+  yt_is '.look.frameRadius == 14 and .look.fieldRadius == 14 and .look.results == ["Results", "0"] and .look.nowPlaying == ["", "repeat off"] and .look.chips == ["Videos", "Playlists", "Channels"] and .look.placeholder == "Search YouTube"'
+check "the sidebar lists Search, Saved and History, PLAYLISTS and n makes one ($(yt_state | jq -c '.look.sidebar'))" \
+  yt_is '.look.sidebar == ["Search", "Saved 0", "History 0", "PLAYLISTS", "n makes one"]'
 
 check "it is still on Search with the list focused before Esc ($(yt_state | jq -c '{view, focus}'))" yt_is '.view == "search" and .focus == "list"'
 wtype -k Escape

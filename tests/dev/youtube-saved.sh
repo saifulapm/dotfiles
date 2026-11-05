@@ -21,8 +21,7 @@ status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition
 store_holds() { jq -e '(.playlists.saved.items | keys) == ["fakeVid0002"] and (.playlists.saved.items.fakeVid0002 | {id, title, channel, duration, thumb}) == {"id": "fakeVid0002", "title": "Feather (feat. Cise Starr & Akin)", "channel": "Nujabes - Topic", "duration": 296, "thumb": "fakeVid0002"}' "$store" >/dev/null 2>&1; }
 saved_count() { yt_is --arg s "Saved $1" '.look.sidebar[1] == $s'; }
 
-legacy_theme paper >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 # The nested session's XDG_STATE_HOME is scratch already and holds the theme the App draws in, so only data and cache move.
 exec_line="env DOTS_DEV_DIR=$DOTS_DEV_DIR DOTS_MACHINE=ytcheck DOTS_YOUTUBE=$repo/bin/dev-fake-youtube DOTS_YOUTUBE_MPV=$repo/dev/youtube/mpv $mise_dirs XDG_DATA_HOME=$work/data XDG_CACHE_HOME=$work $repo/bin/dots-youtube"
 open_app() {
