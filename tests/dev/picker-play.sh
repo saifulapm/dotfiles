@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Slowed 20 times, each card's miniature switch is seen mid-play: Blueprint's scan, Hi-Fi's sweep, Artboard's fade and zoom, Paper's slide.
+# Slowed 20 times, a card's miniature crossfade is seen mid-play: its specimen part way faded in over the picker's paper, then whole at rest.
 {
 export DOTS_MOTION_SLOWDOWN=20
 source "$(dirname "$0")/lib.sh"
@@ -18,63 +18,25 @@ preview_mean() {
 near() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= $3 && b[i] - a[i] <= $3)) || return 1; done; }
 
 until_ok 5000 shell_status >/dev/null
-until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"paper\"' >/dev/null"
+until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"artboard\"' >/dev/null"
 niri msg action spawn -- dots-call themes toggle
-# Paper's open takes 120 ms, 2.4 s slowed.
 until_ok 6000 state_is '.open and .settled'
 
-# Blueprint's scan, 4.4 s slowed: halfway, its bottom rows are still Paper's paper and its top rows its own navy.
-wtype 3
-sleep 2.2
-mid=$(stage blueprint)
-bottom=$(preview_mean blueprint 100 182 40 8)
-top=$(preview_mean blueprint 100 24 40 4)
-check "blueprint mid-scan has drawn part of its card: $mid" jq -e '.h > 40 and .h < 156' <<<"$mid"
-check "blueprint mid-scan: the bottom is still Paper's paper ($bottom)" near "$bottom" "241 233 216" 12
-check "blueprint mid-scan: the top is already its navy ($top)" near "$top" "12 26 46" 20
-until_ok 4000 state_is '.played.ms >= 0'
+# The preview's last rows, below its windows, are bare paper; the card scales the preview, so the row is read from its drawn height.
+bare_y() { themes_state | jq -r '.cards[] | select(.name == "catppuccin-mocha") | .preview.h * 0.97 | floor'; }
 
-# Hi-Fi's sweep, 4.4 s slowed: halfway, one grab of a preview row has its dark paper left of the pointer, Paper's cream right of it, and red where the stage ends. The pointer moves fastest mid-sweep, so the stage is read just before and just after that grab.
-wtype 4
-sleep 2.2
-read -r px py < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "hi-fi") | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
-before=$(stage hi-fi)
-# From one grab of preview row 100: the mean of x 20 to 60, the mean of the 40 px from 30 px past the stage's edge, and the first and last red x.
-sweep_row() {
-  grim -s 1 -t ppm -g "$px,$((py + 100)) 306x1" - | node -e '
-    const b = require("fs").readFileSync(0);
-    const px = b.subarray(b.toString("latin1").match(/^P6\s+\d+\s+\d+\s+\d+\s/)[0].length);
-    const at = (i) => [px[i * 3], px[i * 3 + 1], px[i * 3 + 2]];
-    const mean = (a, z) => { const s = [0, 0, 0]; for (let i = a; i < z; i++) at(i).forEach((v, c) => (s[c] += v)); return s.map((v) => Math.round(v / (z - a))).join(" "); };
-    const xs = [];
-    for (let i = 0; i < 306; i++) if (px[i * 3] > 200 && px[i * 3 + 1] < 110 && px[i * 3 + 2] < 110) xs.push(i);
-    const r = Math.min(Math.round(+process.argv[1]) + 30, 266);
-    console.log(`${mean(20, 60)}|${mean(r, r + 40)}|${xs.length ? `${xs[0]} ${xs[xs.length - 1]}` : "none"}`);
-  ' "$1"
-}
-IFS='|' read -r left right red < <(sweep_row "$(jq .w <<<"$before")")
-after=$(stage hi-fi)
-w0=$(jq '.w | floor' <<<"$before") w1=$(jq '.w | ceil' <<<"$after")
-check "hi-fi mid-sweep has crossed part of its card: $before" jq -e '.w > 40 and .w < 236' <<<"$before"
-check "hi-fi mid-sweep: left of the pointer is its dark paper ($left)" near "$left" "29 32 33" 20
-check "hi-fi mid-sweep: past the pointer is still Paper's paper ($right)" near "$right" "241 233 216" 12
-check "hi-fi mid-sweep: red pointer pixels lie between the stage's edge before and after the grab ($red, stage $w0 to $w1)" bash -c 'read -r a b <<<"$1"; [[ $a =~ ^[0-9]+$ && $a -ge $(($2 - 6)) && $b -le $(($3 + 6)) ]]' _ "$red" "$w0" "$w1"
-until_ok 4000 state_is '.played.ms >= 0'
-
-# Artboard's zoom fades its card in over 4.4 s.
+# The crossfade runs 5.2 s slowed; 1.6 s in, catppuccin-mocha's card is part way between Artboard's paper and its own.
 wtype 2
-sleep 1.1
-mid=$(stage artboard)
-check "artboard mid-zoom is fading in and scaled: $mid" jq -e '.opacity > 0.05 and .opacity < 0.95 and .scale < 1' <<<"$mid"
-until_ok 4000 state_is '.played.ms >= 0'
-
-# Paper's slide eases out over 4.4 s; early on its card is still below its place.
-wtype 1
-sleep 0.2
-mid=$(stage paper)
-check "paper mid-slide is below its place: $mid" jq -e '.y > 10' <<<"$mid"
-until_ok 6000 state_is '.played.ms >= 0'
+sleep 1.6
+mid=$(stage catppuccin-mocha)
+bottom=$(preview_mean catppuccin-mocha 60 "$(bare_y)" 40 2)
+check "catppuccin-mocha mid-fade is part way in, at its full size: $mid" jq -e '.opacity > 0.05 and .opacity < 0.95 and .scale == 1 and .h == 196 and .w == 306 and .y == 0' <<<"$mid"
+partway() { local v; read -r -a v <<<"$1"; ((v[0] < 220 && v[0] > 25)); }
+check "catppuccin-mocha mid-fade: its bare paper reads between #E4E6EA and #11111B ($bottom)" partway "$bottom"
+until_ok 8000 state_is '.played.ms >= 0'
 check "at rest every card is drawn whole" state_is 'all(.cards[]; .stage == {"y": 0, "h": 196, "w": 306, "opacity": 1, "scale": 1})'
+rest=$(preview_mean catppuccin-mocha 60 "$(bare_y)" 40 2)
+check "catppuccin-mocha at rest: its bare paper is #11111B ($rest)" near "$rest" "17 17 27" 12
 
 wtype -k Escape
 exit $((fails > 0))

@@ -1,192 +1,100 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parseToml } from './toml.mjs';
-import { validateTheme, checkTokens } from './theme.mjs';
 import { cards, step, jump, previewSwitch, cardName, tagline, pickerLook, windowLook, terminalLines, swatches, specimenMargins, panelWidth, cardWidth } from './themes.mjs';
+import { schemeTokens } from './colorscheme-file.mjs';
 
-const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
-const paper = load('paper');
-const artboard = load('artboard');
-const blueprint = load('blueprint');
-// The shell reads Hi-Fi as the bracket voice plus engraved, as shell.json and themes.json reach it.
-const hifi = checkTokens(load('hi-fi'));
+const artboard = schemeTokens('artboard');
+const gruvbox = schemeTokens('gruvbox-dark');
+const dawn = schemeTokens('rose-pine-dawn');
 
-const names = ['paper', 'artboard', 'blueprint'];
+const names = ['artboard', 'gruvbox-dark', 'rose-pine-dawn'];
 
 test('step moves the cursor by one name and stops at the ends', () => {
-  assert.equal(step(names, 'paper', 1), 'artboard');
-  assert.equal(step(names, 'blueprint', -1), 'artboard');
-  assert.equal(step(names, 'blueprint', 1), 'blueprint');
-  assert.equal(step(names, 'paper', -1), 'paper');
+  assert.equal(step(names, 'artboard', 1), 'gruvbox-dark');
+  assert.equal(step(names, 'rose-pine-dawn', -1), 'gruvbox-dark');
+  assert.equal(step(names, 'rose-pine-dawn', 1), 'rose-pine-dawn');
+  assert.equal(step(names, 'artboard', -1), 'artboard');
 });
 
-test('each card names its theme in its own typeface and voice', () => {
-  assert.deepEqual([paper, artboard, blueprint].map((t) => { const n = cardName(t); return [n.text, n.font, n.size, n.weight]; }), [
-    ['Paper', 'Instrument Serif', 26, 400],
+test('each card names its scheme in Maple Mono 16 px bold and says whether it is light or dark', () => {
+  assert.deepEqual([artboard, gruvbox].map((t) => { const n = cardName(t); return [n.text, n.font, n.size, n.weight]; }), [
     ['Artboard', 'Maple Mono', 16, 700],
-    ['BLUEPRINT', 'Maple Mono', 14, 700],
+    ['Gruvbox-dark', 'Maple Mono', 16, 700],
   ]);
+  assert.deepEqual([artboard, gruvbox].map((t) => tagline(t).text), ['Light', 'Dark']);
 });
 
-test('each card sums up its primitives in its own voice', () => {
-  assert.deepEqual([paper, artboard, blueprint].map((t) => tagline(t).text), ['grain, ink, a hard shadow', 'Dots · soft shadow · round', 'GRID // GLOW // CUT']);
-  assert.equal(tagline(paper).italic, true);
-});
-
-test('Paper dresses the picker: a serif header, three on the shelf, a vermilion 2 px cursor with a 4 px hard shadow, IN USE', () => {
-  const l = pickerLook(paper);
-  assert.deepEqual([l.header(3, 'paper').title, l.header(3, 'paper').sub, l.header(3, 'paper').right], ['Themes', 'three on the shelf', 'PAPER IN USE']);
-  assert.equal(l.header(4, 'paper').sub, 'four on the shelf');
-  assert.deepEqual([l.cursor.border, l.cursor.shadow.kind, l.cursor.shadow.x, l.cursor.shadow.color], [{ width: 2, color: '#C8381E' }, 'hard', 4, '#C8381E']);
-  assert.equal(l.tag(true, false).text, 'IN USE');
-  assert.equal(l.tag(false, true), null);
-  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['J/K CHOOSE', '1–3 JUMP', '↵ APPLY']);
-  assert.equal(l.number(0), '');
-});
-
-test('Artboard dresses the picker: Themes · 3 themes, a white tile outlined 1.5 px blue, Current and a return badge', () => {
+test("the picker is Artboard's board in every scheme: Themes, 5 themes, Current and a 1.5 px outline, no shadow", () => {
   const l = pickerLook(artboard);
-  assert.deepEqual([l.header(3, 'artboard').title, l.header(3, 'artboard').sub], ['Themes', '3 themes']);
-  assert.deepEqual([l.cursor.fill, l.cursor.border], ['#FFFFFF', { width: 1.5, color: '#3D5AFE' }]);
-  assert.equal(l.tile.fill, '#F6F7F9');
+  assert.deepEqual([l.header(5, 'artboard').title, l.header(5, 'artboard').sub, l.header(5, 'artboard').right], ['Themes', '5 themes', '']);
   assert.deepEqual([l.tag(true, true).text, l.tag(false, true).text, l.tag(false, false)], ['Current', '↵', null]);
-  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['j/k choose', '1–3 jump', '↵ apply']);
-  assert.equal(l.chips, true);
-});
-
-test("Frost's picker tile is its dark field colour", () => {
-  assert.equal(pickerLook(checkTokens(load('frost'))).tile.fill, '#323845');
-});
-
-test("Frost's picker is a glass board: Themes · five on the shelf, In use: Frost, #434C5E edges, an accent-tinted cursor, an ok lamp", () => {
-  const l = pickerLook(checkTokens(load('frost')));
-  const h = l.header(5, 'frost');
-  assert.deepEqual([h.title + h.sub, h.right, h.font, h.subFont], ['Themes · five on the shelf', 'In use: Frost', 'Inter', 'Inter']);
-  assert.deepEqual(l.tile.border, { width: 1, color: '#434C5E' });
-  assert.equal(l.tile.radius, 10);
-  assert.deepEqual([l.cursor.fill, l.cursor.border, l.cursor.shadow], ['#1a88C0D0', { width: 1, color: '#88C0D0' }, undefined]);
-  assert.deepEqual([l.tag(true, true).text, l.tag(true, true).lamp, l.tag(false, true).text, l.tag(false, true).lamp, l.tag(false, false)], ['In use', 'green', '↵ Apply', undefined, null]);
-  assert.deepEqual(l.legend(5).map((k) => `${k.key} ${k.word}`), ['j k Choose', '1–5 Jump', '↵ Apply']);
-  assert.equal(l.esc, 'esc Close');
-});
-
-test("Artboard's picker stays as it was: Themes, 5 themes, Current, a 1.5 px outline and a soft shadow", () => {
-  const l = pickerLook(artboard);
-  assert.deepEqual([l.header(5, 'artboard').sub, l.header(5, 'artboard').right], ['5 themes', '']);
-  assert.deepEqual([l.tag(true, true).text, l.tag(false, true).text], ['Current', '↵']);
   assert.deepEqual(l.tile, { fill: '#F6F7F9', border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 });
-  assert.deepEqual(l.cursor, { fill: '#FFFFFF', border: { width: 1.5, color: '#3D5AFE' }, shadow: { kind: 'soft', x: 0, y: 8, blur: 20, spread: -10, color: '#3D5AFE', alpha: 0.45 }, radius: 12, ticks: false });
+  assert.deepEqual(l.cursor, { fill: '#FFFFFF', border: { width: 1.5, color: '#3D5AFE' }, radius: 12 });
   assert.deepEqual(l.legend(5).map((k) => `${k.key} ${k.word}`), ['j/k choose', '1–5 jump', '↵ apply']);
   assert.equal(l.esc, 'esc');
+  assert.deepEqual([pickerLook(gruvbox).cursor.fill, pickerLook(gruvbox).cursor.border.color], ['#282828', '#83A598']);
 });
 
-test('Blueprint dresses the picker: THEMES // 3 SHEETS, ACTIVE: BLUEPRINT, numbered sheets, [ACTIVE] and [↵]', () => {
-  const l = pickerLook(blueprint);
-  const h = l.header(3, 'blueprint');
-  assert.deepEqual([h.title + h.sub, h.right], ['THEMES // 3 SHEETS', 'ACTIVE: BLUEPRINT']);
-  assert.deepEqual([0, 1, 2].map(l.number), ['01', '02', '03']);
-  assert.deepEqual([l.tag(true, false).text, l.tag(false, true).text], ['[ACTIVE]', '[↵]']);
-  assert.deepEqual([l.cursor.border, l.cursor.ticks], [{ width: 1, color: '#7FE3F0' }, true]);
-  assert.deepEqual(l.legend(3).map((k) => `${k.key} ${k.word}`), ['[J/K] CHOOSE', '[1–3] JUMP', '[↵] APPLY']);
-  assert.equal(l.esc, '[ESC]');
-});
-
-test('a specimen window is framed as niri frames it: Paper ink then muted, hard 2,2 shadows', () => {
-  assert.deepEqual(windowLook(paper, true), { fill: '#FAF6EC', frame: { width: 1, color: '#1C1915' }, shadow: { x: 2, y: 2, blur: 0, color: '#1C1915' }, radius: 0 });
-  assert.deepEqual(windowLook(paper, false).frame, { width: 1, color: '#575653' });
-  assert.equal(windowLook(paper, false).shadow.color, '#575653');
-});
-
-test('Artboard rings only the focused window in blue, rounds both, and shades the other at 0.75 as niri does', () => {
-  assert.deepEqual(windowLook(artboard, true), { fill: '#FFFFFF', frame: { width: 1.5, color: '#3D5AFE' }, shadow: { x: 0, y: 9, blur: 20, color: '#2e15171B' }, radius: 6 });
-  assert.deepEqual(windowLook(artboard, false).frame, { width: 0, color: 'transparent' });
-  assert.equal(windowLook(artboard, false).shadow.color, '#2315171B');
-});
-
-test('Blueprint frames the focused window cyan with its glow, the other #2E5A72 with none', () => {
-  assert.deepEqual(windowLook(blueprint, true), { fill: '#0A1526', frame: { width: 1, color: '#7FE3F0' }, shadow: { x: 0, y: 0, blur: 9, color: '#407FE3F0' }, radius: 0 });
-  assert.deepEqual(windowLook(blueprint, false).frame, { width: 1, color: '#2E5A72' });
-  assert.equal(windowLook(blueprint, false).shadow.color, '#00000000');
-});
-
-test('niri border and ring colours with alpha read as Qt reads them, #AARRGGBB', () => {
-  const t = { ...blueprint, niri: { ...blueprint.niri, border_inactive: '#2E5A7280' } };
-  assert.equal(windowLook(t, false).frame.color, '#802E5A72');
-  const r = { ...artboard, niri: { ...artboard.niri, ring_color: '#3D5AFE80' } };
-  assert.equal(windowLook(r, true).frame.color, '#803D5AFE');
-});
-
-test('a theme without niri shadow keys draws its specimen windows with none', () => {
-  const flat = { ...paper, niri: { gaps: 16, border: 1, blur: false } };
-  assert.equal(windowLook(flat, true).shadow, null);
+test('a specimen window is framed as niri frames it: 1 px ink when focused, the line colour when not, square, no shadow', () => {
+  assert.deepEqual(windowLook(gruvbox, true), { fill: '#282828', frame: { width: 1, color: '#EBDBB2' }, radius: 0 });
+  assert.deepEqual(windowLook(gruvbox, false), { fill: '#282828', frame: { width: 1, color: gruvbox.color.line }, radius: 0 });
 });
 
 test('the terminal reads four lines in the ANSI colours: blue path, red prompt, green pass, yellow hash', () => {
-  const lines = terminalLines(blueprint);
+  const lines = terminalLines(gruvbox);
   assert.equal(lines.length, 4);
   assert.deepEqual(lines.map((l) => l.map((r) => r.text).join('')), [
-    '~/S/g/dotfiles ❯ just test', '✓ 42 passed · 0.9 s', '~/S/g/dotfiles ❯ git log -1', 'a1e9e71 blueprint on the shelf',
+    '~/S/g/dotfiles ❯ just test', '✓ 42 passed · 0.9 s', '~/S/g/dotfiles ❯ git log -1', 'a1e9e71 gruvbox-… on the shelf',
   ]);
-  assert.deepEqual([lines[0][0].color, lines[0][1].color, lines[1][0].color, lines[3][0].color], ['#82AAFF', '#EF5350', '#ADDB67', '#FFB547']);
+  assert.deepEqual([lines[0][0].color, lines[0][1].color, lines[1][0].color, lines[3][0].color], ['#458588', '#CC241D', '#98971A', '#D79921']);
 });
 
 test('the palette strip is ink, ANSI 1 to 6 and the paper', () => {
-  assert.deepEqual(swatches(paper), ['#1C1915', '#C8381E', '#66800B', '#8E6B01', '#205EA6', '#A02F6F', '#24837B', '#F1E9D8']);
-  assert.deepEqual(swatches(blueprint), ['#D6F4F8', '#EF5350', '#ADDB67', '#FFB547', '#82AAFF', '#C792EA', '#7FE3F0', '#0C1A2E']);
+  assert.deepEqual(swatches(gruvbox), ['#EBDBB2', '#CC241D', '#98971A', '#D79921', '#458588', '#B16286', '#689D6A', '#1D2021']);
 });
 
-test('the specimen margins read one scene in each voice: 03 — FOOT, Page 03 / foot, [03] FOOT', () => {
-  const read = (t) => { const m = specimenMargins(t); return [m.number + m.tail, m.goal + m.date, m.rules]; };
-  assert.deepEqual(read(paper), ['03 — FOOT · ~', 'SHIP V2 · 3D — SUN 18 OCT', true]);
-  assert.deepEqual(read(artboard), ['Page 03 / foot — ~', 'Ship v2 · 3d  Sun 18 Oct', false]);
-  assert.deepEqual(read(blueprint), ['[03] FOOT — ~', 'SHIP V2 T−3D · 2026-10-18', false]);
-  assert.equal(specimenMargins(blueprint).goalColor, '#FFB547');
+test('the specimen margins read one scene: Page 03 / foot', () => {
+  const m = specimenMargins(artboard);
+  assert.deepEqual([m.number + m.tail, m.goal + m.date, m.rules], ['Page 03 / foot — ~', 'Ship v2 · 3d  Sun 18 Oct', true]);
 });
 
 test('before the theme loads the picker still has a whole look', () => {
   const l = pickerLook(null);
-  assert.deepEqual([l.header(3, '').title, l.tag(true, false).text, l.cursor.border.width, l.legend(3).length], ['Themes', 'IN USE', 2, 3]);
+  assert.deepEqual([l.header(3, '').title, l.tag(true, false).text, l.cursor.border.width, l.legend(3).length], ['Themes', 'Current', 1.5, 3]);
+});
+
+test('a card plays the crossfade in miniature, slowed with the desktop', () => {
+  assert.deepEqual(previewSwitch(1), { kind: 'fade', ms: 260 });
+  assert.equal(previewSwitch(20).ms, 5200);
 });
 
 test('a digit jumps to its card, and one with no card changes nothing', () => {
-  const names = ['paper', 'artboard', 'blueprint'];
-  assert.equal(jump(names, 'paper', 3), 'blueprint');
-  assert.equal(jump(names, 'blueprint', 1), 'paper');
+  assert.equal(jump(names, 'artboard', 3), 'rose-pine-dawn');
+  assert.equal(jump(names, 'rose-pine-dawn', 1), 'artboard');
   assert.equal(jump(names, 'artboard', 7), 'artboard');
   assert.equal(jump(names, 'artboard', 0), 'artboard');
 });
 
-test('a card plays its own theme switch in miniature: Paper slides, Artboard zooms, Blueprint scans, Hi-Fi sweeps, in 220 ms', () => {
-  assert.deepEqual([paper, artboard, blueprint].map((t) => previewSwitch(t.primitive.motion, 1)), [
-    { kind: 'slide', ms: 220 }, { kind: 'zoom', ms: 220 }, { kind: 'scan', ms: 220 },
-  ]);
-  assert.deepEqual(previewSwitch('ease', 1), { kind: 'cut', ms: 0 });
-  assert.deepEqual(previewSwitch('linear', 10), { kind: 'scan', ms: 2200 });
-  assert.deepEqual(previewSwitch('dial', 1), { kind: 'sweep', ms: 220 });
-  assert.equal(previewSwitch('dial', 20).ms, 4400);
-});
-
 test('a themes.json entry the shell would refuse gets no card, and the rest keep theirs', () => {
-  const noNiri = { ...artboard }; delete noNiri.niri;
+  const noNiri = { ...artboard, name: 'noniri' }; delete noNiri.niri;
   const noAnsi = { ...artboard, name: 'noansi', color: { ...artboard.color } }; delete noAnsi.color.ansi;
-  const noPaper = { ...blueprint, name: 'nopaper' }; delete noPaper.paper;
-  const list = cards([paper, noNiri, noAnsi, noPaper, null, 'x', blueprint]);
-  assert.deepEqual(list.map((t) => t.name), ['paper', 'nopaper', 'blueprint']);
+  const noPaper = { ...gruvbox, name: 'nopaper' }; delete noPaper.paper;
+  const list = cards([dawn, noNiri, noAnsi, noPaper, null, 'x', gruvbox]);
+  assert.deepEqual(list.map((t) => t.name), ['rose-pine-dawn', 'nopaper', 'gruvbox-dark']);
   assert.deepEqual(list[1].paper, {});
   assert.deepEqual(cards({ not: 'a list' }), []);
 });
 
 test('a forged theme name draws on one line, in the order it is spelt', () => {
-  const t = { ...paper, name: 'pa\nper\u202Eevil' };
+  const t = { ...dawn, name: 'pa\nper\u202Eevil' };
   assert.equal(cardName(t).text, 'Pa perevil');
   assert.equal(terminalLines(t)[3][1].text, 'pa perev… on the shelf');
-  assert.equal(cardName({ ...blueprint, name: 'blue\tprint' }).text, 'BLUE PRINT');
+  assert.equal(cardName({ ...gruvbox, name: 'gruv\tbox' }).text, 'Gruv box');
 });
 
 test('a long theme name is cut in the terminal line, so the line fits its window', () => {
-  assert.equal(terminalLines({ ...paper, name: 'n'.repeat(200) })[3][1].text, 'nnnnnnnn… on the shelf');
-  assert.equal(terminalLines(blueprint)[3][1].text, 'blueprint on the shelf');
+  assert.equal(terminalLines({ ...dawn, name: 'n'.repeat(200) })[3][1].text, 'nnnnnnnn… on the shelf');
+  assert.equal(terminalLines(artboard)[3][1].text, 'artboard on the shelf');
 });
 
 test('the picker gives every card 326 px up to four themes on a wide screen', () => {
@@ -204,39 +112,3 @@ test('on a narrow screen four cards shrink to fit inside a 24 px gutter', () => 
   assert.equal(cardWidth(4, 1200), 265);
 });
 
-test('Hi-Fi dresses the picker: THEMES · 4 SOURCES, IN USE: HI-FI, an amber cursor over #3C3836 tiles, a green lamp by IN USE', () => {
-  const l = pickerLook(hifi);
-  const h = l.header(4, 'hi-fi');
-  assert.deepEqual([h.title + h.sub, h.right], ['THEMES · 4 SOURCES', 'IN USE: HI-FI']);
-  assert.equal(l.header(5, 'hi-fi').sub, ' · 5 SOURCES');
-  assert.equal(l.legend(4).map((k) => `${k.key} ${k.word}`).concat([l.esc]).join('  '), 'J K CHOOSE  1–4 JUMP  ↵ APPLY  ESC');
-  assert.deepEqual([l.cursor.border, l.cursor.shadow.kind, l.cursor.shadow.color, l.cursor.ticks], [{ width: 1, color: '#FABD2F' }, 'glow', '#FABD2F', false]);
-  assert.deepEqual(l.tile.border, { width: 1, color: '#3C3836' });
-  const inUse = l.tag(true, false);
-  assert.deepEqual([inUse.text, inUse.lamp, inUse.color], ['IN USE', 'green', '#EBDBB2']);
-  assert.deepEqual([l.tag(false, true).text, l.tag(false, true).color, l.tag(false, true).lamp ?? ''], ['↵ APPLY', '#FABD2F', '']);
-  assert.equal(l.tag(false, false), null);
-});
-
-test('the Hi-fi card is named Hi-fi in Maple Mono 26 px over BRUSHED · AMBER · DIAL', () => {
-  const n = cardName(hifi);
-  assert.deepEqual([n.text, n.font, n.size, n.weight], ['Hi-fi', 'Maple Mono', 26, 400]);
-  assert.equal(tagline(hifi).text, 'BRUSHED · AMBER · DIAL');
-});
-
-test("Hi-Fi's palette strip is its surface, then its bright ANSI 9 to 15", () => {
-  assert.deepEqual(swatches(hifi), ['#282828', '#FB4934', '#B8BB26', '#FABD2F', '#83A598', '#D3869B', '#8EC07C', '#EBDBB2']);
-});
-
-test("Hi-Fi's specimen bar lights one lamp before the shown workspace and puts a red lamp before the goal", () => {
-  const m = specimenMargins(hifi);
-  assert.deepEqual(m.lamps.map((w) => [w.text, w.light]), [['03', 'lit']]);
-  assert.deepEqual([m.number + m.tail, m.numberColor, m.goalLamp], ['03  FOOT', '#FABD2F', 'red']);
-  assert.deepEqual([specimenMargins(paper).lamps, specimenMargins(paper).goalLamp], [[], '']);
-});
-
-test('Frost\'s card reads Frost · glass · ease in Inter, its name too, sentence case', () => {
-  const frost = checkTokens(load('frost'));
-  assert.deepEqual([tagline(frost).text, tagline(frost).font], ['Frost · glass · ease', 'Inter']);
-  assert.deepEqual([cardName(frost).text, cardName(frost).font], ['Frost', 'Inter']);
-});

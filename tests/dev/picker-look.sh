@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The picker wears the current theme: each theme's cursor, current tag, header and keys, and n cards share its width.
+# The picker wears the current colorscheme on the one design: its cursor, current tag, header and keys, a card per scheme, and n cards share its width.
 {
 # Slowed, so the picker opens while the paper's switch still plays.
 export DOTS_MOTION_SLOWDOWN=20
@@ -10,10 +10,7 @@ themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
 state_is() { themes_state | jq -e "$@" >/dev/null; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
-switch() {
-  node "$repo/shell/lib/theme-render.mjs" "$1" >/dev/null
-  printf '%s\n' "$1" >"$XDG_STATE_HOME/dots/theme"
-}
+switch() { "$repo/bin/dots" colorscheme "$1" >/dev/null; }
 shown() { state_is '.open and .settled'; }
 gone() { state_is '.open == false'; }
 open_picker() { niri msg action spawn -- dots-call themes toggle; until_ok 3000 shown; }
@@ -49,144 +46,49 @@ all_rgb() {
     }
   ' "$@"
 }
-vermilion() { all_rgb 200 56 30 10; }
+blue() { all_rgb 61 90 254 30; }
 
 until_ok 5000 shell_status >/dev/null
-until_ok 3000 status_theme paper
+until_ok 3000 status_theme artboard
 
-# Paper: the cursor starts on paper, the current theme.
+# Artboard: the cursor starts on the scheme in use.
 open_picker
-read -r w h < <(card_size paper)
-border_2px() { card_grab paper 0 $((h / 2)) 2 4 | vermilion && ! card_grab paper 2 $((h / 2)) 1 4 | vermilion; }
-check "paper: the cursor card's left edge is 2 px of #C8381E, then not" border_2px
-shadow_4px() { card_grab paper $((w / 2)) "$h" 4 4 | vermilion && ! card_grab paper $((w / 2)) $((h + 4)) 4 1 | vermilion; }
-check "paper: under the cursor card lies a 4 px #C8381E hard shadow, then not" shadow_4px
-check "paper: the cursor card reports a 2 px #c8381e border" state_is '.cards[0].border == {"width": 2, "color": "#c8381e"}'
-check "paper: the current card shows IN USE" state_is '[.cards[].tag] == ["IN USE", "", "", "", ""]'
-check "paper: the header reads Themes five on the shelf, PAPER IN USE" state_is '.header == ["Themesfive on the shelf", "PAPER IN USE"]'
-check "paper: Frost's card reads Frost · glass · ease, whole ($(themes_state | jq -c '.cards[] | select(.name == "frost") | [.tagline, .taglineElided]'))" \
-  state_is '.cards[] | select(.name == "frost") | .tagline == "Frost · glass · ease" and .taglineElided == false'
-aligned() { state_is '(.headerBaselines[0] - .headerBaselines[1] | fabs) < 1 and all(.cards[]; .tag == "" or ((.baselines[0] - .baselines[1]) | fabs) < 1)'; }
-check "paper: PAPER IN USE and IN USE sit on the header's and the name's baselines" aligned
-check "paper: the keys read J/K CHOOSE  1–5 JUMP  ↵ APPLY  ESC" state_is '.legend == "J/K CHOOSE  1–5 JUMP  ↵ APPLY  ESC"'
+check "artboard: a card for each of the five schemes, light or dark, artboard first ($(themes_state | jq -c '[.cards[] | [.title, .tagline]]'))" \
+  state_is '[.cards[] | [.title, .tagline]] == [["Artboard", "Light"], ["Catppuccin-mocha", "Dark"], ["Github-light", "Light"], ["Gruvbox-dark", "Dark"], ["Rose-pine-dawn", "Light"]]'
+check "artboard: the header reads Themes 5 themes" state_is '.header == ["Themes5 themes", ""]'
+check "artboard: the keys read j/k choose  1–5 jump  ↵ apply  esc ($(themes_state | jq -r .legend))" state_is '.legend == "j/k choose  1–5 jump  ↵ apply  esc"'
+check "artboard: the current card shows Current" state_is '[.cards[].tag] == ["Current", "", "", "", ""]'
+aligned() { state_is 'all(.cards[]; .tag == "" or ((.baselines[0] - .baselines[1]) | fabs) < 1)'; }
+check "artboard: Current sits on its card name's baseline" aligned
 wtype j
-until_ok 1000 state_is '.selected == "artboard"'
-check "paper: j moves the vermilion border to artboard and IN USE stays on paper" \
-  state_is '.cards[1].border.color == "#c8381e" and .cards[0].border.color != "#c8381e" and .cards[0].tag == "IN USE"'
+until_ok 1000 state_is '.selected == "catppuccin-mocha"'
+sleep 0.3
+read -r w h < <(card_size catppuccin-mocha)
+check "artboard: j moves the cursor to catppuccin-mocha, which shows ↵, and Current stays" state_is '[.cards[].tag] == ["Current", "↵", "", "", ""]'
+check "artboard: the cursor card reports a 1.5 px #3d5afe border" state_is '.cards[1].border == {"width": 1.5, "color": "#3d5afe"}'
+white_tile() { card_grab catppuccin-mocha 4 $((h / 2)) 3 3 | all_rgb 255 255 255 2; }
+check "artboard: the cursor card is #FFFFFF inside its outline" white_tile
+blue_outline() { card_grab catppuccin-mocha -1 $((h / 2)) 3 2 | has_rgb 61 90 254 30; }
+check "artboard: the cursor card has a #3D5AFE outline" blue_outline
+no_shadow() { card_grab catppuccin-mocha $((w / 2)) $((h + 3)) 4 4 | all_rgb 255 255 255 6; }
+check "artboard: under the cursor card the panel's white is bare, with no shadow" no_shadow
 close_picker
 
-# Artboard, opened while its switch transition still plays: the picker already wears it.
-switch artboard
-until_ok 3000 status_theme artboard
+# Gruvbox, opened while its crossfade still plays: the picker already wears it.
+switch gruvbox-dark
+until_ok 3000 status_theme gruvbox-dark
 open_picker
-# Paper's motion is snappy, so the switch away from it is a slide; .current names the theme whether or not the paper still moves, status reads the paper's running kind.
-check "artboard: the picker opened while the paper's slide still ran" eval 'shell_status | jq -e ".transition == \"slide\"" >/dev/null'
-check "artboard: opened mid-switch, the current card is artboard" state_is '.current == "artboard" and .cards[1].tag == "Current"'
-wtype k
-until_ok 1000 state_is '.selected == "paper"'
-sleep 0.3
-read -r w h < <(card_size paper)
-white_tile() { card_grab paper 4 $((h / 2)) 3 3 | all_rgb 255 255 255 2; }
-check "artboard: the cursor card is #FFFFFF inside its outline" white_tile
-blue_outline() { card_grab paper -1 $((h / 2)) 3 2 | has_rgb 61 90 254 30; }
-check "artboard: the cursor card has a #3D5AFE outline" blue_outline
-check "artboard: the cursor card reports a 1.5 px #3d5afe border" state_is '.cards[0].border == {"width": 1.5, "color": "#3d5afe"}'
-check "artboard: the cursor card shows ↵ and the current shows Current" state_is '[.cards[].tag] == ["↵", "Current", "", "", ""]'
-frame_label() {
-  local x y
-  read -r x y < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cardBox | "\(.x + $ox | round) \(.y + $oy | round)"')
-  grim -s 1 -t ppm -g "$x,$((y - 20)) 60x16" - | has_rgb 61 90 254 30
-}
-check "artboard: the panel has its blue Themes frame label" frame_label
-check "artboard: the header reads Themes 5 themes" state_is '.header == ["Themes5 themes", ""]'
+check "gruvbox-dark: the picker opened while the paper's crossfade still ran" eval 'shell_status | jq -e ".transition == \"fade\"" >/dev/null'
+check "gruvbox-dark: opened mid-switch, the current card is gruvbox-dark" state_is '.current == "gruvbox-dark" and .cards[3].tag == "Current"'
+check "gruvbox-dark: the cursor card reports a 1.5 px #83a598 border" state_is '.cards[3].border == {"width": 1.5, "color": "#83a598"}'
+read -r w h < <(card_size gruvbox-dark)
+dark_tile() { card_grab gruvbox-dark 4 $((h / 2)) 3 3 | all_rgb 40 40 40 2; }
+check "gruvbox-dark: the cursor card is #282828 inside its outline" dark_tile
 close_picker
 ended() { shell_status | jq -e '.transition == ""' >/dev/null; }
-check "artboard: once the switch ends, status reports no transition" until_ok 8000 ended
+check "gruvbox-dark: once the switch ends, status reports no transition" until_ok 8000 ended
 
-switch blueprint
-until_ok 3000 status_theme blueprint
-open_picker
-check "blueprint: the header reads THEMES // 5 SHEETS, ACTIVE: BLUEPRINT" state_is '.header == ["THEMES // 5 SHEETS", "ACTIVE: BLUEPRINT"]'
-check "blueprint: each name follows its number 01 to 05" \
-  state_is '[.cards[] | .number + " " + .title] == ["01 Paper", "02 Artboard", "03 BLUEPRINT", "04 Frost", "05 Hi-fi"]'
-check "blueprint: the current card shows [ACTIVE]" state_is '[.cards[].tag] == ["", "", "[ACTIVE]", "", ""]'
-check "blueprint: ACTIVE: BLUEPRINT and [ACTIVE] sit on the header's and the name's baselines" aligned
-check "blueprint: the keys are bracketed" state_is '.legend == "[J/K] CHOOSE  [1–5] JUMP  [↵] APPLY  [ESC]"'
-close_picker
-
-# Hi-Fi draws its receiver's board in its own tokens, without the marks.
-switch hi-fi
-until_ok 3000 status_theme hi-fi
-open_picker
-check "hi-fi: the header reads THEMES · 5 SOURCES, IN USE: HI-FI" state_is '.header == ["THEMES · 5 SOURCES", "IN USE: HI-FI"]'
-check "hi-fi: the current card shows IN USE after a green lamp" state_is '[.cards[].tag] == ["", "", "", "", "IN USE"] and .cards[4].lamp.light == "green"'
-check "hi-fi: the keys are bare ($(themes_state | jq -r .legend))" state_is '.legend == "J K CHOOSE  1–5 JUMP  ↵ APPLY  ESC"'
-check "hi-fi: Frost's card reads Frost · glass · ease, whole" \
-  state_is '.cards[] | select(.name == "frost") | .tagline == "Frost · glass · ease" and .taglineElided == false'
-# Each other card's specimen speaks in its own theme's voice, so only the panel's own words and Hi-Fi's card are read.
-own() { themes_state | jq '{header, legend, tags: [.cards[].tag], hifi: [.cards[] | select(.name == "hi-fi")]}'; }
-check "hi-fi: nothing the panel or Hi-Fi's card reports holds a bracket ($(own | marked | head -3 | paste -sd'|'))" eval '[ -z "$(own | marked)" ]'
-close_picker
-# Frost's board is glass: the panel reads its header, #434C5E edges, an accent-tinted cursor card and an ok lamp.
-switch frost
-until_ok 3000 status_theme frost
-open_picker
-check "frost: the cards read Paper, Artboard, Blueprint, Frost, Hi-fi in that order" \
-  state_is '[.cards[].title] == ["Paper", "Artboard", "BLUEPRINT", "Frost", "Hi-fi"]'
-check "frost: each card is 257.6 px wide ($(themes_state | jq -c '[.cards[].box.w]'))" \
-  state_is 'all(.cards[]; (.box.w - 257.6 | fabs) < 0.5)'
-check "frost: the header reads Themes · five on the shelf, In use: Frost" state_is '.header == ["Themes · five on the shelf", "In use: Frost"]'
-check "frost: the keys read j k Choose  1–5 Jump  ↵ Apply  esc Close" state_is '.legend == "j k Choose  1–5 Jump  ↵ Apply  esc Close"'
-wtype 5
-until_ok 1000 state_is '.selected == "hi-fi"'
-wtype 4
-until_ok 1000 state_is '.selected == "frost"'
-wtype 5
-until_ok 1000 state_is '.selected == "hi-fi"'
-sleep 0.3
-read -r w h < <(card_size hi-fi)
-check "frost: the cursor card reports a 1 px #88c0d0 border and ↵ Apply" \
-  state_is '.cards[4].border == {"width": 1, "color": "#88c0d0"} and .cards[4].tag == "↵ Apply" and .cards[4].fill == "#1a88c0d0"'
-# The top edge sits on a whole pixel row, where the side edges (x = 1657.4) blend into their neighbours.
-cursor_edge() { card_grab hi-fi $((w / 2)) 0 4 1 | all_rgb 136 192 208 6; }
-check "frost: the cursor card's edge reads #88C0D0 on screen" cursor_edge
-tint() { card_grab hi-fi 3 $((h / 2)) 4 4 | all_rgb 67 79 95 14; }
-check "frost: inside the cursor card the accent tint reads over the glass" tint
-check "frost: a card that is not the cursor reports a #434c5e 1 px border" state_is '.cards[1].border == {"width": 1, "color": "#434c5e"}'
-quiet_edge() { card_grab artboard $((w / 2)) 0 4 1 | all_rgb 67 76 94 6; }
-check "frost: a card that is not the cursor has a #434C5E edge on screen" quiet_edge
-check "frost: the card in use shows In use after an ok #a3be8c lamp" \
-  state_is '[.cards[].tag] == ["", "", "", "In use", "↵ Apply"] and .cards[3].lamp.light == "green" and (.cards[3].lamp.color | ascii_downcase) == "#a3be8c"'
-lamp_dot() {
-  local x y
-  read -r x y < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[3].lamp.box | "\(.x + .w / 2 - 1 + $ox | round) \(.y + .h / 2 - 1 + $oy | round)"')
-  grim -s 1 -t ppm -g "$x,$y 2x2" - | has_rgb 163 190 140 12
-}
-check "frost: the lamp before In use is #A3BE8C on screen" lamp_dot
-# The Frost card's paper is #2E3440 where its windows leave it bare, and frost brightens its corners.
-frost_paper() {
-  local px py pw
-  read -r px py pw < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "frost") | .preview | "\(.x + $ox | round) \(.y + $oy | round) \(.w | round)"')
-  grim -s 1 -t ppm -g "$((px + pw / 2)),$((py + 180)) 6x4" - | all_rgb 46 52 64 6
-}
-check "frost: the Frost card's paper reads #2E3440 at the middle of its bare lower rows" frost_paper
-# Mean channel sum of the PPM on stdin.
-lift() { node -e 'const b=require("fs").readFileSync(0);const h=b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);const p=b.subarray(h[0].length);let s=0;for(const v of p)s+=v;console.log(Math.round(s/(p.length/3)))'; }
-frost_corner() {
-  local px py mid corner
-  read -r px py < <(themes_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cards[] | select(.name == "frost") | .preview | "\(.x + $ox | round) \(.y + $oy | round)"')
-  corner=$(grim -s 1 -t ppm -g "$px,$py 3x3" - | lift)
-  mid=$(grim -s 1 -t ppm -g "$((px + 130)),$((py + 180)) 6x4" - | lift)
-  echo "corner $corner, middle $mid" >&2
-  ((corner > mid + 20))
-}
-check "frost: the Frost card's paper is brighter at its corner than at its middle" frost_corner
-close_picker
-
-switch blueprint
-until_ok 3000 status_theme blueprint
-
-# The five themes fit: five cards share the panel's width, none past its edge or over another.
+# The five schemes fit: five cards share the panel's width, none past its edge or over another.
 list=$XDG_STATE_HOME/dots/theme-out/themes.json
 open_picker
 five_fit() {
@@ -196,42 +98,33 @@ five_fit() {
     and all(.cards[]; .preview.x >= .box.x and .preview.x + .preview.w <= .box.x + .box.w + 0.5)' >/dev/null
 }
 check "five cards share the panel's width without overlap, each specimen inside its card" five_fit
-check "the header counts five sheets and the keys jump 1–5" state_is '.header[0] == "THEMES // 5 SHEETS" and (.legend | contains("[1–5] JUMP"))'
+read -r sw < <(niri msg -j outputs | jq -r 'first(.[]).logical.width')
+equal_fit() {
+  themes_state | jq -e --argjson sw "$sw" '((([44 + 4 * 326 + 3 * 16, $sw - 48] | min) - 108) / 5 | [., 326] | min) as $fit
+    | (.cards | length == 5) and all(.cards[]; (.box.w - $fit | fabs) < 0.5)' >/dev/null
+}
+check "five cards are each the fit wide" equal_fit
 close_picker
 
 # themes.json is a forged write: an entry the shell would refuse gets no card, and a name stays one line, in order, inside its card.
 long=$(printf 'n%.0s' $(seq 200))
 jq --arg long "$long" '[.[0], (.[1] | del(.niri) | .name = "noniri"), (.[1] | del(.color.ansi) | .name = "noansi"),
-  (.[2] | del(.paper) | .name = "blue\nprint\u202eevil"), (.[2] | .name = $long)]' "$list" >"$list.new" && mv "$list.new" "$list"
+  (.[2] | del(.paper) | .name = "gruv\nbox\u202eevil"), (.[2] | .name = $long)]' "$list" >"$list.new" && mv "$list.new" "$list"
 until_ok 2000 state_is '.themes | length == 3'
 open_picker
-check "forged entries without niri or ANSI get no card; the rest draw" state_is '[.cards[].name | .[0:4]] == ["pape", "blue", "nnnn"] and all(.cards[]; .paperReady)'
+check "forged entries without niri or ANSI get no card; the rest draw" state_is '[.cards[].name | .[0:4]] == ["artb", "gruv", "nnnn"] and all(.cards[]; .paperReady)'
 check "a forged name draws on one line, in the order it is spelt" \
-  state_is '.cards[1].title == "BLUE PRINTEVIL" and all(.cards[]; .nameLines == 1)'
+  state_is '.cards[1].title == "Gruv boxevil" and all(.cards[]; .nameLines == 1)'
 check "a 200-character name is cut in its card's terminal line" state_is '.cards[2].terminal[3][1].text == "nnnnnnnn… on the shelf"'
 check "a 200-character name elides inside its card" state_is 'all(.cards[]; (.nameRight | type) == "number" and .nameRight <= .box.x + .box.w)'
 close_picker
 
-# The panel holds four 326 px cards, and Frost's fifth shrinks every card to the fit; a sixth shrinks them again, and none leaves the screen.
-switch paper
-until_ok 3000 status_theme paper
-read -r sw < <(niri msg -j outputs | jq -r 'first(.[]).logical.width')
-open_picker
-equal_fit() {
-  themes_state | jq -e --argjson sw "$sw" '((([44 + 4 * 326 + 3 * 16, $sw - 48] | min) - 108) / 5 | [., 326] | min) as $fit
-    | (.cards | length == 5) and all(.cards[]; (.box.w - $fit | fabs) < 0.5)' >/dev/null
-}
-right_edge() { card_grab paper $(($(card_size paper | cut -d' ' -f1) - 2)) 20 2 4 | vermilion; }
-five_wide() { equal_fit && right_edge ; }
-check "five cards are each the fit wide, and the cursor card's right edge shows its border" five_wide
-close_picker
-
-jq '. + [.[0] | .name = "sixth"]' "$list" >"$list.new" && mv "$list.new" "$list"
+# A sixth card shrinks them again, and none leaves the screen.
+jq '. + [.[0] | .name = "sixth", .name = "seventh", .name = "eighth"]' "$list" >"$list.new" && mv "$list.new" "$list"
 until_ok 2000 state_is '.themes | length == 6'
 open_picker
 inside() { themes_state | jq -e --argjson sw "$sw" '(.cards | length == 6) and all(.cards[]; .box.w < 326 and .box.x >= 0 and .box.x + .box.w <= $sw)' >/dev/null; }
-six_inside() { inside && right_edge ; }
-check "six cards are each under 326 px and inside the screen, the cursor card's right edge shows its border" six_inside
+check "six cards are each under 326 px and inside the screen" inside
 close_picker
 
 exit $((fails > 0))

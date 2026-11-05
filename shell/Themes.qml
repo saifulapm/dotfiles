@@ -1,7 +1,6 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
-import QtQuick.Effects
 import "." as Root
 import "lib/themes.mjs" as Lib
 
@@ -23,8 +22,6 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
-    // In a theme that blurs, the panel's box is the one region the Surfaces window asks niri to blur while the switcher draws.
-    readonly property var blurRegion: panel.glass && visible ? panel.region : null
     readonly property var look: Lib.pickerLook(theme.tokens)
     readonly property var header: look.header(themes.length, theme.name)
     readonly property Root.Motion motion: Root.Motion {
@@ -93,7 +90,6 @@ Item {
             settled: motion.settled,
             drawing: switcher.visible,
             cardBox: panel.drawnBox(),
-            blurRegion: blurRegion ? [panel.regionBox()] : [],
             header: [title.text + sub.text, headRight.text],
             headerBaselines: [title.mapToItem(null, 0, title.baselineOffset).y, headRight.mapToItem(null, 0, headRight.baselineOffset).y],
             legend: legend.line(),
@@ -170,7 +166,7 @@ Item {
                             font.family: switcher.header.font
                             font.pixelSize: switcher.header.size
                             font.weight: switcher.header.weight
-                            font.letterSpacing: switcher.look.voice === "bracket" ? 1.76 : 0
+                            font.letterSpacing: 0
                         }
                         Text {
                             id: sub
@@ -196,10 +192,6 @@ Item {
                         font.family: switcher.look.small.font
                         font.pixelSize: switcher.look.small.size
                         font.letterSpacing: switcher.look.small.spacing
-                    }
-                    Rule {
-                        anchors.bottom: parent.bottom
-                        visible: switcher.look.voice !== "plain"
                     }
                 }
 
@@ -254,46 +246,19 @@ Item {
 
                                 function drawn() {
                                     const a = tile.mapToItem(null, 0, 0);
-                                    const l = tagLamp.mapToItem(null, 0, 0);
                                     return Object.assign({
                                         name: modelData.name,
                                         box: { x: a.x, y: a.y, w: tile.width, h: tile.height },
                                         fill: tile.color.toString(),
                                         border: { width: tile.border.width, color: tile.border.color.toString() },
-                                        number: number.text,
                                         title: name.text,
                                         tag: tagText.visible ? tagText.text : "",
-                                        lamp: tagLamp.visible ? { light: tagLamp.light, color: tagLamp.look.color.toString(), box: { x: l.x, y: l.y, w: tagLamp.width, h: tagLamp.height } } : null,
                                         baselines: [name.mapToItem(null, 0, name.baselineOffset).y, tagText.mapToItem(null, 0, tagText.baselineOffset).y],
                                         nameRight: name.mapToItem(null, name.width, 0).x,
                                         tagline: taglineText.text,
                                         taglineElided: taglineText.truncated,
                                         nameLines: name.lineCount
                                     }, specimen.item ? specimen.item.drawn() : { paperReady: false });
-                                }
-
-                                // The cursor's hard shadow, offset under the tile.
-                                Rectangle {
-                                    visible: card.dress.shadow?.kind === "hard"
-                                    x: card.dress.shadow?.x ?? 0
-                                    y: card.dress.shadow?.y ?? 0
-                                    width: parent.width
-                                    height: parent.height
-                                    color: card.dress.shadow?.color ?? "transparent"
-                                }
-
-                                Loader {
-                                    active: card.dress.shadow?.kind === "soft" || card.dress.shadow?.kind === "glow"
-                                    anchors.fill: parent
-                                    sourceComponent: RectangularShadow {
-                                        offset.x: card.dress.shadow.x
-                                        offset.y: card.dress.shadow.y
-                                        // Qt's docs give 1.2 times the CSS blur for the same falloff.
-                                        blur: card.dress.shadow.blur * 1.2
-                                        spread: card.dress.shadow.spread
-                                        radius: card.dress.radius ?? 0
-                                        color: Qt.alpha(card.dress.shadow.color, card.dress.shadow.alpha)
-                                    }
                                 }
 
                                 Rectangle {
@@ -303,30 +268,6 @@ Item {
                                     color: card.dress.fill
                                     border.width: card.dress.border.width
                                     border.color: card.dress.border.color
-                                }
-
-                                // Blueprint's cursor: registration ticks just outside each corner.
-                                Repeater {
-                                    model: card.dress.ticks ? [[0, 0], [1, 0], [0, 1], [1, 1]] : []
-                                    Item {
-                                        required property var modelData
-                                        x: modelData[0] ? card.width - 4 : -6
-                                        y: modelData[1] ? card.height - 4 : -6
-                                        width: 10
-                                        height: 10
-                                        Rectangle {
-                                            x: parent.modelData[0] ? 9 : 0
-                                            width: 1
-                                            height: 10
-                                            color: c.accent
-                                        }
-                                        Rectangle {
-                                            y: parent.modelData[1] ? 9 : 0
-                                            width: 10
-                                            height: 1
-                                            color: c.accent
-                                        }
-                                    }
                                 }
 
                                 // The specimen at its own size, scaled to the card; its slot never changes size, so nothing moves as it loads.
@@ -367,24 +308,12 @@ Item {
                                         height: 32
                                         readonly property var cardName: Lib.cardName(card.modelData)
                                         readonly property var tagline: Lib.tagline(card.modelData)
-                                        // Hi-Fi's lamp and IN USE sit bare at the line's end, 4 px after the tagline, so the whole tagline fits beside them at 326 px; the other themes keep 6 px of chip padding each side and 10 px before it.
-                                        readonly property bool bare: switcher.theme.tokens?.type.engraved === true
-                                        readonly property real tagRoom: tagText.visible ? tagText.implicitWidth + (bare ? 4 : 22) + (tagLamp.visible ? tagLamp.width + 4 : 0) : 0
+                                        // The tag keeps 6 px of chip padding each side and 10 px before it.
+                                        readonly property real tagRoom: tagText.visible ? tagText.implicitWidth + 22 : 0
 
                                         Row {
                                             id: captionRow
                                             spacing: 10
-                                            Text {
-                                                id: number
-                                                textFormat: Text.PlainText
-                                                visible: text !== ""
-                                                anchors.baseline: name.baseline
-                                                text: switcher.look.number(card.index)
-                                                color: card.cursor ? c.accent : c.muted
-                                                font.family: switcher.look.small.font
-                                                font.pixelSize: switcher.look.small.size
-                                                font.letterSpacing: switcher.look.small.spacing
-                                            }
                                             Text {
                                                 id: name
                                                 textFormat: Text.PlainText
@@ -430,7 +359,7 @@ Item {
                                             textFormat: Text.PlainText
                                             visible: card.tag !== null
                                             anchors.right: parent.right
-                                            anchors.rightMargin: parent.bare ? 0 : 6
+                                            anchors.rightMargin: 6
                                             // On the name's baseline; an anchor cannot reach into the name's Row.
                                             y: captionRow.y + name.y + name.baselineOffset - baselineOffset
                                             text: card.tag?.text ?? ""
@@ -439,16 +368,6 @@ Item {
                                             font.pixelSize: switcher.look.small.size
                                             font.letterSpacing: switcher.look.small.spacing
                                             font.weight: Font.Medium
-                                        }
-                                        // Hi-Fi marks the theme in use with a green lamp before IN USE, since green is never text there.
-                                        Root.Lamp {
-                                            id: tagLamp
-                                            visible: card.tag?.lamp !== undefined
-                                            anchors.right: tagText.left
-                                            anchors.rightMargin: 4
-                                            anchors.verticalCenter: tagText.verticalCenter
-                                            tokens: switcher.theme.tokens
-                                            light: card.tag?.lamp ?? "unlit"
                                         }
                                     }
                                 }
@@ -467,7 +386,7 @@ Item {
                         id: legend
                         x: 22
                         y: 12
-                        spacing: switcher.look.chips ? 8 : 16
+                        spacing: 8
 
                         // The keys as drawn, then Esc, for the state.
                         function line() {
@@ -484,10 +403,10 @@ Item {
                             Rectangle {
                                 required property var modelData
                                 readonly property string drawnText: keyText.text + " " + wordText.text
-                                width: keyRow.width + (switcher.look.chips ? 14 : 0)
-                                height: keyRow.height + (switcher.look.chips ? 6 : 0)
-                                radius: switcher.look.chips ? 6 : 0
-                                color: switcher.look.chips ? switcher.look.chip.fill : "transparent"
+                                width: keyRow.width + 14
+                                height: keyRow.height + 6
+                                radius: 6
+                                color: switcher.look.chip.fill
 
                                 Row {
                                     id: keyRow
@@ -523,11 +442,11 @@ Item {
                         anchors.rightMargin: 22
                         anchors.verticalCenter: legend.verticalCenter
                         text: switcher.look.esc
-                        color: switcher.look.voice === "plain" ? c.muted : switcher.look.chip.key
+                        color: c.muted
                         font.family: switcher.look.small.font
                         font.pixelSize: switcher.look.small.size
                         font.letterSpacing: switcher.look.small.spacing
-                        font.weight: switcher.look.voice === "plain" ? Font.Normal : Font.Bold
+                        font.weight: Font.Normal
                     }
                 }
             }

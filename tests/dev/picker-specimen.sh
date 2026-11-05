@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Each picker card is a specimen of its own theme: its real paper at half period, its margins, terminal lines and palette.
+# Each picker card is a specimen of its own colorscheme on the one design: its dot paper at half period, its margins, terminal lines and palette.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -21,7 +21,7 @@ shades() {
     console.log(seen.size);
   '
 }
-# For a one-row PPM on stdin: exits 0 when it holds 8 or more pixels darker ($1 = dark) or brighter (bright) than the row's commonest colour, r+g+b by $2 or more, and every gap between them is a whole number of the pattern's 8 px times the card's fit ($3), within 1 px; a scaled pattern aliases, so a mark lands on whole pixels and a faint one can drop out.
+# For a one-row PPM on stdin: exits 0 when it holds 8 or more runs of pixels darker ($1 = dark) or brighter (bright) than the row's commonest colour, r+g+b by $2 or more, and every gap between them is a whole number of the pattern's 8 px times the card's fit ($3), within 1 px; a scaled pattern aliases, so a mark lands on whole pixels and a faint one can drop out.
 every8() {
   node -e '
     const b = require("fs").readFileSync(0);
@@ -33,7 +33,13 @@ every8() {
     const base = [...counts].sort((a, z) => z[1] - a[1])[0][0];
     const [dir, thr, fit] = [process.argv[1], Number(process.argv[2]), Number(process.argv[3])];
     const at = [];
-    for (let x = 0; x < w; x++) if ((dir === "dark" ? base - lum(x) : lum(x) - base) >= thr) at.push(x);
+    // A scaled dot can cover two pixels side by side; each run counts once, at its first pixel.
+    let prev = false;
+    for (let x = 0; x < w; x++) {
+      const on = (dir === "dark" ? base - lum(x) : lum(x) - base) >= thr;
+      if (on && !prev) at.push(x);
+      prev = on;
+    }
     const period = 8 * fit, gaps = at.slice(1).map((x, i) => x - at[i]);
     const off = gaps.filter((g) => Math.abs(g - Math.max(1, Math.round(g / period)) * period) > 1);
     console.error(`${at.length} marks at ${at.join(" ")}; gaps off the ${period.toFixed(1)} px period: ${off.join(" ") || "none"}`);
@@ -56,31 +62,32 @@ hex_rgb() { printf '%d %d %d' "0x${1:1:2}" "0x${1:3:2}" "0x${1:5:2}"; }
 near6() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= 6 && b[i] - a[i] <= 6)) || return 1; done; }
 
 until_ok 5000 shell_status >/dev/null
-until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"paper\"' >/dev/null"
+until_ok 3000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"artboard\"' >/dev/null"
 niri msg action spawn -- dots-call themes toggle
 until_ok 3000 state_is '.open and .settled and (.cards | length == 5) and all(.cards[]; .paperReady)'
 check "the picker shows five cards, each paper settled" state_is '.open and (.cards | length == 5) and all(.cards[]; .paperReady)'
-# Below the windows and their shadows, the bottom rows of a preview are bare paper; five cards scale each specimen by the card's fit, so a sample's place inside the 196 px preview scales with it.
+# Below the windows, the bottom rows of a preview are bare paper; five cards scale each specimen by the card's fit, so a sample's place inside the 196 px preview scales with it.
 fit=$(themes_state | jq '.cards[0].preview.h / 196')
 at() { node -e "console.log(Math.round($1 * $fit))"; }
-paper_shades() { (($(grab paper "$(at 60)" "$(at 184)" 40 8 | shades) >= 20)); }
-check "paper: a 40x8 sample of its card paper holds 20 or more shades ($(grab paper "$(at 60)" "$(at 184)" 40 8 | shades))" paper_shades
-artboard_dots() { grab artboard "$(at 20)" "$(at 192)" 120 1 | every8 dark 18 "$fit"; }
-check "artboard: its card's bottom row holds a darker dot every 8 px of the specimen, at the card's fit $fit" artboard_dots
-dot_colour() { grab artboard "$(at 4)" "$(at 20)" 8 8 | has_rgb 180 186 196 14; }
-check "artboard: its card shows a #B4BAC4 dot" dot_colour
-# Blueprint's minor lines are cyan at 5 %, about 25 over the cell in r+g+b, the flat fill 0; x 16 on clears the crop mark.
-blueprint_grid() { grab blueprint "$(at 20)" "$(at 190)" 120 1 | every8 bright 12 "$fit"; }
-check "blueprint: its card's bottom row holds a brighter grid line every 8 px of the specimen, at the card's fit $fit" blueprint_grid
+# Artboard's line dots sit about 20 under its paper in r+g+b, after scaling about 6; the scaled dot rows land on fractional pixels, so the rows around the last one are each tried.
+dot_row() {
+  local y
+  for y in 188 189 190 191 192 193; do grab "$1" "$(at 20)" "$(at "$y")" 120 1 | every8 "$2" 6 "$fit" 2>/dev/null && return 0; done
+  return 1
+}
+check "artboard: its card's bottom row holds a darker dot every 8 px of the specimen, at the card's fit $fit" dot_row artboard dark
+check "gruvbox-dark: its card's bottom row holds a brighter dot every 8 px of the specimen, at the card's fit $fit" dot_row gruvbox-dark bright
+    return 1
+  }
+  check "$name: its card's bottom row holds a dot every 8 px of the specimen, at the card's fit $fit" dots "$([ "$name" = artboard ] && echo dark || echo bright)"
+done
 
-for name in paper artboard blueprint frost hi-fi; do
+for name in artboard catppuccin-mocha github-light gruvbox-dark rose-pine-dawn; do
   card=$(themes_state | jq -c --arg n "$name" '.cards[] | select(.name == $n)')
   want=$(node --input-type=module -e "
-    import { readFileSync } from 'node:fs';
-    import { parseToml } from '$repo/shell/lib/toml.mjs';
-    import { validateTheme, checkTokens } from '$repo/shell/lib/theme.mjs';
     import { swatches } from '$repo/shell/lib/themes.mjs';
-    console.log(swatches(checkTokens(validateTheme(parseToml(readFileSync('$repo/themes/$name/theme.toml', 'utf8'))))).join(' '));
+    import { schemeTokens } from '$repo/shell/lib/colorscheme-file.mjs';
+    console.log(swatches(schemeTokens('$name')).join(' '));
   ")
   read -r -a colours <<<"$want"
   swatch_ok=0
@@ -92,9 +99,8 @@ for name in paper artboard blueprint frost hi-fi; do
   check "$name: its eight swatches are its palette strip (${colours[*]})" test "$swatch_ok" = 0
   check "$name: its terminal draws four lines" test "$(jq '.terminal | length' <<<"$card")" = 4
 done
-check "the cards' margins read 03 — FOOT · ~, Page 03 / foot — ~, [03] FOOT — ~, Frost's 3  foot and Hi-Fi's 03  FOOT ($(themes_state | jq -c '[.cards[].left]'))" \
-  state_is '[.cards[].left] == ["03 — FOOT · ~", "Page 03 / foot — ~", "[03] FOOT — ~", "3  foot", "03  FOOT"]'
-check "hi-fi: its card's bar lights one lamp, the shown workspace's" state_is '.cards[4].lamps == ["lit"]'
+check "every card's margins read Page 03 / foot — ~ ($(themes_state | jq -c '[.cards[].left] | unique'))" \
+  state_is '[.cards[].left] | unique == ["Page 03 / foot — ~"]'
 
 wtype -k Escape
 exit $((fails > 0))

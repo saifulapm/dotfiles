@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import "." as Root
 import "lib/themes.mjs" as Lib
 
@@ -12,29 +11,21 @@ Item {
     required property string dir
     readonly property var c: tokens.color
     readonly property var margins: Lib.specimenMargins(tokens)
-    readonly property real inset: tokens.primitive.paper === "grid" ? 14 : 10
+    readonly property real inset: 10
     // The room the card leaves between the preview and the palette for its name.
     property real gap: 32
     // The paper the card's switch plays over: the current theme's.
     property color under: "transparent"
-    readonly property var motion: Lib.previewSwitch(tokens.primitive.motion, Root.State.slowdown)
+    readonly property var motion: Lib.previewSwitch(Root.State.slowdown)
     // The ms from the key that started the last play to its end, or -1 while it plays.
     property real playedMs: -1
     property real playT0: 0
-    property real offset: 0
-    property real reveal: 196
-    // The share of the preview's width the stage shows, left of Hi-Fi's pointer; a card narrower than 306 px sweeps its own width.
-    property real across: 1
 
-    // Plays the card's own theme switch in miniature: the specimen comes in over the current paper.
+    // Plays the desktop's crossfade in miniature: the specimen fades in over the current paper.
     function play(t0) {
         playing.stop();
         playT0 = t0;
         playedMs = -1;
-        if (motion.kind === "cut") {
-            playedMs = Date.now() - t0;
-            return;
-        }
         playing.start();
     }
 
@@ -66,7 +57,6 @@ Item {
             preview: box(preview),
             swatches: swatches,
             left: leftNumber.text + leftTail.text,
-            lamps: Array.from({ length: lamps.count }, (_, i) => lamps.itemAt(i).light),
             right: rightGoal.text + rightDate.text,
             clock: clock.text,
             terminal: terminal.lines(),
@@ -95,10 +85,8 @@ Item {
 
             Item {
                 id: stage
-                y: specimen.offset
-                width: preview.width * specimen.across
-                height: specimen.reveal
-                clip: specimen.reveal < preview.height || specimen.across < 1
+                width: preview.width
+                height: preview.height
 
                 Item {
                     width: preview.width
@@ -110,29 +98,13 @@ Item {
                         tokens: specimen.tokens
                         dir: specimen.dir
                         period: 0.5
-                        // The arrival and Artboard's zoom fade the specimen and the stage, not the fill.
+                        // The arrival and the crossfade fade the specimen and the stage, not the fill.
                         blending: specimen.opacity < 1 || stage.opacity < 1
                     }
 
                     Row {
                         x: specimen.inset
                         y: 7
-                        // Hi-Fi's lit pilot lamp before the shown workspace's number.
-                        Row {
-                            id: lampRow
-                            anchors.verticalCenter: parent.verticalCenter
-                            rightPadding: lamps.count > 0 ? 4 : 0
-                            Repeater {
-                                id: lamps
-                                model: specimen.margins.lamps
-                                Root.Lamp {
-                                    required property var modelData
-                                    tokens: specimen.tokens
-                                    light: modelData.light
-                                    size: 3
-                                }
-                            }
-                        }
                         Text {
                             id: leftNumber
                             textFormat: Text.PlainText
@@ -156,14 +128,6 @@ Item {
                         anchors.right: parent.right
                         anchors.rightMargin: specimen.inset
                         y: 7
-                        spacing: specimen.margins.goalLamp ? 6 : 0
-                        Root.Lamp {
-                            visible: specimen.margins.goalLamp !== ""
-                            anchors.verticalCenter: parent.verticalCenter
-                            tokens: specimen.tokens
-                            light: specimen.margins.goalLamp || "unlit"
-                            size: 3
-                        }
                         Text {
                             id: rightGoal
                             textFormat: Text.PlainText
@@ -182,7 +146,7 @@ Item {
                         }
                     }
 
-                    // Paper's ink rules run along the margin, broken by the island.
+                    // The ink rules run along the margin, broken by the island.
                     Repeater {
                         model: specimen.margins.rules ? [specimen.inset, 186] : []
                         Rectangle {
@@ -197,7 +161,6 @@ Item {
 
                     Root.Surface {
                         id: chip
-                        visible: !specimen.tokens.type.engraved
                         x: 127
                         y: 5
                         width: 52
@@ -206,22 +169,15 @@ Item {
                         role: "chip"
                     }
 
-                    // Hi-Fi's island is a glass display with its clock backlit amber.
-                    Root.Glass {
-                        visible: specimen.tokens.type.engraved === true
-                        anchors.fill: chip
-                        tokens: specimen.tokens.type.engraved ? specimen.tokens : null
-                    }
-
                     Text {
                         id: clock
                         textFormat: Text.PlainText
                         anchors.centerIn: chip
                         text: specimen.margins.clock
-                        color: specimen.tokens.type.engraved ? specimen.c.accent : chip.style.text
+                        color: chip.style.text
                         font.family: specimen.tokens.type.mono
                         font.pixelSize: 8
-                        font.weight: specimen.tokens.type.engraved ? Font.Bold : Font.Medium
+                        font.weight: Font.Medium
                     }
 
                     Frame {
@@ -283,9 +239,9 @@ Item {
                                 textFormat: Text.PlainText
                                 text: "Good afternoon"
                                 color: specimen.c.ink
-                                font.family: specimen.tokens.type.voice === "caps" ? specimen.tokens.type.display : specimen.tokens.type.ui
-                                font.pixelSize: specimen.tokens.type.voice === "caps" ? 13 : 9
-                                font.weight: specimen.tokens.type.voice === "caps" ? Font.Normal : Font.Bold
+                                font.family: specimen.tokens.type.ui
+                                font.pixelSize: 9
+                                font.weight: Font.Bold
                             }
                             Repeater {
                                 model: [80, 62]
@@ -293,7 +249,6 @@ Item {
                                     required property var modelData
                                     width: modelData
                                     height: 3
-                                    radius: specimen.tokens.primitive.corner === "round" ? 1.5 : 0
                                     color: specimen.c.line
                                 }
                             }
@@ -305,7 +260,6 @@ Item {
                             width: parent.width - 18
                             height: 26
                             color: "transparent"
-                            radius: specimen.tokens.primitive.corner === "round" ? 4 : 0
                             border.width: 1
                             border.color: specimen.c.line
                         }
@@ -313,30 +267,6 @@ Item {
                 }
             }
 
-            // Blueprint's scan line, at the edge of what it has drawn.
-            Rectangle {
-                visible: playing.running && specimen.motion.kind === "scan"
-                y: stage.height - 1
-                width: parent.width
-                height: 2
-                color: specimen.c.accent
-            }
-
-            // Hi-Fi's pointer, at the edge of what it has swept: 2 px of danger red in a faint glow.
-            Rectangle {
-                visible: playing.running && specimen.motion.kind === "sweep"
-                x: stage.width - 4
-                width: 6
-                height: parent.height
-                color: Qt.alpha(specimen.c.danger, 0.3)
-            }
-            Rectangle {
-                visible: playing.running && specimen.motion.kind === "sweep"
-                x: stage.width - 2
-                width: 2
-                height: parent.height
-                color: specimen.c.danger
-            }
         }
 
         Item {
@@ -357,102 +287,32 @@ Item {
                     required property int index
                     width: (specimen.width - 7 * 3) / 8
                     height: 10
-                    radius: specimen.tokens.primitive.corner === "round" ? 3 : 0
                     color: modelData
-                    // The paper swatch would vanish into a card of the same colour, so it keeps a hairline; Hi-Fi's surface swatch comes first.
-                    border.width: index === (specimen.tokens.type.engraved ? 0 : 7) ? 1 : 0
+                    // The paper swatch would vanish into a card of the same colour, so it keeps a hairline.
+                    border.width: index === 7 ? 1 : 0
                     border.color: specimen.c.line
                 }
             }
         }
     }
 
-    ParallelAnimation {
+    // The stage fades in over the current paper, on Qt's nearest curve to the desktop's.
+    NumberAnimation {
         id: playing
+        target: stage
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: specimen.motion.ms
+        easing.type: Easing.InOutSine
         onFinished: specimen.playedMs = Date.now() - specimen.playT0
-
-        // Paper: the sheet slides up from the bottom edge.
-        NumberAnimation {
-            target: specimen
-            property: "offset"
-            from: specimen.motion.kind === "slide" ? 196 : 0
-            to: 0
-            duration: specimen.motion.ms
-            easing.type: Easing.OutExpo
-        }
-        // Artboard: the canvas zooms out 3% and springs back while the sheet fades in.
-        SequentialAnimation {
-            NumberAnimation {
-                target: stage
-                property: "scale"
-                from: 1
-                to: specimen.motion.kind === "zoom" ? 0.97 : 1
-                duration: specimen.motion.ms * 85 / 220
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: stage
-                property: "scale"
-                to: 1
-                duration: specimen.motion.ms * 135 / 220
-                easing.type: Easing.OutBack
-                easing.overshoot: 2.5
-            }
-        }
-        NumberAnimation {
-            target: stage
-            property: "opacity"
-            from: specimen.motion.kind === "zoom" ? 0 : 1
-            to: 1
-            duration: specimen.motion.ms
-        }
-        // Blueprint: a scan line comes down and the sheet shows above it.
-        NumberAnimation {
-            target: specimen
-            property: "reveal"
-            from: specimen.motion.kind === "scan" ? 0 : 196
-            to: 196
-            duration: specimen.motion.ms
-        }
-        // Hi-Fi: a red pointer crosses left to right and the sheet shows left of it.
-        NumberAnimation {
-            target: specimen
-            property: "across"
-            from: specimen.motion.kind === "sweep" ? 0 : 1
-            to: 1
-            duration: specimen.motion.ms
-            easing.type: Easing.InOutCubic
-        }
     }
 
-    // A window as niri frames it: its shadow or glow, then its fill, corner and border or ring.
+    // A window as niri frames it: its fill, square, and its 1 px frame.
     component Frame: Item {
         id: win
         required property var look
         default property alias content: body.data
-
-        Rectangle {
-            visible: win.look.shadow !== null && win.look.shadow.blur === 0
-            x: win.look.shadow?.x ?? 0
-            y: win.look.shadow?.y ?? 0
-            width: win.width
-            height: win.height
-            radius: win.look.radius
-            color: win.look.shadow?.color ?? "transparent"
-        }
-
-        Loader {
-            active: win.look.shadow !== null && win.look.shadow.blur > 0
-            anchors.fill: parent
-            sourceComponent: RectangularShadow {
-                offset.x: win.look.shadow.x
-                offset.y: win.look.shadow.y
-                // Qt's docs give 1.2 times the CSS blur for the same falloff.
-                blur: win.look.shadow.blur * 1.2
-                radius: win.look.radius
-                color: win.look.shadow.color
-            }
-        }
 
         // Its text stays inside it, as a window's does.
         Rectangle {
