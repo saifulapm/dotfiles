@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseQuestions, shown, optionFor, answerArgv, summary, linkify, baseName } from './questions.mjs';
+import { parseQuestions, shown, optionFor, answerArgv, summary, linkify, baseName, unbidi } from './questions.mjs';
 
 const q = (id, extra = {}) => Object.assign({ id, project: 'dotfiles', machine: 'mini.taila27604.ts.net:8790', text: `${id}?`, options: ['Import now', 'Later'], popup: true }, extra);
 const file = (...qs) => JSON.stringify({ self: 'macbook', questions: qs });
@@ -68,4 +68,11 @@ test('a link in parentheses leaves the closing parenthesis out, and new lines st
   const l = linkify('URL (https://eventsmith.lareys.dev) and api.ebdfy.com.\nNext');
   assert.deepEqual(l.urls, ['https://eventsmith.lareys.dev', 'https://api.ebdfy.com']);
   assert.equal(l.html, 'URL (<a href="0">https://eventsmith.lareys.dev</a>) and <a href="1">api.ebdfy.com</a>.<br>Next');
+});
+
+test('an asker\'s bidi controls are dropped from what the card draws, so an option never reads reordered', () => {
+  assert.equal(unbidi('live \u202Eliat gnirts'), 'live liat gnirts');
+  assert.equal(unbidi('a\u200Eb\u200Fc\u061Cd\u202Ae\u2066f\u2069g'), 'abcdefg');
+  assert.equal(unbidi('two\nlines stay'), 'two\nlines stay');
+  assert.equal(summary(q('Q', { options: ['a\u202Eb'], recommend: 'a\u202Eb' })), '1 option · ★ ab');
 });

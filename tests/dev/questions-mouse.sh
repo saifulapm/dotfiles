@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# An island question by mouse: a click on the closed card opens it as Mod+I does, a click on an option answers with it, and a click on Reply opens the reply line, behind which no option answers.
+# An island question by mouse: a click on the closed card opens it as Mod+I does, a click on an option answers with it, and a click on Reply opens the reply line, behind which no option answers; an option's bidi controls never reorder what the card draws.
 {
 fake=$(mktemp -d)
 calls=$fake/calls
@@ -72,6 +72,19 @@ point click $at
 until_ok 1000 test -s "$calls"
 check "behind the reply line, a click where the first option was answers nothing ($(calls_count) calls)" test "$(calls_count)" -eq 0
 check "and the reply line keeps the keyboard ($(island | jq -c '.ask.replying'))" ask_is '.replying'
+
+# An option's bidi controls are the asker's: the card draws its words in order, and a click answers with the option as asked.
+wtype -k Escape
+: >"$calls"
+forged=$(printf 'live \u202Eliat gnirts')
+ask Q4 "Which?" "$forged" "plain"
+until_ok 2000 mode_is question
+click_island island
+until_ok 2000 island_drawn ask:option:0
+check "the option draws without its bidi control ($(island | jq -c '.ask.options[0].text'))" ask_is '.options[0].text == "1 · live liat gnirts"'
+click_island ask:option:0
+until_ok 2000 called "answer --by popup -- Q4 $forged"
+check "and a click answers with the option as asked" called "answer --by popup -- Q4 $forged"
 
 exit $((fails > 0))
 }

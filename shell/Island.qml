@@ -682,7 +682,7 @@ PanelWindow {
     property bool attaching: false
     // Why the last attach found nothing, such as no image on the clipboard; the next key clears it.
     property string askNote: ""
-    readonly property var askLinks: Q.linkify(heldQuestion?.pairing ? "" : heldQuestion?.text ?? "")
+    readonly property var askLinks: Q.linkify(Q.unbidi(heldQuestion?.pairing ? "" : heldQuestion?.text ?? ""))
     readonly property var askFiles: heldQuestion ? questions.attached[heldQuestion.id] ?? [] : []
     readonly property string askFailed: heldQuestion ? questions.failed[heldQuestion.id] ?? "" : ""
     // Where a screenshot or a pasted image is kept until mem has handed it to the hub.
@@ -2510,7 +2510,7 @@ PanelWindow {
                                         width: parent.width - 24
                                         textFormat: Text.PlainText
                                         wrapMode: Text.Wrap
-                                        text: (parent.isReply ? "r" : parent.index + 1) + " · " + parent.modelData + (parent.recommended ? "  ★" : "")
+                                        text: (parent.isReply ? "r" : parent.index + 1) + " · " + Q.unbidi(parent.modelData) + (parent.recommended ? "  ★" : "")
                                         color: parent.recommended ? box.style.fill : box.style.text
                                         font.family: island.theme.tokens?.type.ui ?? ""
                                         font.pixelSize: 13

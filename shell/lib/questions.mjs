@@ -40,11 +40,14 @@ export const answerArgv = (id, text, files = []) => ['mem', 'answer', '--by', 'p
 
 export const baseName = (path) => path.split('/').pop();
 
+// The asker's bidi controls, dropped from what the card draws so its words keep their order; an answer still sends the option as asked.
+export const unbidi = (s) => s.replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g, '');
+
 // The closed card's last line: how many options, and the one the agent recommends.
 export function summary(question) {
   const n = question.options.length;
   if (n === 0) return 'No options · r to reply';
-  return `${n} ${n === 1 ? 'option' : 'options'}` + (question.recommend ? ` · ★ ${question.recommend}` : '');
+  return `${n} ${n === 1 ? 'option' : 'options'}` + (question.recommend ? ` · ★ ${unbidi(question.recommend)}` : '');
 }
 
 const escape = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
