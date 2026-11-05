@@ -13,8 +13,8 @@ test('Mod+Space has a title and spawns dots-call launcher toggle', () => {
   assert.match(binds, /^\s*Mod\+Space hotkey-overlay-title="[^"]+" \{ spawn "dots-call" "launcher" "toggle"; \}$/m);
 });
 
-test('Mod+Shift+T has a title and spawns dots-call themes toggle', () => {
-  assert.match(binds, /^\s*Mod\+Shift\+T hotkey-overlay-title="[^"]+" \{ spawn "dots-call" "themes" "toggle"; \}$/m);
+test('Mod+Shift+T has a title and opens the launcher in colorscheme mode', () => {
+  assert.match(binds, /^\s*Mod\+Shift\+T hotkey-overlay-title="Colorschemes" \{ spawn "dots-call" "launcher" "mode" "colorschemes"; \}$/m);
 });
 
 const esc = (s) => s.replace(/[+.]/g, '\\$&');

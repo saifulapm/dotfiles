@@ -4,7 +4,7 @@
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
-all_loaded() { shell_status | jq -e '[.loaded[]] | sort == ["cheatsheet", "control", "goals", "launcher", "notifs", "polkit", "recorder", "themes"]' >/dev/null; }
+all_loaded() { shell_status | jq -e '[.loaded[]] | sort == ["cheatsheet", "control", "goals", "launcher", "notifs", "polkit", "recorder"]' >/dev/null; }
 until_ok 4000 all_loaded
 check "with nothing opened, every surface has loaded ($(shell_status | jq -c .loaded))" all_loaded
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }

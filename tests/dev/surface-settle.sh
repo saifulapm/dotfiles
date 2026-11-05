@@ -21,7 +21,7 @@ settles() {
 }
 
 until_ok 5000 shell_status >/dev/null
-for s in launcher themes notifs cheatsheet goals control; do settles "$s"; done
+for s in launcher notifs cheatsheet goals control; do settles "$s"; done
 # The launcher times its own close: 0.8 of the open's 362 ms, 290, less a frame or so.
 check "the launcher's close took 260 to 330 ms, shorter than its open ($(timeout 0.5 qs ipc call launcher state | jq -c '[.closeTookMs, .settleMs, .motionMs]'))" \
   surface_is launcher '.closeTookMs >= 260 and .closeTookMs <= 330 and .closeTookMs < .settleMs and .motionMs.close < .motionMs.open'

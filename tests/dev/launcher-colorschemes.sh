@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The launcher's c mode: c and a space list every colorscheme, typing filters by title and family, the selection scrolls past the eighth row, and Enter switches within 1000 ms of the key.
+# The launcher's c mode: c and a space list every colorscheme, typing filters by title and family, the selection scrolls past the eighth row, Enter switches within 1000 ms of the key, and Mod+Shift+T opens the same list where the Themes surface was.
 {
 export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
@@ -50,11 +50,18 @@ check "the switch record starts at the key and ends within 1000 ms of it ($(jq -
   record_is '.to == "catppuccin-mocha" and .start >= $k and .end - $k <= 1000'
 until_ok 3000 eval "shell_status | jq -e '.theme == \"catppuccin-mocha\" and .transition == \"\"' >/dev/null"
 
-open_launcher
-wtype "c "
-until_ok 3000 state_is '.mode == "colorschemes" and .count > 0'
+# Mod+Shift+T's command, spawned through niri as the bind spawns it.
+niri msg action spawn -- dots-call launcher mode colorschemes
+until_ok 3000 state_is '.open and .keyboard and .settled'
+check "Mod+Shift+T opens the launcher with c and a space typed" state_is '.query == "c " and .mode == "colorschemes" and .count == 40'
 check "the mark moves to Catppuccin Mocha" state_is '[.results, .marks] | transpose | map(select(.[1])) == [["Catppuccin Mocha", true]]'
 close_launcher
+
+# The Themes surface is gone: no IPC target answers to it and the shell never loads it.
+dots-call themes toggle 2>/dev/null
+rc=$?
+check "dots-call themes toggle exits 1 (got $rc)" test "$rc" = 1
+check "the shell loads no themes surface" eval "shell_status | jq -e '.loaded | index(\"themes\") == null' >/dev/null"
 
 exit $((fails > 0))
 }

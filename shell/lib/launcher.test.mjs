@@ -69,7 +69,7 @@ test('windows rank by title then app_id, as rows with the window id', () => {
 test('commands filter by name, lock first for lo', () => {
   assert.deepEqual(commandRows('lo').map((r) => r.title), ['lock', 'Pick colour']);
   assert.deepEqual(commandRows('lock')[0].exec, ['qs', 'ipc', 'call', 'lock', 'lock']);
-  assert.deepEqual(commandRows('theme')[0].exec, ['qs', 'ipc', 'call', 'themes', 'open']);
+  assert.deepEqual(commandRows('theme')[0].exec, ['dots-call', 'launcher', 'mode', 'colorschemes']);
   assert.deepEqual(commandRows('record')[0].exec, ['qs', 'ipc', 'call', 'record', 'toggle']);
   assert.deepEqual(commandRows('sync')[0].exec, ['dots', 'sync']);
 });

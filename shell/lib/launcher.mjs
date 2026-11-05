@@ -67,7 +67,7 @@ const COMMANDS = [
   { title: 'Read QR code from region', detail: 'zbarimg, copied as sensitive', tool: 'zbarimg', exec: ['dots-capture', 'qr'] },
   { title: 'Pick colour', detail: 'hex to the clipboard', tool: 'niri', exec: ['dots-capture', 'colour'] },
   { title: 'lock', detail: 'Lock the screen', exec: ['qs', 'ipc', 'call', 'lock', 'lock'] },
-  { title: 'theme', detail: 'Switch theme', exec: ['qs', 'ipc', 'call', 'themes', 'open'] },
+  { title: 'theme', detail: 'Switch colorscheme', exec: ['dots-call', 'launcher', 'mode', 'colorschemes'] },
   { title: 'record', detail: 'Start or stop recording', exec: ['qs', 'ipc', 'call', 'record', 'toggle'] },
   { title: 'sync', detail: 'Sync dotfiles', exec: ['dots', 'sync'] },
 ];

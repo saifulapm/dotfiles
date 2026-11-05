@@ -434,34 +434,6 @@ ShellRoot {
     }
 
     Root.Ipc {
-        target: "themes"
-
-        // t0 is taken before the first load, so a cold open's time includes loading.
-        function open(): void {
-            const t0 = Date.now();
-            surfacesLoader.active = true;
-            surfacesLoader.item.openThemes(t0);
-        }
-
-        function close(): void {
-            surfacesLoader.item?.themes?.close();
-        }
-
-        function toggle(): void {
-            if (surfacesLoader.item?.themes?.shown)
-                close();
-            else
-                open();
-        }
-
-        function state(): string {
-            if (surfacesLoader.item?.themes)
-                return surfacesLoader.item.themes.state();
-            return JSON.stringify({ open: false, themes: root.themeList.map(t => t.name), selected: themeService.name, current: themeService.name, openMs: null, opens: 0 });
-        }
-    }
-
-    Root.Ipc {
         target: "cheatsheet"
 
         // t0 is taken before the first load, so a cold open's time includes loading.

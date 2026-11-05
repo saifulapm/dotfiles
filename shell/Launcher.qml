@@ -87,12 +87,12 @@ Item {
         tokens: launcher.theme.tokens
     }
 
-    // mode is clipboard or emoji when a key opened the launcher straight into one; typed is the key that opened it from the overview.
+    // mode is clipboard, emoji or colorschemes when a key opened the launcher straight into one; typed is the key that opened it from the overview.
     function open(t0, mode, typed) {
         openT0 = t0;
         openMs = null;
         opens += 1;
-        input.text = typed || ({ clipboard: "v ", emoji: ": " })[mode] || "";
+        input.text = typed || ({ clipboard: "v ", emoji: ": ", colorschemes: "c " })[mode] || "";
         selected = 0;
         scrollTop = 0;
         shown = true;
@@ -185,6 +185,7 @@ Item {
             mode: mode,
             query: query,
             results: rows.map(r => r.title),
+            names: rows.map(r => r.name ?? null),
             ids: rows.map(r => r.id ?? null),
             icons: rows.map(r => r.icon ?? null),
             selected: selected,

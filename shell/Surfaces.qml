@@ -22,7 +22,6 @@ PanelWindow {
     // The Desk's niri service, null until the Desk loads.
     required property var niri
     readonly property var launcher: launcherLoader.item
-    readonly property var themes: themesLoader.item
     readonly property var notifications: notifsLoader.item
     readonly property var cheatsheet: cheatsheetLoader.item
     readonly property var control: controlLoader.item
@@ -36,7 +35,7 @@ PanelWindow {
     readonly property var dns: dnsLoader.item
     readonly property var picker: pickerLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, themes, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
+    readonly property var all: [launcher, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
     readonly property bool shown: all.some(s => s?.shown ?? false)
     // While niri's overview is open the shell holds the keyboard, so no key reaches the window behind it.
     readonly property bool overview: niri?.overview ?? false
@@ -71,12 +70,6 @@ PanelWindow {
         launcherLoader.active = true;
         closeOthers(launcher);
         launcher.open(t0, mode, typed);
-    }
-
-    function openThemes(t0) {
-        themesLoader.active = true;
-        closeOthers(themes);
-        themes.open(t0);
     }
 
     function openNotifs(t0) {
@@ -165,7 +158,7 @@ PanelWindow {
         interval: 50
         repeat: true
         onTriggered: {
-            const next = [launcherLoader, themesLoader, notifsLoader, cheatsheetLoader, controlLoader, recorderLoader, polkitLoader, goalsLoader].find(l => !l.active && (l !== goalsLoader || host.goals));
+            const next = [launcherLoader, notifsLoader, cheatsheetLoader, controlLoader, recorderLoader, polkitLoader, goalsLoader].find(l => !l.active && (l !== goalsLoader || host.goals));
             if (next)
                 next.active = true;
             else
@@ -235,16 +228,6 @@ PanelWindow {
                 if (host.overview)
                     Quickshell.execDetached(["niri", "msg", "action", "close-overview"]);
             }
-        }
-    }
-
-    Loader {
-        id: themesLoader
-        anchors.fill: parent
-        active: false
-        sourceComponent: Root.Themes {
-            theme: host.theme
-            themes: host.themeList
         }
     }
 

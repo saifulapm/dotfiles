@@ -15,9 +15,9 @@ export function report(m, b) {
     line('idle rss', Math.floor(m.rssKiB / 1024), 'MiB', '≤', b.rssMiB, m.rssKiB <= b.rssMiB * 1024),
     line('panel cold', m.coldMs, 'ms', '≤', b.coldMs, m.coldMs <= b.coldMs),
     line('panel warm', m.warmMs, 'ms', '≤', b.warmMs, m.warmMs <= b.warmMs),
-    // The theme picker answers to the launcher's budgets.
-    line('picker cold', m.pickerColdMs, 'ms', '≤', b.coldMs, m.pickerColdMs <= b.coldMs),
-    line('picker warm', m.pickerWarmMs, 'ms', '≤', b.warmMs, m.pickerWarmMs <= b.warmMs),
+    // The launcher's colorscheme mode, its forty rows and strips, answers to the launcher's budgets; cold is its first open after a start.
+    line('c mode cold', m.schemesColdMs, 'ms', '≤', b.coldMs, m.schemesColdMs <= b.coldMs),
+    line('c mode warm', m.schemesWarmMs, 'ms', '≤', b.warmMs, m.schemesWarmMs <= b.warmMs),
     // Pass's first open after its 30 s unload, which loads it again.
     line('pass cold', m.passColdMs, 'ms', '≤', b.coldMs, m.passColdMs <= b.coldMs),
     // The file picker's first open after its 30 s unload, from the request's arrival to its first frame.
@@ -61,15 +61,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const switchMs = Number(process.argv[8]);
   const switchedKiB = Number(process.argv[9]);
   const anonShmemKiB = Number(process.argv[10]);
-  const pickerColdMs = Number(process.argv[11]);
-  const pickerWarmMs = Number(process.argv[12]);
+  const schemesColdMs = Number(process.argv[11]);
+  const schemesWarmMs = Number(process.argv[12]);
   const passColdMs = Number(process.argv[13]);
   const filesColdMs = Number(process.argv[14]);
   const [appFirstFrameMs, appRssKiB, appLeft] = process.argv.slice(15, 18).map(Number);
   const [dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft] = process.argv.slice(18, 21).map(Number);
   const [deenFirstFrameMs, deenRssKiB, deenLeft] = process.argv.slice(21, 24).map(Number);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, pickerColdMs, pickerWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, schemesColdMs, schemesWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),

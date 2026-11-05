@@ -284,9 +284,8 @@ reaches them in about 4 ms and falls back to `qs ipc call`; a typed call
 | `idle` | `state`, `times <dimS> <lockS> <offS>` | dim, lock and monitors-off steps |
 | `island` | `state`, `focus` | the top island: clock, toasts, OSD, lease slot |
 | `notifs` | `state`, `open`, `close`, `toggle`, `clear`, `dnd <bool>`, `toggleDnd` | notification centre |
-| `launcher` | `state`, `open`, `close`, `toggle`, `mode <name>` | modes apps, windows, clipboard, emoji, calculator, commands |
+| `launcher` | `state`, `open`, `close`, `toggle`, `mode <name>` | modes apps, windows, clipboard, emoji, calculator, commands, colorschemes (`c `; `dots colorscheme <name>` switches from a shell) |
 | `control` | `state`, `open`, `close`, `toggle`, `section <name>` | sections audio, wifi, bluetooth, power, display, route |
-| `themes` | `state`, `open`, `close`, `toggle` | the theme picker; `dots colorscheme <name>` switches from a shell |
 | `notes` | `state`, `open`, `toggle`, `pin`, `capture` | notes panel |
 | `goals` | `state`, `open`, `close`, `toggle` | goals panel |
 | `pass` | `state`, `open`, `close`, `toggle` | password picker |

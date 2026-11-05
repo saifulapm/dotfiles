@@ -11,7 +11,7 @@ live_pid=$(systemctl --user show -p MainPID --value dots-shell.service)
 live_theme=$(<"$live_theme_file") || exit 2
 [[ $live_pid =~ ^[1-9][0-9]*$ && -n $live_theme ]] || { echo "soak: cannot read the live shell's PID and theme, so it cannot be guarded" >&2; exit 2; }
 
-# The nested session starts in a colorscheme, so the picker lists the schemes the soak cycles through.
+# The nested session starts in a colorscheme, and the soak cycles through every one in colorschemes/.
 export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
@@ -43,7 +43,7 @@ sleep 5
 idle_s=$(((minutes + 1) * step_s))
 timeout 0.5 qs ipc call idle times "$idle_s" "$((idle_s + 1))" "$((idle_s + 2))" >/dev/null || die "the idle times were not set"
 
-mapfile -t names < <(timeout 0.5 qs ipc call themes state | jq -r '.themes[]')
+mapfile -t names < <(cd "$(dirname "$0")/../colorschemes" && ls -- *.toml | sed 's/\.toml$//')
 theme=$(shell_status | jq -r .theme)
 # A theme shown once keeps its shaders, so every theme is shown before the first sample and minute 5 is a warm baseline.
 for t in "${names[@]}" "$theme"; do

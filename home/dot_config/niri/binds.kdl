@@ -12,7 +12,7 @@ binds {
     Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
     Mod+C hotkey-overlay-title="Control" { spawn "dots-call" "control" "toggle"; }
-    Mod+Shift+T hotkey-overlay-title="Themes" { spawn "dots-call" "themes" "toggle"; }
+    Mod+Shift+T hotkey-overlay-title="Colorschemes" { spawn "dots-call" "launcher" "mode" "colorschemes"; }
     Mod+A hotkey-overlay-title="Notifications" { spawn "dots-call" "notifs" "toggle"; }
     Mod+Shift+A hotkey-overlay-title="Clear Notifications" { spawn "dots-call" "notifs" "clear"; }
     Mod+D hotkey-overlay-title="Do Not Disturb" { spawn "dots-call" "notifs" "toggleDnd"; }

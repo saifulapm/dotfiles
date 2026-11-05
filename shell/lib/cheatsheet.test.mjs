@@ -107,9 +107,9 @@ test('the touchpad rows name niri\'s swipes and corner, the two pinches and the 
 
 test('a filter matches the title or the key text, ignoring case', () => {
   const rows = parseBinds(binds);
-  assert.deepEqual(filterRows(rows, 'theme').map((r) => r.title), ['Themes']);
+  assert.deepEqual(filterRows(rows, 'colorsch').map((r) => r.title), ['Colorschemes']);
   assert.deepEqual(filterRows(rows, 'mod ⇧').map((r) => r.title), [
-    'Mail: kak-mail', 'Click by Grid', 'Themes', 'Clear Notifications', 'Pin Notes', 'DNS Shield', 'System Monitor: btop', 'Quit niri', 'Screens Off', 'Screenshot: Screen', 'Screenshot: Region',
+    'Mail: kak-mail', 'Click by Grid', 'Colorschemes', 'Clear Notifications', 'Pin Notes', 'DNS Shield', 'System Monitor: btop', 'Quit niri', 'Screens Off', 'Screenshot: Screen', 'Screenshot: Region',
     'Screenshot: Window', 'Copy Text from a Region', 'Annotate a Region', 'Record a Region', 'Cast: Focused Window', 'Cast: Focused Screen', 'Cast: Nothing', 'Window Shorter', 'Window Taller',
     'Fullscreen Window', 'Expel Window from Column', 'Focus Floating or Tiled', 'Center Column',
     'Window to Scratchpad or Back', 'Window Follows Workspaces', 'Move Workspace Down', 'Move Workspace Up',

@@ -7,7 +7,7 @@ unset TMUX
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
-themes_is() { timeout 0.5 qs ipc call themes state 2>/dev/null | jq -e "$1" >/dev/null; }
+sheet_is() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so a press spawns the bind's command through niri.
 press() { t0=$(now_ms); niri msg action spawn -- dots-call launcher toggle >/dev/null; }
 wait_until() { while (($(now_ms) - t0 < $1)); do sleep 0.005; done; }
@@ -70,11 +70,11 @@ press
 until_ok 9000 state_is .settled
 wtype -k Escape
 until_ok 1000 state_is '.open == false and .drawing'
-niri msg action spawn -- dots-call themes open >/dev/null
-until_ok 2000 themes_is .open
-check "opening the theme picker mid-close stops the launcher drawing at once" state_is '.drawing == false'
-timeout 0.5 qs ipc call themes close >/dev/null
-until_ok 9000 themes_is '.drawing == false'
+niri msg action spawn -- dots-call cheatsheet open >/dev/null
+until_ok 2000 sheet_is .open
+check "opening the cheat sheet mid-close stops the launcher drawing at once" state_is '.drawing == false'
+timeout 0.5 qs ipc call cheatsheet close >/dev/null
+until_ok 9000 sheet_is '.drawing == false'
 
 # Every other surface's card springs too, read from the card as drawn rather than from its Motion.
 surface_is() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -e "$2" >/dev/null; }
@@ -93,7 +93,7 @@ springs() {
   check "the $1 card still draws as its close plays" surface_is "$1" .drawing
   until_ok 9000 surface_is "$1" '.drawing == false'
 }
-for s in themes notifs cheatsheet goals control; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
+for s in notifs cheatsheet goals control; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
 springs record "qs ipc call record toggle" "qs ipc call record toggle"
 # pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent, as in polkit.sh.
 fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }

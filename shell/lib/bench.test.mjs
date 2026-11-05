@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, BUDGETS } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, pickerColdMs: 41, pickerWarmMs: 9, passColdMs: 37, filesColdMs: 33, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, schemesColdMs: 41, schemesWarmMs: 9, passColdMs: 37, filesColdMs: 33, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
 
 test('every measure within budget reads ok and passes', () => {
   const r = report(good, BUDGETS);
@@ -15,8 +15,8 @@ test('every measure within budget reads ok and passes', () => {
     'cgroup mem    231 MiB',
     'panel cold    48 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
-    'picker cold   41 ms   ≤ 50 ms    ok',
-    'picker warm   9 ms    ≤ 16 ms    ok',
+    'c mode cold   41 ms   ≤ 50 ms    ok',
+    'c mode warm   9 ms    ≤ 16 ms    ok',
     'pass cold     37 ms   ≤ 50 ms    ok',
     'files cold    33 ms   ≤ 50 ms    ok',
     'timers        1       = 1        ok',
@@ -113,22 +113,22 @@ test('the CLI prints the cgroup memory from its ninth argument', () => {
   assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /cgroup mem {4}231 MiB/);
 });
 
-test('a picker cold of 51 ms is OVER and 50 ok, a picker warm of 17 ms is OVER and 16 ok', () => {
-  assert.equal(report({ ...good, pickerColdMs: 50 }, BUDGETS).over, false);
-  const cold = report({ ...good, pickerColdMs: 51 }, BUDGETS);
+test('a c mode cold of 51 ms is OVER and 50 ok, a c mode warm of 17 ms is OVER and 16 ok', () => {
+  assert.equal(report({ ...good, schemesColdMs: 50 }, BUDGETS).over, false);
+  const cold = report({ ...good, schemesColdMs: 51 }, BUDGETS);
   assert.equal(cold.over, true);
-  assert.equal(cold.lines[5], 'picker cold   51 ms   ≤ 50 ms    OVER');
-  assert.equal(report({ ...good, pickerWarmMs: 16 }, BUDGETS).over, false);
-  const warm = report({ ...good, pickerWarmMs: 17 }, BUDGETS);
+  assert.equal(cold.lines[5], 'c mode cold   51 ms   ≤ 50 ms    OVER');
+  assert.equal(report({ ...good, schemesWarmMs: 16 }, BUDGETS).over, false);
+  const warm = report({ ...good, schemesWarmMs: 17 }, BUDGETS);
   assert.equal(warm.over, true);
-  assert.equal(warm.lines[6], 'picker warm   17 ms   ≤ 16 ms    OVER');
+  assert.equal(warm.lines[6], 'c mode warm   17 ms   ≤ 16 ms    OVER');
 });
 
-test('the CLI prints both picker lines from its tenth and eleventh arguments and exits 1 when either is over', () => {
+test('the CLI prints both c mode lines from its tenth and eleventh arguments and exits 1 when either is over', () => {
   const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544'];
   const out = execFileSync('node', [cli, ...args, '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'], { encoding: 'utf8' });
-  assert.match(out, /picker cold {3}41 ms +≤ 50 ms +ok/);
-  assert.match(out, /picker warm {3}9 ms +≤ 16 ms +ok/);
+  assert.match(out, /c mode cold {3}41 ms +≤ 50 ms +ok/);
+  assert.match(out, /c mode warm {3}9 ms +≤ 16 ms +ok/);
   for (const [c, w] of [['51', '9'], ['41', '17']]) {
     assert.throws(
       () => execFileSync('node', [cli, ...args, c, w, '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'], { stdio: 'pipe' }),

@@ -18,7 +18,7 @@ open_close() {
 
 until_ok 10000 paper_up
 pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
-for t in launcher themes notifs cheatsheet control goals; do open_close "$t" open; done
+for t in launcher notifs cheatsheet control goals; do open_close "$t" open; done
 open_close launcher mode emoji
 open_close launcher mode clipboard
 open_close record toggle

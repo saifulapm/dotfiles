@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The shell times itself: a qs ipc round trip costs tens of ms, too much to time a 16 ms open from here.
 {
-# The nested session starts in a colorscheme, so the picker lists the schemes the switches go through.
+# The nested session starts in a colorscheme, and the switches go through every one in colorschemes/.
 export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/../tests/dev/lib.sh"
 
@@ -28,22 +28,20 @@ open_once() {
   until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
 }
 
-picker_reported() { themes_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
-themes_state() { timeout 0.5 qs ipc call themes state 2>/dev/null; }
-themes_focus() { themes_state | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
+launcher_focus() { launcher_state | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 
-# Opens the theme picker number $1 like open_once does the launcher: reads the time the shell measured, closes it and waits for the keyboard.
-picker_once() {
-  qs ipc call themes open >/dev/null || die "themes open failed"
-  until_ok 3000 picker_reported "$1" || die "picker open $1 never reported openMs"
-  themes_state | jq -r .openMs
-  qs ipc call themes close >/dev/null
-  until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+# Opens the launcher's colorscheme mode as open number $1, like open_once: reads the time the launcher measured, closes it and waits for the keyboard.
+schemes_once() {
+  qs ipc call launcher mode colorschemes >/dev/null || die "launcher colorschemes mode failed"
+  until_ok 3000 open_reported "$1" || die "colorschemes open $1 never reported openMs"
+  launcher_state | jq -r .openMs
+  qs ipc call launcher close >/dev/null
+  until_ok 3000 launcher_closed || die "the launcher never gave the keyboard back"
 }
 
 # A start's first frame and cold open vary by 50 ms run to run, so each budget holds the median of five starts; nothing asks qs before niri lists the paper, since early ipc calls hold a start back 1 to 2 s.
 paper_gone() { ! layer_up dots-paper; }
-frames=() colds=() picker_colds=()
+frames=() colds=() schemes_colds=()
 # lib.sh waits for the warm-up, so even the first start is a fresh one, and each open lands before its shell warms.
 for i in 1 2 3 4 5; do
   systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
@@ -52,16 +50,16 @@ for i in 1 2 3 4 5; do
   until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
   frames+=("$(shell_status | jq -r .firstFrameMs)")
   colds+=("$(open_once 1)") || exit 1
-  picker_colds+=("$(picker_once 1)") || exit 1
+  schemes_colds+=("$(schemes_once 2)") || exit 1
 done
-echo "     first frames: ${frames[*]}; cold opens: ${colds[*]}; picker cold opens: ${picker_colds[*]}"
+echo "     first frames: ${frames[*]}; cold opens: ${colds[*]}; c mode cold opens: ${schemes_colds[*]}"
 median() { printf '%s\n' "$@" | sort -n | sed -n 3p; }
 first_frame=$(median "${frames[@]}")
 cold=$(median "${colds[@]}")
-picker_cold=$(median "${picker_colds[@]}")
+schemes_cold=$(median "${schemes_colds[@]}")
 sleep 0.3
-warm=$(open_once 2) || exit 1
-picker_warm=$(picker_once 2) || exit 1
+warm=$(open_once 3) || exit 1
+schemes_warm=$(schemes_once 4) || exit 1
 
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
@@ -99,32 +97,27 @@ files_cold=$(files_once) || exit 1
 until_ok 35000 files_is '.loaded == false' || die "the file picker never unloaded"
 
 switch_json=$XDG_STATE_HOME/dots/theme-switch.json
-theme_index() { themes_state | jq -r --arg n "$1" '.themes | index($n)'; }
-selected_is() { themes_state | jq -e --arg t "$1" '.selected == $t' >/dev/null; }
+first_is() { launcher_state | jq -e --arg t "$1" '.names[0] == $t' >/dev/null; }
 switched_to() { jq -e --arg t "$1" --arg was "$2" '.to == $t and (tojson != $was)' "$switch_json" >/dev/null 2>&1; }
 
-# Through the switcher as a person would, so the time runs from the Enter key to dots colorscheme's last reload.
+# Through the launcher's c mode as a person would, the name typed as its title, so the time runs from the Enter key to dots colorscheme's last reload.
 switch_once() {
-  local to=$1 was from delta key
+  local to=$1 was
   was=$(jq -c . "$switch_json" 2>/dev/null)
-  qs ipc call themes open >/dev/null || die "themes open failed"
-  until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
-  from=$(themes_state | jq -r .selected)
-  delta=$(($(theme_index "$to") - $(theme_index "$from")))
-  key=j
-  ((delta < 0)) && key=k delta=$((-delta))
-  for ((; delta > 0; delta--)); do wtype "$key"; done
-  until_ok 1000 selected_is "$to" || die "the cursor never reached $to"
+  qs ipc call launcher mode colorschemes >/dev/null || die "launcher colorschemes mode failed"
+  until_ok 3000 launcher_focus Exclusive || die "the launcher never took the keyboard"
+  wtype "${to//-/ }"
+  until_ok 1000 first_is "$to" || die "typing ${to//-/ } never put $to first"
   wtype -k Return
   until_ok 3000 switched_to "$to" "$was" || die "the switch to $to was never recorded"
-  until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+  until_ok 3000 launcher_focus None || die "the launcher never gave the keyboard back"
   jq -r .ms "$switch_json"
 }
 # The budget's RSS is read with every surface opened once on the starting theme, before any switch.
-qs ipc call themes open >/dev/null || die "themes open failed"
-until_ok 3000 themes_focus Exclusive || die "the switcher never took the keyboard"
-qs ipc call themes close >/dev/null
-until_ok 3000 themes_focus None || die "the switcher never gave the keyboard back"
+qs ipc call launcher mode colorschemes >/dev/null || die "launcher colorschemes mode failed"
+until_ok 3000 launcher_focus Exclusive || die "the launcher never took the keyboard"
+qs ipc call launcher close >/dev/null
+until_ok 3000 launcher_focus None || die "the launcher never gave the keyboard back"
 notifs_focus() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e --arg k "$1" '.open == ($k == "Exclusive")' >/dev/null && niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 qs ipc call notifs open >/dev/null || die "notifs open failed"
 until_ok 3000 notifs_focus Exclusive || die "the notification centre never took the keyboard"
@@ -163,7 +156,7 @@ anon_shmem_kib=$(awk '$1 == "anon" || $1 == "shmem" { b += $2 } END { printf "%d
 
 start=$(shell_status | jq -r .theme)
 switch_max=0
-mapfile -t names < <(themes_state | jq -r '.themes[]')
+mapfile -t names < <(cd "$(dirname "$0")/../colorschemes" && ls -- *.toml | sed 's/\.toml$//')
 for to in $(node "$(dirname "$0")/../shell/lib/bench.mjs" cycle "$start" "${names[@]}"); do
   ms=$(switch_once "$to") || exit 1
   echo "     switch to $to: $ms ms" >&2
@@ -240,6 +233,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$picker_cold" "$picker_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left"
 exit
 }
