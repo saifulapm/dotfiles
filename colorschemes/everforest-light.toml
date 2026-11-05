@@ -1,0 +1,34 @@
+# UI and code colours from sainnhe/everforest's medium light palette (autoload/everforest.vim): paper bg_dim, surface bg0, ink fg, muted grey2, line its VertSplit bg4, comment grey1 and meta its PreProc purple; the ANSI 16 are its terminal colours (colors/everforest.vim).
+[meta]
+name = "everforest-light"
+title = "Everforest Light"
+family = "Everforest"
+variant = "light"
+source = "https://github.com/sainnhe/everforest"
+licence = "MIT"
+
+[color]
+paper = "#EFEBD4"
+surface = "#FDF6E3"
+ink = "#5C6A72"
+muted = "#829181"
+line = "#E0DCC7"
+accent = "#3A94C5"
+danger = "#F85552"
+ok = "#8DA101"
+ansi = [
+  "#5C6A72", "#F85552", "#8DA101", "#DFA000", "#3A94C5", "#DF69BA", "#35A77C", "#E6E2CC",
+  "#5C6A72", "#F85552", "#8DA101", "#DFA000", "#3A94C5", "#DF69BA", "#35A77C", "#E6E2CC",
+]
+
+[syntax]
+keyword = "#DF69BA"
+function = "#3A94C5"
+string = "#8DA101"
+type = "#DFA000"
+value = "#F57D26"
+variable = "#F85552"
+attribute = "#F57D26"
+meta = "#DF69BA"
+builtin = "#35A77C"
+comment = "#939F91"
