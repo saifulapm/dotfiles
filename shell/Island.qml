@@ -202,7 +202,7 @@ PanelWindow {
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
-    readonly property var motion: I.islandMotion(theme.tokens?.primitive.motion)
+    readonly property var motion: I.islandMotion(!!theme.tokens)
     readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
@@ -531,8 +531,7 @@ PanelWindow {
                 needle: point(meter.needle.rotation, osdLook.meter.needle.length - 8),
                 red: point((osdLook.meter.angle(osdLook.meter.red) + osdLook.meter.angle(100)) / 2, osdLook.meter.radius),
                 labels: meter.labels().map(l => ({ text: l.text, color: l.color, box: { x: l.box.x + shift, y: l.box.y, w: l.box.w, h: l.box.h } }))
-            } : null,
-            highlightBox: box.highlight.visible ? at(box.highlight) : null
+            } : null
         };
     }
 
@@ -707,9 +706,6 @@ PanelWindow {
             summaryColor: String(summary.color),
             bodyBox: body.visible ? at(body) : null,
             islandBox: at(box),
-            // The region niri blurs behind the box, in the island window's pixels.
-            blurRegion: blurRegion ? [box.regionBox()] : [],
-            highlightBox: box.highlight.visible ? at(box.highlight) : null,
             scale: noteScale.visible ? { box: at(noteScale), ticks: noteScale.marks.ticks.length } : null,
             bracketsShown: openBracket.visible,
             appElided: appName.truncated,
@@ -894,9 +890,6 @@ PanelWindow {
     mask: Region {
         item: box
     }
-    // In a theme that blurs the island is glass at rest too, so its window always asks niri to blur behind its own box.
-    readonly property var blurRegion: box.glass ? box.region : null
-    BackgroundEffect.blurRegion: blurRegion
 
     Connections {
         target: Root.Pairing

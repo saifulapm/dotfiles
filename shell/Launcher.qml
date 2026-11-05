@@ -78,15 +78,9 @@ Item {
     }
     readonly property var rows: found.slice(0, 8)
     readonly property var look: L.launcherLook(theme.tokens)
-    // A theme that blurs draws the card as glass and asks niri to blur the card's rounded box, nothing else.
-    readonly property bool glass: card.glass
-    readonly property var blurRegion: glass && visible ? card.region : null
-    // The blur region read from the Region on the first frame the open drew, so a check sees what niri was asked for before the card settled.
-    property var firstRegion: []
     readonly property Root.Motion motion: Root.Motion {
         shown: launcher.shown
         tokens: launcher.theme.tokens
-        onFirstFrameChanged: launcher.firstRegion = firstFrame >= 0 && launcher.blurRegion ? [card.regionBox()] : []
     }
 
     // mode is clipboard or emoji when a key opened the launcher straight into one; typed is the key that opened it from the overview.
@@ -206,8 +200,6 @@ Item {
             frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
             glassFill: String(card.drawnFill),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
-            firstRegion: firstRegion,
             nameFont: nameBox ? nameBox.fontInfo.family : null,
             fieldFill: look.field ? String(well.color) : null,
             fieldBorder: look.field ? String(well.border.color) : null,

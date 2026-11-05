@@ -169,21 +169,6 @@ export function springCurve(stiffness, damping, within = 500) {
   return { ms: Math.round(secs * 1000), points: sampled((x) => at(x * secs)) };
 }
 
-// A CSS cubic-bezier(x1, y1, x2, y2), solved for its x by bisection.
-function bezier(x1, y1, x2, y2) {
-  const coord = (a, b, t) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
-  return sampled((x) => {
-    let lo = 0;
-    let hi = 1;
-    for (let i = 0; i < 30; i++) {
-      const mid = (lo + hi) / 2;
-      if (coord(x1, x2, mid) < x) lo = mid;
-      else hi = mid;
-    }
-    return coord(y1, y2, (lo + hi) / 2);
-  });
-}
-
 // The value of a sampled curve at progress t, straight between samples.
 export function ease(points, t) {
   if (t <= 0) return points[0];
@@ -192,23 +177,9 @@ export function ease(points, t) {
   return points[i] + (points[i + 1] - points[i]) * (t * STEPS - i);
 }
 
-const LINEAR = sampled((x) => x);
-// niri's curves for the same tokens, so the island moves as the windows do.
-export const EASED = {
-  snappy: { ms: 120, points: bezier(0.16, 1, 0.3, 1), swap: 'drop' },
-  ease: { ms: 200, points: bezier(0.33, 1, 0.68, 1), swap: 'drop' },
-  typewriter: { ms: 90, points: LINEAR, swap: 'scan' },
-  linear: { ms: 150, points: LINEAR, swap: 'scan' },
-};
-
-// How the island morphs under a theme's motion token: the shape's open and close curves and how its content swaps; null before a theme loads.
-export function islandMotion(motion) {
-  if (motion === 'spring') {
-    const open = springCurve(260, 0.7);
-    return { open, close: springCurve(390, 0.78), swap: { kind: 'blur', inMs: Math.min(Math.max(Math.round(open.ms * 0.5), 180), 320), outMs: 130, delay: 60, blur: 6 } };
-  }
-  const e = EASED[motion];
-  if (!e) return null;
-  const swap = e.swap === 'drop' ? { kind: 'drop', inMs: Math.max(Math.round(e.ms * 0.8), 80), outMs: 60, delay: 20 } : { kind: 'scan', inMs: e.ms, outMs: 80, delay: 40 };
-  return { open: { ms: e.ms, points: e.points }, close: { ms: Math.round(e.ms * 0.8), points: e.points }, swap };
+// How the island morphs on the one spring: the shape's open and close curves and how its content swaps, scaling in from 90% as it fades; null before the scheme loads.
+export function islandMotion(loaded) {
+  if (!loaded) return null;
+  const open = springCurve(260, 0.7);
+  return { open, close: springCurve(390, 0.78), swap: { kind: 'spring', inMs: Math.min(Math.max(Math.round(open.ms * 0.5), 180), 320), outMs: 130, delay: 60 } };
 }

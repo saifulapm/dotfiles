@@ -2,7 +2,7 @@ import QtQuick
 import "." as Root
 import "lib/motion.mjs" as M
 
-// Plays a surface's open and close on its theme's motion token; the surface's card draws the pose (agent #PQC9EDND).
+// Plays a surface's open and close on the one spring; the surface's card draws the pose.
 Item {
     id: motion
 
@@ -11,10 +11,11 @@ Item {
     // False while the surface's content is still loading; its open waits, so the whole drop plays from its first frame.
     property bool ready: true
     readonly property bool open: shown && ready
-    readonly property var curves: M.surfaceMotion(tokens?.primitive.motion, Root.State.slowdown)
+    // None before the scheme loads, so a surface opened that early shows at once.
+    readonly property var curves: tokens ? M.surfaceMotion(Root.State.slowdown) : null
     // How far through its open the card is drawn: 0 draws nothing, 1 is at rest.
     property real progress: 0
-    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 })
+    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1 })
     // A closing surface still draws, though it gave the keyboard back when its close began.
     readonly property bool drawing: shown || progress > 0
     readonly property bool settled: open && progress === 1
@@ -46,7 +47,7 @@ Item {
             closeStartedAt = 0;
         }
     }
-    // A theme switch mid-motion carries on at the new theme's pace.
+    // The scheme loading mid-motion carries on at the spring's pace.
     onCurvesChanged: if (clock.running)
         play()
     onSettledChanged: if (settled)
