@@ -28,13 +28,13 @@ export function validateColorscheme(doc) {
   return Object.assign({}, meta, { color: Object.assign({}, color, { ansi: [...color.ansi] }), syntax: Object.assign({}, syntax) });
 }
 
-// The design system: Artboard's dots, geometry and spring, square, a 1 px frame in ink on the focused window and line on the rest, no shadow, Maple Mono in the plain voice.
+// The design system: Artboard's dots, geometry and spring, square, a quiet 1 px line frame on every window and surface, no shadow, Maple Mono in the plain voice.
 export function designOf(s) {
   const doc = {
     meta: { name: s.name, mode: s.variant },
     color: s.color,
     syntax: s.syntax,
-    primitive: { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' },
+    primitive: { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' },
     paper: { spacing: 16, dot: s.color.line },
     type: { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 },
     niri: {

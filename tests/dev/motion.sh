@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The one design's window open and close shaders, seen at slowdown 20 in the pixels of a plain magenta foot framed 1 px in ink.
+# The one design's window open and close shaders, seen at slowdown 20 in the pixels of a plain magenta foot framed 1 px in line.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -86,13 +86,13 @@ artboard() {
   check "a resting magenta window is found" calibrate
   [ -n "$box" ] || return
   read -r x y w h <<<"$box"
-  # The window is square in a 1 px ink frame: the pixel left and right of its magenta is ink, and its top corners are no paper showing round a radius.
+  # The window is square in a 1 px line frame: the pixel left and right of its magenta is Artboard's line #D0D7DE, and its top corners are no paper showing round a radius.
   local corner='
-    const ink = (c) => Math.max(...c) < 80;
+    const line = (c) => near(c, [208, 215, 222], 8);
     const paper = (c) => near(c, [228, 230, 234], 10);
     let x0 = w, y0 = h, x1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (magenta(at(x, y))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); }
-    return x1 >= 0 && ink(at(x0 - 1, y0 + 20)) && ink(at(x1 + 1, y0 + 20)) && !paper(at(x0, y0)) && !paper(at(x1, y0));'
+    return x1 >= 0 && line(at(x0 - 1, y0 + 20)) && line(at(x1 + 1, y0 + 20)) && !paper(at(x0, y0)) && !paper(at(x1, y0));'
   open_magenta
   wait_until 1000
   t=$(($(now_ms) - t0))
@@ -102,7 +102,7 @@ artboard() {
       let n = 0; for (let i = 0; i < w; i++) if (magenta(at(i, 0))) n++;
       return n >= $w * 0.96 - 1 && n <= $w * 0.98;"
   sleep 4
-  check "at rest: square corners in a 1 px ink frame" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
+  check "at rest: square corners in a 1 px line frame" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
   close_window
   until_ok 8000 has_windows 0
 }

@@ -16,7 +16,7 @@ const doc = (t) => ({ meta: { name: t.name, mode: t.mode }, ...structuredClone({
 test('a scheme on the one design validates into its tokens', () => {
   const t = validateTheme(doc(artboard));
   assert.deepEqual([t.name, t.mode, t.color.paper, t.color.ink], ['artboard', 'light', '#E4E6EA', '#15171B']);
-  assert.deepEqual(t.primitive, { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' });
+  assert.deepEqual(t.primitive, { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' });
   assert.deepEqual([t.type.display, t.type.ui, t.type.mono, t.type.voice], ['Maple Mono', 'Maple Mono', 'Maple Mono', 'plain']);
 });
 

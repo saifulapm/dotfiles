@@ -6,9 +6,9 @@ import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 const artboard = schemeTokens('artboard');
 const mocha = schemeTokens('catppuccin-mocha');
 
-test("a card is the scheme's surface in a 1 px ink frame, square, with no shadow, over a 0.72 wash", () => {
-  assert.deepEqual(surfaceStyle(artboard, 'card'), { fill: '#FFFFFF', text: '#15171B', frame: { width: 1, color: '#15171B' }, wash: 0.72 });
-  assert.deepEqual(surfaceStyle(mocha, 'card'), { fill: '#1E1E2E', text: '#CDD6F4', frame: { width: 1, color: '#CDD6F4' }, wash: 0.72 });
+test("a card is the scheme's surface in a 1 px line frame, square, with no shadow, over a 0.72 wash", () => {
+  assert.deepEqual(surfaceStyle(artboard, 'card'), { fill: '#FFFFFF', text: '#15171B', frame: { width: 1, color: '#D0D7DE' }, wash: 0.72 });
+  assert.deepEqual(surfaceStyle(mocha, 'card'), { fill: '#1E1E2E', text: '#CDD6F4', frame: { width: 1, color: '#313244' }, wash: 0.72 });
 });
 
 test("a light scheme's island is an ink slab with paper text; a dark scheme's is its surface with ink text", () => {

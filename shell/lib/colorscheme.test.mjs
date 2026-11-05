@@ -42,7 +42,7 @@ test('ink on surface under 4.5:1 is refused with contrast in the message', () =>
 
 test('every scheme wears the one design: dots in line, square, ink frame, no shadow, Maple Mono, plain, spring', () => {
   const t = designOf(validateColorscheme(artboard()));
-  assert.deepEqual(t.primitive, { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' });
+  assert.deepEqual(t.primitive, { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' });
   assert.deepEqual(t.paper, { spacing: 16, dot: '#D0D7DE' });
   assert.deepEqual(t.type, { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 });
   assert.equal(t.mode, 'light');

@@ -1,5 +1,5 @@
 // Validates the one design's theme document, as colorscheme.mjs builds it (Artboard's dots, an ink frame, no shadow, square, the spring, Maple Mono in the plain voice), and renders its fragments; pure, so the shell can import it too.
-const DESIGN = { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' };
+const DESIGN = { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
 const SYNTAX = ['keyword', 'function', 'string', 'type', 'value', 'variable', 'attribute', 'meta', 'builtin', 'comment'];
 const FONT = 'Maple Mono';

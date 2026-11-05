@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Under a colorscheme two tiled foots sit on the paper framed square in 1 px, ink on the focused one and line on the other, with no pixel darker than the paper within 20 px outside either frame; the old Artboard's shadow (#15171B2E, softness 40, y 18) put into niri.kdl after the switch fails the last check.
+# Under a colorscheme two tiled foots sit on the paper framed square in 1 px line, the focused one too, with no pixel darker than the paper within 20 px outside either frame; the old Artboard's shadow (#15171B2E, softness 40, y 18) put into niri.kdl after the switch fails the last check.
 {
 export DOTS_DEV_SCHEME=${DOTS_DEV_SCHEME-gruvbox-dark}
 source "$(dirname "$0")/lib.sh"
@@ -75,8 +75,7 @@ read_frames() {
 frames=$(read_frames)
 echo "tiles: $frames"
 check "two tiles lie across the screen a quarter down" jq -e 'length == 2' <<<"$frames"
-check "one tile is framed in ink on all four sides and square at its corners" jq -e 'map(select(.edges == ["ink","ink","ink","ink","ink","ink"])) | length == 1' <<<"$frames"
-check "the other is framed in line on all four sides and square at its corners" jq -e 'map(select(.edges == ["line","line","line","line","line","line"])) | length == 1' <<<"$frames"
+check "both tiles, the focused one too, are framed in line on all four sides and square at their corners" jq -e 'map(select(.edges == ["line","line","line","line","line","line"])) | length == 2' <<<"$frames"
 check "no pixel within 20 px outside either frame is darker than the paper" jq -e 'all(.[]; .darker == false)' <<<"$frames"
 
 exit $((fails > 0))

@@ -27,7 +27,7 @@ test('the shell tokens name the one design and the scheme\'s light or dark', (t)
   const shell = JSON.parse(readFileSync(join(out, 'shell.json'), 'utf8'));
   assert.equal(shell.name, 'artboard');
   assert.equal(shell.mode, 'light');
-  assert.deepEqual(shell.primitive, { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' });
+  assert.deepEqual(shell.primitive, { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' });
   assert.equal(shell.type.voice, 'plain');
   assert.equal(shell.color.paper, '#E4E6EA');
   assert.equal(shell.color.surface, '#FFFFFF');
