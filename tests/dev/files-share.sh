@@ -34,9 +34,6 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
 files_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "files")] | length'; }
 files_up() { [ "$(files_windows)" = 1 ] && files_is '.firstFrameMs != null and .listed'; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-no_transition() { shell_status | jq -e '.transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; until_ok 2000 no_transition; sleep 0.3; }
 open_share() { wtype s; until_ok 3000 files_is '.share.open and .share.listed and (.share.rows | length) > 0'; }
 close_share() { wtype -k Escape; until_ok 2000 files_is '.share.open == false'; }
 # Moves the list's cursor to the first row whose name starts with $1.
@@ -53,7 +50,6 @@ cp_log() { cat "$ts_dir/cp.log" 2>/dev/null; }
 
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_up
-in_theme paper
 wtype -k space -k space -k space
 until_ok 1000 files_is '(.marked | length) == 3'
 check "three files are marked ($(files_state | jq -c .marked))" files_is '.marked == ["a.bin", "b.bin", "c.bin"]'
@@ -62,8 +58,8 @@ open_share
 echo "     share: $(files_state | jq -c '.share | {head, rows: [.rows[] | [.name, .detail, .status, .color]]}')"
 check "s lists the devices over Files: 6 rows" files_is '.share.open and (.share.rows | length) == 6'
 check "online devices come first, offline ones after" files_is '(.share.rows | map(.status == "offline")) as $o | $o == ($o | sort) and ($o | any) and ($o | all | not)'
-check "an offline row is drawn in Paper's muted #575653, an online one in its ink #1c1915" \
-  files_is '(.share.rows | map(select(.status == "offline" and (.current | not)) | .color) | unique) == ["#575653"] and .share.rows[1].status == "online" and .share.rows[1].color == "#1c1915"'
+check "an offline row is drawn in the muted #57606a, an online one in ink #15171b" \
+  files_is '(.share.rows | map(select(.status == "offline" and (.current | not)) | .color) | unique) == ["#57606a"] and .share.rows[1].status == "online" and .share.rows[1].color == "#15171b"'
 check "a device named with a newline and U+202E draws on one line, without them ($(files_state | jq -c '.share.rows[0] | [.name, .lines]'))" \
   files_is '.share.rows[0].lines == 1 and (.share.rows[0].name | test("[\\n‮]") | not) and (.share.rows[0].name | startswith("a b"))'
 
@@ -85,26 +81,18 @@ share_to iPhone
 check "the cursor is on the iPhone, online" files_is '.share.rows[.share.selected] | .name == "iPhone" and .status == "online"'
 wtype -k Return
 check "Enter on the iPhone closes the list" until_ok 2000 files_is '.share.open == false'
-check "and the island shows the send of 3 files to iPhone ($(island | jq -c .sending))" until_ok 5000 island_is '.mode == "sending" and .sending.label == "SENDING 3 FILES TO IPHONE ·"'
+check "and the island shows the send of 3 files to iPhone ($(island | jq -c .sending))" until_ok 5000 island_is '.mode == "sending" and (.sending.label | startswith("Sending 3 files to iPhone ·"))'
 check "the fake logged one file cp of the three paths to the iPhone's address ($(cp_log))" \
   test "$(cp_log)" = "file cp $h/a.bin $h/b.bin $h/c.bin 100.95.3.21:"
 check "the send ends and the island lets go of it" until_ok 15000 island_is '.sending == null'
 
-for theme in paper artboard blueprint; do
-  in_theme "$theme"
-  open_share
-  echo "     $theme: $(files_state | jq -c '.share | {head, keys, first: .rows[1]}')"
-  case $theme in
-    paper) head='{"label": "SHARE", "count": "3 files · 8.9 MB", "tag": "tailnet"}' keys='["↵ SEND WITH TAILDROP", "J/K MOVE", "ESC"]' on=online off='offline, seen' ;;
-    artboard) head='{"label": "Share", "count": "3 files · 8.9 MB", "tag": "tailnet"}' keys='["↵ send with Taildrop", "j/k move", "esc"]' on=online off='offline, seen' ;;
-    blueprint) head='{"label": "SHARE", "count": "3 FILES · 8.9 MB", "tag": "TAILNET"}' keys='["[↵] SEND WITH TAILDROP", "[J/K] MOVE", "[ESC]"]' on=ONLINE off='OFFLINE, SEEN' ;;
-  esac
-  check "$theme: the head reads as its board does" files_is --argjson h "$head" '.share.head == $h'
-  check "$theme: the key strip reads as its board does" files_is --argjson k "$keys" '.share.keys == $k'
-  check "$theme: an online row reads its address and $on" files_is --arg on "$on" '.share.rows[] | select(.name == "iPhone") | .detail == "100.95.3.21" and .status == $on'
-  check "$theme: an offline row reads when it was seen" files_is --arg off "$off" '.share.rows[] | select(.name == "fedora") | (.detail | startswith($off))'
-  close_share
-done
+open_share
+echo "     $(files_state | jq -c '.share | {head, keys, first: .rows[1]}')"
+check "the head reads as the board does" files_is '.share.head == {"label": "Share", "count": "3 files · 8.9 MB", "tag": "tailnet"}'
+check "the key strip reads as the board does" files_is '.share.keys == ["↵ send with Taildrop", "j/k move", "esc"]'
+check "an online row reads its address and online" files_is '.share.rows[] | select(.name == "iPhone") | .detail == "100.95.3.21" and .status == "online"'
+check "an offline row reads when it was seen" files_is '.share.rows[] | select(.name == "fedora") | (.detail | startswith("offline, seen"))'
+close_share
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 300 <<<"$errs")}" test -z "$errs"

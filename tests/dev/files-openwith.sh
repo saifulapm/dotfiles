@@ -58,27 +58,11 @@ check "a Name with a newline and U+202E draws on one line ($(ow '.rows[] | selec
   files_is '.openWith.rows[] | select(.app == "dots-test-forged.desktop") | .lines == 1 and .name == "zz forged namex"'
 
 n=$(files_state | jq '.openWith.rows | length')
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null && until_ok 2000 status_theme "$1" && until_ok 2000 files_is --arg v "$2" '.voice == $v'; }
-in_theme paper caps
-check "Paper: OPEN WITH · 3 JPEG images · $n apps ($(ow '| {label, title, count}'))" \
-  files_is --arg c "$n apps" '.openWith | .label == "OPEN WITH" and .title == "3 JPEG images" and .count == $c'
-check "Paper: the keys read ↵ OPEN, J/K MOVE, SHIFT+↵ MAKE DEFAULT, ESC ($(ow .keys))" \
-  files_is '.openWith.keys == [{"key": "↵", "word": "OPEN"}, {"key": "J/K", "word": "MOVE"}, {"key": "SHIFT+↵", "word": "MAKE DEFAULT"}, {"key": "ESC", "word": ""}]'
-check "Paper: imv's row reads Image viewer · imv, default ($(ow '.rows[0] | {sub, badge}'))" files_is '.openWith.rows[0] | .sub == "Image viewer · imv" and .badge == "default"'
-in_theme artboard plain
-check "Artboard: Open with · 3 JPEG images · $n apps ($(ow '| {label, title, count}'))" \
+check "Open with · 3 JPEG images · $n apps ($(ow '| {label, title, count}'))" \
   files_is --arg c "$n apps" '.openWith | .label == "Open with" and .title == "3 JPEG images" and .count == $c'
-check "Artboard: the keys read as typed ($(ow .keys))" \
+check "the keys read as typed ($(ow .keys))" \
   files_is '.openWith.keys == [{"key": "↵", "word": "open"}, {"key": "j/k", "word": "move"}, {"key": "shift+↵", "word": "make default"}, {"key": "esc", "word": ""}]'
-check "Artboard: imv's row reads Image viewer · imv, default" files_is '.openWith.rows[0] | .sub == "Image viewer · imv" and .badge == "default"'
-in_theme blueprint bracket
-check "Blueprint: OPEN WITH // 3 JPEG IMAGES · $n APPS ($(ow '| {label, title, count}'))" \
-  files_is --arg c "$n APPS" '.openWith | .label == "OPEN WITH" and .title == "3 JPEG IMAGES" and .count == $c'
-check "Blueprint: the keys are bracketed in caps ($(ow .keys))" \
-  files_is '.openWith.keys == [{"key": "[↵]", "word": "OPEN"}, {"key": "[J/K]", "word": "MOVE"}, {"key": "[SHIFT+↵]", "word": "MAKE DEFAULT"}, {"key": "[ESC]", "word": ""}]'
-check "Blueprint: imv's row reads IMAGE VIEWER · imv, [DEFAULT] ($(ow '.rows[0] | {sub, badge}'))" files_is '.openWith.rows[0] | .sub == "IMAGE VIEWER · imv" and .badge == "[DEFAULT]"'
-in_theme paper caps
+check "imv's row reads Image viewer · imv, default ($(ow '.rows[0] | {sub, badge}'))" files_is '.openWith.rows[0] | .sub == "Image viewer · imv" and .badge == "default"'
 
 wtype -k Escape
 until_ok 1000 files_is '.openWith.open | not'

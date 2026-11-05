@@ -35,11 +35,11 @@ check "its first frame came $(files_state | jq .firstFrameMs) ms after the proce
   files_is '(.firstFrameMs | type) == "number" and .firstFrameMs > 0 and .firstFrameMs < 500'
 check "its title is the folder, Home ($(niri msg -j windows | jq -r '.[] | select(.app_id == "files") | .title'))" \
   bash -c "niri msg -j windows | jq -e 'any(.[]; .app_id == \"files\" and .title == \"Home\")' >/dev/null"
-check "the header reads FILES · Home · MOD Y in Paper ($(files_state | jq -c .head))" \
-  files_is '.head == {"label": "FILES", "folder": "Home", "chip": "MOD Y"}'
+check "the header reads Files · Home · Mod+Y ($(files_state | jq -c .head))" \
+  files_is '.head == {"label": "Files", "folder": "Home", "chip": "Mod+Y"}'
 
 # A drive mounted on this machine lists between the pins and Trash, and is no part of this check.
-check "the places are Home, Downloads, Codes, Pictures, Documents, the two bookmarks under PINNED, and Trash ($(files_state | jq -c .places))" \
+check "the places are Home, Downloads, Codes, Pictures, Documents, the two bookmarks under Pinned, and Trash ($(files_state | jq -c .places))" \
   files_is '[.places[] | select(startswith("drives:") | not)] == ["places:Home", "places:Downloads", "places:Codes", "places:Pictures", "places:Documents", "pinned:lareys", "pinned:invoices", "trash:Trash"]'
 until_ok 2000 files_is '.listed'
 wtype jj
@@ -87,7 +87,7 @@ check "space marks IMG_2039.jpg and IMG_2040.jpg and steps down ($(files_state |
 check "the status line counts them ($(files_state | jq -r .status.counts))" files_is '.status.counts | endswith(" · 2 marked")'
 wtype k
 until_ok 1000 files_is '.cursor == "IMG_2040.jpg"'
-check "the marked cursor row draws its mark ($(files_state | jq -c .drawn))" files_is '.drawn.mark == "■" and .drawn.name == "IMG_2040.jpg"'
+check "the marked cursor row draws its mark ($(files_state | jq -c .drawn))" files_is '.drawn.mark == "●" and .drawn.name == "IMG_2040.jpg"'
 
 row_at() { files_state | jq --arg n "$1" '.rows | index($n)'; }
 go_to() {
@@ -110,7 +110,7 @@ check "tab moves to the places, on Downloads ($(files_state | jq -c '{side, plac
 wtype jjjj
 wtype -k Return
 until_ok 2000 files_is '.listed and .side == "list" and (.folder | endswith("/Codes"))'
-check "j to lareys under PINNED and Enter opens ~/Codes, back in the list ($(files_state | jq -r .folder))" files_is '.side == "list" and (.folder | endswith("/Codes"))'
+check "j to lareys under Pinned and Enter opens ~/Codes, back in the list ($(files_state | jq -r .folder))" files_is '.side == "list" and (.folder | endswith("/Codes"))'
 
 niri msg action spawn -- foot -c /dev/null
 until_ok 3000 bash -c "niri msg -j windows | jq -e 'any(.[]; .app_id == \"foot\" and .is_focused)' >/dev/null"
