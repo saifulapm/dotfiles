@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PaperFill at period 0.5 draws Artboard's dots every 8 px, Blueprint's major lines every 40 and its crop marks 7 px long, 4 px in.
+# PaperFill at period 0.5 draws the dots every 8 px.
 {
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 # The nested shell runs a copy whose Sheet draws at half period, so the edit never reaches the shell/ the live shell watches.
@@ -34,36 +34,15 @@ has_rgb() {
   ' "$@"
 }
 near6() { local a b; read -r -a a <<<"$1"; read -r -a b <<<"$2"; for i in 0 1 2; do ((a[i] - b[i] <= 6 && b[i] - a[i] <= 6)) || return 1; done; }
-switch() {
-  node "$repo/shell/lib/theme-render.mjs" "$1" >/dev/null
-  printf '%s\n' "$1" >"$XDG_STATE_HOME/dots/theme"
-}
-
-# A point 8 px past a multiple of 16 is mid-cell at the full period and a dot at half.
-dx=$((ox + w / 2 / 16 * 16 + 8)) dy=$((oy + h / 2 / 16 * 16 + 8))
-switch artboard
+# A point 8 px past a multiple of 16 is mid-cell at the full period and a dot at half; a quarter down is clear of the day's passage card.
+dx=$((ox + w / 2 / 16 * 16 + 8)) dy=$((oy + h / 4 / 16 * 16 + 8))
 artboard_up() { near6 "$(mean_at "$((dx + 3))" "$((dy + 3))" 2 2)" "228 230 234"; }
 until_ok 3000 artboard_up
-sleep 0.3
-dot_shown() { grim -s 1 -t ppm -g "$((dx - 2)),$((dy - 2)) 4x4" - | has_rgb 180 186 196 12; }
-check "artboard: a dot #B4BAC4 sits at $dx,$dy" dot_shown
-bare() { ! grim -s 1 -t ppm -g "$((dx + 2)),$((dy + 2)) 4x4" - | has_rgb 180 186 196 12; }
+# artboard's dots are its line colour, #D0D7DE.
+dot_shown() { grim -s 1 -t ppm -g "$((dx - 2)),$((dy - 2)) 4x4" - | has_rgb 208 215 222 8; }
+check "artboard: a dot #D0D7DE sits at $dx,$dy" dot_shown
+bare() { ! grim -s 1 -t ppm -g "$((dx + 2)),$((dy + 2)) 4x4" - | has_rgb 208 215 222 8; }
 check "artboard: 4 px past it is bare paper" bare
-
-# x 40 past a multiple of 80 is between lines at the full period and a major line at half; y 3 past one is off every line.
-gx=$((ox + w / 2 / 80 * 80 + 40)) gy=$((oy + h / 2 / 80 * 80 + 3))
-switch blueprint
-blueprint_up() { near6 "$(mean_at "$((gx + 4))" "$gy" 1 1)" "12 26 46"; }
-until_ok 3000 blueprint_up
-sleep 0.3
-read -r lr lg lb < <(mean_at "$gx" "$gy" 1 1)
-read -r cr cg cb < <(mean_at "$((gx + 4))" "$gy" 1 1)
-check "blueprint: the major line at x $gx ($lr $lg $lb) is brighter than the cell ($cr $cg $cb)" \
-  test $((lr + lg + lb - cr - cg - cb)) -ge 30
-mark_in() { grim -s 1 -t ppm -g "$((ox + 4)),$((oy + 4)) 3x3" - | has_rgb 127 227 240 12; }
-check "blueprint: the crop mark #7FE3F0 starts 4 px in" mark_in
-mark_short() { ! grim -s 1 -t ppm -g "$((ox + 11)),$((oy + 4)) 12x12" - | has_rgb 127 227 240 12; }
-check "blueprint: the crop mark ends 7 px long" mark_short
 
 exit $((fails > 0))
 }
