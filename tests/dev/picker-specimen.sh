@@ -77,10 +77,6 @@ dot_row() {
 }
 check "artboard: its card's bottom row holds a darker dot every 8 px of the specimen, at the card's fit $fit" dot_row artboard dark
 check "gruvbox-dark: its card's bottom row holds a brighter dot every 8 px of the specimen, at the card's fit $fit" dot_row gruvbox-dark bright
-    return 1
-  }
-  check "$name: its card's bottom row holds a dot every 8 px of the specimen, at the card's fit $fit" dots "$([ "$name" = artboard ] && echo dark || echo bright)"
-done
 
 for name in artboard catppuccin-mocha github-light gruvbox-dark rose-pine-dawn; do
   card=$(themes_state | jq -c --arg n "$name" '.cards[] | select(.name == $n)')
