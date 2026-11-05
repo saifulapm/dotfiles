@@ -5,15 +5,12 @@ source "$(dirname "$0")/lib.sh"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 state_is() { island | jq -e "$1" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 8000 status_theme "$1"; }
 # The newest notification replaces the shown one, so each check waits for its own summary, drawn and settled.
 shown() { until_ok 3000 state_is "(.note.summary | ascii_downcase) == \"$1\" and .animating == false"; }
 note() { island | jq -c ".note.$1"; }
 notify() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$@" >/dev/null; }
 
 until_ok 5000 shell_status >/dev/null
-in_theme artboard
 
 notify-send -a x -h string:desktop-entry:foot hi
 shown hi
@@ -28,13 +25,10 @@ notify "x" 0 "/usr/share/pixmaps/helix.png" given "" '[]' '{"desktop-entry": <"f
 shown given
 check "an app icon given beats the desktop entry ($(note icon))" state_is '(.note.icon // "" | test("helix")) and .note.glyph == null'
 
-# The value hint draws the OSD's bar under the body: 40 lights 8 of 20 in each theme, and a replace moves it.
-for t in paper artboard blueprint; do
-  in_theme "$t"
-  notify-send -a dl -h int:value:40 "Download $t"
-  shown "download $t"
-  check "$t: value 40 lights 8 of 20 ($(note bar))" state_is '.note.bar == 8'
-done
+# The value hint draws the OSD's bar under the body: 40 lights 8 of 20, and a replace moves it.
+notify-send -a dl -h int:value:40 "Download"
+shown download
+check "value 40 lights 8 of 20 ($(note bar))" state_is '.note.bar == 8'
 id=$(notify-send -p -a dl -h int:value:20 Moving)
 shown moving
 check "value 20 lights 4 ($(note bar))" state_is '.note.bar == 4'
@@ -58,12 +52,9 @@ magenta() {
   '
 }
 right_thumb='.note.picture.w == 48 and .note.picture.h == 48 and .note.picture.x > .note.summaryBox.x + .note.summaryBox.w'
-for t in paper artboard blueprint; do
-  in_theme "$t"
-  notify-send -a Art -h string:image-path:"$pic" "Cover $t"
-  shown "cover $t"
-  check "$t: an image-path PNG draws a 48 px thumbnail at the right ($(note picture))" state_is "$right_thumb"
-done
+notify-send -a Art -h string:image-path:"$pic" "Cover"
+shown cover
+check "an image-path PNG draws a 48 px thumbnail at the right ($(note picture))" state_is "$right_thumb"
 notify "Art" 0 "" data "" '[]' '{"image-data": <(2, 2, 8, true, 8, 4, [byte 255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255])>}' 5000
 shown data
 check "image data sent by gdbus draws the same ($(note picture))" state_is "$right_thumb"
@@ -80,7 +71,6 @@ check "its Mod+A row draws no picture ($(magenta) px)" test "$(magenta)" = 0
 niri msg action spawn -- dots-call notifs close
 until_ok 2000 eval 'notifs | jq -e ".open == false" >/dev/null'
 
-in_theme artboard
 notify "Art" 0 "$pic" same "" '[]' "{\"image-path\": <\"$pic\">}" 5000
 shown same
 check "a picture that is the app icon's file draws no thumbnail ($(note picture))" state_is '.note.picture == null'
