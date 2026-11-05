@@ -46,6 +46,9 @@ export function reduce(state, event) {
       return set(state, { windows: state.windows.filter((w) => w.id !== e.id) });
     case 'WorkspaceUrgencyChanged':
       return set(state, { workspaces: state.workspaces.map((w) => (w.id === e.id ? set(w, { is_urgent: e.urgent }) : w)) });
+    // niri sends it once a focus has held past its debounce, so a window passed on the way is never the one focused last.
+    case 'WindowFocusTimestampChanged':
+      return set(state, { windows: state.windows.map((w) => (w.id === e.id ? set(w, { focus_timestamp: e.focus_timestamp }) : w)) });
     case 'WindowUrgencyChanged':
       return set(state, { windows: state.windows.map((w) => (w.id === e.id ? set(w, { is_urgent: e.urgent }) : w)) });
     case 'OverviewOpenedOrClosed':

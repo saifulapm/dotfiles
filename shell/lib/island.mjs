@@ -59,14 +59,34 @@ export function commNames(text) {
 // niri stops a PipeWire share by its session, and a session can hold more than one stream (XPRY7NFD).
 export const stopSessions = (shares) => [...new Set(shares.filter((s) => s.kind === 'PipeWire').map((s) => s.session))];
 
-// The apps recording from the default source, newest first and each named once: a capture stream with an active link from it, but no monitor, passive stream or the shell's own recorder, whose pid is ownPid (A1KE151A, Q24TQVMB). A link's end that has gone reads -1. Serials are never reused, as node ids are (TJKMQNCR).
-export function micApps(streams, links, sourceId, ownPid) {
+// The streams recording from the default source, newest first: a capture stream with an active link from it, but no monitor, passive stream or the shell's own recorder, whose pid is ownPid (A1KE151A, Q24TQVMB). A link's end that has gone reads -1. Serials are never reused, as node ids are (TJKMQNCR).
+function recordingStreams(streams, links, sourceId, ownPid) {
   const counted = (p) => p['stream.monitor'] !== 'true' && (p['node.passive'] ?? 'false') === 'false' && p['media.category'] !== 'Monitor' && !(ownPid > 0 && p['application.process.id'] === String(ownPid));
-  const names = streams
+  return streams
     .filter((s) => s.capture && counted(s.props) && sourceId >= 0 && links.some((l) => l.active && l.source === sourceId && l.target === s.id))
-    .sort((a, b) => Number(b.props['object.serial'] ?? b.id) - Number(a.props['object.serial'] ?? a.id))
-    .map((s) => oneLine(s.props['application.name'] || s.props['node.description'] || s.props['node.name'] || ''));
+    .sort((a, b) => Number(b.props['object.serial'] ?? b.id) - Number(a.props['object.serial'] ?? a.id));
+}
+
+// The apps recording from the default source, newest first and each named once.
+export function micApps(streams, links, sourceId, ownPid) {
+  const names = recordingStreams(streams, links, sourceId, ownPid).map((s) => oneLine(s.props['application.name'] || s.props['node.description'] || s.props['node.name'] || ''));
   return [...new Set(names)];
+}
+
+// The newest recording app, whose window a click on the mic slot focuses, as {pid, client}: a PulseAudio app's stream names its process, a native stream only its PipeWire client, which does; null when nothing records.
+export function micRecorder(streams, links, sourceId, ownPid) {
+  const s = recordingStreams(streams, links, sourceId, ownPid)[0];
+  return s ? { pid: Number(s.props['application.process.id'] ?? 0) || 0, client: Number(s.props['client.id'] ?? 0) || 0 } : null;
+}
+
+// The window of the first pid in chain (a process, then its parent, and so on up) that has one; of several, the one focused last, or null. niri cannot say which window of a process records.
+export function windowFor(windows, chain) {
+  const at = (w) => (w.focus_timestamp ? w.focus_timestamp.secs * 1e9 + w.focus_timestamp.nanos : -1);
+  for (const pid of chain) {
+    const own = windows.filter((w) => w.pid === pid);
+    if (own.length) return own.reduce((a, b) => (at(b) > at(a) ? b : a)).id;
+  }
+  return null;
 }
 
 // The media card's controls, each with the key that runs it; play/pause says what a press does next.

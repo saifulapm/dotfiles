@@ -55,15 +55,19 @@ PanelWindow {
     readonly property var captureLinks: Pipewire.linkGroups.values.filter(g => captures.includes(g.target))
     readonly property PwNode micSource: Pipewire.defaultAudioSource
     // The apps recording from the default source, newest first; a link's end that has gone reads -1 (A1KE151A). Do Not Disturb never hides it (N6622XD7).
-    readonly property var micApps: I.micApps(captures.map(n => ({
-                    id: n.id,
-                    capture: true,
-                    props: n.properties ?? {}
-                })), captureLinks.map(g => ({
-                    source: g.source?.id ?? -1,
-                    target: g.target?.id ?? -1,
-                    active: g.state === PwLinkState.Active
-                })), micSource?.id ?? -1, Root.State.recordingPid)
+    readonly property var micStreams: captures.map(n => ({
+                id: n.id,
+                capture: true,
+                props: n.properties ?? {}
+            }))
+    readonly property var micLinks: captureLinks.map(g => ({
+                source: g.source?.id ?? -1,
+                target: g.target?.id ?? -1,
+                active: g.state === PwLinkState.Active
+            }))
+    readonly property var micApps: I.micApps(micStreams, micLinks, micSource?.id ?? -1, Root.State.recordingPid)
+    // The newest of them, whose window a click on the mic slot focuses.
+    readonly property var micRecorder: I.micRecorder(micStreams, micLinks, micSource?.id ?? -1, Root.State.recordingPid)
     readonly property var mic: micApps.length ? micApps : null
     // Mod+I on LIVE opens a card of the shares, with who watches each; Enter stops every PipeWire share, Esc closes (MGX0WWS8).
     property bool sharingOpen: false
@@ -758,16 +762,28 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
-    // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, or the calendar when nothing is live.
-    readonly property bool clickable: ["rest", "playing", "lease", "sharing"].indexOf(mode) >= 0 || (mode === "question" && !focused)
+    // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, the recording app's window, or the calendar when nothing is live.
+    readonly property bool clickable: ["rest", "playing", "lease", "sharing", "mic"].indexOf(mode) >= 0 || (mode === "question" && !focused)
     function openActivity() {
-        if (mode === "playing") {
+        if (mode === "mic") {
+            focusRecorder();
+        } else if (mode === "playing") {
             mediaOpen = true;
             focused = true;
             keys.forceActiveFocus();
         } else if (clickable) {
             focusIsland();
         }
+    }
+
+    // The recording process (asked of its PipeWire client when its stream names none), then its parent and on up, since chromium records from a child of the process that owns its windows; the answer picks the window.
+    function focusRecorder() {
+        const r = micRecorder;
+        if (!r || (r.pid <= 0 && r.client <= 0))
+            return;
+        ancestry.running = false;
+        ancestry.command = ["sh", "-c", 'p=$1; [ "$p" -gt 0 ] || p=$(pw-dump "$2" 2>/dev/null | grep -o \'"application.process.id": *[0-9]*\' | grep -o \'[0-9]*$\' | head -1); while [ "${p:-0}" -gt 1 ]; do echo "$p"; p=$(awk \'/^PPid:/ { print $2 }\' "/proc/$p/status" 2>/dev/null); done', "sh", String(r.pid), String(r.client)];
+        ancestry.running = true;
     }
 
     // A click on an option answers with it as its number key does, and Reply opens the reply line as r does; neither while the reply line or the file picker has the question.
@@ -976,6 +992,17 @@ PanelWindow {
                 island.questions.attach(forId, [file]);
             else
                 island.askNote = "No image on the clipboard";
+        }
+    }
+
+    Process {
+        id: ancestry
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const id = I.windowFor(island.niri.state.windows, text.split("\n").filter(l => l).map(Number));
+                if (id !== null)
+                    Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(id)]);
+            }
         }
     }
 

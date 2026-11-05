@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls, micRecorder, windowFor } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -355,4 +355,24 @@ test('the media card names its keys, and play/pause says what a press does next'
   assert.equal(mediaControls(false)[1].text, '␣ play');
   assert.equal(islandText('mediaCard', { mediaCard: { title: 'Low\nTide', artist: 'lofi', playing: false } }, AT), 'Low Tide — lofi  h previous  ␣ play  l next');
   assert.equal(islandText('mediaCard', { mediaCard: { title: 'Track', artist: '', playing: true } }, AT), 'Track  h previous  ␣ pause  l next');
+});
+
+test("the mic slot's recorder is the newest app's process, or the PipeWire client that knows it", () => {
+  const streams = [rec(52, { 'application.name': 'Other', 'object.serial': '900', 'application.process.id': '5200', 'client.id': '61' }), rec(40, { 'application.name': 'Test Recorder', 'object.serial': '300', 'client.id': '44' })];
+  assert.deepEqual(micRecorder(streams, [from(MIC, 40), from(MIC, 52)], MIC, 0), { pid: 5200, client: 61 });
+  assert.deepEqual(micRecorder(streams, [from(MIC, 40)], MIC, 0), { pid: 0, client: 44 });
+  assert.equal(micRecorder(streams, [], MIC, 0), null);
+});
+
+const win = (id, pid, secs) => ({ id, pid, focus_timestamp: secs === null ? null : { secs, nanos: 0 } });
+
+test('the recording app\'s window is the nearest ancestor\'s, the one of them focused last', () => {
+  const windows = [win(1, 300, 10), win(2, 300, 30), win(3, 300, 20), win(4, 999, 50)];
+  // chromium records from a child of its browser process, which owns the windows.
+  assert.equal(windowFor(windows, [310, 300, 1]), 2);
+  assert.equal(windowFor(windows, [999, 300]), 4);
+  assert.equal(windowFor([win(1, 300, null), win(2, 300, 5)], [300]), 2);
+  assert.equal(windowFor([win(7, 300, null)], [300]), 7);
+  assert.equal(windowFor(windows, [42, 1]), null);
+  assert.equal(windowFor([{ id: 1, pid: 300, focus_timestamp: { secs: 5, nanos: 900 } }, { id: 2, pid: 300, focus_timestamp: { secs: 5, nanos: 100 } }], [300]), 1);
 });

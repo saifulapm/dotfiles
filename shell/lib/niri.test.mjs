@@ -242,3 +242,9 @@ test("a reconnect's replayed rejection does not notify a streak twice", () => {
 test('a reconnect after a good load notifies the next rejection', () => {
   assert.equal(loads([true], reconnected(loads([true, false]).s)).n, 1);
 });
+
+test('a window focused long enough takes its new focus timestamp', () => {
+  const state = reduce(initial, { WindowsChanged: { windows: [{ id: 1, pid: 300, focus_timestamp: { secs: 1, nanos: 0 } }, { id: 2, pid: 300, focus_timestamp: null }] } });
+  const after = reduce(state, { WindowFocusTimestampChanged: { id: 2, focus_timestamp: { secs: 9, nanos: 5 } } });
+  assert.deepEqual(after.windows.map((w) => w.focus_timestamp), [{ secs: 1, nanos: 0 }, { secs: 9, nanos: 5 }]);
+});
