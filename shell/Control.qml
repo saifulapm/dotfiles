@@ -89,7 +89,6 @@ Item {
             drawing: control.visible,
             cardBox: card.drawnBox(),
             cardFill: String(card.drawnFill),
-            heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,
             tabText: tab ? tab.text : null,
             tabBox: tab ? box(tab) : null,
@@ -151,27 +150,11 @@ Item {
             width: parent.width
             spacing: 0
 
-            // Blueprint names Control and its section on a line of their own above the tabs.
-            Text {
-                id: header
-                visible: look.label.kind === "header"
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.topMargin: 12
-                text: look.heading("control", Lib.SECTIONS[control.current])
-                color: look.small.color
-                font.family: look.small.font
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
-            }
-
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
-                Layout.topMargin: look.label.kind === "header" ? 8 : 14
+                Layout.topMargin: 14
                 Layout.bottomMargin: 14
                 spacing: 4
 

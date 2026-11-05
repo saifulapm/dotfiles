@@ -120,7 +120,7 @@ export function specimenMargins(tokens) {
     tail: look.tail(SCENE.view),
     goal: look.goal(SCENE.goal),
     goalColor: look.goalColor,
-    date: (look.sep ? ` ${look.sep} ` : '  ') + look.date(SCENE.date),
+    date: '  ' + look.date(SCENE.date),
     font: style.font,
     rules: style.rules,
     tracking: style.tracking / 2,

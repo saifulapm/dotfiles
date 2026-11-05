@@ -452,20 +452,10 @@ Item {
         }
     }
 
-    // A rule across the panel in the theme's rule colour, dashed where the theme dashes its rules.
-    component Rule: Item {
+    // A rule across the panel in the scheme's rule colour.
+    component Rule: Rectangle {
         width: column.width
         height: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !switcher.look.rule.dashed
-            color: switcher.look.rule.color
-        }
-        Root.Dashed {
-            anchors.fill: parent
-            visible: switcher.look.rule.dashed
-            color: switcher.look.rule.color
-        }
+        color: switcher.look.rule.color
     }
 }
