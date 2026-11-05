@@ -52,3 +52,22 @@ wheel_box() {
   point move $at
   point wheel "$2"
 }
+
+# An App's window by its app id: tiled windows report no position, so float_app floats it at 20,20 on the output, and app_spot adds its origin to a box the App answers.
+app_window_id() { niri msg -j windows | jq -r --arg a "$1" '[.[] | select(.app_id == $a)][0].id'; }
+app_origin() { niri msg -j windows | jq -r --arg a "$1" '.[] | select(.app_id == $a) | .layout | "\((.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]) | floor) \((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor)"'; }
+app_placed() { app_origin "$1" | grep -qx '[0-9]* [0-9]*'; }
+float_app() {
+  niri msg action toggle-window-floating --id "$(app_window_id "$1")"
+  niri msg action move-floating-window --id "$(app_window_id "$1")" -x 20 -y 20
+  until_ok 2000 app_placed "$1" || return 1
+  # A window opened since wtype's last key gets niri's keymap; a Shift first hands it wtype's.
+  wtype -k Shift_L
+}
+# The output point at a fraction across a box {x,y,w,h} in the App's window, its middle by default: "x y", or nothing when the box is null.
+app_spot() {
+  local fx fy
+  [ -n "$2" ] && [ "$2" != null ] || return 1
+  read -r fx fy <<<"$(app_origin "$1")"
+  jq -r --argjson fx "$fx" --argjson fy "$fy" --argjson f "${3:-0.5}" '"\(($fx + .x + .w * $f) | floor) \(($fy + .y + .h / 2) | floor)"' <<<"$2"
+}
