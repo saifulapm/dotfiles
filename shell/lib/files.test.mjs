@@ -306,3 +306,28 @@ test('the path line splits into the muted lead and the folder\'s own name', () =
   assert.deepEqual(F.pathParts('/home/s', '/etc'), { lead: '/', name: 'etc' });
   assert.deepEqual(F.pathParts('/home/s', '/home/s/a\nb‮c'), { lead: '~/', name: 'a bc' });
 });
+
+test('a click selects only its row, Shift extends from the cursor, Ctrl toggles one row', () => {
+  const rows = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((name) => ({ name, dir: false }));
+  const none = { ctrl: false, shift: false };
+  let s = F.clicked(rows, ['a', 'g'], 0, 2, none, F.toggleMark);
+  assert.deepEqual(s, { selected: 2, marked: [] });
+  s = F.clicked(rows, s.marked, s.selected, 5, { ctrl: false, shift: true }, F.toggleMark);
+  assert.deepEqual(s, { selected: 5, marked: ['c', 'd', 'e', 'f'] });
+  s = F.clicked(rows, s.marked, s.selected, 3, { ctrl: true, shift: false }, F.toggleMark);
+  assert.deepEqual(s, { selected: 3, marked: ['c', 'e', 'f'] });
+  // Before any click the cursor is on the first row, so Shift selects from there; a range runs upwards too.
+  assert.deepEqual(F.clicked(rows, [], 0, 2, { ctrl: false, shift: true }, F.toggleMark).marked, ['a', 'b', 'c']);
+  assert.deepEqual(F.clicked(rows, [], 4, 1, { ctrl: false, shift: true }, F.toggleMark).marked, ['b', 'c', 'd', 'e']);
+  // Ctrl with nothing marked keeps the cursor row selected beside the new one.
+  assert.deepEqual(F.clicked(rows, [], 1, 4, { ctrl: true, shift: false }, F.toggleMark), { selected: 4, marked: ['b', 'e'] });
+});
+
+test('a click marks only what the surface\'s own toggle would', () => {
+  const rows = [{ name: 'shots', dir: true }, { name: 'x�', dir: false, undecodable: true }, { name: 'a.jpg', dir: false }];
+  const files = (m, r) => (!r || r.dir ? m : F.toggleMark(m, r));
+  assert.deepEqual(F.clicked(rows, [], 0, 2, { ctrl: false, shift: true }, files).marked, ['a.jpg']);
+  assert.deepEqual(F.clicked(rows, [], 0, 1, { ctrl: true, shift: false }, files), { selected: 1, marked: [] });
+  // A surface that marks nothing, a single-file picker, only moves the cursor.
+  assert.deepEqual(F.clicked(rows, [], 0, 2, { ctrl: true, shift: true }, (m) => m), { selected: 2, marked: [] });
+});

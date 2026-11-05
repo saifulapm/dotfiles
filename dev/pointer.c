@@ -1,4 +1,4 @@
-// A virtual pointer for nested checks: it reads press, move, release, click, wheel and sleep lines on stdin and holds one pointer from press to release.
+// A virtual pointer for nested checks: it reads press, move, release, click, dclick, wheel and sleep lines on stdin and holds one pointer from press to release.
 #include <linux/input-event-codes.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -83,20 +83,26 @@ int main(int argc, char **argv) {
 				zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
 				zwlr_virtual_pointer_v1_frame(pointer);
 			}
-		} else if (strcmp(cmd, "click") == 0) {
-			// A click is a move, a press and a release, the button held 50 ms as a hand holds it.
+		} else if (strcmp(cmd, "click") == 0 || strcmp(cmd, "dclick") == 0) {
+			// A click is a move, a press and a release, the button held 50 ms as a hand holds it; dclick X Y GAP clicks twice, GAP ms apart (100 by default).
 			zwlr_virtual_pointer_v1_motion_absolute(pointer, now_ms(), (uint32_t)tx, (uint32_t)ty, width, height);
 			zwlr_virtual_pointer_v1_frame(pointer);
 			wl_display_roundtrip(display);
 			x = tx;
 			y = ty;
 			pause_ms(50);
-			zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
-			zwlr_virtual_pointer_v1_frame(pointer);
-			wl_display_roundtrip(display);
-			pause_ms(50);
-			zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
-			zwlr_virtual_pointer_v1_frame(pointer);
+			int clicks = strcmp(cmd, "dclick") == 0 ? 2 : 1;
+			for (int i = 0; i < clicks; i++) {
+				if (i > 0)
+					pause_ms(n >= 4 ? steps : 100);
+				zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
+				zwlr_virtual_pointer_v1_frame(pointer);
+				wl_display_roundtrip(display);
+				pause_ms(50);
+				zwlr_virtual_pointer_v1_button(pointer, now_ms(), BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+				zwlr_virtual_pointer_v1_frame(pointer);
+				wl_display_roundtrip(display);
+			}
 		} else if (strcmp(cmd, "wheel") == 0) {
 			// wheel N turns a mouse wheel N notches where the pointer is, down when N is positive, one frame per notch; a notch is 15 as libinput reports one.
 			int notches = (int)tx;

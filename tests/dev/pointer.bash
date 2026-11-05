@@ -1,6 +1,6 @@
 # Sourced after lib.sh by a mouse check: a virtual pointer built for this run, and clicks or wheel turns over a shell surface's click area by the name `shell box` knows it by.
 
-# The virtual pointer reads press, move, release, click, wheel and sleep lines; each line it reads, it answers done.
+# The virtual pointer reads press, move, release, click, dclick, wheel and sleep lines; each line it reads, it answers done.
 ptr_dir=$DOTS_DEV_DIR/pointer
 mkdir -p "$ptr_dir"
 wayland-scanner client-header "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$ptr_dir/wlr-virtual-pointer-unstable-v1-client-protocol.h"
@@ -43,6 +43,16 @@ click_box() {
   at=$(shell_spot "$1" "${2:-0.5}") || { echo "no click area named $1 is drawn"; return 1; }
   # shellcheck disable=SC2086
   point click $at
+}
+# A click at output point x y with a modifier (shift, ctrl) held in the focused window: wtype holds it around the click, as a hand holds it before pressing.
+mod_click() {
+  local mod=$1 k
+  shift
+  wtype -M "$mod" -s 1200 -m "$mod" &
+  k=$!
+  sleep 0.4
+  point click "$@"
+  wait "$k"
 }
 # The pointer over a named click area, then the wheel turned $2 notches, down when positive.
 wheel_box() {

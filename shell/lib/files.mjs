@@ -43,6 +43,16 @@ export function toggleMark(marked, row) {
   return marked.indexOf(row.name) >= 0 ? marked.filter((n) => n !== row.name) : marked.concat([row.name]);
 }
 
+// A click on row i: alone it selects only that row; Shift selects from the cursor to it; Ctrl adds or drops it, the cursor row kept when nothing was marked. toggle is the surface's own mark key, so a click marks only what that key would.
+export function clicked(rows, marked, selected, i, mods, toggle) {
+  if (mods.shift) {
+    const from = Math.min(selected, i), to = Math.max(selected, i);
+    return { selected: i, marked: rows.slice(from, to + 1).reduce((m, r) => toggle(m, r), []) };
+  }
+  if (mods.ctrl) return { selected: i, marked: toggle(marked.length ? marked : toggle([], rows[selected]), rows[i]) };
+  return { selected: i, marked: [] };
+}
+
 // What y, x, d, o and s act on: the marked rows in the list's order, or the cursor row when nothing is marked (#Q4T3GECS).
 export function targets(rows, marked, folder, cursor) {
   const base = folder === '/' ? '' : folder;
