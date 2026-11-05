@@ -1,4 +1,8 @@
 // How a surface looks under a token set, on the one design: the scheme's surface in a 1 px ink frame, square, with no shadow.
+import { contrast } from './theme.mjs';
+
+// A light scheme's text on its ink slab: the paper where it reads at 4.5:1 there, else the surface, which ink always reads on.
+export const slabText = (c) => (contrast(c.paper, c.ink) >= 4.5 ? c.paper : c.surface);
 
 // A chip is the island drawn small, inside a theme picker's specimen.
 const islandish = (role) => role === 'island' || role === 'chip';
@@ -10,7 +14,7 @@ export function surfaceStyle(tokens, role) {
   const slab = islandish(role) && tokens.mode !== 'dark';
   return {
     fill: slab ? c.ink : c.surface,
-    text: slab ? c.paper : c.ink,
+    text: slab ? slabText(c) : c.ink,
     frame: { width: islandish(role) ? 0 : 1, color: c.ink },
     wash: 0.72,
   };

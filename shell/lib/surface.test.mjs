@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { surfaceStyle, marginStyle, restyled } from './surface.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
+import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 
 const artboard = schemeTokens('artboard');
 const mocha = schemeTokens('catppuccin-mocha');
@@ -18,7 +18,7 @@ test("a light scheme's island is an ink slab with paper text; a dark scheme's is
 });
 
 test('every scheme gives the same shape, so nothing but colour changes between them', () => {
-  for (const n of ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn']) {
+  for (const n of schemeNames()) {
     for (const role of ['card', 'island', 'chip']) assert.deepEqual(Object.keys(surfaceStyle(schemeTokens(n), role)), ['fill', 'text', 'frame', 'wash'], `${n} ${role}`);
   }
 });

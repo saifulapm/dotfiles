@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { schemeTokens } from './colorscheme-file.mjs';
+import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
-const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
+const SCHEMES = schemeNames();
 // A look's data as JSON reads it: its functions drop out, so what is left is every value it draws with.
 const data = (look) => JSON.parse(JSON.stringify(look));
 const look = (name) => launcherLook(schemeTokens(name));

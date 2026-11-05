@@ -5,6 +5,7 @@ import { chipLabel } from './notifs.mjs';
 import { captureText } from './island.mjs';
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
+import { slabText } from './surface.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder', 'colorschemes'];
 
@@ -30,15 +31,20 @@ export function readable(fg, bg, toward) {
 // The same tones for any other scheme, mixed from its own tokens, so a dark scheme's lit row and island read in its colours, not Artboard's light ones.
 function derived(c, mode) {
   const up = (h) => h.toUpperCase();
-  const tint = up(mix(c.surface, c.accent, 0.14));
+  // A ground ink text sits on: the surface mixed toward a colour, backing toward the surface until ink reads there at 4.5:1, so every word moved toward ink on it ends readable; ink always reads on the surface.
+  const ground = (toward, share) => {
+    while (share > 0 && contrast(c.ink, mix(c.surface, toward, share)) < 4.5) share = Math.round((share - 0.01) * 100) / 100;
+    return up(share > 0 ? mix(c.surface, toward, share) : c.surface);
+  };
+  const tint = ground(c.accent, 0.14);
   // The island is an ink slab on a light scheme and the surface on a dark one, as surface.mjs draws it.
   const fill = mode === 'dark' ? c.surface : c.ink;
-  const text = mode === 'dark' ? c.ink : c.paper;
+  const text = mode === 'dark' ? c.ink : slabText(c);
   return {
     tint,
     deep: readable(c.accent, tint, c.ink),
-    tile: up(mix(c.surface, c.ink, 0.06)),
-    field: up(mix(c.surface, c.ink, 0.04)),
+    tile: ground(c.ink, 0.06),
+    field: ground(c.ink, 0.04),
     thumb: up(mix(c.surface, c.ink, 0.09)),
     rule: up(mix(c.surface, c.ink, 0.12)),
     bar: up(mix(c.accent, c.surface, 0.2)),

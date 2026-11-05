@@ -2,9 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { lockLook } from './lock-look.mjs';
 import { contrast } from './theme.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
+import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 
-const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
+const SCHEMES = schemeNames();
 
 test("rose-pine-dawn locks into Artboard's card: a 96 px bold Maple Mono clock in Dawn's ink, the date as the card's label", () => {
   assert.deepEqual(lockLook(schemeTokens('rose-pine-dawn'), 'saiful'), {

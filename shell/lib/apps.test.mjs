@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
-import { loadScheme } from './colorscheme-file.mjs';
+import { loadScheme, schemeNames } from './colorscheme-file.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
@@ -244,7 +244,7 @@ test('pi colours code from the scheme syntax table, as kak and helix do', () => 
 });
 
 test('pi dim text reads at 4.5:1 on every scheme and stays dimmer than its muted text', () => {
-  for (const name of ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn']) {
+  for (const name of schemeNames()) {
     const v = JSON.parse(renderPi(loadScheme(name))).vars;
     assert.ok(contrast(v.dimText, v.background) >= 4.5, `${name}: ${contrast(v.dimText, v.background)}`);
     assert.ok(contrast(v.dimText, v.background) < contrast(v.mutedText, v.background), name);

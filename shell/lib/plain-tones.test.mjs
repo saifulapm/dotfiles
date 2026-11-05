@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { contrast } from './theme.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
+import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 import { plainTones, launcherLook, listLook, osdLook, chipLook, islandLook } from './voice.mjs';
 import { surfaceStyle } from './surface.mjs';
 
-const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
+const SCHEMES = schemeNames();
 const artboard = schemeTokens('artboard');
 
 test("Artboard keeps its own board colours, before the tokens load too; every other scheme mixes its from its tokens", () => {

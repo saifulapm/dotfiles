@@ -5,9 +5,9 @@ import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc, contrast } from './theme.mjs';
-import { loadScheme } from './colorscheme-file.mjs';
+import { loadScheme, schemeNames } from './colorscheme-file.mjs';
 
-const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
+const SCHEMES = schemeNames();
 const artboard = loadScheme('artboard');
 const gruvbox = loadScheme('gruvbox-dark');
 // A scheme's tokens back in the document shape the validator reads.

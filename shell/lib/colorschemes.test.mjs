@@ -117,3 +117,10 @@ test('Tokyo Night is Apache-2.0 and the licence file holds the Apache 2.0 text o
   const text = readFileSync(join(repo, 'colorschemes/THIRD_PARTY_LICENSES'), 'utf8');
   assert.equal(text.match(/TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION/g)?.length, 1);
 });
+
+// m81: four checks over every scheme named the first five by hand, so the forty passed them unread and the walk found lit rows at 3.85:1.
+test('no test names its colorschemes by hand; each reads schemeNames()', () => {
+  const lib = new URL('.', import.meta.url).pathname;
+  const found = readdirSync(lib).filter((f) => f.endsWith('.test.mjs') && /\[\s*'artboard',\s*'catppuccin-mocha'/.test(readFileSync(join(lib, f), 'utf8')));
+  assert.deepEqual(found, []);
+});
