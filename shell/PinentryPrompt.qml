@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Layouts
 import "." as Root
 import "lib/voice.mjs" as V
@@ -18,8 +17,6 @@ Item {
     readonly property bool confirm: seen?.kind === "confirm"
 
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the prompt draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property var words: P.cardText(look, seen?.kind ?? "passphrase")
@@ -70,10 +67,6 @@ Item {
     function swapped() {
     }
 
-    function headingItem() {
-        return look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip;
-    }
-
     function box(item) {
         const a = item.mapToItem(null, 0, 0);
         return { x: a.x, y: a.y, w: item.width, h: item.height };
@@ -87,9 +80,9 @@ Item {
             loaded: true,
             open: shown,
             kind: seen?.kind ?? null,
-            heading: headingItem().text,
-            // The heading's chip, pill or line as drawn, for a check that reads the screen.
-            headingBox: box(look.label.kind === "header" ? header : headingItem().parent),
+            heading: pill.text,
+            // The heading's pill as drawn, for a check that reads the screen.
+            headingBox: box(pill.parent),
             hint: hint.join("  "),
             description: descriptionText.text,
             descriptionLines: descriptionText.lineCount,
@@ -102,8 +95,7 @@ Item {
             motion: motion.curves?.kind ?? null,
             settled: motion.settled,
             drawing: prompt.visible,
-            cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : []
+            cardBox: card.drawnBox()
         });
     }
 
@@ -131,43 +123,13 @@ Item {
             width: parent.width
             spacing: 0
 
-            // The heading in the launcher's label idiom: Paper's ink chip, Artboard's pill, Blueprint's header line.
+            // The heading in the launcher's pill.
             RowLayout {
                 Layout.fillWidth: true
                 Layout.margins: 20
                 Layout.bottomMargin: 10
 
-                Text {
-                    id: header
-                    visible: prompt.look.label.kind === "header"
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    text: prompt.words.heading
-                    color: prompt.look.small.color
-                    font.family: prompt.look.small.font
-                    font.pixelSize: prompt.look.small.size
-                    font.letterSpacing: prompt.look.small.spacing
-                }
-
                 Rectangle {
-                    visible: prompt.look.label.kind === "chip"
-                    implicitWidth: chip.implicitWidth + 14
-                    implicitHeight: chip.implicitHeight + 6
-                    color: prompt.look.label.fill
-                    Text {
-                        id: chip
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: prompt.words.heading
-                        color: prompt.look.label.color
-                        font.family: prompt.fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
-                    }
-                }
-
-                Rectangle {
-                    visible: prompt.look.label.kind === "pill"
                     implicitWidth: pill.implicitWidth + 18
                     implicitHeight: pill.implicitHeight + 6
                     radius: 8
@@ -224,18 +186,16 @@ Item {
                     font.family: prompt.fonts.ui
                     font.pixelSize: 16
                     clip: true
-                    cursorDelegate: prompt.look.caret === "block" ? blockCaret : null
                     Keys.onReturnPressed: prompt.submit()
                     Keys.onEnterPressed: prompt.submit()
                     Keys.onEscapePressed: prompt.close()
                 }
 
-                // A block caret sits on the first cell, so the placeholder starts after it rather than under it.
                 Text {
                     textFormat: Text.PlainText
                     visible: input.text === ""
                     anchors.verticalCenter: parent.verticalCenter
-                    x: prompt.look.caret === "block" ? 12 + 11 + 6 : 12
+                    x: 12
                     text: V.line(prompt.seen?.prompt).replace(/:$/, "") || "Passphrase"
                     color: prompt.c.muted
                     font.family: prompt.fonts.ui
@@ -267,12 +227,12 @@ Item {
                 font.letterSpacing: prompt.look.small.spacing
             }
 
-            // The key strip as the launcher's legend draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key strip as the launcher's legend draws it, each pair in a chip.
             Row {
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
-                spacing: prompt.look.legend("").chips ? 8 : 14
+                spacing: 8
 
                 Repeater {
                     id: hintRepeater
@@ -283,15 +243,15 @@ Item {
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pairRow.implicitWidth + (prompt.look.legend("").chips ? 14 : 0)
-                        height: pairRow.implicitHeight + (prompt.look.legend("").chips ? 6 : 0)
+                        width: pairRow.implicitWidth + 14
+                        height: pairRow.implicitHeight + 6
                         radius: 6
                         color: prompt.look.chip.fill
 
                         Row {
                             id: pairRow
                             anchors.centerIn: parent
-                            spacing: prompt.look.legend("").chips ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText
@@ -314,37 +274,6 @@ Item {
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-
-    FontMetrics {
-        id: caretMetrics
-        font: input.font
-    }
-
-    // Qt sizes the delegate to the cursor's line, which grows once a mask dot is drawn from a fallback font, so the block keeps the field font's line height, centred in the field, empty or typed.
-    Component {
-        id: blockCaret
-
-        Item {
-            id: caretSlot
-            width: 11
-            // Qt hides only its own caret when the field loses focus, so a delegate follows cursorVisible itself.
-            visible: input.cursorVisible
-
-            Rectangle {
-                width: parent.width
-                height: Math.round(caretMetrics.height)
-                y: Math.round((input.height - height) / 2 - caretSlot.y)
-                color: prompt.look.prompt.color
-
-                RectangularShadow {
-                    anchors.fill: parent
-                    z: -1
-                    blur: 9.6
-                    color: Qt.alpha(prompt.look.prompt.color, 0.8)
                 }
             }
         }

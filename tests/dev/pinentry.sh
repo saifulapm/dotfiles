@@ -110,12 +110,10 @@ wtype -k Escape
 until_ok 3000 exited "$p"
 until_ok 3000 state_is '.drawing == false'
 
-# Each theme draws the card with its own heading and key strip, read off the screen.
+# The card draws its heading and key strip, read off the screen.
 read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 box_of() { pin_state | jq -r --argjson ox "$ox" --argjson oy "$oy" --arg k "$1" '.[$k] | "\(.x + $ox - 4 | round),\(.y + $oy - 4 | round) \(.w + 8 | round)x\(.h + 8 | round)"'; }
-# Paper's chip is light on ink, which tesseract reads only negated.
+# tesseract reads the heading's pill negated.
 negated() {
   node -e '
     const b = require("fs").readFileSync(0);
@@ -128,18 +126,16 @@ seen_text() {
   grim -s 2 -g "$(box_of cardBox)" - | tesseract stdin - 2>/dev/null
   grim -s 4 -t ppm -g "$(box_of headingBox)" - | negated | tesseract stdin - --psm 7 2>/dev/null
 }
-for t in "artboard|Passphrase|↵ unlock  esc cancel" "blueprint|GPG // PASSPHRASE|[↵] UNLOCK  [ESC] CANCEL" "paper|PASSPHRASE|↵ UNLOCK  ESC CANCEL"; do
-  IFS='|' read -r name heading hint <<<"$t"
-  in_theme "$name"
-  p=$(ask "Unlock the $name key")
-  until_ok 3000 state_is '.open and .settled'
-  check "$name: the heading reads $heading and the strip $hint ($(pin_state | jq -c '[.heading, .hint]'))" state_is ".heading == \"$heading\" and .hint == \"$hint\""
-  text=$(seen_text | tr -s ' \n' ' ')
-  check "$name: the screen shows the heading (tesseract read: $text)" grep -qF "$heading" <<<"$text"
-  wtype -k Escape
-  until_ok 3000 exited "$p"
-  until_ok 3000 state_is '.drawing == false'
-done
+heading=Passphrase
+hint="↵ unlock  esc cancel"
+p=$(ask "Unlock the key")
+until_ok 3000 state_is '.open and .settled'
+check "the heading reads $heading and the strip $hint ($(pin_state | jq -c '[.heading, .hint]'))" state_is ".heading == \"$heading\" and .hint == \"$hint\""
+text=$(seen_text | tr -s ' \n' ' ')
+check "the screen shows the heading (tesseract read: $text)" grep -qF "$heading" <<<"$text"
+wtype -k Escape
+until_ok 3000 exited "$p"
+until_ok 3000 state_is '.drawing == false'
 
 # A closed card unloads 30 s after it stops drawing.
 check "the card is still loaded right after it closes" state_is '.loaded'

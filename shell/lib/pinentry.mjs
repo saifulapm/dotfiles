@@ -35,11 +35,11 @@ export function errorLine(text) {
   return m ? `Bad passphrase · try ${m[1]} of ${m[2]}` : line(text);
 }
 
-// The heading in the launcher's label idiom (Blueprint's header names gpg) and the key strip.
+// The heading in the launcher's pill idiom and the key strip.
 export function cardText(look, kind) {
   const name = kind === 'confirm' ? 'confirm' : 'passphrase';
   return {
-    heading: look.label.kind === 'header' ? look.heading('gpg', name) : look.heading(name, ''),
+    heading: look.heading(name, ''),
     keys: look.keys(kind === 'confirm' ? [['↵', 'allow'], ['esc', 'deny']] : [['↵', 'unlock'], ['esc', 'cancel']]),
   };
 }
