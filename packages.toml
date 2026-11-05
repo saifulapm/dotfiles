@@ -140,11 +140,6 @@ arch = "all"
 why = "Bangla, the fallback for every font"
 
 [[package]]
-name = "google-noto-serif-bengali-vf-fonts"
-arch = "all"
-why = "Noto Serif Bengali, the face Paper draws Deen's Bangla in"
-
-[[package]]
 name = "google-noto-sans-cjk-vf-fonts"
 arch = "all"
 why = "Korean, Japanese and Chinese, the fallback for every font, which YouTube titles need"
