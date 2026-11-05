@@ -1,0 +1,34 @@
+# UI and code colours are sainnhe/gruvbox-material's dark "medium" background and "material" foreground (autoload/gruvbox_material.vim), the code ones as colors/gruvbox-material.vim's syntax groups use them; paper is its bg_dim and line its window separator bg5. The ANSI 16 are its terminal colours (colors/gruvbox-material.vim), attribute and meta the tinted-theming base16 "Gruvbox Material Dark, Medium" base09 and 0F.
+[meta]
+name = "gruvbox-material-dark"
+title = "Gruvbox Material Dark"
+family = "Gruvbox Material"
+variant = "dark"
+source = "https://github.com/sainnhe/gruvbox-material"
+licence = "MIT"
+
+[color]
+paper = "#1B1B1B"
+surface = "#282828"
+ink = "#D4BE98"
+muted = "#A89984"
+line = "#5A524C"
+accent = "#7DAEA3"
+danger = "#EA6962"
+ok = "#A9B665"
+ansi = [
+  "#5A524C", "#EA6962", "#A9B665", "#D8A657", "#7DAEA3", "#D3869B", "#89B482", "#D4BE98",
+  "#5A524C", "#EA6962", "#A9B665", "#D8A657", "#7DAEA3", "#D3869B", "#89B482", "#D4BE98",
+]
+
+[syntax]
+keyword = "#EA6962"
+function = "#A9B665"
+string = "#A9B665"
+type = "#D8A657"
+value = "#D3869B"
+variable = "#7DAEA3"
+attribute = "#E78A4E"
+meta = "#BD6F3E"
+builtin = "#D8A657"
+comment = "#928374"

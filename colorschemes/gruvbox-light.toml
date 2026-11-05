@@ -1,0 +1,34 @@
+# UI and code colours are morhetz/gruvbox's light palette as colors/gruvbox.vim uses it; paper is light0_soft, its darker light background, as light0_hard is lighter than light0. The ANSI 16 are its g:terminal_color_N, danger, ok, attribute and meta the tinted-theming base16 "Gruvbox light, medium" base08, 0B, 09, 0F.
+[meta]
+name = "gruvbox-light"
+title = "Gruvbox Light"
+family = "Gruvbox"
+variant = "light"
+source = "https://github.com/morhetz/gruvbox"
+licence = "MIT"
+
+[color]
+paper = "#F2E5BC"
+surface = "#FBF1C7"
+ink = "#3C3836"
+muted = "#7C6F64"
+line = "#EBDBB2"
+accent = "#076678"
+danger = "#9D0006"
+ok = "#79740E"
+ansi = [
+  "#FBF1C7", "#CC241D", "#98971A", "#D79921", "#458588", "#B16286", "#689D6A", "#7C6F64",
+  "#928374", "#9D0006", "#79740E", "#B57614", "#076678", "#8F3F71", "#427B58", "#3C3836",
+]
+
+[syntax]
+keyword = "#9D0006"
+function = "#79740E"
+string = "#79740E"
+type = "#B57614"
+value = "#8F3F71"
+variable = "#076678"
+attribute = "#AF3A03"
+meta = "#D65D0E"
+builtin = "#AF3A03"
+comment = "#928374"
