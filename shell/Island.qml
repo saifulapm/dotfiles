@@ -768,7 +768,7 @@ PanelWindow {
         if (mode === "mic") {
             focusRecorder();
         } else if (mode === "downloading") {
-            Quickshell.execDetached(["dots-youtube"]);
+            Quickshell.execDetached([Quickshell.env("DOTS_YOUTUBE_APP") || Quickshell.shellDir + "/../bin/dots-youtube"]);
         } else if (mode === "playing") {
             mediaOpen = true;
             focused = true;
