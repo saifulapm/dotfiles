@@ -8,11 +8,9 @@ import { validateTheme, renderNiri } from './theme.mjs';
 const read = (name) => parseToml(readFileSync(new URL(`../../colorschemes/${name}.toml`, import.meta.url), 'utf8'));
 const artboard = () => read('artboard');
 
-test('artboard keeps the exact colours of the artboard theme', () => {
+test('artboard keeps the exact colours of the old artboard theme', () => {
   const s = validateColorscheme(artboard());
-  const theme = parseToml(readFileSync(new URL('../../themes/artboard/theme.toml', import.meta.url), 'utf8'));
-  assert.deepEqual(s.color, theme.color);
-  assert.deepEqual(s.syntax, theme.syntax);
+  assert.deepEqual([s.color.paper, s.color.surface, s.color.ink, s.color.muted, s.color.line, s.color.accent], ['#E4E6EA', '#FFFFFF', '#15171B', '#57606A', '#D0D7DE', '#3D5AFE']);
   assert.equal(s.variant, 'light');
   assert.equal(s.title, 'Artboard');
 });
@@ -49,7 +47,6 @@ test('every scheme wears the one design: dots in line, square, ink frame, no sha
   assert.deepEqual(t.type, { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 });
   assert.equal(t.mode, 'light');
   assert.equal(t.name, 'artboard');
-  assert.equal(t.color.glass, t.color.surface);
   // The shell checks shell.json against the theme check, so the design must pass it as it stands.
   assert.doesNotThrow(() => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } })));
 });

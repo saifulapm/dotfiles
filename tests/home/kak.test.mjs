@@ -36,7 +36,7 @@ before(() => {
   );
   assert.equal(applied.status, 0, applied.stderr);
   // The colorscheme file kakrc loads is the one dots colorscheme renders.
-  const theme = spawnSync('node', [join(repo, 'shell/lib/theme-render.mjs'), 'paper'], { encoding: 'utf8', env });
+  const theme = spawnSync('node', [join(repo, 'shell/lib/colorscheme-render.mjs'), 'github-light'], { encoding: 'utf8', env });
   assert.equal(theme.status, 0, theme.stderr);
 });
 
@@ -167,32 +167,32 @@ const keysOf = (s) => [...s].map((c) => (c === ' ' ? '<space>' : c));
 test('a kak-mail list draws its date, sender and subject in the Mail faces, unread bold, cursor row apart', async (t) => {
   const ui = mailSession(t, 'mail-box Imbox');
   const second = await ui.until(() => ui.row('Second read row'), 'the list');
-  assert.equal(atomOf(second, 'Sender 0002').face.fg, 'rgb:2c4a9a');
-  assert.equal(atomOf(second, 'Second read row').face.fg, 'rgb:1c1915');
+  assert.equal(atomOf(second, 'Sender 0002').face.fg, 'rgb:0969da');
+  assert.equal(atomOf(second, 'Second read row').face.fg, 'rgb:1f2328');
   assert.deepEqual(atomOf(second, 'Second read row').face.attributes, []);
   const date = second.find((a) => /\d{4}-\d\d-\d\d|[A-Z][a-z]{2} \d\d/.test(a.contents));
-  assert.equal(date.face.fg, 'rgb:575653');
+  assert.equal(date.face.fg, 'rgb:59636e');
   assert.ok(atomOf(ui.row('Third unread row'), 'Third unread row').face.attributes.includes('bold'));
   const cursor = atomOf(ui.row('First cursor row'), 'First cursor row').face;
-  assert.equal(cursor.bg, 'rgb:1c1915');
-  assert.equal(cursor.fg, 'rgb:faf6ec');
+  assert.equal(cursor.bg, 'rgb:eef1ff');
+  assert.equal(cursor.fg, 'rgb:2638c9');
 });
 
 test('a kak-mail list ends in the key strip, and the cursor row follows the cursor', async (t) => {
   const ui = mailSession(t, 'mail-box Imbox');
   await ui.until(() => ui.row('Second read row'), 'the list');
-  const want = '↵ OPEN · R REPLY · E ARCHIVE · S SCREENER · F FEED · ? HELP';
+  const want = '↵ open · r reply · e archive · s screener · f feed · ? help';
   await ui.until(() => ui.strip().includes(want), 'the strip');
   ui.keys('j', 'j');
-  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:1c1915', 'the cursor on row 3');
+  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:eef1ff', 'the cursor on row 3');
   assert.ok(ui.strip().includes(want), ui.strip());
 });
 
 test('a theme switch recolours an open kak-mail list and its strip with no reopen', async (t) => {
   const ui = mailSession(t, 'mail-box Imbox');
   await ui.until(() => ui.row('Second read row'), 'the list');
-  const render = (name) => assert.equal(spawnSync('node', [join(repo, 'shell/lib/theme-render.mjs'), name], { env, encoding: 'utf8' }).status, 0);
-  t.after(() => render('paper'));
+  const render = (name) => assert.equal(spawnSync('node', [join(repo, 'shell/lib/colorscheme-render.mjs'), name], { env, encoding: 'utf8' }).status, 0);
+  t.after(() => render('github-light'));
   render('artboard');
   ui.keys(...keysOf(':colorscheme dots'), '<ret>');
   await ui.until(() => atomOf(ui.row('Second read row') ?? [], 'Sender 0002')?.face.fg === 'rgb:3d5afe', 'the Artboard sender');

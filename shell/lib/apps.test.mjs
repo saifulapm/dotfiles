@@ -5,53 +5,47 @@ import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'n
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { parseToml } from './toml.mjs';
-import { validateTheme, contrast } from './theme.mjs';
+import { contrast } from './theme.mjs';
+import { loadScheme } from './colorscheme-file.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
-const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
-const blueprint = load('blueprint');
-const paper = load('paper');
+// Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
+const light = loadScheme('github-light');
+const dark = loadScheme('gruvbox-dark');
 
-const artboard = load('artboard');
+const artboard = loadScheme('artboard');
 
-// The tmux bar reads as the page's running head, in the margins' voice: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
+// The tmux bar reads as the page's running head, in the margins' words, with an accent dot before the current window.
 const tmuxOpt = (t, name) => renderTmux(t).match(new RegExp(`^set -g ${name} "(.*)"$`, 'm'))[1];
 
 test('the tmux bar draws no filled block in any theme, only text in the margin colours', () => {
-  for (const t of [paper, artboard, blueprint]) {
+  for (const t of [light, artboard, dark]) {
     for (const o of ['status-left', 'status-right', 'window-status-format', 'window-status-current-format']) {
       assert.doesNotMatch(tmuxOpt(t, o), /bg=(?!default)/, `${t.name} ${o}`);
     }
   }
 });
 
-test('tmux windows read like the margin number: Paper 01 FISH in ink, Blueprint [01] in cyan, Artboard an accent dot', () => {
-  const caps = /s\/a\/A\//;
-  assert.match(tmuxOpt(paper, 'window-status-current-format'), /^#\[fg=#1c1915,bold\]#\{\?#\{e\|<:#\{window_index\},10\},0,\}#\{window_index\}#\[nobold\] /);
-  assert.match(tmuxOpt(paper, 'window-status-current-format'), caps);
-  assert.match(tmuxOpt(paper, 'window-status-format'), /^#\[fg=#575653\]/);
-  assert.match(tmuxOpt(blueprint, 'window-status-current-format'), /^#\[fg=#7fe3f0\]\[#\{\?/);
-  assert.match(tmuxOpt(artboard, 'window-status-current-format'), /^#\[fg=#3d5afe\]● #\[fg=#15171b,bold\]/);
-  assert.doesNotMatch(tmuxOpt(artboard, 'window-status-current-format'), caps);
-  assert.equal(tmuxOpt(paper, 'window-status-separator'), '#[fg=#575653] — ');
-  assert.equal(tmuxOpt(blueprint, 'window-status-separator'), '#[fg=#80a4c2] · ');
+test('tmux windows read like the margin number: an accent dot before the current window in ink, the rest muted', () => {
+  for (const t of [light, dark, artboard]) {
+    const c = t.color;
+    assert.ok(tmuxOpt(t, 'window-status-current-format').startsWith(`#[fg=${c.accent.toLowerCase()}]● #[fg=${c.ink.toLowerCase()},bold]#{?#{e|<:#{window_index},10},0,}#{window_index}#[nobold] `), t.name);
+    assert.ok(tmuxOpt(t, 'window-status-format').startsWith(`#[fg=${c.muted.toLowerCase()}]`), t.name);
+    assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /s\/a\/A\//, t.name);
+    assert.equal(tmuxOpt(t, 'window-status-separator'), `#[fg=${c.muted.toLowerCase()}]    `, t.name);
+  }
 });
 
-test('the tmux session drops amx\'s prefix, turns the accent while the prefix key is held, and agents speak in the margin voice', () => {
-  assert.match(tmuxOpt(paper, 'status-left'), /^ #\[fg=#\{\?client_prefix,#c8381e,#575653\}\]#\{s\/\^amx-\/\/;=\/24\/…;s\/a\/A\//);
-  assert.match(tmuxOpt(paper, 'status-right'), /^#\(dots-agents caps 575653 c8381e 1c1915\)/);
-  assert.match(tmuxOpt(artboard, 'status-right'), /^#\(dots-agents plain 57606a 3d5afe 15171b\)/);
-  assert.match(tmuxOpt(blueprint, 'status-right'), /^#\(dots-agents bracket 80a4c2 ffb547 d6f4f8\)/);
+test('the tmux session drops amx\'s prefix, turns the accent while the prefix key is held, and agents speak in the margins\' words', () => {
+  assert.equal(tmuxOpt(dark, 'status-left'), ' #[fg=#{?client_prefix,#83a598,#a89984}]#{s/^amx-//;=/24/…:session_name}#[default] ');
+  assert.match(tmuxOpt(artboard, 'status-right'), /^#\(dots-agents 57606a 3d5afe 15171b\)/);
+  assert.match(tmuxOpt(dark, 'status-right'), /^#\(dots-agents a89984 83a598 ebdbb2\)/);
 });
 
-test('the active tmux pane border follows the frame', () => {
-  assert.match(renderTmux(paper), /^set -g pane-active-border-style "fg=#1c1915"$/m);
-  assert.match(renderTmux(blueprint), /^set -g pane-active-border-style "fg=#7fe3f0"$/m);
-  assert.match(renderTmux(paper), /^set -g pane-border-lines single$/m);
-  const double = structuredClone(paper);
-  double.primitive.frame = 'double';
-  assert.match(renderTmux(double), /^set -g pane-border-lines double$/m);
+test('the active tmux pane border is the ink frame, in single lines', () => {
+  assert.match(renderTmux(light), /^set -g pane-active-border-style "fg=#1f2328"$/m);
+  assert.match(renderTmux(dark), /^set -g pane-active-border-style "fg=#ebdbb2"$/m);
+  for (const k of ['pane', 'popup', 'menu']) assert.match(renderTmux(dark), new RegExp(`^set -g ${k}-border-lines single$`, 'm'), k);
 });
 
 test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
@@ -63,7 +57,7 @@ test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
     rmSync(dir, { recursive: true, force: true });
   });
   execFileSync('tmux', ['-L', sock, '-f', '/dev/null', 'new-session', '-d', '-s', 'amx-dots']);
-  for (const theme of [paper, artboard, blueprint]) {
+  for (const theme of [light, artboard, dark]) {
     writeFileSync(join(dir, 'tmux.conf'), renderTmux(theme));
     tmux('source-file', join(dir, 'tmux.conf'));
     assert.match(tmux('show', '-g', 'status-style'), new RegExp(`fg=${theme.color.muted.toLowerCase()},bg=default`));
@@ -74,44 +68,44 @@ test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
 });
 
 test('kakoune colorscheme defines the core faces from the tokens', () => {
-  const kak = renderKak(blueprint);
-  assert.match(kak, /^face global Default rgb:d6f4f8,rgb:0a1526$/m);
-  assert.match(kak, /^face global PrimarySelection rgb:0a1526,rgb:7fe3f0\+fg$/m);
-  assert.match(kak, /^face global StatusLine rgb:d6f4f8,rgb:0a1526$/m);
+  const kak = renderKak(dark);
+  assert.match(kak, /^face global Default rgb:ebdbb2,rgb:282828$/m);
+  assert.match(kak, /^face global PrimarySelection rgb:282828,rgb:83a598\+fg$/m);
+  assert.match(kak, /^face global StatusLine rgb:ebdbb2,rgb:282828$/m);
 });
 
 test('kakoune draws its status line and info flat and its menu on a 6% ink tint, keeping red for errors', () => {
-  const kak = renderKak(paper);
-  assert.match(kak, /^face global StatusLineInfo rgb:575653,rgb:faf6ec$/m);
-  assert.match(kak, /^face global Information rgb:1c1915,rgb:faf6ec$/m);
-  assert.match(kak, /^face global MenuBackground rgb:1c1915,rgb:ede9df$/m);
-  assert.match(kak, /^face global Error rgb:faf6ec,rgb:c8381e$/m);
+  const kak = renderKak(light);
+  assert.match(kak, /^face global StatusLineInfo rgb:59636e,rgb:ffffff$/m);
+  assert.match(kak, /^face global Information rgb:1f2328,rgb:ffffff$/m);
+  assert.match(kak, /^face global MenuBackground rgb:1f2328,rgb:f2f2f2$/m);
+  assert.match(kak, /^face global Error rgb:ffffff,rgb:d1242f$/m);
 });
 
-test('kakoune colours code from the theme\'s syntax table', () => {
-  const kak = renderKak(blueprint);
-  assert.match(kak, /^face global keyword rgb:c792ea\+b$/m);
-  assert.match(kak, /^face global string rgb:ecc48d$/m);
-  assert.match(kak, /^face global comment rgb:637777\+i$/m);
+test('kakoune colours code from the scheme\'s syntax table', () => {
+  const kak = renderKak(dark);
+  assert.match(kak, /^face global keyword rgb:fb4934\+b$/m);
+  assert.match(kak, /^face global string rgb:b8bb26$/m);
+  assert.match(kak, /^face global comment rgb:928374\+i$/m);
 });
 
 test('gtk.css defines the window and accent colours', () => {
-  const css = renderGtkCss(blueprint);
-  assert.match(css, /^@define-color window_bg_color #0c1a2e;$/m);
-  assert.match(css, /^@define-color window_fg_color #d6f4f8;$/m);
-  assert.match(css, /^@define-color accent_bg_color #7fe3f0;$/m);
+  const css = renderGtkCss(dark);
+  assert.match(css, /^@define-color window_bg_color #1d2021;$/m);
+  assert.match(css, /^@define-color window_fg_color #ebdbb2;$/m);
+  assert.match(css, /^@define-color accent_bg_color #83a598;$/m);
 });
 
 test('gtk settings prefer dark exactly for dark mode', () => {
-  assert.match(renderGtkSettings(blueprint), /^\[Settings\]\ngtk-application-prefer-dark-theme=true$/m);
-  assert.match(renderGtkSettings(paper), /^gtk-application-prefer-dark-theme=false$/m);
-  assert.match(renderGtkSettings(paper), /^gtk-font-name=Maple Mono 11$/m);
+  assert.match(renderGtkSettings(dark), /^\[Settings\]\ngtk-application-prefer-dark-theme=true$/m);
+  assert.match(renderGtkSettings(light), /^gtk-application-prefer-dark-theme=false$/m);
+  assert.match(renderGtkSettings(light), /^gtk-font-name=Maple Mono 11$/m);
 });
 
 // A colour policy would block the theme extension, so the manifest alone carries the exact colours, from Chromium's next start.
 test('the chromium theme extension frames the window in paper and draws the toolbar on surface', () => {
   const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  for (const t of [paper, blueprint, artboard]) {
+  for (const t of [light, dark, artboard]) {
     const m = JSON.parse(renderChromiumTheme(t));
     assert.equal(m.manifest_version, 3);
     assert.deepEqual(m.theme.colors.frame, rgbOf(t.color.paper), t.name);
@@ -119,7 +113,7 @@ test('the chromium theme extension frames the window in paper and draws the tool
     assert.deepEqual(m.theme.colors.toolbar_text, rgbOf(t.color.ink), t.name);
     assert.deepEqual(m.theme.colors.ntp_background, rgbOf(t.color.paper), t.name);
   }
-  assert.deepEqual(JSON.parse(renderChromiumTheme(blueprint)).theme.colors.frame, [12, 26, 46]);
+  assert.deepEqual(JSON.parse(renderChromiumTheme(dark)).theme.colors.frame, [29, 32, 33]);
 });
 
 // Chromium ignores a new-tab override inside a theme, so the page is its own extension; its key fixes the id whatever folder it loads from.
@@ -135,10 +129,10 @@ test('the new-tab extension overrides the new tab with a fixed id and reads the 
   assert.equal(id, 'aakconifmcmaooplokgfeaepglecbmaf');
 });
 
-test('the new-tab page names its theme\'s voice and loads its theme, its look and its script', () => {
-  for (const [t, voice] of [[paper, 'caps'], [blueprint, 'bracket'], [artboard, 'plain']]) {
+test('the new-tab page names its scheme and loads its colours, its look and its script', () => {
+  for (const t of [light, dark, artboard]) {
     const html = renderNewtabHtml(t);
-    assert.match(html, new RegExp(`<html lang="en" data-voice="${voice}" data-theme="${t.name}">`), t.name);
+    assert.match(html, new RegExp(`<html lang="en" data-theme="${t.name}">`), t.name);
     assert.match(html, /<title>New Tab<\/title>/);
     assert.match(html, /<link rel="stylesheet" href="theme.css">\s*<link rel="stylesheet" href="newtab.css">/);
     assert.match(html, /<script type="module" src="newtab.js"><\/script>/);
@@ -146,44 +140,37 @@ test('the new-tab page names its theme\'s voice and loads its theme, its look an
   }
 });
 
-test('the new-tab page draws in the theme\'s paper, ink and fonts, on its paper\'s texture', () => {
+test('the new-tab page draws in the scheme\'s paper, ink and fonts, on the dot grid', () => {
   const vars = (t) => Object.fromEntries([...renderNewtabCss(t).matchAll(/--([a-z-]+): ([^;]+);/g)].map((m) => [m[1], m[2]]));
   assert.deepEqual(
-    { paper: vars(paper).paper, ink: vars(paper).ink, surface: vars(paper).surface, accent: vars(paper).accent, display: vars(paper).display, ui: vars(paper).ui },
-    { paper: '#F1E9D8', ink: '#1C1915', surface: '#FAF6EC', accent: '#C8381E', display: '"Instrument Serif"', ui: '"Maple Mono"' },
+    { paper: vars(artboard).paper, ink: vars(artboard).ink, surface: vars(artboard).surface, accent: vars(artboard).accent, display: vars(artboard).display, ui: vars(artboard).ui },
+    { paper: '#E4E6EA', ink: '#15171B', surface: '#FFFFFF', accent: '#3D5AFE', display: '"Maple Mono"', ui: '"Maple Mono"' },
   );
-  assert.equal(vars(blueprint).paper, '#0C1A2E');
-  assert.equal(vars(blueprint).display, '"Maple Mono"');
-  assert.equal(vars(artboard).paper, '#E4E6EA');
-  assert.match(renderNewtabCss(blueprint), /linear-gradient\(rgba\(127, 227, 240, 0.13\) 1px, transparent 1px\)/);
-  assert.match(renderNewtabCss(blueprint), /background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;/);
-  assert.match(renderNewtabCss(artboard), /radial-gradient\(#B4BAC4 1px, transparent 1.3px\)/);
+  assert.equal(vars(dark).paper, '#1D2021');
+  assert.match(renderNewtabCss(artboard), /radial-gradient\(#D0D7DE 1px, transparent 1.3px\)/);
   assert.match(renderNewtabCss(artboard), /background-size: 16px 16px;/);
-  assert.match(renderNewtabCss(paper), /feTurbulence/);
-  // As the shell's grain shader does, the noise scales the paper by 1 +- grain, so its mean stays the paper colour.
-  assert.match(renderNewtabCss(paper), /flood-color='%23F1E9D8'/);
-  assert.match(renderNewtabCss(paper), /operator='arithmetic' k1='0.12' k2='0.94' k3='0' k4='0'/);
-  assert.match(renderNewtabCss(paper), /color-scheme: light;/);
-  assert.match(renderNewtabCss(blueprint), /color-scheme: dark;/);
+  assert.match(renderNewtabCss(dark), /radial-gradient\(#3C3836 1px, transparent 1.3px\)/);
+  assert.match(renderNewtabCss(light), /color-scheme: light;/);
+  assert.match(renderNewtabCss(dark), /color-scheme: dark;/);
 });
 
 test('colors.fish sets fish and fzf colours', () => {
-  const fish = renderFish(blueprint);
-  assert.match(fish, /^set -g fish_color_normal d6f4f8$/m);
+  const fish = renderFish(dark);
+  assert.match(fish, /^set -g fish_color_normal ebdbb2$/m);
   // The prompt draws the directory and a failed status in these.
-  assert.match(fish, /^set -g fish_color_cwd 7fe3f0$/m);
-  assert.match(fish, /^set -g fish_color_status ffb547$/m);
-  assert.match(fish, /^set -gx FZF_DEFAULT_OPTS "--color=fg:#d6f4f8,bg:#0a1526,hl:#7fe3f0/m);
+  assert.match(fish, /^set -g fish_color_cwd 83a598$/m);
+  assert.match(fish, /^set -g fish_color_status fb4934$/m);
+  assert.match(fish, /^set -gx FZF_DEFAULT_OPTS "--color=fg:#ebdbb2,bg:#282828,hl:#83a598/m);
 });
 
 test('yazi theme sets the keys yazi 26.9 reads', () => {
-  const y = renderYazi(blueprint);
+  const y = renderYazi(dark);
   assert.match(y, /^\[mgr\]$/m);
-  assert.match(y, /^cwd = \{ fg = "cyan" \}$/m);
-  assert.match(y, /^hovered = \{ fg = "#0a1526", bg = "cyan" \}$/m);
+  assert.match(y, /^cwd = \{ fg = "lightblue" \}$/m);
+  assert.match(y, /^hovered = \{ fg = "#282828", bg = "lightblue" \}$/m);
   assert.match(y, /^\[mode\]$/m);
   assert.match(y, /^\[status\]$/m);
-  assert.match(y, /^border_style = \{ fg = "black" \}$/m);
+  assert.match(y, /^border_style = \{ fg = "#3c3836" \}$/m);
   // Named colours follow the terminal palette, so a running yazi recolours live.
   const named = y.match(/"[a-z]+"/g).length;
   const hex = y.match(/"#[0-9a-f]{6}"/g).length;
@@ -205,24 +192,24 @@ test('a running fish takes the new colours at its next prompt', (t) => {
   t.after(() => rmSync(state, { recursive: true, force: true }));
   const out = join(state, 'dots/theme-out');
   execFileSync('mkdir', ['-p', out]);
-  writeFileSync(join(out, 'colors.fish'), renderFish(paper));
+  writeFileSync(join(out, 'colors.fish'), renderFish(light));
   const config = new URL('../../home/dot_config/fish/config.fish', import.meta.url).pathname;
   // One fish: the config at start, then a new colours file and a prompt, as after dots colorscheme.
-  const script = `source ${config}; echo $fish_color_normal; echo '${renderFish(blueprint).replace(/'/g, "\\'")}' > ${out}/colors.fish; emit fish_prompt; echo $fish_color_normal`;
+  const script = `source ${config}; echo $fish_color_normal; echo '${renderFish(dark).replace(/'/g, "\\'")}' > ${out}/colors.fish; emit fish_prompt; echo $fish_color_normal`;
   const seen = execFileSync('fish', ['--no-config', '-c', script], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' }).trim().split('\n');
-  assert.deepEqual(seen, [paper.color.ink.slice(1).toLowerCase(), 'd6f4f8']);
+  assert.deepEqual(seen, [light.color.ink.slice(1).toLowerCase(), 'ebdbb2']);
 });
 
-// claude, pi and amx kept v1's dark palette, so on Paper and Artboard they drew dark boxes in a light terminal.
-test('the Claude Code theme starts from the light or dark preset of the theme and takes its tokens', () => {
+// claude, pi and amx kept v1's dark palette, so on a light scheme they drew dark boxes in a light terminal.
+test('the Claude Code theme starts from the light or dark preset of the scheme and takes its tokens', () => {
   const a = JSON.parse(renderClaude(artboard));
   assert.equal(a.name, 'dots');
   assert.equal(a.base, 'light');
   assert.deepEqual([a.overrides.claude, a.overrides.text, a.overrides.inverseText, a.overrides.success, a.overrides.error], ['#3d5afe', '#15171b', '#ffffff', '#1a7f37', '#cf222e']);
   assert.equal(a.overrides.diffAdded, '#ddece1');
-  const b = JSON.parse(renderClaude(blueprint));
+  const b = JSON.parse(renderClaude(dark));
   assert.equal(b.base, 'dark');
-  assert.equal(b.overrides.claude, '#7fe3f0');
+  assert.equal(b.overrides.claude, '#83a598');
 });
 
 // Claude Code 2.1.303's theme keys; a key left out falls back to Claude's own preset colour.
@@ -241,31 +228,31 @@ const CLAUDE_KEYS = [
 ];
 
 test('the Claude Code theme sets every colour Claude reads, subagents and the sidebar included', () => {
-  const o = JSON.parse(renderClaude(paper)).overrides;
+  const o = JSON.parse(renderClaude(light)).overrides;
   assert.deepEqual(Object.keys(o).sort(), [...CLAUDE_KEYS].sort());
   for (const [k, v] of Object.entries(o)) assert.match(v, /^#[0-9a-f]{6}$/, k);
-  assert.equal(o.red_FOR_SUBAGENTS_ONLY, '#c8381e');
-  assert.equal(o.cyan_FOR_SUBAGENTS_ONLY, '#24837b');
-  assert.equal(o.composerSidebarBackground, '#ede9df');
+  assert.equal(o.red_FOR_SUBAGENTS_ONLY, '#cf222e');
+  assert.equal(o.cyan_FOR_SUBAGENTS_ONLY, '#1b7c83');
+  assert.equal(o.composerSidebarBackground, '#f2f2f2');
 });
 
-test('pi colours code from the theme syntax table, as kak and helix do', () => {
-  const p = JSON.parse(renderPi(paper));
+test('pi colours code from the scheme syntax table, as kak and helix do', () => {
+  const p = JSON.parse(renderPi(light));
   const hex = (role) => p.vars[p.colors[role]];
   assert.deepEqual(['syntaxKeyword', 'syntaxFunction', 'syntaxString', 'syntaxNumber', 'syntaxType', 'syntaxComment'].map(hex),
-    ['#66800b', '#bc5215', '#24837b', '#bc5215', '#8e6b01', '#575653']);
+    ['#cf222e', '#8250df', '#0a3069', '#0550ae', '#953800', '#59636e']);
 });
 
-test('pi dim text reads at 4.5:1 on every theme and stays dimmer than its muted text', () => {
-  for (const t of [paper, artboard, blueprint]) {
-    const v = JSON.parse(renderPi(t)).vars;
-    assert.ok(contrast(v.dimText, v.background) >= 4.5, `${t.name}: ${contrast(v.dimText, v.background)}`);
-    assert.ok(contrast(v.dimText, v.background) < contrast(v.mutedText, v.background), t.name);
+test('pi dim text reads at 4.5:1 on every scheme and stays dimmer than its muted text', () => {
+  for (const name of ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn']) {
+    const v = JSON.parse(renderPi(loadScheme(name))).vars;
+    assert.ok(contrast(v.dimText, v.background) >= 4.5, `${name}: ${contrast(v.dimText, v.background)}`);
+    assert.ok(contrast(v.dimText, v.background) < contrast(v.mutedText, v.background), name);
   }
 });
 
 test('pi sets its optional colours and export page, and points at the pi.dev schema', () => {
-  const p = JSON.parse(renderPi(paper));
+  const p = JSON.parse(renderPi(light));
   for (const k of ['scrollbarTrack', 'scrollbarThumb', 'searchMatchBg', 'searchMatchText', 'thinkingMax']) assert.ok(p.colors[k] in p.vars, k);
   for (const k of ['pageBg', 'cardBg', 'infoBg']) assert.ok(p.export[k] in p.vars, k);
   assert.equal(p.$schema, 'https://pi.dev/schemas/theme.schema.json');
@@ -274,7 +261,7 @@ test('pi sets its optional colours and export page, and points at the pi.dev sch
 test('the pi theme names its appearance, sits on the terminal surface, and every colour resolves to a var', () => {
   const a = JSON.parse(renderPi(artboard));
   assert.deepEqual([a.name, a.appearance, a.vars.background, a.vars.foreground, a.vars.accent], ['dots', 'light', '#ffffff', '#15171b', '#3d5afe']);
-  assert.equal(JSON.parse(renderPi(blueprint)).appearance, 'dark');
+  assert.equal(JSON.parse(renderPi(dark)).appearance, 'dark');
   assert.ok(Object.keys(a.colors).length >= 51, `${Object.keys(a.colors).length} colours`);
   for (const [k, v] of Object.entries(a.colors)) assert.ok(v in a.vars, `${k}: ${v}`);
 });
@@ -287,44 +274,44 @@ test('the amx theme sets its six roles from the tokens', () => {
 });
 
 test('helix takes the kak look: syntax colours, a flat status line, and the menu and popups on a 6% ink tint', () => {
-  const hx = renderHelix(paper);
-  assert.match(hx, /^"ui\.background" = \{ bg = "#faf6ec" \}$/m);
-  assert.match(hx, /^"keyword" = \{ fg = "#66800b", modifiers = \["bold"\] \}$/m);
-  assert.match(hx, /^"comment" = \{ fg = "#575653", modifiers = \["italic"\] \}$/m);
-  assert.match(hx, /^"string" = "#24837b"$/m);
-  assert.match(hx, /^"ui\.statusline" = \{ fg = "#1c1915", bg = "#faf6ec" \}$/m);
-  assert.match(hx, /^"ui\.statusline\.normal" = \{ fg = "#c8381e", bg = "#faf6ec", modifiers = \["bold"\] \}$/m);
-  assert.match(hx, /^"ui\.popup" = \{ fg = "#1c1915", bg = "#ede9df" \}$/m);
-  assert.match(hx, /^"ui\.menu\.selected" = \{ fg = "#faf6ec", bg = "#c8381e" \}$/m);
-  assert.match(hx, /^"diagnostic\.error" = \{ underline = \{ color = "#c8381e", style = "curl" \} \}$/m);
-  assert.match(renderHelix(blueprint), /^"function" = "#82aaff"$/m);
+  const hx = renderHelix(light);
+  assert.match(hx, /^"ui\.background" = \{ bg = "#ffffff" \}$/m);
+  assert.match(hx, /^"keyword" = \{ fg = "#cf222e", modifiers = \["bold"\] \}$/m);
+  assert.match(hx, /^"comment" = \{ fg = "#59636e", modifiers = \["italic"\] \}$/m);
+  assert.match(hx, /^"string" = "#0a3069"$/m);
+  assert.match(hx, /^"ui\.statusline" = \{ fg = "#1f2328", bg = "#ffffff" \}$/m);
+  assert.match(hx, /^"ui\.statusline\.normal" = \{ fg = "#0969da", bg = "#ffffff", modifiers = \["bold"\] \}$/m);
+  assert.match(hx, /^"ui\.popup" = \{ fg = "#1f2328", bg = "#f2f2f2" \}$/m);
+  assert.match(hx, /^"ui\.menu\.selected" = \{ fg = "#ffffff", bg = "#0969da" \}$/m);
+  assert.match(hx, /^"diagnostic\.error" = \{ underline = \{ color = "#d1242f", style = "curl" \} \}$/m);
+  assert.match(renderHelix(dark), /^"function" = "#b8bb26"$/m);
 });
 
 // mpv reads # as a comment, so every colour is quoted; the OSC takes its colours through script-opts.
 test('the mpv fragment sets the OSD, the subtitle font and the OSC colours from the tokens', () => {
-  const conf = renderMpv(blueprint);
-  assert.match(conf, /^osd-color="#d6f4f8"$/m);
-  assert.match(conf, /^osd-back-color="#0a1526"$/m);
-  assert.match(conf, /^osd-border-color="#0a1526"$/m);
+  const conf = renderMpv(dark);
+  assert.match(conf, /^osd-color="#ebdbb2"$/m);
+  assert.match(conf, /^osd-back-color="#282828"$/m);
+  assert.match(conf, /^osd-border-color="#282828"$/m);
   assert.match(conf, /^osd-font="Maple Mono"$/m);
-  assert.match(conf, /^script-opts-append="osc-background_color=#0a1526"$/m);
-  assert.match(conf, /^script-opts-append="osc-held_element_color=#7fe3f0"$/m);
-  assert.match(renderMpv(paper), /^sub-font="Instrument Serif"$/m);
+  assert.match(conf, /^script-opts-append="osc-background_color=#282828"$/m);
+  assert.match(conf, /^script-opts-append="osc-held_element_color=#83a598"$/m);
+  assert.match(renderMpv(light), /^sub-font="Maple Mono"$/m);
   for (const line of conf.trim().split('\n')) assert.match(line, /^[a-z-]+="[^"]+"$/);
 });
 
 // Dark themes recolour the page, keeping image hues, as v1 did; a light theme sets recolor false outright, since a re-source keeps any option it does not name.
 test('the zathura fragment sets every colour, the font, and recolours pages only in dark themes', () => {
-  const z = renderZathura(blueprint);
-  assert.match(z, /^set default-bg "#0c1a2e"$/m);
-  assert.match(z, /^set statusbar-fg "#d6f4f8"$/m);
-  assert.match(z, /^set index-active-bg "#7fe3f0"$/m);
+  const z = renderZathura(dark);
+  assert.match(z, /^set default-bg "#1d2021"$/m);
+  assert.match(z, /^set statusbar-fg "#ebdbb2"$/m);
+  assert.match(z, /^set index-active-bg "#83a598"$/m);
   assert.match(z, /^set font "Maple Mono 11"$/m);
   assert.match(z, /^set recolor true$/m);
   assert.match(z, /^set recolor-keephue true$/m);
-  assert.match(z, /^set recolor-lightcolor "#0c1a2e"$/m);
-  assert.match(z, /^set recolor-darkcolor "#d6f4f8"$/m);
-  for (const t of [paper, artboard]) {
+  assert.match(z, /^set recolor-lightcolor "#1d2021"$/m);
+  assert.match(z, /^set recolor-darkcolor "#ebdbb2"$/m);
+  for (const t of [light, artboard]) {
     assert.match(renderZathura(t), /^set recolor false$/m, t.name);
     assert.match(renderZathura(t), new RegExp(`^set default-bg "${t.color.paper.toLowerCase()}"$`, 'm'), t.name);
   }
@@ -335,30 +322,30 @@ test('the zathura fragment sets every colour, the font, and recolours pages only
 });
 
 // imv has no include, so the theme renders its whole config, v1's binds with it.
-test('the imv config sits the image on paper with the overlay in ink on surface, and keeps v1\'s trash binds', () => {
-  const imv = renderImv(blueprint);
+test('the imv config sits the image on light with the overlay in ink on surface, and keeps v1\'s trash binds', () => {
+  const imv = renderImv(dark);
   assert.match(imv, /^\[options\]$/m);
-  assert.match(imv, /^background = 0c1a2e$/m);
-  assert.match(imv, /^overlay_text_color = d6f4f8$/m);
-  assert.match(imv, /^overlay_background_color = 0a1526$/m);
+  assert.match(imv, /^background = 1d2021$/m);
+  assert.match(imv, /^overlay_text_color = ebdbb2$/m);
+  assert.match(imv, /^overlay_background_color = 282828$/m);
   assert.match(imv, /^overlay_font = Maple Mono:14$/m);
   assert.match(imv, /^\[binds\]\n<Ctrl\+x> = exec gio trash -- "\$imv_current_file"; quit\n<Ctrl\+Shift\+X> = exec gio trash -- "\$imv_current_file"; close$/m);
-  assert.match(renderImv(paper), /^background = f1e9d8$/m);
+  assert.match(renderImv(light), /^background = e8eaed$/m);
 });
 
-// wl-kbptr's labels and boxes in the theme's colours and face: ink labels, the typed part in accent, the screen washed in paper.
+// wl-kbptr's labels and boxes in the theme's colours and face: ink labels, the typed part in accent, the screen washed in light.
 test('the wl-kbptr config draws its labels in ink and the theme\'s face, picks in accent and washes the screen in paper', () => {
-  const k = renderKbptr(blueprint);
+  const k = renderKbptr(dark);
   for (const mode of ['tile', 'floating', 'bisect']) {
     const section = k.split(/^(?=\[)/m).find((s) => s.startsWith(`[mode_${mode}]`));
     assert.ok(section, mode);
-    assert.match(section, /^label_color=#d6f4f8ff$/m);
+    assert.match(section, /^label_color=#ebdbb2ff$/m);
     assert.match(section, /^label_font_family=Maple Mono$/m);
-    assert.match(section, /^unselectable_bg_color=#0c1a2e99$/m);
+    assert.match(section, /^unselectable_bg_color=#1d202199$/m);
   }
-  assert.match(k, /^\[mode_floating\]\n(?:.*\n)*?selectable_border_color=#7fe3f0ff$/m);
-  assert.match(k, /^label_select_color=#7fe3f0ff$/m);
-  assert.match(k, /^pointer_color=#7fe3f0ff$/m);
+  assert.match(k, /^\[mode_floating\]\n(?:.*\n)*?selectable_border_color=#83a598ff$/m);
+  assert.match(k, /^label_select_color=#83a598ff$/m);
+  assert.match(k, /^pointer_color=#83a598ff$/m);
   assert.doesNotMatch(k, /^\[general\]/m);
-  assert.match(renderKbptr(paper), /^unselectable_bg_color=#f1e9d899$/m);
+  assert.match(renderKbptr(light), /^unselectable_bg_color=#e8eaed99$/m);
 });

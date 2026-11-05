@@ -4,131 +4,178 @@ import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseToml } from './toml.mjs';
 import { validateTheme, checkTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc, contrast } from './theme.mjs';
+import { loadScheme } from './colorscheme-file.mjs';
 
-const paper = parseToml(readFileSync(new URL('../../themes/paper/theme.toml', import.meta.url), 'utf8'));
+const SCHEMES = ['artboard', 'catppuccin-mocha', 'github-light', 'gruvbox-dark', 'rose-pine-dawn'];
+const artboard = loadScheme('artboard');
+const gruvbox = loadScheme('gruvbox-dark');
+// A scheme's tokens back in the document shape the validator reads.
+const doc = (t) => ({ meta: { name: t.name, mode: t.mode }, ...structuredClone({ color: t.color, syntax: t.syntax, primitive: t.primitive, paper: t.paper, type: t.type, niri: t.niri }) });
 
-test('the Paper theme validates into its tokens', () => {
-  const t = validateTheme(paper);
-  assert.equal(t.name, 'paper');
-  assert.equal(t.mode, 'light');
-  assert.equal(t.color.paper, '#F1E9D8');
-  assert.equal(t.color.ink, '#1C1915');
-  assert.equal(t.color.ansi.length, 16);
-  assert.equal(t.primitive.paper, 'grain');
+test('a scheme on the one design validates into its tokens', () => {
+  const t = validateTheme(doc(artboard));
+  assert.deepEqual([t.name, t.mode, t.color.paper, t.color.ink], ['artboard', 'light', '#E4E6EA', '#15171B']);
+  assert.deepEqual(t.primitive, { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' });
+  assert.deepEqual([t.type.display, t.type.ui, t.type.mono, t.type.voice], ['Maple Mono', 'Maple Mono', 'Maple Mono', 'plain']);
 });
 
-test('a primitive outside its menu is refused by name', () => {
-  const bad = structuredClone(paper);
-  bad.primitive.frame = 'dashed';
-  assert.throws(() => validateTheme(bad), /primitive\.frame: "dashed"/);
+test('a primitive, font or voice other than the one design is refused by name', () => {
+  for (const [k, v] of [['paper', 'grid'], ['frame', 'none'], ['shadow', 'soft'], ['corner', 'round'], ['motion', 'snappy']]) {
+    const bad = doc(artboard);
+    bad.primitive[k] = v;
+    assert.throws(() => validateTheme(bad), new RegExp(`primitive\\.${k}: "${v}"`), k);
+  }
+  const font = doc(artboard);
+  font.type.ui = 'Inter';
+  assert.throws(() => validateTheme(font), /type\.ui: "Inter" is not Maple Mono/);
+  const voice = doc(artboard);
+  voice.type.voice = 'caps';
+  assert.throws(() => validateTheme(voice), /type\.voice: "caps" is not plain/);
 });
 
-test('a colour that is not #RRGGBB is refused by name', () => {
-  const bad = structuredClone(paper);
-  bad.color.ink = 'black';
-  assert.throws(() => validateTheme(bad), /color\.ink/);
+test('a colour that is not #RRGGBB is refused by name, and ansi must hold 16', () => {
+  const bad = doc(artboard);
+  bad.color.paper = 'cream';
+  assert.throws(() => validateTheme(bad), /color\.paper: "cream"/);
+  const short = doc(artboard);
+  short.color.ansi = short.color.ansi.slice(0, 8);
+  assert.throws(() => validateTheme(short), /color\.ansi must hold 16/);
 });
 
-test('ansi must hold 16 colours', () => {
-  const bad = structuredClone(paper);
-  bad.color.ansi = bad.color.ansi.slice(0, 8);
-  assert.throws(() => validateTheme(bad), /color\.ansi/);
-});
-
-test('every theme carries its code colours, each #RRGGBB', () => {
-  assert.equal(validateTheme(paper).syntax.keyword, '#66800B');
-  const bad = structuredClone(paper);
+test('every scheme carries its code colours, each #RRGGBB', () => {
+  const bad = doc(artboard);
   bad.syntax.string = 'teal';
   assert.throws(() => validateTheme(bad), /syntax\.string: "teal"/);
   delete bad.syntax;
   assert.throws(() => validateTheme(bad), /missing \[syntax\]/);
 });
 
-test('the niri fragment sets the paper as background and the ink frame', () => {
-  const kdl = renderNiri(validateTheme(paper));
-  assert.match(kdl, /background-color "#F1E9D8"/);
-  assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#1C1915"/);
-  assert.match(kdl, /shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=3 y=3\s*color "#1C1915"/);
-  assert.match(kdl, /geometry-corner-radius 0/);
-});
-
-test('windows sit 56 px down and 32 px in, clear of the margins, with niri drawing their frames', () => {
-  const kdl = renderNiri(validateTheme(paper));
-  assert.match(kdl, /struts \{\s*top 32\s*bottom 4\s*left 8\s*right 8\s*\}/);
-  assert.match(kdl, /^prefer-no-csd$/m);
-});
-
 test('rendered tokens check out, and a bad colour in them is refused by name', () => {
-  const t = validateTheme(paper);
+  const t = validateTheme(doc(artboard));
   assert.deepEqual(checkTokens(JSON.parse(JSON.stringify(t))), t);
   assert.throws(() => checkTokens({ ...t, color: { ...t.color, paper: 'notacolor' } }), /color\.paper/);
 });
 
-test('the foot fragment carries the palette', () => {
-  const ini = renderFoot(validateTheme(paper));
-  // A light theme fills [colors-light] and starts in it, so foot tells apps the truth about light and dark.
+test('the niri fragment sets the paper as background, frames windows 1 px in ink and the line colour, square, with no ring or shadow', () => {
+  const kdl = renderNiri(artboard);
+  assert.match(kdl, /background-color "#E4E6EA"/);
+  assert.match(kdl, /focus-ring \{\s*off\s*\}/);
+  assert.match(kdl, new RegExp(`border \\{\\s*on\\s*width 1\\s*active-color "#15171B"\\s*inactive-color "${artboard.color.line}"`));
+  assert.match(kdl, /shadow \{\s*off\s*\}/);
+  assert.match(kdl, /geometry-corner-radius 0/);
+});
+
+test('windows sit 56 px down and 32 px in, clear of the margins, with niri drawing their frames', () => {
+  const kdl = renderNiri(artboard);
+  assert.match(kdl, /struts \{\s*top 28\s*bottom 0\s*left 4\s*right 4\s*\}/);
+  assert.match(kdl, /^prefer-no-csd$/m);
+});
+
+test('every animation runs on the spring, the window opening on damping 0.72 and stiffness 380', () => {
+  const kdl = renderNiri(artboard);
+  assert.match(kdl, /window-open \{\s*spring damping-ratio=0\.72 stiffness=380 epsilon=0\.0001/);
+  assert.match(kdl, /window-close \{\s*duration-ms 160\s*curve "ease-out-quad"/);
+  assert.match(kdl, /workspace-switch \{\s*spring damping-ratio=0\.85 stiffness=600/);
+  assert.doesNotMatch(kdl, /slowdown/);
+});
+
+test('windows spring up from 96% and fade in, and shrink, sink and fade out', () => {
+  const kdl = renderNiri(artboard);
+  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
+  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*smoothstep\(0\.0, 0\.6, niri_clamped_progress\)/);
+  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - smoothstep\(0\.0, 1\.0, p\)\)/);
+});
+
+test('every scheme renders the same niri fragment but for its colours', () => {
+  const shape = (name) => renderNiri(loadScheme(name)).replace(/#[0-9A-Fa-f]{6}(80)?/g, '#');
+  for (const name of SCHEMES) assert.equal(shape(name), shape('artboard'), name);
+});
+
+test('the backdrop between workspaces during a switch is the paper, not niri\'s grey', () => {
+  for (const name of SCHEMES) {
+    const t = loadScheme(name);
+    assert.match(renderNiri(t), new RegExp(`overview \\{\\s*backdrop-color "${t.color.paper}"\\s*\\}`));
+  }
+});
+
+test('niri tabs sit at the top in ink and the line colour, square', () => {
+  const tabs = renderNiri(artboard).match(/^    tab-indicator \{\n([^]*?)\n    \}$/m)?.[1] ?? '';
+  assert.match(tabs, /^\s+position "top"$/m);
+  assert.match(tabs, /^\s+width 4$/m);
+  assert.match(tabs, /^\s+corner-radius 0$/m);
+  assert.match(tabs, /^\s+length total-proportion=0\.3$/m);
+  assert.match(tabs, /^\s+active-color "#15171B"$/m);
+  assert.match(tabs, new RegExp(`^\\s+inactive-color "${artboard.color.line}"$`, 'm'));
+  assert.match(tabs, /^\s+hide-when-single-tab$/m);
+  assert.match(tabs, /^\s+place-within-column$/m);
+});
+
+test('niri shows where a moved window lands in the accent at half strength', () => {
+  assert.match(renderNiri(artboard), /^    insert-hint \{\n        color "#3D5AFE80"\n    \}$/m);
+});
+
+test('niri dresses the Alt+Tab switcher: the highlight takes the accent, danger for urgent, square', () => {
+  const hl = renderNiri(gruvbox).match(/^recent-windows \{\n    highlight \{\n([^]*?)\n    \}\n\}$/m)?.[1] ?? '';
+  assert.match(hl, new RegExp(`^        active-color "${gruvbox.color.accent}"$`, 'm'));
+  assert.match(hl, new RegExp(`^        urgent-color "${gruvbox.color.danger}"$`, 'm'));
+  assert.match(hl, /^        corner-radius 0$/m);
+});
+
+test('a tab position outside left, right, top and bottom is refused by name', () => {
+  const bad = doc(artboard);
+  bad.niri.tab_position = 'middle';
+  assert.throws(() => validateTheme(bad), /niri\.tab_position: "middle"/);
+});
+
+test('the foot fragment carries the palette in its own mode section', () => {
+  const ini = renderFoot(artboard);
+  // A light scheme fills [colors-light] and starts in it, so foot tells apps the truth about light and dark.
   assert.match(ini, /^\[main\]\ninitial-color-theme=light\n\[colors-light\]$/m);
   assert.doesNotMatch(ini, /colors-dark/);
-  assert.match(ini, /^background=FAF6EC$/m);
-  assert.match(ini, /^foreground=1C1915$/m);
-  assert.match(ini, /^regular1=C8381E$/m);
+  assert.match(ini, /^background=FFFFFF$/m);
+  assert.match(ini, /^foreground=15171B$/m);
 });
 
-test('foot\'s own chrome takes the theme too: cursor, selection, URLs, labels, search', () => {
-  const ini = renderFoot(load('blueprint'));
+test('foot\'s own chrome takes the scheme too: cursor, selection, URLs, labels, search', () => {
+  const ini = renderFoot(gruvbox);
   assert.match(ini, /^initial-color-theme=dark\n\[colors-dark\]$/m);
-  assert.match(ini, /^cursor=0A1526 7FE3F0$/m);
-  assert.match(ini, /^selection-foreground=0A1526$/m);
-  assert.match(ini, /^selection-background=7FE3F0$/m);
-  assert.match(ini, /^urls=7FE3F0$/m);
-  assert.match(ini, /^jump-labels=0A1526 7FE3F0$/m);
-  assert.match(ini, /^search-box-no-match=0A1526 FFB547$/m);
-});
-
-test('a theme font is Maple Mono, Inter or Instrument Serif; Inter is Frost\'s alone', () => {
-  const bad = structuredClone(paper);
-  bad.type.ui = 'Helvetica';
-  assert.throws(() => validateTheme(bad), /type\.ui: "Helvetica" is not one of Maple Mono, Inter, Instrument Serif/);
-  assert.deepEqual([load('artboard').type.display, load('artboard').type.ui], ['Maple Mono', 'Maple Mono']);
-});
-
-test('each theme names its voice, since the fonts no longer tell the themes apart', () => {
-  assert.deepEqual(['paper', 'artboard', 'blueprint'].map((n) => load(n).type.voice), ['caps', 'plain', 'bracket']);
-  const bad = structuredClone(paper);
-  bad.type.voice = 'loud';
-  assert.throws(() => validateTheme(bad), /type\.voice: "loud"/);
+  assert.match(ini, /^cursor=282828 83A598$/m);
+  assert.match(ini, /^selection-background=83A598$/m);
+  assert.match(ini, /^urls=83A598$/m);
+  assert.match(ini, /^regular1=CC241D$/m);
 });
 
 test('the footclient overrides say what the fragment says, one per line', () => {
-  const t = load('artboard');
-  const args = renderFootArgs(t).trim().split('\n');
+  const args = renderFootArgs(artboard).trim().split('\n');
   assert.equal(args[0], 'main.initial-color-theme=light');
   assert.ok(args.includes('colors-light.background=FFFFFF'));
   assert.ok(args.includes('colors-light.cursor=FFFFFF 3D5AFE'));
-  const keys = renderFoot(t).split('\n').filter((l) => l.includes('=')).length;
-  assert.equal(args.length, keys);
+  assert.equal(args.length, renderFoot(artboard).split('\n').filter((l) => l.includes('=')).length);
 });
 
-test('foot accepts the home foot.ini with each theme included', (t) => {
+test('foot accepts the home foot.ini with each scheme included', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'dots-foot-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   const home = readFileSync(new URL('../../home/dot_config/foot/foot.ini', import.meta.url), 'utf8');
-  for (const name of ['paper', 'artboard', 'blueprint']) {
-    writeFileSync(join(dir, 'theme.ini'), renderFoot(load(name)));
+  for (const name of SCHEMES) {
+    writeFileSync(join(dir, 'theme.ini'), renderFoot(loadScheme(name)));
     writeFileSync(join(dir, 'foot.ini'), home.replace(/^include=.*$/m, `include=${join(dir, 'theme.ini')}`));
     execFileSync('foot', ['--check-config', '-c', join(dir, 'foot.ini')], { stdio: 'pipe' });
   }
 });
 
-const load = (name) => validateTheme(parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8')));
+test('the foot OSC string sets the 16 colours, cursor and selection, then foreground and background', () => {
+  const osc = renderFootOsc(gruvbox);
+  assert.ok(osc.startsWith('\x1b]4;0;#282828\x1b\\'));
+  assert.ok(osc.includes('\x1b]12;#83A598\x1b\\\x1b]17;#83A598\x1b\\\x1b]19;#282828\x1b\\'));
+  assert.ok(osc.endsWith('\x1b]10;#EBDBB2\x1b\\\x1b]11;#282828\x1b\\'));
+});
 
-test('muted text reads at 4.5:1 or more on each paper', () => {
-  for (const name of ['paper', 'artboard', 'blueprint']) {
-    const t = load(name);
-    assert.ok(contrast(t.color.muted, t.color.paper) >= 4.5, `${name}: ${contrast(t.color.muted, t.color.paper)}`);
+test('ink reads at 4.5:1 or more on each surface', () => {
+  for (const name of SCHEMES) {
+    const t = loadScheme(name);
+    assert.ok(contrast(t.color.ink, t.color.surface) >= 4.5, `${name}: ${contrast(t.color.ink, t.color.surface).toFixed(2)}`);
   }
 });
 
@@ -136,198 +183,4 @@ test('contrast is the WCAG ratio, either way round', () => {
   assert.equal(contrast('#000000', '#FFFFFF'), 21);
   assert.equal(contrast('#FFFFFF', '#000000'), 21);
   assert.equal(contrast('#777777', '#777777'), 1);
-});
-
-test('the Artboard and Blueprint themes carry their canvas tokens', () => {
-  const a = load('artboard');
-  assert.deepEqual([a.mode, a.color.paper, a.color.surface, a.primitive.paper, a.primitive.corner], ['light', '#E4E6EA', '#FFFFFF', 'dots', 'round']);
-  assert.deepEqual([a.niri.gaps, a.niri.ring_width, a.niri.ring_color], [28, 2, '#3D5AFE']);
-  const b = load('blueprint');
-  assert.deepEqual([b.mode, b.color.paper, b.color.surface, b.color.ink, b.primitive.frame], ['dark', '#0C1A2E', '#0A1526', '#D6F4F8', 'glow']);
-  assert.deepEqual([b.niri.border_inactive, b.niri.shadow_color, b.type.ui], ['#2E5A72', '#7FE3F040', 'Maple Mono']);
-});
-
-test('a niri colour that is not #RRGGBB or #RRGGBBAA is refused by name', () => {
-  const bad = structuredClone(paper);
-  bad.niri.shadow_color = 'ink';
-  assert.throws(() => validateTheme(bad), /niri\.shadow_color/);
-});
-
-test('Artboard has no border, a 2 px blue focus ring, a soft long shadow and radius 14', () => {
-  const kdl = renderNiri(load('artboard'));
-  assert.match(kdl, /border \{\s*off\s*\}/);
-  assert.match(kdl, /focus-ring \{\s*on\s*width 2\s*active-color "#3D5AFE"/);
-  assert.match(kdl, /shadow \{\s*on\s*softness 40\s*spread 0\s*offset x=0 y=18\s*color "#15171B2E"/);
-  assert.match(kdl, /geometry-corner-radius 14/);
-  assert.match(kdl, /spring damping-ratio=0\.72 stiffness=380/);
-});
-
-test('Blueprint frames the focused window in cyan, the others in #2E5A72, and glows only the focused one', () => {
-  const kdl = renderNiri(load('blueprint'));
-  assert.match(kdl, /border \{\s*on\s*width 1\s*active-color "#7FE3F0"\s*inactive-color "#2E5A72"/);
-  assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, /shadow \{\s*on\s*softness 18\s*spread 0\s*offset x=0 y=0\s*color "#7FE3F040"\s*inactive-color "#00000000"/);
-  assert.match(kdl, /geometry-corner-radius 0/);
-});
-
-test('each theme\'s fragment times every animation from its motion', () => {
-  const block = (kdl, name) => kdl.match(new RegExp(`\\n    ${name} \\{\\n([\\s\\S]*?)\\n    \\}`))?.[1].split('custom-shader')[0].trim().split(/\s*\n\s*/);
-  const paper = renderNiri(load('paper'));
-  assert.deepEqual(block(paper, 'workspace-switch'), ['spring damping-ratio=1.0 stiffness=1200 epsilon=0.0001']);
-  assert.deepEqual(block(paper, 'window-close'), ['duration-ms 100', 'curve "ease-out-quad"']);
-  const blueprint = renderNiri(load('blueprint'));
-  assert.deepEqual(block(blueprint, 'window-movement'), ['duration-ms 150', 'curve "linear"']);
-  assert.deepEqual(block(blueprint, 'exit-confirmation-open-close'), ['duration-ms 150', 'curve "linear"']);
-  const artboard = renderNiri(load('artboard'));
-  assert.deepEqual(block(artboard, 'config-notification-open-close'), ['spring damping-ratio=0.6 stiffness=1000 epsilon=0.0001']);
-  assert.deepEqual(block(artboard, 'screenshot-ui-open'), ['duration-ms 200', 'curve "ease-out-cubic"']);
-  for (const kdl of [paper, blueprint, artboard]) {
-    for (const name of ['window-open', 'window-close', 'workspace-switch', 'horizontal-view-movement', 'window-movement', 'window-resize',
-      'overview-open-close', 'screenshot-ui-open', 'config-notification-open-close', 'exit-confirmation-open-close']) {
-      assert.ok(block(kdl, name), `${name} is set`);
-    }
-  }
-});
-
-test('a motion outside the three boards keeps one open and close curve and leaves the rest to niri', () => {
-  const t = load('paper');
-  t.primitive.motion = 'ease';
-  const kdl = renderNiri(t);
-  assert.match(kdl, /window-open \{\s*duration-ms 200\s*curve "ease-out-cubic"\s*\}/);
-  assert.match(kdl, /window-close \{\s*duration-ms 90\s*curve "linear"\s*\}/);
-  assert.doesNotMatch(kdl, /workspace-switch|window-movement/);
-});
-
-test('no rendered fragment slows niri\'s animations; slowdown belongs to the nested test config', () => {
-  for (const name of ['paper', 'artboard', 'blueprint']) assert.doesNotMatch(renderNiri(load(name)), /slowdown/);
-});
-
-test('Blueprint opens and closes with its own shaders, its pen baked in as its accent', () => {
-  const kdl = renderNiri(load('blueprint'));
-  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /vec4 open_color\(vec3 coords_geo, vec3 size_geo\)/);
-  assert.match(shader('window-close'), /vec4 close_color\(vec3 coords_geo, vec3 size_geo\)/);
-  for (const glsl of [shader('window-open'), shader('window-close')]) assert.match(glsl, /vec4\(0\.498, 0\.890, 0\.941, 1\.0\)/);
-});
-
-test('Paper drops its windows in whole and lifts them out, 8 px either way, with no fade', () => {
-  const kdl = renderNiri(load('paper'));
-  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /vec4 open_color[\s\S]*8\.0 \* \(1\.0 - p\)/);
-  assert.match(shader('window-close'), /vec4 close_color[\s\S]*8\.0 \* p/);
-  for (const glsl of [shader('window-open'), shader('window-close')]) assert.doesNotMatch(glsl, /\* p;|\* \(1\.0 - p\);/);
-});
-
-test('Artboard springs its windows up from 96% and fades them in, and shrinks, sinks and fades them out', () => {
-  const kdl = renderNiri(load('artboard'));
-  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*smoothstep\(0\.0, 0\.6, niri_clamped_progress\)/);
-  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - smoothstep\(0\.0, 1\.0, p\)\)/);
-});
-
-// One physical pixel, so a 1 px line stays one row on the 1.25 panel instead of flickering between one and two.
-test('a shader measures one physical pixel from niri_scale', () => {
-  for (const name of ['paper', 'blueprint']) {
-    const kdl = renderNiri(load(name));
-    assert.match(kdl, /float dots_px\(\) \{\n\s*return niri_scale > 0\.5 \? 1\.0 \/ niri_scale : 1\.0;\n\s*\}/, name);
-  }
-});
-
-test('Paper\'s 8 px drop and lift move in whole physical pixels, so its text stays sharp', () => {
-  const kdl = renderNiri(load('paper'));
-  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /floor\(8\.0 \* \(1\.0 - p\) \/ w \+ 0\.5\) \* w/);
-  assert.match(shader('window-close'), /floor\(8\.0 \* p \/ w \+ 0\.5\) \* w/);
-});
-
-// The glow is niri's shadow, drawn into niri_tex below the window too, so a scan that stopped at the window's edge popped it on at the end.
-test('Blueprint\'s scan runs past the window by its glow\'s reach, its pen one physical pixel wide with a bright tip', () => {
-  const kdl = renderNiri(load('blueprint'));
-  const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  for (const glsl of [shader('window-open'), shader('window-close')]) {
-    assert.match(glsl, /float reach = 18\.0;/);
-    assert.match(glsl, /\* \(size_geo\.y \+ 2\.0 \* reach\)/);
-    assert.match(glsl, /dots_outline\(px, size_geo\.xy, w\)/);
-    assert.match(glsl, /px\.y < scan \+ w\)/);
-  }
-  assert.match(shader('window-open'), /mix\(vec4\(0\.498, 0\.890, 0\.941, 1\.0\), vec4\(1\.0\), 0\.7\)/);
-});
-
-test('a theme with no shadow scans no further than its window', () => {
-  const t = load('blueprint');
-  delete t.niri.shadow_color;
-  assert.match(renderNiri(t), /float reach = 0\.0;/);
-});
-
-test('a motion no board draws keeps niri\'s own open and close', () => {
-  const t = load('blueprint');
-  t.primitive.motion = 'typewriter';
-  assert.doesNotMatch(renderNiri(t), /custom-shader/);
-});
-
-test('the backdrop between workspaces during a switch is the theme\'s paper, not niri\'s grey', () => {
-  for (const name of ['paper', 'artboard', 'blueprint']) {
-    const t = load(name);
-    assert.match(renderNiri(t), new RegExp(`overview \\{\\s*backdrop-color "${t.color.paper}"\\s*\\}`));
-  }
-});
-
-test('a theme without shadow keys gets no shadow', () => {
-  const t = load('paper');
-  delete t.niri.shadow_color;
-  assert.match(renderNiri(t), /shadow \{\s*off\s*\}/);
-});
-
-test('the foot OSC string sets the 16 colours, cursor and selection, then foreground and background', () => {
-  const osc = renderFootOsc(load('blueprint'));
-  assert.ok(osc.startsWith('\x1b]4;0;#2E5A72\x1b\\'));
-  assert.ok(osc.includes('\x1b]4;15;#FFFFFF\x1b\\'));
-  assert.ok(osc.includes('\x1b]12;#7FE3F0\x1b\\\x1b]17;#7FE3F0\x1b\\\x1b]19;#0A1526\x1b\\'));
-  assert.ok(osc.endsWith('\x1b]10;#D6F4F8\x1b\\\x1b]11;#0A1526\x1b\\'));
-});
-
-const tabs = (name) => renderNiri(load(name)).match(/^    tab-indicator \{\n([^]*?)\n    \}$/m)?.[1] ?? '';
-
-test('each theme draws niri tabs in its own language: Paper index tabs, Artboard pills, Blueprint a dimension line', () => {
-  const paper = tabs('paper');
-  assert.match(paper, /^\s+position "top"$/m);
-  assert.match(paper, /^\s+width 5$/m);
-  assert.match(paper, /^\s+corner-radius 0$/m);
-  // niri reads total-proportion only as a float, so 1.0 keeps its point.
-  assert.match(paper, /^\s+length total-proportion=1\.0$/m);
-  assert.match(paper, /^\s+active-color "#1C1915"$/m);
-  assert.match(paper, /^\s+inactive-color "#575653"$/m);
-  const artboard = tabs('artboard');
-  assert.match(artboard, /^\s+length total-proportion=0\.3$/m);
-  assert.match(artboard, /^\s+corner-radius 2$/m);
-  assert.match(artboard, /^\s+active-color "#3D5AFE"$/m);
-  const blueprint = tabs('blueprint');
-  assert.match(blueprint, /^\s+position "left"$/m);
-  assert.match(blueprint, /^\s+width 2$/m);
-  assert.match(blueprint, /^\s+active-color "#7FE3F0"$/m);
-  assert.match(blueprint, /^\s+inactive-color "#2E5A72"$/m);
-  for (const t of [paper, artboard, blueprint]) {
-    assert.match(t, /^\s+hide-when-single-tab$/m);
-    assert.match(t, /^\s+place-within-column$/m);
-  }
-});
-
-test('niri shows where a moved window lands in the theme accent at half strength', () => {
-  assert.match(renderNiri(load('blueprint')), /^    insert-hint \{\n        color "#7FE3F080"\n    \}$/m);
-});
-
-test('niri dresses the Alt+Tab switcher: the highlight takes the accent, danger for urgent, and the corner primitive', () => {
-  for (const name of ['paper', 'blueprint', 'artboard']) {
-    const t = load(name);
-    const hl = renderNiri(t).match(/^recent-windows \{\n    highlight \{\n([^]*?)\n    \}\n\}$/m)?.[1] ?? '';
-    assert.match(hl, new RegExp(`^        active-color "${t.color.accent}"$`, 'm'), name);
-    assert.match(hl, new RegExp(`^        urgent-color "${t.color.danger}"$`, 'm'), name);
-    assert.match(hl, new RegExp(`^        corner-radius ${t.primitive.corner === 'round' ? 14 : 0}$`, 'm'), name);
-  }
-});
-
-test('a tab position outside left, right, top and bottom is refused by name', () => {
-  const bad = structuredClone(paper);
-  bad.niri.tab_position = 'middle';
-  assert.throws(() => validateTheme(bad), /niri\.tab_position: "middle"/);
 });

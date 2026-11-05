@@ -6,8 +6,8 @@ import { checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFo
 import { listLook } from './voice.mjs';
 import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
-// Board hexes for the kak-mail list that no token carries: Paper's sender blue, Artboard's date orange.
-const MAIL_BOARD = { paper: { sender: '#2C4A9A' }, artboard: { date: '#C2410C' } };
+// Board hexes for the kak-mail list that no token carries: Artboard's date orange.
+const MAIL_BOARD = { artboard: { date: '#C2410C' } };
 const rgb = (s) => `rgb:${s.toLowerCase().slice(1)}`;
 
 // The kak-mail list's faces and key strip, which dots.kak carries so a `colorscheme dots` recolours an open list.
@@ -17,22 +17,21 @@ function renderMailKak(t) {
   const board = MAIL_BOARD[t.name] ?? {};
   const strip = [['↵', 'open'], ['r', 'reply'], ['e', 'archive'], ['s', 'screener'], ['f', 'feed'], ['?', 'help']];
   const keys = look.keys(strip).map((k) => `{MailKey}${k.key}{MailStrip} ${k.word}`).join(' · ');
-  const key = look.voice === 'bracket' ? c.accent : c.ink;
   const faces = [
     ['MailDate', rgb(board.date ?? c.muted)],
-    ['MailSender', rgb(board.sender ?? c.accent)],
+    ['MailSender', rgb(c.accent)],
     ['MailSubject', rgb(c.ink)],
     ['MailUnread', 'default,default+b'],
     ['MailCursor', `${rgb(look.cursor.text)},${rgb(look.cursor.fill)}+b`],
     ['MailStrip', `${rgb(c.muted)},${rgb(c.surface)}`],
-    ['MailKey', `${rgb(key)},${rgb(c.surface)}${look.voice === 'caps' ? '+b' : ''}`],
+    ['MailKey', `${rgb(c.ink)},${rgb(c.surface)}`],
   ];
   return faces.map(([n, v]) => `face global ${n} ${v}`).join('\n') + `\nset-option global mail_keys '${keys}'\ntry mail-strip-all\n`;
 }
 
-// `label` begins each error line, as `theme paper` or `colorscheme artboard`; `list` is the picker's cards.
+// `label` begins each error line, as `colorscheme artboard`; `list` is the picker's cards.
 export function renderOutputs(theme, list, label) {
-  // The apps that speak in the shell's voice read the tokens as the shell does, so Hi-Fi's engraved voice draws Blueprint's words bare.
+  // The apps that speak in the shell's voice read the tokens as the shell does.
   const spoken = checkTokens(theme);
   // The default state dir is the live desktop's: only the checkout its shell runs from may write there, so a worktree's render cannot rewrite it.
   if (!process.env.XDG_STATE_HOME) {

@@ -206,7 +206,7 @@ test('kak loads mail.kak with the carried config and no error', () => {
     XDG_CACHE_HOME: join(home, '.cache'),
     XDG_RUNTIME_DIR: runDir,
   };
-  const theme = run('node', [join(repo, 'shell/lib/theme-render.mjs'), 'paper'], { env });
+  const theme = run('node', [join(repo, 'shell/lib/colorscheme-render.mjs'), 'github-light'], { env });
   assert.equal(theme.status, 0, theme.stderr);
   const out = join(root, 'kak-mail');
   // define-command refuses a name that exists, so each catch marks a command mail.kak defined.

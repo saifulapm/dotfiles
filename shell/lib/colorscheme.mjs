@@ -38,7 +38,7 @@ export function designOf(s) {
     paper: { spacing: 16, dot: s.color.line },
     type: { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 },
     niri: {
-      gaps: 28, border: 1, blur: false, border_inactive: s.color.line, ring_width: 0,
+      gaps: 28, border: 1, border_inactive: s.color.line,
       tab_position: 'top', tab_width: 4, tab_gap: 8, tab_length: 0.3, tab_gaps: 8,
     },
   };

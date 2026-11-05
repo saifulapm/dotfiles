@@ -1,18 +1,10 @@
-// Validates a parsed theme.toml and renders its fragments; pure, so the shell can import it too.
-const MENUS = {
-  paper: ['flat', 'grain', 'dots', 'grid', 'gradient', 'brushed', 'frost'],
-  frame: ['hairline', 'ink', 'double', 'none', 'glow'],
-  shadow: ['soft', 'hard-offset', 'none'],
-  corner: ['round', 'square', 'cut'],
-  motion: ['spring', 'snappy', 'ease', 'typewriter', 'linear', 'dial'],
-};
+// Validates the one design's theme document, as colorscheme.mjs builds it (Artboard's dots, an ink frame, no shadow, square, the spring, Maple Mono in the plain voice), and renders its fragments; pure, so the shell can import it too.
+const DESIGN = { paper: 'dots', frame: 'ink', shadow: 'none', corner: 'square', motion: 'spring' };
 const COLORS = ['paper', 'ink', 'muted', 'line', 'surface', 'accent', 'danger', 'ok'];
 const SYNTAX = ['keyword', 'function', 'string', 'type', 'value', 'variable', 'attribute', 'meta', 'builtin', 'comment'];
-const FONTS = ['Maple Mono', 'Inter', 'Instrument Serif'];
-const VOICES = ['plain', 'caps', 'bracket', 'engraved'];
+const FONT = 'Maple Mono';
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const HEXA = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
-const NIRI_COLORS = ['border_active', 'border_inactive', 'ring_color', 'shadow_color', 'shadow_inactive'];
 const TAB_SIDES = ['left', 'right', 'top', 'bottom'];
 
 export function validateTheme(doc) {
@@ -22,43 +14,33 @@ export function validateTheme(doc) {
   if (meta.mode !== 'light' && meta.mode !== 'dark') fail(`meta.mode: "${meta.mode}" is not light or dark`);
   const color = doc.color ?? fail('missing [color]');
   for (const k of COLORS) if (!HEX.test(color[k] ?? '')) fail(`color.${k}: "${color[k]}" is not #RRGGBB`);
-  // Glass is the island's, OSDs' and fields' fill; a theme without one draws them on its surface. Edge is a frame's colour apart from line; a theme without one frames as before. Both may carry alpha last, as niri writes it.
-  for (const k of ['glass', 'edge']) if (k in color && !HEXA.test(color[k])) fail(`color.${k}: "${color[k]}" is not #RRGGBB or #RRGGBBAA`);
   if (!Array.isArray(color.ansi) || color.ansi.length !== 16 || !color.ansi.every((c) => HEX.test(c))) {
     fail('color.ansi must hold 16 #RRGGBB colours');
   }
   const syntax = doc.syntax ?? fail('missing [syntax]');
   for (const k of SYNTAX) if (!HEX.test(syntax[k] ?? '')) fail(`syntax.${k}: "${syntax[k]}" is not #RRGGBB`);
   const primitive = doc.primitive ?? fail('missing [primitive]');
-  for (const [k, menu] of Object.entries(MENUS)) {
-    if (!menu.includes(primitive[k])) fail(`primitive.${k}: "${primitive[k]}" is not one of ${menu.join(', ')}`);
-  }
+  for (const [k, v] of Object.entries(DESIGN)) if (primitive[k] !== v) fail(`primitive.${k}: "${primitive[k]}" is not ${v}, the one design's`);
   const type = doc.type ?? fail('missing [type]');
-  for (const k of ['display', 'ui', 'mono']) if (!FONTS.includes(type[k])) fail(`type.${k}: "${type[k]}" is not one of ${FONTS.join(', ')}`);
-  if (!VOICES.includes(type.voice)) fail(`type.voice: "${type.voice}" is not one of ${VOICES.join(', ')}`);
+  for (const k of ['display', 'ui', 'mono']) if (type[k] !== FONT) fail(`type.${k}: "${type[k]}" is not ${FONT}`);
+  if (type.voice !== 'plain') fail(`type.voice: "${type.voice}" is not plain`);
   const niri = doc.niri ?? fail('missing [niri]');
-  for (const k of NIRI_COLORS) {
-    if (k in niri && !HEXA.test(niri[k])) fail(`niri.${k}: "${niri[k]}" is not #RRGGBB or #RRGGBBAA`);
-  }
+  if ('border_inactive' in niri && !HEXA.test(niri.border_inactive)) fail(`niri.border_inactive: "${niri.border_inactive}" is not #RRGGBB or #RRGGBBAA`);
   if ('tab_position' in niri && !TAB_SIDES.includes(niri.tab_position)) fail(`niri.tab_position: "${niri.tab_position}" is not one of ${TAB_SIDES.join(', ')}`);
   return {
     name: meta.name,
     mode: meta.mode,
-    color: Object.assign({}, color, { glass: color.glass ?? color.surface, ansi: [...color.ansi] }),
+    color: Object.assign({}, color, { ansi: [...color.ansi] }),
     syntax: Object.assign({}, syntax),
     primitive: Object.assign({}, primitive),
     paper: Object.assign({}, doc.paper),
     type: { display: type.display, ui: type.ui, mono: type.mono, voice: type.voice, scale: type.scale ?? 1 },
-    niri: Object.assign({}, niri, { gaps: niri.gaps ?? 16, border: niri.border ?? 1, blur: niri.blur ?? false }),
+    niri: Object.assign({}, niri, { gaps: niri.gaps ?? 16, border: niri.border ?? 1 }),
   };
 }
 
-// The tokens as Qt reads them: theme.toml writes alpha last (#RRGGBBAA, niri's order) and Qt wants it first (#AARRGGBB).
-export function qtTokens(t) {
-  const qt = (hex) => (hex.length === 9 ? `#${hex.slice(7)}${hex.slice(1, 7)}`.toUpperCase() : hex);
-  const color = Object.assign({}, t.color, { glass: qt(t.color.glass) }, 'edge' in t.color ? { edge: qt(t.color.edge) } : {});
-  return Object.assign({}, t, { color });
-}
+// The tokens as Qt reads them; every colour is #RRGGBB, so this is a copy.
+export const qtTokens = (t) => Object.assign({}, t, { color: Object.assign({}, t.color) });
 
 // The WCAG contrast ratio of two #RRGGBB colours.
 export function contrast(a, b) {
@@ -71,80 +53,24 @@ export function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-// The shell's tokens come from shell.json, so they get the same check as theme.toml; the engraved voice draws Blueprint's layout without its [ ] marks, so the shell reads it as the bracket voice plus engraved, which only what draws a mark asks for.
-export function checkTokens(t) {
-  const engraved = t.type?.voice === 'engraved' || t.type?.engraved === true;
-  const checked = validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }, engraved ? { type: Object.assign({}, t.type, { voice: 'engraved' }) } : {}));
-  if (engraved) Object.assign(checked.type, { voice: 'bracket', engraved: true });
-  return checked;
-}
-
-// Ease and typewriter open on a plain ease-out and close fast and linear, with no shader.
-const OPEN_CLOSE = {
-  'window-open': 'duration-ms 200\n        curve "ease-out-cubic"',
-  'window-close': 'duration-ms 90\n        curve "linear"',
-};
+// The shell's tokens come from shell.json, so they get the same check as the render.
+export const checkTokens = (t) => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }));
 
 const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
 const eased = (ms, curve) => `duration-ms ${ms}\n        curve "${curve}"`;
-// niri 26.04 names no ease-in or ease-in-out curve, so those are its cubic-bezier.
-const bezier = (ms, ...p) => `duration-ms ${ms}\n        curve "cubic-bezier" ${p.join(' ')}`;
-const inOutCubic = (ms) => bezier(ms, 0.65, 0, 0.35, 1);
-// Every animation's timing for the four motions the Motion boards draw; another motion keeps OPEN_CLOSE for open and close only.
+// Every animation's timing on the one spring.
 const MOTION = {
-  snappy: {
-    'window-open': eased(140, 'ease-out-expo'),
-    'window-close': eased(100, 'ease-out-quad'),
-    'workspace-switch': spring('1.0', 1200),
-    'horizontal-view-movement': spring('1.0', 1000),
-    'window-movement': spring('1.0', 1000),
-    'window-resize': spring('1.0', 1000),
-    'overview-open-close': eased(160, 'ease-out-expo'),
-    'screenshot-ui-open': eased(120, 'ease-out-expo'),
-    'config-notification-open-close': spring('1.0', 1000),
-    'exit-confirmation-open-close': spring('1.0', 1000),
-  },
-  spring: {
-    'window-open': spring(0.72, 380),
-    'window-close': eased(160, 'ease-out-quad'),
-    'workspace-switch': spring(0.85, 600),
-    'horizontal-view-movement': spring(0.9, 700),
-    'window-movement': spring(0.8, 600),
-    'window-resize': spring(0.85, 600),
-    'overview-open-close': spring(0.85, 600),
-    'screenshot-ui-open': eased(200, 'ease-out-cubic'),
-    'config-notification-open-close': spring(0.6, 1000),
-    'exit-confirmation-open-close': spring(0.6, 1000),
-  },
-  linear: {
-    'window-open': eased(220, 'linear'),
-    'window-close': eased(160, 'linear'),
-    'workspace-switch': eased(200, 'ease-out-cubic'),
-    'horizontal-view-movement': eased(200, 'ease-out-cubic'),
-    'window-movement': eased(150, 'linear'),
-    'window-resize': eased(150, 'linear'),
-    'overview-open-close': eased(180, 'linear'),
-    'screenshot-ui-open': eased(150, 'linear'),
-    'config-notification-open-close': eased(150, 'linear'),
-    'exit-confirmation-open-close': eased(150, 'linear'),
-  },
-  // Hi-Fi's dial has a flywheel: what travels eases in and out. Open and close run in linear time, since SHADERS.dial times the glow in ms and eases the window itself.
-  dial: {
-    'window-open': eased(220, 'linear'),
-    'window-close': eased(140, 'linear'),
-    'workspace-switch': inOutCubic(260),
-    'horizontal-view-movement': inOutCubic(260),
-    'window-movement': eased(200, 'ease-out-cubic'),
-    'window-resize': eased(200, 'ease-out-cubic'),
-    'overview-open-close': inOutCubic(240),
-    'screenshot-ui-open': eased(160, 'ease-out-cubic'),
-    'config-notification-open-close': eased(160, 'ease-out-cubic'),
-    'exit-confirmation-open-close': eased(160, 'ease-out-cubic'),
-  },
+  'window-open': spring(0.72, 380),
+  'window-close': eased(160, 'ease-out-quad'),
+  'workspace-switch': spring(0.85, 600),
+  'horizontal-view-movement': spring(0.9, 700),
+  'window-movement': spring(0.8, 600),
+  'window-resize': spring(0.85, 600),
+  'overview-open-close': spring(0.85, 600),
+  'screenshot-ui-open': eased(200, 'ease-out-cubic'),
+  'config-notification-open-close': spring(0.6, 1000),
+  'exit-confirmation-open-close': spring(0.6, 1000),
 };
-
-// A #RRGGBB colour as an opaque GLSL vec4, so a shader draws in the theme's own ink.
-const glslColor = (hex) => `vec4(${[1, 3, 5].map((i) => (parseInt(hex.slice(i, i + 2), 16) / 255).toFixed(3)).join(', ')}, 1.0)`;
 
 // niri draws the whole tile into niri_tex, border, ring and shadow included, so a shader samples it past the geometry and stops only at the texture's edge.
 const TEX = `vec4 dots_tex(vec3 coords_geo) {
@@ -153,44 +79,8 @@ const TEX = `vec4 dots_tex(vec3 coords_geo) {
     return texture2D(niri_tex, t.st);
 }`;
 
-// One physical pixel in logical px, from the output scale niri passes as niri_scale (declared in its preludes, though not documented).
-const PX = `float dots_px() {
-    return niri_scale > 0.5 ? 1.0 / niri_scale : 1.0;
-}`;
-
-// How far along the outline w px wide, clockwise from the top-left corner, a pixel lies; -1.0 off the outline.
-const OUTLINE = `float dots_outline(vec2 px, vec2 size, float w) {
-    if (px.x < 0.0 || px.y < 0.0 || px.x >= size.x || px.y >= size.y) return -1.0;
-    if (px.y < w) return px.x;
-    if (px.x >= size.x - w) return size.x + px.y;
-    if (px.y >= size.y - w) return 2.0 * size.x + size.y - px.x;
-    if (px.x < w) return 2.0 * (size.x + size.y) - px.y;
-    return -1.0;
-}`;
-
-// The open and close shaders the Motion boards draw, by motion; the Blueprint pen is the accent, and reach is how far its glow lies past the window.
+// The open and close shaders the Motion board draws.
 const SHADERS = {
-  snappy: () => ({
-    // Whole from the first frame, 8 px above its place, dropping into it a whole physical pixel at a time, so its text never blurs.
-    open: `${TEX}
-${PX}
-vec4 open_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float w = dots_px();
-    return dots_tex(vec3(coords_geo.x, coords_geo.y + floor(8.0 * (1.0 - p) / w + 0.5) * w / size_geo.y, 1.0));
-}`,
-    // Lifts 8 px, a whole physical pixel at a time, while a cut climbs from just below its shadow to its top.
-    close: `${TEX}
-${PX}
-vec4 close_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float w = dots_px();
-    vec3 c = vec3(coords_geo.x, coords_geo.y + floor(8.0 * p / w + 0.5) * w / size_geo.y, 1.0);
-    if (c.y > (1.0 - p) * (1.0 + 8.0 / size_geo.y)) return vec4(0.0);
-    return dots_tex(c);
-}`,
-  }),
-  spring: () => ({
     // From 96% around its centre and 8 px low, overshooting with the spring, eased in over the first 60%.
     open: `${TEX}
 vec4 open_color(vec3 coords_geo, vec3 size_geo) {
@@ -208,83 +98,6 @@ vec4 close_color(vec3 coords_geo, vec3 size_geo) {
     c.y -= 8.0 * p / size_geo.y;
     return dots_tex(c) * (1.0 - smoothstep(0.0, 1.0, p));
 }`,
-  }),
-  linear: (c, reach) => {
-    const pen = glslColor(c.accent);
-    return {
-      // The outline is traced until 55%, its last 6 px a bright pen tip; from 45% a scan line comes down from above the glow to below it and shows the window above it.
-      open: `${TEX}
-${PX}
-${OUTLINE}
-vec4 open_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float w = dots_px();
-    float reach = ${reach.toFixed(1)};
-    vec2 px = coords_geo.xy * size_geo.xy;
-    float scan = -reach + (p - 0.45) / 0.55 * (size_geo.y + 2.0 * reach);
-    vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
-    float d = dots_outline(px, size_geo.xy, w);
-    float len = min(p / 0.55, 1.0) * 2.0 * (size_geo.x + size_geo.y);
-    bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
-    if (inside && p < 1.0 && px.y >= scan && px.y < scan + w) color = ${pen};
-    if (d >= 0.0 && d <= len) color = p < 0.55 && d > len - 6.0 ? mix(${pen}, vec4(1.0), 0.7) : ${pen};
-    return color;
-}`,
-      // A scan line goes up from below the glow and takes the window with it in the first 60%; then the outline is lifted, last drawn first.
-      close: `${TEX}
-${PX}
-${OUTLINE}
-vec4 close_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float w = dots_px();
-    float reach = ${reach.toFixed(1)};
-    vec2 px = coords_geo.xy * size_geo.xy;
-    float scan = -reach + (1.0 - p / 0.6) * (size_geo.y + 2.0 * reach);
-    vec4 color = px.y < scan ? dots_tex(coords_geo) : vec4(0.0);
-    float d = dots_outline(px, size_geo.xy, w);
-    bool inside = px.x >= 0.0 && px.x < size_geo.x && px.y >= 0.0 && px.y < size_geo.y;
-    if (inside && p < 0.6 && px.y >= scan && px.y < scan + w) color = ${pen};
-    if (d >= 0.0 && d <= clamp((1.0 - p) / 0.4, 0.0, 1.0) * 2.0 * (size_geo.x + size_geo.y)) color = ${pen};
-    return color;
-}`,
-    };
-  },
-  dial: (c) => {
-    const amber = glslColor(c.accent);
-    // The glow is what lies past the geometry, plus the 1 px border ring just inside it, which niri draws amber on the focused window.
-    const GLOW = `bool dots_glow(vec2 px, vec2 size) {
-    return px.x < 1.0 || px.y < 1.0 || px.x >= size.x - 1.0 || px.y >= size.y - 1.0;
-}`;
-    return {
-      // Warms up like a filament: opacity only, rising with a cubic ease-in of the time; the glow and the amber border come up over the last 60 of 220 ms.
-      open: `${TEX}
-${GLOW}
-vec4 open_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    vec2 px = coords_geo.xy * size_geo.xy;
-    vec4 color = dots_tex(coords_geo);
-    if (dots_glow(px, size_geo.xy)) return color * clamp((p - 160.0 / 220.0) / (60.0 / 220.0), 0.0, 1.0);
-    return color * p * p * p;
-}`,
-      // Powers off: the glow goes in the first 40 of 140 ms, then the window fades out on a quartic ease-out, nearly gone by 80%, while a one-physical-pixel amber outline at 30% stays to the end, fading over the last 10% so the last frame is the paper alone.
-      close: `${TEX}
-${PX}
-${GLOW}
-vec4 close_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float w = dots_px();
-    vec2 px = coords_geo.xy * size_geo.xy;
-    vec4 color = dots_tex(coords_geo);
-    if (dots_glow(px, size_geo.xy)) color *= 1.0 - clamp(p / (40.0 / 140.0), 0.0, 1.0);
-    else color *= pow(1.0 - clamp((p - 40.0 / 140.0) / (100.0 / 140.0), 0.0, 1.0), 4.0);
-    bool inside = px.x >= 0.0 && px.y >= 0.0 && px.x < size_geo.x && px.y < size_geo.y;
-    bool edge = px.x < w || px.y < w || px.x >= size_geo.x - w || px.y >= size_geo.y - w;
-    float glow = 0.3 * (1.0 - smoothstep(0.9, 1.0, p));
-    if (inside && edge) color = glow * ${amber} + (1.0 - glow) * color;
-    return color;
-}`,
-    };
-  },
 };
 
 const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).join('\n');
@@ -292,49 +105,32 @@ const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).joi
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
-  // A theme may light its focused frame apart from its ink, as Hi-Fi does in amber.
-  const frameColor = n.border_active ?? (t.primitive.frame === 'glow' ? c.accent : c.ink);
-  const border = t.primitive.frame === 'none' || !n.border
-    ? 'border {\n        off\n    }'
-    : `border {\n        on\n        width ${n.border}\n        active-color "${frameColor}"\n        inactive-color "${n.border_inactive ?? c.muted}"\n    }`;
-  const ring = n.ring_width
-    ? `focus-ring {\n        on\n        width ${n.ring_width}\n        active-color "${n.ring_color ?? c.accent}"\n    }`
-    : 'focus-ring {\n        off\n    }';
-  // The glow of a glow frame is niri's shadow, so the shadow follows the [niri] keys, not the shadow primitive.
-  const [ox, oy] = n.shadow_offset ?? [0, 0];
-  const shadow = n.shadow_color
-    ? [
-      'shadow {', '        on', `        softness ${n.shadow_softness ?? 30}`, `        spread ${n.shadow_spread ?? 0}`,
-      `        offset x=${ox} y=${oy}`, `        color "${n.shadow_color}"`,
-      ...(n.shadow_inactive ? [`        inactive-color "${n.shadow_inactive}"`] : []), '    }',
-    ].join('\n')
-    : 'shadow {\n        off\n    }';
-  const radius = n.radius ?? (t.primitive.corner === 'round' ? 14 : 0);
-  // Tabs take the focus colour and the inactive frame's colour; a round theme draws them as pills.
+  const border = `border {\n        on\n        width ${n.border}\n        active-color "${c.ink}"\n        inactive-color "${n.border_inactive ?? c.muted}"\n    }`;
+  // Tabs take the focus colour and the inactive frame's colour.
   const tabs = n.tab_position
     ? [
       'tab-indicator {', '        hide-when-single-tab', '        place-within-column', `        gap ${n.tab_gap}`, `        width ${n.tab_width}`,
       `        length total-proportion=${Number.isInteger(n.tab_length) ? n.tab_length.toFixed(1) : n.tab_length}`, `        position "${n.tab_position}"`, `        gaps-between-tabs ${n.tab_gaps}`,
-      `        corner-radius ${t.primitive.corner === 'round' ? n.tab_width / 2 : 0}`,
-      `        active-color "${n.ring_width ? n.ring_color ?? c.accent : frameColor}"`, `        inactive-color "${n.border_inactive ?? c.muted}"`,
+      '        corner-radius 0',
+      `        active-color "${c.ink}"`, `        inactive-color "${n.border_inactive ?? c.muted}"`,
       `        urgent-color "${c.danger}"`, '    }',
     ].join('\n')
     : 'tab-indicator {\n        hide-when-single-tab\n    }';
-  const motion = MOTION[t.primitive.motion] ?? OPEN_CLOSE;
-  // The glow's farthest edge past the window: its blur, spread and offset.
-  const reach = n.shadow_color ? (n.shadow_softness ?? 30) + (n.shadow_spread ?? 0) + Math.max(Math.abs(ox), Math.abs(oy)) : 0;
-  const shaders = SHADERS[t.primitive.motion]?.(c, reach) ?? {};
   const shader = (name) => {
-    const glsl = shaders[{ 'window-open': 'open', 'window-close': 'close' }[name]];
+    const glsl = SHADERS[{ 'window-open': 'open', 'window-close': 'close' }[name]];
     return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
   };
-  const animations = Object.entries(motion).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
+  const animations = Object.entries(MOTION).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
   return `layout {
     gaps ${t.niri.gaps}
     background-color "${c.paper}"
-    ${ring}
+    focus-ring {
+        off
+    }
     ${border}
-    ${shadow}
+    shadow {
+        off
+    }
     ${tabs}
     insert-hint {
         color "${c.accent}80"
@@ -355,18 +151,18 @@ overview {
     backdrop-color "${c.paper}"
 }
 
-// The Alt+Tab switcher's highlight wears the theme. Its binds sit in binds.kdl, since niri merges this section only across includes.
+// The Alt+Tab switcher's highlight wears the scheme. Its binds sit in binds.kdl, since niri merges this section only across includes.
 recent-windows {
     highlight {
         active-color "${c.accent}"
         urgent-color "${c.danger}"
-        padding ${radius ? 24 : 16}
-        corner-radius ${radius}
+        padding 16
+        corner-radius 0
     }
 }
 
 window-rule {
-    geometry-corner-radius ${radius}
+    geometry-corner-radius 0
     clip-to-geometry true
 }
 

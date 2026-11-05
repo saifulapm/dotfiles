@@ -36,7 +36,7 @@ test('the script, run where a dark old theme is saved, saves artboard and tells 
   assert.equal(r.status, 0, r.stderr);
   const state = join(root, 'state');
   mkdirSync(join(state, 'dots'), { recursive: true });
-  writeFileSync(join(state, 'dots/theme'), 'hi-fi\n');
+  writeFileSync(join(state, 'dots/theme'), 'blueprint\n');
   const bin = join(root, 'stubs');
   mkdirSync(bin);
   writeFileSync(join(bin, 'gsettings'), `#!/bin/bash\necho "$*" >>${join(root, 'gsettings.log')}\n`, { mode: 0o755 });

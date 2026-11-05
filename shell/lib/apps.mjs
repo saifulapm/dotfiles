@@ -1,50 +1,36 @@
 // Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, imv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
+import { contrast } from './theme.mjs';
 import { plainTones } from './voice.mjs';
 
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
 
 
-// tmux has no case modifier, so the caps voices upper-case a name letter by letter.
-const CAPS = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => `s/${l}/${l.toUpperCase()}/`).join(';');
-
-// The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: Paper's caps and dashes, Artboard's accent dot, Blueprint's brackets.
+// The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: an accent dot before the current window.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
-  const frame = t.primitive.frame;
-  const edge = { ink, double: ink, hairline: muted }[frame] ?? accent;
-  const lines = frame === 'double' ? 'double' : 'single';
-  const voice = { plain: 'plain', bracket: 'bracket' }[t.type.voice] ?? 'caps';
-  const say = (mods, name) => `#{${[mods, voice === 'plain' ? '' : CAPS].filter((m) => m).join(';')}:${name}}`;
+  const say = (mods, name) => `#{${mods}:${name}}`;
   const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
   const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
-  const shown = t.type.engraved ? number : `[${number}]`;
-  const current = {
-    caps: `#[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
-    bracket: `#[fg=${accent}]${shown}#[fg=${ink}] ${name}#[default]`,
-    plain: `#[fg=${accent}]● #[fg=${ink},bold]${number}#[nobold] ${name}#[default]`,
-  }[voice];
-  const other = voice === 'bracket' ? `#[fg=${muted}]${shown} ${name}#[default]` : `#[fg=${muted}]${number} ${name}#[default]`;
-  const sep = { caps: ' — ', bracket: ' · ', plain: '    ' }[voice];
-  // Paper and Artboard raise an alert in the accent; Blueprint in amber, its danger token, as the margins' goal does.
-  const alert = voice === 'bracket' ? danger : accent;
+  const current = `#[fg=${accent}]● #[fg=${ink},bold]${number}#[nobold] ${name}#[default]`;
+  const other = `#[fg=${muted}]${number} ${name}#[default]`;
   const folder = `#{?#{==:#{pane_current_path},#{HOME}},~,${say('b;=/-24/…', 'pane_current_path')}}`;
   return [
     `set -g status-style "fg=${muted},bg=default"`,
     `set -g status-left " #[fg=#{?client_prefix,${accent},${muted}}]${say('s/^amx-//;=/24/…', 'session_name')}#[default] "`,
-    `set -g status-right "#(dots-agents ${voice} ${[muted, alert, ink].map((x) => x.slice(1)).join(' ')})#[fg=${muted}]${folder} "`,
+    `set -g status-right "#(dots-agents ${[muted, accent, ink].map((x) => x.slice(1)).join(' ')})#[fg=${muted}]${folder} "`,
     `set -g window-status-format "${other}"`,
     `set -g window-status-current-format "${current}"`,
-    `set -g window-status-separator "#[fg=${muted}]${sep}"`,
-    `set -g pane-border-lines ${lines}`,
+    `set -g window-status-separator "#[fg=${muted}]    "`,
+    'set -g pane-border-lines single',
     `set -g pane-border-style "fg=${line}"`,
-    `set -g pane-active-border-style "fg=${edge}"`,
-    `set -g popup-border-lines ${t.primitive.corner === 'round' ? 'rounded' : lines}`,
-    `set -g popup-border-style "fg=${edge}"`,
-    `set -g menu-border-lines ${t.primitive.corner === 'round' ? 'rounded' : lines}`,
-    `set -g menu-border-style "fg=${edge}"`,
+    `set -g pane-active-border-style "fg=${ink}"`,
+    'set -g popup-border-lines single',
+    `set -g popup-border-style "fg=${ink}"`,
+    'set -g menu-border-lines single',
+    `set -g menu-border-style "fg=${ink}"`,
     `set -g menu-style "fg=${ink},bg=${surface}"`,
     `set -g menu-selected-style "fg=${surface},bg=${accent}"`,
     `set -g message-style "fg=${ink},bg=${paper}"`,
@@ -305,9 +291,8 @@ export function renderNewtabManifest() {
 }
 
 export function renderNewtabHtml(t) {
-  const voice = t.type.voice;
   return `<!doctype html>
-<html lang="en" data-voice="${voice}"${t.type.engraved ? ' data-engraved="true"' : ''} data-theme="${t.name}">
+<html lang="en" data-theme="${t.name}">
 <head>
 <meta charset="utf-8">
 <title>New Tab</title>
@@ -327,31 +312,16 @@ export function renderNewtabHtml(t) {
 `;
 }
 
-// Board hexes for the new-tab page that no token carries: Paper's tile; a plain theme's field, tile, row tint and deep text come from its row of the plain table.
-const NEWTAB_BOARD = { paper: { tile: '#E8DEC6' } };
+// The new-tab page's field, tile, row tint and deep text, from the plain table.
 const newtabBoard = (t) => {
-  if (t.type.voice !== 'plain') return NEWTAB_BOARD[t.name] || {};
   const { tile, field, tint, deep } = plainTones(t);
   return { tile, field, tint, deep };
 };
 
-// The page's paper, drawn as the shell draws it: Paper's grain scales the paper by 1 +- grain as its shader does, Blueprint's grid from its paper tokens, Artboard's dots.
+// The page's paper, drawn as the shell draws it: the dot grid.
 function newtabTexture(t) {
   const p = t.paper || {};
-  if (t.primitive.paper === 'grain') {
-    const g = p.grain;
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='g' x='0' y='0' width='100%' height='100%' color-interpolation-filters='sRGB'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 0 0 0 0 1' result='n'/><feFlood flood-color='${t.color.paper}'/><feComposite in2='n' operator='arithmetic' k1='${+(2 * g).toFixed(4)}' k2='${+(1 - g).toFixed(4)}' k3='0' k4='0'/></filter><rect width='300' height='300' filter='url(#g)'/></svg>`;
-    return `background-image: url("data:image/svg+xml,${svg.replace(/</g, '%3C').replace(/>/g, '%3E').replace(/#/g, '%23')}");`;
-  }
-  if (t.primitive.paper === 'grid') {
-    const [r, g, b] = [1, 3, 5].map((i) => parseInt(t.color.accent.slice(i, i + 2), 16));
-    const lines = (a) => `linear-gradient(rgba(${r}, ${g}, ${b}, ${a}) 1px, transparent 1px), linear-gradient(90deg, rgba(${r}, ${g}, ${b}, ${a}) 1px, transparent 1px)`;
-    return `background-image: ${lines(p.major_alpha)}, ${lines(p.minor_alpha)};\n  background-size: ${p.major}px ${p.major}px, ${p.major}px ${p.major}px, ${p.minor}px ${p.minor}px, ${p.minor}px ${p.minor}px;`;
-  }
-  if (t.primitive.paper === 'dots') {
-    return `background-image: radial-gradient(${p.dot} 1px, transparent 1.3px);\n  background-size: ${p.spacing}px ${p.spacing}px;\n  background-position: ${p.spacing / 2}px ${p.spacing / 2}px;`;
-  }
-  return '';
+  return `background-image: radial-gradient(${p.dot} 1px, transparent 1.3px);\n  background-size: ${p.spacing}px ${p.spacing}px;\n  background-position: ${p.spacing / 2}px ${p.spacing / 2}px;`;
 }
 
 export function renderNewtabCss(t) {
@@ -492,12 +462,20 @@ const PI_COLORS = {
 };
 const PI_EXPORT = { pageBg: 'background', cardBg: 'panel', infoBg: 'highlight' };
 
+// The most of the surface ink takes on, up to share, while it still reads at 4.5:1 on it: a scheme with soft ink keeps its dim text readable.
+const readableShare = (ink, surface, share) => {
+  let s = share;
+  while (s > 0 && contrast(mix(ink, surface, s), surface) < 4.5) s = Math.round((s - 0.01) * 100) / 100;
+  return Math.max(0, s);
+};
+
 export function renderPi(t) {
   const { a, ink, line, surface, accent, danger, ok, on } = agentColors(t);
+  const dim = readableShare(ink, surface, 0.39);
   const vars = {
     background: surface, foreground: ink, accent, selectionBackground: line, selectionForeground: ink, selectedBackground: on(accent, 0.22),
     panel: on(ink, 0.06), panelAlt: on(ink, 0.1), panelPending: on(accent, 0.12), panelSuccess: on(ok, 0.12), panelError: on(danger, 0.12),
-    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, 0.34), dimText: mix(ink, surface, 0.39), highlight: on(a[3], 0.2),
+    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, Math.min(0.34, dim - 0.05)), dimText: mix(ink, surface, dim), highlight: on(a[3], 0.2),
   };
   a.forEach((hex, i) => (vars['color' + i] = hex));
   // Code takes the theme's syntax table, as kak and helix do.

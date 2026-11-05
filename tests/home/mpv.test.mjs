@@ -66,14 +66,14 @@ async function until(f, ms) {
   return true;
 }
 
-for (const name of ['paper', 'blueprint', 'artboard']) {
+for (const name of ['github-light', 'gruvbox-dark', 'artboard']) {
   test(`a new mpv in ${name} draws its OSD and OSC in the rendered colours`, { skip: !spawnSync('sh', ['-c', 'command -v mpv']).stdout.length }, async (t) => {
     const { home, text } = render('macbook-m2');
     t.after(() => rmSync(home, { recursive: true, force: true }));
     mkdirSync(join(home, '.config/mpv'), { recursive: true });
     writeFileSync(join(home, '.config/mpv/mpv.conf'), text);
     const state = join(home, '.local/state');
-    const r = spawnSync('node', [join(repo, 'shell/lib/theme-render.mjs'), name], { env: { PATH: process.env.PATH, XDG_STATE_HOME: state }, encoding: 'utf8' });
+    const r = spawnSync('node', [join(repo, 'shell/lib/colorscheme-render.mjs'), name], { env: { PATH: process.env.PATH, XDG_STATE_HOME: state }, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
     const fragment = readFileSync(join(state, 'dots/theme-out/mpv.conf'), 'utf8');
     const want = (k) => fragment.match(new RegExp(`^${k}="([^"]+)"$`, 'm'))[1];

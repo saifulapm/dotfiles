@@ -7,7 +7,6 @@ import { join } from 'node:path';
 
 const repo = new URL('../..', import.meta.url).pathname;
 const cli = new URL('./colorscheme-render.mjs', import.meta.url).pathname;
-const themeCli = new URL('./theme-render.mjs', import.meta.url).pathname;
 const scratch = (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'dots-scheme-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
@@ -15,12 +14,10 @@ const scratch = (t) => {
 };
 const files = (dir) => readdirSync(dir, { recursive: true }).sort();
 
-test('a colorscheme renders every output the theme render made', (t) => {
-  const a = scratch(t);
-  const b = scratch(t);
-  execFileSync('node', [themeCli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: a } });
-  execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: b } });
-  assert.deepEqual(files(join(b, 'dots/theme-out')), files(join(a, 'dots/theme-out')));
+test('a colorscheme renders every app\'s output', (t) => {
+  const state = scratch(t);
+  execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'helix.toml', 'imv.conf', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
 });
 
 test('the shell tokens name the one design and the scheme\'s light or dark', (t) => {
