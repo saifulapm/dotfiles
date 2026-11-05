@@ -174,8 +174,8 @@ test('a kak-mail list draws its date, sender and subject in the Mail faces, unre
   assert.equal(date.face.fg, 'rgb:59636e');
   assert.ok(atomOf(ui.row('Third unread row'), 'Third unread row').face.attributes.includes('bold'));
   const cursor = atomOf(ui.row('First cursor row'), 'First cursor row').face;
-  assert.equal(cursor.bg, 'rgb:eef1ff');
-  assert.equal(cursor.fg, 'rgb:2638c9');
+  assert.equal(cursor.bg, 'rgb:ddeafa');
+  assert.equal(cursor.fg, 'rgb:0b62c8');
 });
 
 test('a kak-mail list ends in the key strip, and the cursor row follows the cursor', async (t) => {
@@ -184,7 +184,7 @@ test('a kak-mail list ends in the key strip, and the cursor row follows the curs
   const want = '↵ open · r reply · e archive · s screener · f feed · ? help';
   await ui.until(() => ui.strip().includes(want), 'the strip');
   ui.keys('j', 'j');
-  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:eef1ff', 'the cursor on row 3');
+  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:ddeafa', 'the cursor on row 3');
   assert.ok(ui.strip().includes(want), ui.strip());
 });
 
