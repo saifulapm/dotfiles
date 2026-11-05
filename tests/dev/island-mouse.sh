@@ -17,6 +17,7 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 volume_is() { [ "$(wpctl get-volume @DEFAULT_AUDIO_SINK@)" = "Volume: $1" ]; }
 # The island's click area in output pixels, as `island box` answers it.
+settled() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e '.animating == false' >/dev/null; }
 island_spot() {
   local box
   box=$(timeout 0.5 qs ipc call island box "$1" 2>/dev/null)
@@ -27,6 +28,8 @@ island_drawn() { island_spot "$1" >/dev/null; }
 # The pointer over the island, then the wheel turned $1 notches, down when positive.
 island_wheel() {
   local at
+  # A box still morphing from the last mode has its middle where the next one is not drawn.
+  until_ok 2000 settled
   at=$(island_spot island) || { echo "no island click area is drawn"; return 1; }
   # shellcheck disable=SC2086
   point move $at
@@ -34,6 +37,8 @@ island_wheel() {
 }
 click_island() {
   local at
+  # A box still morphing from the last mode has its middle where the next one is not drawn.
+  until_ok 2000 settled
   at=$(island_spot "${1:-island}") || { echo "no island click area named ${1:-island} is drawn"; return 1; }
   # shellcheck disable=SC2086
   point click $at
