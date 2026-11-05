@@ -1,0 +1,34 @@
+# UI and code colours from the tinted-theming base16 "selenized-light", whose values are jan-warchol/selenized's own (the-values.md), paper its bg_1; the ANSI 16 are its alacritty theme (terminals/alacritty/selenized-light.toml).
+[meta]
+name = "selenized-light"
+title = "Selenized Light"
+family = "Selenized"
+variant = "light"
+source = "https://github.com/jan-warchol/selenized"
+licence = "MIT"
+
+[color]
+paper = "#ECE3CC"
+surface = "#FBF3DB"
+ink = "#53676D"
+muted = "#909995"
+line = "#D5CDB6"
+accent = "#006DCE"
+danger = "#CC1729"
+ok = "#428B00"
+ansi = [
+  "#ECE3CC", "#D2212D", "#489100", "#AD8900", "#0072D4", "#CA4898", "#009C8F", "#909995",
+  "#D5CDB6", "#CC1729", "#428B00", "#A78300", "#006DCE", "#C44392", "#00978A", "#3A4D53",
+]
+
+[syntax]
+keyword = "#825DC0"
+function = "#006DCE"
+string = "#428B00"
+type = "#A78300"
+value = "#BC5819"
+variable = "#CC1729"
+attribute = "#BC5819"
+meta = "#C44392"
+builtin = "#00978A"
+comment = "#909995"

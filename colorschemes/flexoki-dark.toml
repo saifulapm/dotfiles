@@ -1,0 +1,34 @@
+# UI and code colours from the tinted-theming base24 "Flexoki Dark" (Steph Ango's, matching kepano/flexoki _generators/src/palette.ts); the ANSI 16 are kepano/flexoki's kitty theme (kitty/flexoki_dark.conf). Flexoki has no background darker than black #100F0F (base24 base10 #1C1B1A is lighter), so paper is surface darkened 0.06 in OKLCH lightness.
+[meta]
+name = "flexoki-dark"
+title = "Flexoki Dark"
+family = "Flexoki"
+variant = "dark"
+source = "https://github.com/kepano/flexoki"
+licence = "MIT"
+
+[color]
+paper = "#050404"
+surface = "#100F0F"
+ink = "#CECDC3"
+muted = "#878580"
+line = "#282726"
+accent = "#4385BE"
+danger = "#D14D41"
+ok = "#879A39"
+ansi = [
+  "#100F0F", "#AF3029", "#66800B", "#AD8301", "#205EA6", "#A02F6F", "#24837B", "#878580",
+  "#6F6E69", "#D14D41", "#879A39", "#D0A215", "#4385BE", "#CE5D97", "#3AA99F", "#CECDC3",
+]
+
+[syntax]
+keyword = "#8B7EC8"
+function = "#4385BE"
+string = "#879A39"
+type = "#D0A215"
+value = "#DA702C"
+variable = "#D14D41"
+attribute = "#DA702C"
+meta = "#CE5D97"
+builtin = "#3AA99F"
+comment = "#575653"

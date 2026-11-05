@@ -1,0 +1,34 @@
+# UI and code colours from the Dracula spec (draculatheme.com/spec) in the tinted-theming base24 "Dracula" slots, paper the spec's Background Dark; muted and meta are that base24's base04 and base0F, which Dracula does not define. The ANSI 16 are dracula/alacritty's (dracula.toml), the spec's ANSI palette.
+[meta]
+name = "dracula"
+title = "Dracula"
+family = "Dracula"
+variant = "dark"
+source = "https://github.com/dracula/dracula-theme"
+licence = "MIT"
+
+[color]
+paper = "#21222C"
+surface = "#282A36"
+ink = "#F8F8F2"
+muted = "#9EA8C7"
+line = "#44475A"
+accent = "#BD93F9"
+danger = "#FF5555"
+ok = "#50FA7B"
+ansi = [
+  "#21222C", "#FF5555", "#50FA7B", "#F1FA8C", "#BD93F9", "#FF79C6", "#8BE9FD", "#F8F8F2",
+  "#6272A4", "#FF6E6E", "#69FF94", "#FFFFA5", "#D6ACFF", "#FF92DF", "#A4FFFF", "#FFFFFF",
+]
+
+[syntax]
+keyword = "#FF79C6"
+function = "#BD93F9"
+string = "#50FA7B"
+type = "#F1FA8C"
+value = "#FFB86C"
+variable = "#FF5555"
+attribute = "#FFB86C"
+meta = "#993333"
+builtin = "#8BE9FD"
+comment = "#6272A4"

@@ -1,0 +1,34 @@
+# UI and code colours from the tinted-theming base24 "Flexoki Light" (Steph Ango's, matching kepano/flexoki _generators/src/palette.ts), paper its base10, Flexoki base-50; the ANSI 16 are kepano/flexoki's kitty theme (kitty/flexoki_light.conf).
+[meta]
+name = "flexoki-light"
+title = "Flexoki Light"
+family = "Flexoki"
+variant = "light"
+source = "https://github.com/kepano/flexoki"
+licence = "MIT"
+
+[color]
+paper = "#F2F0E5"
+surface = "#FFFCF0"
+ink = "#403E3C"
+muted = "#9F9D96"
+line = "#E6E4D9"
+accent = "#205EA6"
+danger = "#AF3029"
+ok = "#66800B"
+ansi = [
+  "#100F0F", "#D14D41", "#879A39", "#D0A215", "#4385BE", "#CE5D97", "#3AA99F", "#FFFCF0",
+  "#6F6E69", "#AF3029", "#66800B", "#AD8301", "#205EA6", "#A02F6F", "#24837B", "#F2F0E5",
+]
+
+[syntax]
+keyword = "#5E409D"
+function = "#205EA6"
+string = "#66800B"
+type = "#AD8301"
+value = "#BC5215"
+variable = "#AF3029"
+attribute = "#BC5215"
+meta = "#A02F6F"
+builtin = "#24837B"
+comment = "#CECDC3"

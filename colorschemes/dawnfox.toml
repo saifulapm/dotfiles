@@ -1,0 +1,34 @@
+# UI and code colours from EdenEast/nightfox.nvim's own base16 (extra/dawnfox/base16.yaml), paper its bg0 (lua/nightfox/palette/dawnfox.lua); the ANSI 16 are its kitty extra's (extra/dawnfox/kitty.conf). Comment is that base16's base03, the purple #5F5695, as upstream maps it.
+[meta]
+name = "dawnfox"
+title = "Dawnfox"
+family = "Nightfox"
+variant = "light"
+source = "https://github.com/EdenEast/nightfox.nvim"
+licence = "MIT"
+
+[color]
+paper = "#EBE5DF"
+surface = "#FAF4ED"
+ink = "#575279"
+muted = "#A8A3B3"
+line = "#EBDFE4"
+accent = "#286983"
+danger = "#B4637A"
+ok = "#618774"
+ansi = [
+  "#575279", "#B4637A", "#618774", "#EA9D34", "#286983", "#907AA9", "#56949F", "#E5E9F0",
+  "#5F5695", "#C26D85", "#629F81", "#EEA846", "#2D81A3", "#9A80B9", "#5CA7B4", "#E6EBF3",
+]
+
+[syntax]
+keyword = "#907AA9"
+function = "#286983"
+string = "#618774"
+type = "#EA9D34"
+value = "#D7827E"
+variable = "#B4637A"
+attribute = "#D7827E"
+meta = "#D685AF"
+builtin = "#56949F"
+comment = "#5F5695"

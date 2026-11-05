@@ -1,0 +1,34 @@
+# Greys and paper from nyoom-engineering/oxocarbon.nvim's dark palette (lua/oxocarbon/init.lua: base00 to base06 as its blend_hex gives them, paper its float colour "blend"); its own base08 to base15 are not base16 roles, so danger, ok, accent and the code colours are the tinted-theming base16 "Oxocarbon Dark" ones. The ANSI 16 are init.lua's terminal_color_0 to 15 as upstream sets them, red and green slots included.
+[meta]
+name = "oxocarbon"
+title = "Oxocarbon"
+family = "Oxocarbon"
+variant = "dark"
+source = "https://github.com/nyoom-engineering/oxocarbon.nvim"
+licence = "MIT"
+
+[color]
+paper = "#131313"
+surface = "#161616"
+ink = "#F2F2F2"
+muted = "#D0D0D0"
+line = "#393939"
+accent = "#33B1FF"
+danger = "#EE5396"
+ok = "#42BE65"
+ansi = [
+  "#262626", "#33B1FF", "#BE95FF", "#42BE65", "#78A9FF", "#82CFFF", "#3DDBD9", "#F2F2F2",
+  "#525252", "#33B1FF", "#BE95FF", "#42BE65", "#78A9FF", "#82CFFF", "#08BDBA", "#FFFFFF",
+]
+
+[syntax]
+keyword = "#BE95FF"
+function = "#33B1FF"
+string = "#42BE65"
+type = "#FF6F00"
+value = "#FF7EB6"
+variable = "#EE5396"
+attribute = "#FF7EB6"
+meta = "#82CFFF"
+builtin = "#3DDBD9"
+comment = "#525252"

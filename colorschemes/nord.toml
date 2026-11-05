@@ -1,0 +1,34 @@
+# UI and code colours from nordtheme/nord's palette (src/nord.css) in the tinted-theming base16 "Nord" slots, accent nord8, which nord.css names the palette's accent; the ANSI 16 are nordtheme/alacritty's (src/nord.yaml). Nord has no background darker than nord0, so paper is surface darkened 0.06 in OKLCH lightness.
+[meta]
+name = "nord"
+title = "Nord"
+family = "Nord"
+variant = "dark"
+source = "https://github.com/nordtheme/nord"
+licence = "MIT"
+
+[color]
+paper = "#1F2530"
+surface = "#2E3440"
+ink = "#E5E9F0"
+muted = "#D8DEE9"
+line = "#434C5E"
+accent = "#88C0D0"
+danger = "#BF616A"
+ok = "#A3BE8C"
+ansi = [
+  "#3B4252", "#BF616A", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B48EAD", "#88C0D0", "#E5E9F0",
+  "#4C566A", "#BF616A", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B48EAD", "#8FBCBB", "#ECEFF4",
+]
+
+[syntax]
+keyword = "#B48EAD"
+function = "#81A1C1"
+string = "#A3BE8C"
+type = "#EBCB8B"
+value = "#D08770"
+variable = "#BF616A"
+attribute = "#D08770"
+meta = "#5E81AC"
+builtin = "#88C0D0"
+comment = "#4C566A"

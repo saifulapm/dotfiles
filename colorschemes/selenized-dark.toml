@@ -1,0 +1,34 @@
+# UI and code colours from the tinted-theming base16 "selenized-dark", whose values are jan-warchol/selenized's own (the-values.md); the ANSI 16 are its alacritty theme (terminals/alacritty/selenized-dark.toml). Selenized has no background darker than bg_0, so paper is surface darkened 0.06 in OKLCH lightness.
+[meta]
+name = "selenized-dark"
+title = "Selenized Dark"
+family = "Selenized"
+variant = "dark"
+source = "https://github.com/jan-warchol/selenized"
+licence = "MIT"
+
+[color]
+paper = "#002C38"
+surface = "#103C48"
+ink = "#ADBCBC"
+muted = "#72898F"
+line = "#2D5B69"
+accent = "#4695F7"
+danger = "#FA5750"
+ok = "#75B938"
+ansi = [
+  "#184956", "#FA5750", "#75B938", "#DBB32D", "#4695F7", "#F275BE", "#41C7B9", "#72898F",
+  "#2D5B69", "#FF665C", "#84C747", "#EBC13D", "#58A3FF", "#FF84CD", "#53D6C7", "#CAD8D9",
+]
+
+[syntax]
+keyword = "#AF88EB"
+function = "#4695F7"
+string = "#75B938"
+type = "#DBB32D"
+value = "#ED8649"
+variable = "#FA5750"
+attribute = "#ED8649"
+meta = "#F275BE"
+builtin = "#41C7B9"
+comment = "#72898F"
