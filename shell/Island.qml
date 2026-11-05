@@ -743,6 +743,13 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
+    // A click on the resting island opens what it shows: the lease or sharing card, or the calendar when nothing is live.
+    readonly property bool clickable: ["rest", "lease", "sharing"].indexOf(mode) >= 0
+    function openActivity() {
+        if (clickable)
+            focusIsland();
+    }
+
     // Runs the notification's default action when it has one; either way it leaves the island.
     function openNotification() {
         if (notification)
@@ -990,7 +997,9 @@ PanelWindow {
         // Under every part, so a question's scroll and a notification's own area take the pointer first.
         Root.Click {
             name: "island"
-            acceptedButtons: Qt.NoButton
+            acceptedButtons: island.clickable ? Qt.LeftButton : Qt.NoButton
+            cursorShape: island.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onTapped: island.openActivity()
             onWheel: event => island.wheeled(event.angleDelta.y)
         }
 

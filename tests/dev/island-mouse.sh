@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD.
+# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD; a click on the resting island opens its activity, the calendar when nothing is live, and a notification keeps its own click.
 {
+export DOTS_DEV_FAKE_CASTS=1
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
 
@@ -25,6 +26,30 @@ island_wheel() {
   # shellcheck disable=SC2086
   point move $at
   point wheel "$1"
+}
+click_island() {
+  local at
+  at=$(island_spot island) || { echo "no island click area is drawn"; return 1; }
+  # shellcheck disable=SC2086
+  point click $at
+}
+island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == $k)' >/dev/null; }
+opened() { until_ok 2000 mode_is "$1" && until_ok 2000 island_focus Exclusive; }
+lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
+# An agent unlock turns the monitors off a second later, so the check wakes them as Saiful would.
+unlock() {
+  local n
+  n=$(timeout 0.5 qs ipc call lock state | jq .monitorsOff)
+  timeout 0.5 qs ipc call lock unlock "$@" >/dev/null
+  until_ok 3000 lock_is ".locked == false and .monitorsOff > $n"
+  niri msg action power-on-monitors
+}
+out=$DOTS_DEV_DIR/printed
+: >"$out"
+sender=
+cleanup() {
+  pointer_stop
+  [ -z "$sender" ] || kill "$sender" 2>/dev/null
 }
 
 until_ok 5000 shell_status >/dev/null
@@ -67,6 +92,51 @@ island_wheel -1
 until_ok 2000 volume_is 0.45
 check "one notch up over a notification raises the volume ($(wpctl get-volume @DEFAULT_AUDIO_SINK@))" volume_is 0.45
 check "and the notification stays on the island" mode_is notification
+# A pointer over a notification holds it, so the pointer leaves for its 5 s to run out.
+point move 20 600
+until_ok 8000 mode_is rest
+
+# With nothing live, a click opens the calendar with the keyboard, and Esc closes it.
+click_island
+opened calendar
+check "a click on the resting island opens the calendar ($(island | jq -c '{mode, focused}'))" mode_is calendar
+check "and gives it the keyboard" island_focus Exclusive
+wtype -k Escape
+until_ok 2000 mode_is rest
+check "Esc closes it" mode_is rest
+
+# A notification's click still opens the notification: its default action runs and the calendar never opens.
+notify-send -a T -A default=Open "click me" >"$out" &
+sender=$!
+until_ok 2000 mode_is notification
+click_island
+until_ok 2000 bash -c "[ \"\$(cat '$out')\" = default ]"
+check "a click on a notification runs its default action ($(cat "$out"))" test "$(cat "$out")" = default
+check "and opens no calendar ($(island | jq -r .mode))" bash -c "! timeout 0.5 qs ipc call island state | jq -e '.mode == \"calendar\"' >/dev/null"
+until_ok 8000 mode_is rest
+
+# LIVE opens the sharing card.
+fake_event '{"CastStartedOrChanged":{"cast":{"stream_id":3001,"session_id":3001,"kind":"PipeWire","target":{"Output":{"name":"winit"}},"is_dynamic_target":false,"is_active":true,"pid":null,"pw_node_id":null}}}' >/dev/null
+until_ok 3000 mode_is sharing
+click_island
+opened sharingCard
+check "a click on LIVE opens the sharing card ($(island | jq -c '{mode, text}'))" mode_is sharingCard
+wtype -k Escape
+until_ok 2000 mode_is sharing
+fake_event '{"CastStopped":{"stream_id":3001}}' >/dev/null
+until_ok 3000 mode_is rest
+
+# An agent's lease opens the lease card.
+niri msg action spawn -- dots-call lock lock
+until_ok 3000 lock_is '.locked and .secure'
+unlock claude 2
+until_ok 3000 mode_is lease
+click_island
+opened leaseCard
+check "a click on the lease slot opens the lease card ($(island | jq -c '{mode, focused}'))" mode_is leaseCard
+wtype -k Escape
+until_ok 2000 mode_is lease
+check "Esc closes it, still unlocked" lock_is '.locked == false'
 
 exit $((fails > 0))
 }
