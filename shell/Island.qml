@@ -2,8 +2,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
 import Quickshell.Wayland
+import Quickshell.Widgets
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Layouts
 import QtQuick.Shapes
 import "." as Root
@@ -38,7 +38,6 @@ PanelWindow {
     // Home first, then UTC, London and New York, each {city, time, offset, day, home}; empty until dots-zones answers.
     readonly property var cities: zones.answer ? W.cityRows(clock.now.getTime(), zones.answer) : []
     readonly property var clockLook: V.clockLook(theme.tokens)
-    readonly property var restLook: V.restLook(theme.tokens)
     readonly property var notification: notifs.current
     readonly property real recordingSince: Root.State.recordingSince
     // Bumped each second while a recording runs, so its counter moves.
@@ -80,7 +79,6 @@ PanelWindow {
     property real leaseNow: Date.now()
     readonly property var lease: lock.leased ? { who: lock.heldBy, left: Math.max(0, lock.leaseUntil - leaseNow) } : null
     readonly property var leaseLook: V.leaseLook(theme.tokens)
-    readonly property var engraving: V.engraving(theme.tokens)
     // The last minute takes the theme's warning; a renew past it brings the normal look back.
     readonly property bool leaseWarning: lease !== null && lease.left <= 60000
     // Mod+I during a lease opens its card: who, when it unlocked and the time left; Enter locks, Esc closes.
@@ -92,13 +90,8 @@ PanelWindow {
     property var toast: null
     // dots-capture's result, {kind, title, detail, swatch}, for the toast's 1.5 s.
     property var capture: null
-    property var heldCapture: null
-    onCaptureChanged: {
-        if (capture)
-            heldCapture = capture;
-        holdCaptureNote();
-    }
-    // Paper's pill, or Artboard's and Blueprint's notification card.
+    onCaptureChanged: holdCaptureNote()
+    // The capture draws in the notification's card.
     readonly property var captureLook: V.captureLook(theme.tokens)
     // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
     property var sending: null
@@ -176,14 +169,9 @@ PanelWindow {
     readonly property bool noteHeld: mode === "notification" && (noteArea.containsMouse || focused || noteDragging)
     onNoteHeldChanged: notifs.pause(noteHeld)
     readonly property var osdLook: V.osdLook(theme.tokens)
-    // Hi-Fi draws volume as a VU meter and brightness as the bar; every other theme draws the bar.
-    readonly property bool osdMeter: osdLook.kind(heldOsd?.kind ?? "volume") === "meter"
-    // Frost draws volume as a glass track and brightness as the bar.
-    readonly property bool osdTrack: osdLook.kind(heldOsd?.kind ?? "volume") === "track"
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
-            capture: captureLook.card ? [0, 0] : [I.boxWidth(Math.ceil(captureRow.implicitWidth) + 2 * captureLook.pad), captureLook.height],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             downloading: [downloadingLook.width, downloadingLook.height],
@@ -193,17 +181,17 @@ PanelWindow {
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
-            osd: osdMeter ? [osdLook.meter.width, osdLook.meter.height] : osdTrack ? [osdLook.track.width, osdLook.track.height] : [osdLook.width, osdLook.height]
+            osd: [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? (captureLook.card ? "notification" : "capture") : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(!!theme.tokens)
-    readonly property bool animating: morphing.running || [labelPart, capturePart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -249,8 +237,6 @@ PanelWindow {
     }
     component HeadText: Text {
         textFormat: Text.PlainText
-        style: island.engraving.on ? Text.Raised : Text.Normal
-        styleColor: island.engraving.color
         color: island.noteLook.head.color
         font.family: island.noteLook.head.font
         font.pixelSize: island.noteLook.head.size
@@ -295,37 +281,14 @@ PanelWindow {
             }
         }
     }
-    // A chip's outline: a box with Artboard's radius, or Blueprint's frame with its top right corner cut.
-    component ChipBack: Item {
-        id: chipBack
+    // A chip's outline: a rounded box.
+    component ChipBack: Rectangle {
         property color fill: "transparent"
         property color frame: "transparent"
         property real frameWidth: 1
-        property real radius: 0
-        property real cut: 0
-
-        Rectangle {
-            anchors.fill: parent
-            visible: chipBack.cut === 0
-            radius: chipBack.radius
-            color: chipBack.fill
-            border.width: chipBack.frameWidth
-            border.color: chipBack.frame
-        }
-        Shape {
-            anchors.fill: parent
-            visible: chipBack.cut > 0
-            preferredRendererType: Shape.GeometryRenderer
-
-            ShapePath {
-                strokeColor: chipBack.frame
-                strokeWidth: chipBack.frameWidth
-                fillColor: chipBack.fill
-                PathPolyline {
-                    path: [Qt.point(0.5, 0.5), Qt.point(chipBack.width - 0.5 - chipBack.cut, 0.5), Qt.point(chipBack.width - 0.5, chipBack.cut), Qt.point(chipBack.width - 0.5, chipBack.height - 0.5), Qt.point(0.5, chipBack.height - 0.5), Qt.point(0.5, 0.5)]
-                }
-            }
-        }
+        color: fill
+        border.width: frameWidth
+        border.color: frame
     }
     // A file notification's chip: the grip, a file glyph and the extension or count; empty, it is the slot a dragged chip left.
     component FileChip: Item {
@@ -348,7 +311,6 @@ PanelWindow {
             fill: fileChip.at?.fill ?? "transparent"
             frame: fileChip.at?.frame ?? "transparent"
             radius: fileChip.at?.radius ?? 0
-            cut: fileChip.look?.cut ?? 0
         }
         Shape {
             anchors.fill: parent
@@ -407,30 +369,20 @@ PanelWindow {
         property var grabbed: null
         readonly property string url: grabbed ? String(grabbed.url) : ""
         readonly property var drag: look?.drag ?? null
-        width: faceRow.implicitWidth + (drag ? drag.pad[1] + drag.pad[3] : 0) + (drag?.shadow ? 3 : 0)
-        height: faceRow.implicitHeight + (drag ? drag.pad[0] + drag.pad[2] : 0) + (drag?.shadow ? 3 : 0)
+        width: faceRow.implicitWidth + (drag ? drag.pad[1] + drag.pad[3] : 0)
+        height: faceRow.implicitHeight + (drag ? drag.pad[0] + drag.pad[2] : 0)
 
         function grab() {
             if (files.length > 0 && width > 0)
                 grabToImage(r => face.grabbed = r);
         }
 
-        Rectangle {
-            visible: face.drag?.shadow ? true : false
-            x: 3
-            y: 3
-            width: parent.width - 3
-            height: parent.height - 3
-            color: face.drag?.shadow ?? "transparent"
-        }
         ChipBack {
-            width: parent.width - (face.drag?.shadow ? 3 : 0)
-            height: parent.height - (face.drag?.shadow ? 3 : 0)
+            anchors.fill: parent
             fill: face.drag?.fill ?? "transparent"
             frame: face.drag?.frame ?? "transparent"
             frameWidth: face.drag?.frameWidth ?? 1
             radius: face.drag?.radius ?? 0
-            cut: face.drag?.cut ?? 0
         }
         Row {
             id: faceRow
@@ -464,33 +416,23 @@ PanelWindow {
         }
     }
 
-    // A capture as drawn, for `island state`: in the pill or the card, its title, detail and swatch.
+    // A capture as drawn in the notification's card, for `island state`: its title, detail and swatch.
     function captureState() {
         if (mode !== "capture")
             return null;
-        const hex = (item) => item.visible ? String(item.color).toUpperCase() : null;
-        if (notePart.shown)
-            return {
-                drawn: "card",
-                head: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
-                title: summary.text,
-                detail: body.text,
-                swatch: island.heldNotification?.swatch && tile.visible ? hex(tile) : hex(noteSwatch)
-            };
         return {
-            drawn: capturePart.shown ? "pill" : null,
-            check: captureCheck.visible,
-            title: captureTitle.text,
-            titleElided: captureTitle.truncated,
-            detail: captureDetail.text,
-            detailFont: [captureDetail.font.family, captureDetail.font.pixelSize],
-            swatch: hex(captureSwatch)
+            drawn: notePart.shown ? "card" : null,
+            head: appName.text,
+            title: summary.text,
+            titleElided: summary.truncated,
+            detail: body.text,
+            swatch: island.heldNotification?.swatch && tile.visible ? String(tile.color).toUpperCase() : null
         };
     }
 
     // A card theme draws the capture as a notification, so the card is handed a note while the capture is what shows; one the card held stays drawn as it leaves.
     function holdCaptureNote() {
-        if (capture && mode === "capture" && captureLook.card)
+        if (capture && mode === "capture")
             heldNotification = captureLook.note(capture);
     }
 
@@ -498,55 +440,29 @@ PanelWindow {
     function osdState() {
         if (mode !== "osd")
             return null;
-        const meter = osdMeterLoader.item;
         const shift = (screen.width - width) / 2;
         const at = item => {
             const p = item.mapToItem(null, 0, 0);
             return { x: p.x + shift, y: p.y, w: item.width, h: item.height };
         };
-        const point = (deg, r) => {
-            const p = meter.inWindow(deg, r);
-            return { x: p.x + shift, y: p.y };
-        };
-        const word = meter ? meter.word : osdWord;
-        const value = meter ? meter.valueText : osdValue;
         return {
-            kind: meter ? "meter" : osdTrack ? "track" : "bar",
-            word: word.text,
-            value: value.text,
-            valueFont: [value.font.family, value.font.pixelSize],
-            bars: meter || osdTrack ? null : osdLook.bars,
-            lit: meter || osdTrack ? null : osdBars.drawn(),
-            // The track and its fill as drawn, for pixel reads.
+            value: osdValue.text,
+            valueFont: [osdValue.font.family, osdValue.font.pixelSize],
+            bars: osdLook.bars,
+            lit: osdBars.drawn(),
             islandBox: at(box),
-            track: osdTrack ? { box: at(osdTrackBar), fill: at(osdTrackBar.fillItem) } : null,
-            fillAnimation: osdTrack ? osdTrackBar.fillAnimation : null,
-            valueBox: at(value),
-            // The needle as drawn, and two points on the dial for pixel reads: inside the needle near its tip, and the middle of the red zone.
-            needleAngle: meter ? Math.round(meter.needle.rotation * 10) / 10 : null,
-            // The needle's swing in volume units: peak is the furthest value drawn past `to`, settleMs the ms to rest or -1 while it moves.
-            swing: meter ? Object.assign({}, meter.swing, { peak: Math.round(meter.swing.peak * 100) / 100 }) : null,
-            meter: meter ? {
-                box: at(meter),
-                needle: point(meter.needle.rotation, osdLook.meter.needle.length - 8),
-                red: point((osdLook.meter.angle(osdLook.meter.red) + osdLook.meter.angle(100)) / 2, osdLook.meter.radius),
-                labels: meter.labels().map(l => ({ text: l.text, color: l.color, box: { x: l.box.x + shift, y: l.box.y, w: l.box.w, h: l.box.h } }))
-            } : null
+            valueBox: at(osdValue)
         };
     }
 
-    // The card's name, unlock time and time left as its layout draws them.
+    // The card's name, unlock time and time left as drawn.
     function leaseCardDrawn() {
-        const layout = leaseLook.card.layout;
-        const row = i => sheetRepeater.itemAt(i);
-        const who = layout === "print" ? cardWhoPrint : layout === "card" ? cardWhoCard : null;
-        const time = layout === "print" ? printTime : layout === "card" ? cardTime : null;
         return {
-            who: who ? who.text : row(0)?.value ?? "",
-            elided: who ? who.truncated : row(0)?.elided ?? false,
-            unlocked: layout === "print" ? cardUnlockedPrint.text : layout === "card" ? cardUnlockedCard.text : row(1)?.value ?? "",
-            time: time ? time.text : row(2)?.value ?? "",
-            timeColor: String(time ? time.color : row(2)?.valueColor ?? "")
+            who: cardWhoCard.text,
+            elided: cardWhoCard.truncated,
+            unlocked: cardUnlockedCard.text,
+            time: cardTime.text,
+            timeColor: String(cardTime.color)
         };
     }
 
@@ -558,7 +474,7 @@ PanelWindow {
         return rows;
     }
 
-    // The month grid as drawn, for `island state`: the header and title texts, the weekday letters and today's cell.
+    // The month grid as drawn, for `island state`: the title text, the weekday letters and today's cell.
     function gridDrawn() {
         const weekdays = [];
         for (let i = 0; i < weekdayRepeater.count; i++)
@@ -570,8 +486,7 @@ PanelWindow {
                 today = { day: cell.dayText.text, width: cell.todayMark.width, height: cell.todayMark.height, filled: cell.todayMark.color.a > 0, border: cell.todayMark.border.width, bold: cell.dayText.font.weight === Font.Bold };
         }
         return {
-            header: headerName.visible ? headerName.text : gridHead.visible ? gridHead.text : "",
-            title: headerMonth.text !== "" ? headerMonth.text : titleRight.visible ? titleLeft.text + " " + titleRight.text : titleLeft.text,
+            title: titleLeft.text,
             weekdays,
             today
         };
@@ -665,7 +580,7 @@ PanelWindow {
     // What the lease slot and card draw, for `island state`.
     function leaseState() {
         if (mode === "leaseCard")
-            return Object.assign({ card: true, layout: leaseLook.card.layout, title: cardTitle.text, label: leaseFrameLabel.visible ? leaseFrameLabel.text : "", handles: box.style.handles, bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
+            return Object.assign({ card: true, label: leaseFrameLabel.visible ? leaseFrameLabel.text : "", bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
         if (mode !== "lease")
             return null;
         return {
@@ -691,10 +606,9 @@ PanelWindow {
             const p = item.mapToItem(null, 0, 0);
             return { x: p.x + (screen.width - width) / 2, y: p.y, w: item.width, h: item.height };
         };
-        const bracketEnd = closeBracket.mapToItem(null, closeBracket.width, 0).x;
-        const shownChip = bodyChip.visible ? bodyChip : columnChip.visible ? columnChip : null;
+        const shownChip = columnChip.visible ? columnChip : null;
         return {
-            app: openBracket.visible ? openBracket.text + appName.text + closeBracket.text : appName.text,
+            app: appName.text,
             age: age.text,
             summary: summary.text,
             summaryLines: summary.lineCount,
@@ -706,10 +620,8 @@ PanelWindow {
             summaryColor: String(summary.color),
             bodyBox: body.visible ? at(body) : null,
             islandBox: at(box),
-            scale: noteScale.visible ? { box: at(noteScale), ticks: noteScale.marks.ticks.length } : null,
-            bracketsShown: openBracket.visible,
             appElided: appName.truncated,
-            bracketEnd: bracketEnd,
+            appEnd: appName.mapToItem(null, appName.width, 0).x,
             ageStart: age.mapToItem(null, 0, 0).x,
             tileBox: tile.visible ? at(tile) : null,
             glyph: tile.visible && glyph.visible ? glyph.text : null,
@@ -1053,8 +965,8 @@ PanelWindow {
         height: island.progress >= 1 || !island.curve ? island.toHeight : island.fromHeight + (island.toHeight - island.fromHeight) * I.ease(island.curve.points, island.progress)
         tokens: island.theme.tokens
         role: "island"
-        // The lease card's own frame, and the slot's last minute: Paper's sheet and vermilion rule, Blueprint's amber frame and glow.
-        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : island.mode === "lease" && island.leaseWarning ? island.leaseLook.warning.box : island.mode === "downloading" && island.downloading.failure ? island.downloadingLook.failure.box : island.mode === "notification" && island.noteDragging && island.chipLook.frame ? { frame: island.chipLook.frame } : null
+        // The open lease card is framed in the accent.
+        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : null
 
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
@@ -1077,102 +989,10 @@ PanelWindow {
                     width: Math.min(implicitWidth, parent.width - 28)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
-                    // Hi-Fi's clock glows amber on its glass, like a lit dial.
-                    readonly property bool lit: island.mode === "rest" && island.restLook.color !== ""
-                    color: lit ? island.restLook.color : box.style.text
+                    color: box.style.text
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
                     font.weight: Font.Medium
-                    layer.enabled: lit
-                    layer.effect: MultiEffect {
-                        shadowEnabled: true
-                        shadowColor: island.restLook.glow || "transparent"
-                        shadowOpacity: 0.35
-                        shadowBlur: 0.6
-                        blurMax: 16
-                        shadowHorizontalOffset: 0
-                        shadowVerticalOffset: 0
-                    }
-                }
-            }
-
-            // Paper's capture pill: a check for what was copied, the title in caps, a colour's swatch, then the count or the hex; a miss draws only its muted words.
-            IslandPart {
-                id: capturePart
-                shown: island.part === "capture"
-                key: ""
-                swap: island.motion?.swap ?? null
-                x: Math.round((parent.width - width) / 2)
-                width: island.sizes.capture[0]
-                height: island.sizes.capture[1]
-
-                Row {
-                    id: captureRow
-                    readonly property var look: island.captureLook
-                    readonly property var detailLook: !look.card && island.heldCapture ? look.detail(island.heldCapture) : null
-                    // What the title and detail may take once the check and swatch have theirs; a long title leaves the detail half.
-                    readonly property real room: I.MAX_WIDTH - 2 * (look.pad ?? 0) - (captureCheck.visible ? captureCheck.width + spacing : 0) - (captureSwatch.visible ? captureSwatch.width + spacing : 0) - (captureTitle.visible && captureDetail.visible ? spacing : 0)
-                    anchors.centerIn: parent
-                    spacing: look.gap ?? 0
-
-                    Shape {
-                        id: captureCheck
-                        visible: (island.heldCapture?.title ?? "") !== ""
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: captureRow.look.check ?? 0
-                        height: width
-                        preferredRendererType: Shape.CurveRenderer
-                        ShapePath {
-                            strokeColor: box.style.text
-                            strokeWidth: 1.6
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: "M2 6.5l2.5 2.5L10 3.5"
-                            }
-                        }
-                    }
-
-                    Text {
-                        id: captureTitle
-                        visible: text !== ""
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.min(implicitWidth, captureDetail.visible ? captureRow.room / 2 : captureRow.room)
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        text: captureRow.look.card ? "" : captureRow.look.titleText(island.heldCapture?.title ?? "")
-                        color: box.style.text
-                        font.family: captureRow.look.title?.font ?? ""
-                        font.pixelSize: captureRow.look.title?.size ?? 10
-                        font.letterSpacing: captureRow.look.title?.spacing ?? 0
-                    }
-
-                    // A light outline, so a dark colour still reads on the island.
-                    Rectangle {
-                        id: captureSwatch
-                        visible: !!island.heldCapture?.swatch
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: captureRow.look.swatch ?? 0
-                        height: width
-                        color: island.heldCapture?.swatch ?? "transparent"
-                        border.width: 1
-                        border.color: box.style.text
-                    }
-
-                    Text {
-                        id: captureDetail
-                        visible: text !== ""
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.min(implicitWidth, captureRow.room - (captureTitle.visible ? captureTitle.width : 0))
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        text: island.heldCapture?.detail ?? ""
-                        color: captureRow.detailLook?.color || box.style.text
-                        font.family: captureRow.detailLook?.font ?? ""
-                        font.pixelSize: captureRow.detailLook?.size ?? 12
-                        font.weight: captureRow.detailLook?.weight ?? Font.Normal
-                        font.letterSpacing: captureRow.detailLook?.spacing ?? 0
-                        font.italic: captureRow.detailLook?.italic ?? false
-                    }
                 }
             }
 
@@ -1593,155 +1413,22 @@ PanelWindow {
                 width: island.sizes.leaseCard[0]
                 height: island.sizes.leaseCard[1]
 
-                // One card in three layouts, each as its board draws it: Paper's print, Artboard's card, Blueprint's sheet.
                 Column {
                     id: leaseColumn
                     // Not named card: the notification's id: card would win the lookup.
                     readonly property var look: island.leaseLook.card
-                    readonly property string layout: look.layout
                     readonly property color ink: look.ink || box.style.text
                     readonly property color muted: island.theme.tokens?.color.muted ?? ink
                     readonly property color accent: island.theme.tokens?.color.accent ?? ink
-                    readonly property color timeColor: island.leaseWarning ? island.leaseLook.warning.time : layout === "sheet" ? accent : ink
+                    readonly property color timeColor: island.leaseWarning ? island.leaseLook.warning.time : ink
                     readonly property string font: island.theme.tokens?.type.ui ?? ""
-                    readonly property string display: island.theme.tokens?.type.display ?? ""
                     readonly property real share: island.lease && island.lock.leaseUntil > island.lock.unlockedAt ? Math.min(1, island.lease.left / (island.lock.leaseUntil - island.lock.unlockedAt)) : 0
                     width: parent.width
 
-                    // The head: Paper's square, AGENT and LEASE; Blueprint's [ AGENT ], LEASE and its title.
+                    // A lock tile, the head, name and unlock time, the time at the right, and the bar.
                     Item {
-                        visible: leaseColumn.layout !== "card"
                         width: parent.width
-                        height: visible ? headColumn.implicitHeight + (leaseColumn.layout === "print" ? 23 : 24) : 0
-
-                        Column {
-                            id: headColumn
-                            x: leaseColumn.layout === "print" ? 15 : 18
-                            y: leaseColumn.layout === "print" ? 11 : 12
-                            width: parent.width - 2 * x
-                            spacing: 4
-
-                            Item {
-                                width: parent.width
-                                height: headLeft.implicitHeight
-
-                                Row {
-                                    id: headLeft
-                                    spacing: 8
-
-                                    Rectangle {
-                                        visible: leaseColumn.layout === "print"
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 8
-                                        height: 8
-                                        color: leaseColumn.accent
-                                    }
-
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        text: leaseColumn.layout === "print" ? "AGENT" : V.mark(island.theme.tokens?.type.engraved === true, "AGENT", " ")
-                                        color: leaseColumn.look.headColor || leaseColumn.muted
-                                        font.family: leaseColumn.font
-                                        font.pixelSize: 10
-                                        font.letterSpacing: leaseColumn.layout === "print" ? 1.4 : 1.6
-                                    }
-                                }
-
-                                Text {
-                                    anchors.right: parent.right
-                                    textFormat: Text.PlainText
-                                    text: "LEASE"
-                                    color: leaseColumn.look.headColor || leaseColumn.muted
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 10
-                                    font.letterSpacing: leaseColumn.layout === "print" ? 1.4 : 1.6
-                                }
-                            }
-
-                            Text {
-                                id: cardTitle
-                                visible: leaseColumn.layout === "sheet"
-                                width: parent.width
-                                textFormat: Text.PlainText
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                text: leaseColumn.layout === "sheet" ? leaseColumn.look.title(island.lease?.who ?? "") : ""
-                                color: leaseColumn.accent
-                                font.family: leaseColumn.font
-                                font.pixelSize: 15
-                                font.weight: Font.Bold
-                                font.letterSpacing: 0.6
-                            }
-
-                            // Paper: the name in serif with when it unlocked, and LEFT with the time large at the right.
-                            Item {
-                                visible: leaseColumn.layout === "print"
-                                width: parent.width
-                                height: visible ? Math.max(printLeft.implicitHeight, printRight.implicitHeight) + 4 : 0
-
-                                Column {
-                                    id: printLeft
-                                    anchors.bottom: parent.bottom
-                                    width: parent.width - printRight.width - 16
-                                    spacing: 4
-
-                                    Text {
-                                        id: cardWhoPrint
-                                        width: parent.width
-                                        textFormat: Text.PlainText
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        text: leaseColumn.look.who(island.lease?.who ?? "")
-                                        color: leaseColumn.ink
-                                        font.family: leaseColumn.display
-                                        font.pixelSize: 24
-                                    }
-
-                                    Text {
-                                        id: cardUnlockedPrint
-                                        textFormat: Text.PlainText
-                                        text: leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
-                                        color: leaseColumn.look.unlockedColor || leaseColumn.muted
-                                        font.family: leaseColumn.font
-                                        font.pixelSize: 12
-                                    }
-                                }
-
-                                Row {
-                                    id: printRight
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    spacing: 8
-
-                                    Text {
-                                        anchors.baseline: printTime.baseline
-                                        textFormat: Text.PlainText
-                                        text: leaseColumn.look.left ?? ""
-                                        color: leaseColumn.look.headColor || leaseColumn.muted
-                                        font.family: leaseColumn.font
-                                        font.pixelSize: 10
-                                        font.letterSpacing: 1.4
-                                    }
-
-                                    Text {
-                                        id: printTime
-                                        textFormat: Text.PlainText
-                                        text: island.leaseLook.time(island.lease?.left ?? 0)
-                                        color: leaseColumn.timeColor
-                                        font.family: leaseColumn.display
-                                        font.pixelSize: 44
-                                        font.features: { "tnum": 1 }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Artboard: a lock tile, the head, name and unlock time, the time at the right, and the bar.
-                    Item {
-                        visible: leaseColumn.layout === "card"
-                        width: parent.width
-                        height: visible ? cardRow.implicitHeight + 14 + 6 + 30 : 0
+                        height: cardRow.implicitHeight + 14 + 6 + 30
 
                         Item {
                             id: cardRow
@@ -1860,127 +1547,34 @@ PanelWindow {
                         }
                     }
 
-                    // Blueprint: WHO, SINCE and LEFT rows and a bar of blocks, between dashed rules.
-                    Item {
-                        visible: leaseColumn.layout === "sheet"
-                        width: parent.width
-                        height: visible ? sheetRows.implicitHeight + 24 : 0
-
-                        Root.Dashed {
-                            width: parent.width
-                            height: 1
-                            color: island.theme.tokens?.color.line ?? leaseColumn.muted
-                        }
-
-                        Column {
-                            id: sheetRows
-                            x: 18
-                            y: 12
-                            width: parent.width - 36
-                            spacing: 8
-
-                            Repeater {
-                                id: sheetRepeater
-                                model: leaseColumn.layout === "sheet" ? [["WHO", "who"], ["SINCE", "since"], ["LEFT", "left"]] : []
-
-                                Item {
-                                    required property var modelData
-                                    readonly property string value: rowValue.text
-                                    readonly property bool elided: rowValue.truncated
-                                    readonly property color valueColor: rowValue.color
-                                    width: sheetRows.width
-                                    height: rowValue.implicitHeight
-
-                                    Text {
-                                        anchors.baseline: rowValue.baseline
-                                        textFormat: Text.PlainText
-                                        text: parent.modelData[0]
-                                        color: leaseColumn.muted
-                                        font.family: leaseColumn.font
-                                        font.pixelSize: 10
-                                        font.letterSpacing: 1.6
-                                    }
-
-                                    Text {
-                                        id: rowValue
-                                        anchors.right: parent.right
-                                        width: Math.min(implicitWidth, parent.width - 60)
-                                        horizontalAlignment: Text.AlignRight
-                                        textFormat: Text.PlainText
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                        readonly property string kind: parent.modelData[1]
-                                        text: kind === "who" ? leaseColumn.look.who(island.lease?.who ?? "") : kind === "since" ? leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm")) : island.leaseLook.time(island.lease?.left ?? 0)
-                                        color: kind === "left" ? leaseColumn.timeColor : leaseColumn.ink
-                                        font.family: leaseColumn.font
-                                        font.pixelSize: 12
-                                        font.weight: kind === "left" ? Font.Bold : Font.Normal
-                                        font.features: { "tnum": 1 }
-                                    }
-                                }
-                            }
-
-                            Row {
-                                readonly property int lit: Math.ceil(leaseColumn.share * 20)
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    text: "▮".repeat(parent.lit)
-                                    color: island.leaseWarning ? island.leaseLook.warning.time : leaseColumn.accent
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 12
-                                    font.letterSpacing: 0.6
-                                }
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    text: "▮".repeat(20 - parent.lit)
-                                    color: island.theme.tokens?.color.line ?? leaseColumn.muted
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 12
-                                    font.letterSpacing: 0.6
-                                }
-                            }
-                        }
-                    }
-
-                    // The keys, under a rule: Paper's paper-coloured line, Artboard's chips, Blueprint's dashes.
+                    // The keys as chips, under a rule.
                     Item {
                         width: parent.width
-                        height: keysRow.implicitHeight + (leaseColumn.layout === "print" ? 18 : 22)
+                        height: keysRow.implicitHeight + 22
 
                         Rectangle {
-                            visible: leaseColumn.layout !== "sheet"
                             width: parent.width
                             height: 1
-                            color: leaseColumn.layout === "print" ? leaseColumn.ink : leaseColumn.look.tile ?? "transparent"
-                        }
-
-                        Root.Dashed {
-                            visible: leaseColumn.layout === "sheet"
-                            width: parent.width
-                            height: 1
-                            color: island.theme.tokens?.color.line ?? leaseColumn.muted
+                            color: leaseColumn.look.tile
                         }
 
                         Row {
                             id: keysRow
-                            x: leaseColumn.layout === "print" ? 15 : 18
-                            y: leaseColumn.layout === "print" ? 9 : 10
-                            spacing: leaseColumn.layout === "card" ? 8 : 14
+                            x: 18
+                            y: 10
+                            spacing: 8
 
                             Repeater {
                                 model: leaseColumn.look.keys
 
                                 Rectangle {
                                     required property var modelData
-                                    readonly property bool tiled: leaseColumn.layout === "card"
-                                    width: keyText.implicitWidth + (tiled ? 14 : 0)
-                                    height: keyText.implicitHeight + (tiled ? 6 : 0)
+                                    width: keyText.implicitWidth + 14
+                                    height: keyText.implicitHeight + 6
                                     radius: 6
-                                    color: tiled ? leaseColumn.look.tile : "transparent"
+                                    color: leaseColumn.look.tile
 
-                                    // The key bold in ink, or Blueprint's accent, then what it does.
+                                    // The key in ink, then what it does.
                                     Row {
                                         id: keyText
                                         anchors.centerIn: parent
@@ -1989,10 +1583,10 @@ PanelWindow {
                                         Text {
                                             textFormat: Text.PlainText
                                             text: parent.parent.modelData[0]
-                                            color: leaseColumn.layout === "sheet" ? leaseColumn.accent : leaseColumn.ink
+                                            color: leaseColumn.ink
                                             font.family: leaseColumn.font
-                                            font.pixelSize: parent.parent.tiled ? 11 : 10
-                                            font.weight: parent.parent.tiled ? Font.Medium : Font.Bold
+                                            font.pixelSize: 11
+                                            font.weight: Font.Medium
                                         }
 
                                         Text {
@@ -2000,8 +1594,7 @@ PanelWindow {
                                             text: parent.parent.modelData[1]
                                             color: leaseColumn.look.headColor || leaseColumn.muted
                                             font.family: leaseColumn.font
-                                            font.pixelSize: parent.parent.tiled ? 11 : 10
-                                            font.letterSpacing: parent.parent.tiled ? 0 : 1.2
+                                            font.pixelSize: 11
                                         }
                                     }
                                 }
@@ -2076,57 +1669,15 @@ PanelWindow {
                 width: island.sizes.osd[0]
                 height: island.sizes.osd[1]
 
-                Loader {
-                    id: osdMeterLoader
-                    active: island.osdMeter
-                    // The last two volumes the OSD showed, for a meter built after the change; brightness never moves them.
-                    property real now: -1
-                    property real prev: -1
-                    // Whichever of this and the island's own handler runs first, the meter reads the volume before the change.
-                    function volumeBefore() {
-                        const v = island.heldOsd?.value ?? 0;
-                        if (now === v && prev >= 0)
-                            return prev;
-                        return now >= 0 ? now : v;
-                    }
-                    Connections {
-                        target: island
-                        function onOsdChanged() {
-                            if (island.osd?.kind !== "volume" || island.osd.value === osdMeterLoader.now)
-                                return;
-                            osdMeterLoader.prev = osdMeterLoader.now;
-                            osdMeterLoader.now = island.osd.value;
-                        }
-                    }
-                    sourceComponent: OsdMeter {
-                        look: island.osdLook.meter
-                        value: island.heldOsd?.value ?? 0
-                        before: osdMeterLoader.volumeBefore()
-                    }
-                }
-
-                // The word or glyph, the bar and the value, as each theme's volume board draws them.
+                // The glyph, the bar and the value.
                 RowLayout {
-                    visible: !island.osdMeter
                     anchors.fill: parent
-                    anchors.leftMargin: island.osdLook.voice === "caps" ? 14 : 16
+                    anchors.leftMargin: 16
                     anchors.rightMargin: anchors.leftMargin
-                    spacing: island.osdLook.voice === "plain" ? 12 : 10
-
-                    Text {
-                        id: osdWord
-                        visible: text !== ""
-                        textFormat: Text.PlainText
-                        text: island.osdLook.word(island.heldOsd?.kind ?? "volume")
-                        color: island.osdLook.label?.color || box.style.text
-                        font.family: island.osdLook.label?.font ?? ""
-                        font.pixelSize: island.osdLook.label?.size ?? 10
-                        font.letterSpacing: island.osdLook.label?.spacing ?? 0
-                    }
+                    spacing: 12
 
                     // A speaker for volume, a sun for brightness, drawn as 16 px strokes in the text colour.
                     Shape {
-                        visible: island.osdLook.word("volume") === ""
                         implicitWidth: 16
                         implicitHeight: 16
 
@@ -2145,17 +1696,8 @@ PanelWindow {
                         }
                     }
 
-                    OsdTrack {
-                        id: osdTrackBar
-                        visible: island.osdTrack
-                        Layout.fillWidth: true
-                        look: island.osdLook.track ?? ({ thickness: 0, color: "transparent", fill: "transparent", duration: 0 })
-                        value: island.heldOsd?.value ?? 0
-                    }
-
                     OsdBars {
                         id: osdBars
-                        visible: !island.osdTrack
                         Layout.fillWidth: true
                         look: island.osdLook
                         value: island.heldOsd?.value ?? 0
@@ -2166,7 +1708,7 @@ PanelWindow {
                         textFormat: Text.PlainText
                         horizontalAlignment: Text.AlignRight
                         text: island.heldOsd ? island.osdLook.valueText(island.heldOsd.value) : ""
-                        readonly property var look: island.osdTrack ? island.osdLook.track.value : island.osdLook.value
+                        readonly property var look: island.osdLook.value
                         color: look.color || box.style.text
                         font.family: look.font
                         font.pixelSize: look.size
@@ -2211,12 +1753,6 @@ PanelWindow {
                             source: tile.visible ? island.heldNotification?.icon ?? "" : ""
                             sourceSize.width: 24
                             sourceSize.height: 24
-                            // Frost draws the app's icon in its accent.
-                            layer.enabled: !!island.noteLook.tile?.ink
-                            layer.effect: MultiEffect {
-                                colorization: 1
-                                colorizationColor: island.noteLook.tile?.ink ?? "transparent"
-                            }
                         }
 
                         Text {
@@ -2226,7 +1762,7 @@ PanelWindow {
                             // An icon that is missing or fails to load leaves the letter.
                             visible: icon.status !== Image.Ready && !island.heldNotification?.swatch
                             text: island.noteLook.glyph(island.heldNotification?.app ?? "")
-                            color: island.noteLook.tile?.ink ?? box.style.text
+                            color: box.style.text
                             font.family: island.theme.tokens?.type.mono ?? ""
                             font.pixelSize: 15
                             font.weight: Font.DemiBold
@@ -2235,115 +1771,51 @@ PanelWindow {
 
                     Column {
                         width: parent.width - (tile.visible ? tile.width + parent.spacing : 0) - (columnChip.visible ? columnChip.width + parent.spacing : 0) - (thumb.visible ? thumb.width + parent.spacing : 0)
-                        spacing: island.noteLook.voice === "plain" ? 2 : 4
+                        spacing: 2
 
                         Item {
                             width: parent.width
                             height: age.implicitHeight
 
-                            // Blueprint's brackets stay drawn around a long name, which elides inside them.
-                            Row {
-                                id: appRow
-                                readonly property real room: parent.width - age.implicitWidth - 12
-
-                                HeadText {
-                                    id: openBracket
-                                    visible: island.noteLook.brackets && appName.text !== ""
-                                    text: "[ "
-                                }
-                                HeadText {
-                                    id: appName
-                                    width: Math.min(implicitWidth, Math.max(0, appRow.room - (openBracket.visible ? openBracket.implicitWidth + closeBracket.implicitWidth : 0)))
-                                    elide: Text.ElideRight
-                                    text: island.noteLook.appText(island.heldNotification?.app ?? "")
-                                }
-                                HeadText {
-                                    id: closeBracket
-                                    visible: openBracket.visible
-                                    text: " ]"
-                                }
+                            HeadText {
+                                id: appName
+                                width: Math.min(implicitWidth, Math.max(0, parent.width - age.implicitWidth - 12))
+                                elide: Text.ElideRight
+                                text: island.noteLook.appText(island.heldNotification?.app ?? "")
                             }
 
                             HeadText {
                                 id: age
                                 anchors.right: parent.right
-                                // Blueprint's board says DRAGGING here, bold in the accent, while the chip is out.
-                                readonly property bool dragWord: island.noteDragging && island.chipLook.dragAge !== ""
-                                text: dragWord ? island.chipLook.dragAge : island.noteLook.age
-                                color: dragWord ? island.theme.tokens.color.accent : island.noteLook.head.color
-                                font.bold: dragWord
+                                text: island.noteLook.age
                             }
                         }
 
                         Text {
                             id: summary
                             textFormat: Text.PlainText
-                            width: parent.width - (noteSwatch.visible ? noteSwatch.width + 10 : 0)
+                            width: parent.width
                             text: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
                             elide: Text.ElideRight
-                            lineHeight: island.noteLook.voice === "caps" ? 1.1 : 1
                             color: island.noteLook.summary.color || box.style.text
                             font.family: island.noteLook.summary.font
                             font.pixelSize: island.noteLook.summary.size
                             font.weight: island.noteLook.summary.weight
                             font.letterSpacing: island.noteLook.summary.spacing
-                            // Hi-Fi's amber summary glows; the layer is made only for a theme that asks for it.
-                            layer.enabled: !!island.noteLook.summary.glow
-                            layer.effect: MultiEffect {
-                                shadowEnabled: true
-                                shadowColor: island.noteLook.summary.glow || "transparent"
-                                shadowOpacity: 0.35
-                                shadowBlur: 0.6
-                                blurMax: 16
-                                shadowHorizontalOffset: 0
-                                shadowVerticalOffset: 0
-                            }
-
-                            // With no tile, Blueprint's board draws a picked colour 10 px after the summary.
-                            Rectangle {
-                                id: noteSwatch
-                                visible: island.noteLook.tile === null && !!island.heldNotification?.swatch
-                                x: Math.min(summary.implicitWidth, summary.width) + 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 16
-                                height: 16
-                                color: island.heldNotification?.swatch ?? "transparent"
-                                border.width: 1
-                                border.color: box.style.text
-                            }
                         }
 
-                        // Paper and Blueprint draw the chip at the right of the body line.
-                        Item {
+                        Text {
+                            id: body
                             width: parent.width
-                            visible: body.text !== "" || bodyChip.visible
-                            height: Math.max(body.visible ? body.implicitHeight : 0, bodyChip.visible ? bodyChip.implicitHeight + 2 : 0)
-
-                            Text {
-                                width: parent.width - (bodyChip.visible ? bodyChip.width + 12 : 0)
-                                visible: text !== ""
-                                id: body
-                                text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
-                                textFormat: Text.PlainText
-                                wrapMode: Text.Wrap
-                                maximumLineCount: 3
-                                elide: Text.ElideRight
-                                color: island.noteLook.body.color || box.style.text
-                                font.family: island.noteLook.body.font
-                                font.pixelSize: island.noteLook.body.size
-                            }
-
-                            FileChip {
-                                id: bodyChip
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: implicitWidth
-                                height: implicitHeight
-                                look: island.chipLook.toastPlace === "body" ? island.chipLook : null
-                                at: island.chipLook.toast
-                                files: island.heldNotification?.files ?? []
-                                empty: island.noteDragging
-                            }
+                            visible: text !== ""
+                            text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            color: island.noteLook.body.color || box.style.text
+                            font.family: island.noteLook.body.font
+                            font.pixelSize: island.noteLook.body.size
                         }
 
                         // The value hint, in the bar the theme's OSD draws a volume with.
@@ -2358,7 +1830,7 @@ PanelWindow {
                         Row {
                             visible: island.noteChips.length > 0
                             topPadding: 6
-                            spacing: island.keyLook.legend("").chips ? 8 : 14
+                            spacing: 8
 
                             Repeater {
                                 id: actionRepeater
@@ -2369,16 +1841,16 @@ PanelWindow {
                                     required property var modelData
                                     readonly property string drawn: actionKey.text + " " + actionWord.text
                                     readonly property var ink: [String(actionKey.color), String(actionWord.color), String(color.a > 0 ? color : box.style.fill)]
-                                    width: actionPair.implicitWidth + (island.keyLook.legend("").chips ? 14 : 0)
-                                    height: actionPair.implicitHeight + (island.keyLook.legend("").chips ? 6 : 0)
+                                    width: actionPair.implicitWidth + 14
+                                    height: actionPair.implicitHeight + 6
                                     radius: 6
-                                    // On the dark card, Artboard's chip takes the icon tile's fill and the key takes the card's text.
-                                    color: island.keyLook.legend("").chips ? island.noteLook.tile?.fill ?? "transparent" : "transparent"
+                                    // On the dark card the chip takes the icon tile's fill and the key takes the card's text.
+                                    color: island.noteLook.tile.fill
 
                                     Row {
                                         id: actionPair
                                         anchors.centerIn: parent
-                                        spacing: island.keyLook.legend("").chips ? 6 : 5
+                                        spacing: 6
 
                                         Text {
                                             id: actionKey
@@ -2417,42 +1889,26 @@ PanelWindow {
                         empty: island.noteDragging
                     }
 
-                    // The notification's picture, 48 px at the card's far right; Artboard rounds it as it does the tile.
-                    Image {
+                    // The notification's picture, 48 px at the card's far right, rounded as the tile is.
+                    ClippingRectangle {
                         id: thumb
-                        visible: status === Image.Ready
+                        visible: thumbImage.status === Image.Ready
                         anchors.verticalCenter: parent.verticalCenter
                         width: 48
                         height: 48
-                        source: island.heldNotification?.picture ?? ""
-                        asynchronous: true
-                        fillMode: Image.PreserveAspectCrop
-                        sourceSize.width: 96
-                        sourceSize.height: 96
-                        layer.enabled: thumbMask.radius > 0
-                        layer.effect: MultiEffect {
-                            maskEnabled: true
-                            maskSource: thumbMask
-                        }
+                        radius: island.noteLook.tile.radius
+                        color: "transparent"
 
-                        Rectangle {
-                            id: thumbMask
+                        Image {
+                            id: thumbImage
                             anchors.fill: parent
-                            visible: false
-                            radius: island.noteLook.tile?.radius ?? 0
-                            layer.enabled: true
+                            source: island.heldNotification?.picture ?? ""
+                            asynchronous: true
+                            fillMode: Image.PreserveAspectCrop
+                            sourceSize.width: 96
+                            sourceSize.height: 96
                         }
                     }
-                }
-
-                // Hi-Fi's tuning scale keeps to the bottom edge, below however tall the card grows.
-                Root.TuningScale {
-                    id: noteScale
-                    visible: island.noteLook.glass
-                    tokens: island.theme.tokens
-                    x: island.noteLook.pad.x
-                    y: parent.height - height - 8
-                    width: parent.width - 2 * x
                 }
 
                 // Out of sight: the drag image is grabbed from here.
@@ -2485,35 +1941,7 @@ PanelWindow {
                     width: parent.width - 36
                     spacing: 10
 
-                    // Blueprint heads the whole card: its name at the left, the month at the right.
-                    Item {
-                        visible: island.clockLook.grid.header !== ""
-                        width: parent.width
-                        height: headerName.implicitHeight
-
-                        Text {
-                            id: headerName
-                            textFormat: Text.PlainText
-                            text: island.clockLook.grid.header
-                            color: island.clockLook.grid.title.left.color || box.style.text
-                            font.family: island.clockLook.grid.title.left.font
-                            font.pixelSize: island.clockLook.grid.title.left.size
-                            font.letterSpacing: island.clockLook.grid.title.left.spacing
-                        }
-
-                        Text {
-                            id: headerMonth
-                            anchors.right: parent.right
-                            textFormat: Text.PlainText
-                            text: island.clockLook.grid.title.place === "header" ? island.titleParts.join(" ") : ""
-                            color: island.clockLook.grid.title.left.color || box.style.text
-                            font.family: island.clockLook.grid.title.left.font
-                            font.pixelSize: island.clockLook.grid.title.left.size
-                            font.letterSpacing: island.clockLook.grid.title.left.spacing
-                        }
-                    }
-
-                    // The month at the theme's width, a rule, then the city column.
+                    // The month, a rule, then the city column.
                     Row {
                         width: parent.width
 
@@ -2522,40 +1950,14 @@ PanelWindow {
                             width: island.clockLook.gridWidth
                             spacing: island.clockLook.grid.gap
 
-                            // Paper heads the month as it heads the city column, after an accent square.
                             Item {
-                                visible: island.clockLook.grid.head !== ""
                                 width: parent.width
-                                height: gridHead.implicitHeight
-
-                                Rectangle {
-                                    anchors.verticalCenter: gridHead.verticalCenter
-                                    width: 8
-                                    height: 8
-                                    color: island.theme.tokens?.color.accent ?? box.style.text
-                                }
-
-                                Text {
-                                    id: gridHead
-                                    x: 16
-                                    textFormat: Text.PlainText
-                                    text: island.clockLook.grid.head
-                                    color: box.style.text
-                                    font.family: island.clockLook.offset.font
-                                    font.pixelSize: island.clockLook.offset.size
-                                    font.letterSpacing: island.clockLook.offset.spacing
-                                }
-                            }
-
-                            Item {
-                                visible: island.clockLook.grid.title.place !== "header"
-                                width: parent.width
-                                height: island.clockLook.grid.title.place === "line" ? 24 : titleLeft.implicitHeight
+                                height: 24
 
                                 Text {
                                     id: titleLeft
                                     readonly property var at: island.clockLook.grid.title.left
-                                    anchors.verticalCenter: island.clockLook.grid.title.place === "line" ? parent.verticalCenter : undefined
+                                    anchors.verticalCenter: parent.verticalCenter
                                     textFormat: Text.PlainText
                                     text: island.titleParts[0] ?? ""
                                     color: at.color || box.style.text
@@ -2563,20 +1965,6 @@ PanelWindow {
                                     font.pixelSize: at.size
                                     font.weight: at.weight
                                     font.letterSpacing: at.spacing
-                                }
-
-                                Text {
-                                    id: titleRight
-                                    readonly property var at: island.clockLook.grid.title.right
-                                    visible: island.clockLook.grid.title.place === "split"
-                                    anchors.right: parent.right
-                                    anchors.baseline: titleLeft.baseline
-                                    textFormat: Text.PlainText
-                                    text: visible ? island.titleParts[1] ?? "" : ""
-                                    color: at?.color || box.style.text
-                                    font.family: at?.font ?? ""
-                                    font.pixelSize: at?.size ?? 12
-                                    font.italic: at?.italic ?? false
                                 }
                             }
 
@@ -2659,20 +2047,9 @@ PanelWindow {
                             height: Math.max(monthGrid.height, cityColumn.height)
 
                             Rectangle {
-                                visible: !island.clockLook.rule.dashed
                                 x: island.clockLook.gap
                                 width: 1
                                 height: parent.height
-                                color: parent.ink
-                            }
-
-                            Root.Dashed {
-                                visible: island.clockLook.rule.dashed
-                                x: island.clockLook.gap + 1
-                                width: parent.height
-                                height: 1
-                                rotation: 90
-                                transformOrigin: Item.TopLeft
                                 color: parent.ink
                             }
                         }
@@ -2680,31 +2057,6 @@ PanelWindow {
                         Column {
                             id: cityColumn
                             width: month.width - monthGrid.width - 2 * island.clockLook.gap - 1
-
-                            // Paper heads the column as it heads its cards, after an accent square.
-                            Item {
-                                visible: island.clockLook.head !== ""
-                                width: parent.width
-                                height: cityHead.implicitHeight + 8
-
-                                Rectangle {
-                                    anchors.verticalCenter: cityHead.verticalCenter
-                                    width: 8
-                                    height: 8
-                                    color: island.theme.tokens?.color.accent ?? box.style.text
-                                }
-
-                                Text {
-                                    id: cityHead
-                                    x: 16
-                                    textFormat: Text.PlainText
-                                    text: island.clockLook.head
-                                    color: box.style.text
-                                    font.family: island.clockLook.offset.font
-                                    font.pixelSize: island.clockLook.offset.size
-                                    font.letterSpacing: island.clockLook.offset.spacing
-                                }
-                            }
 
                             Repeater {
                                 id: cityRepeater
@@ -2730,14 +2082,7 @@ PanelWindow {
                                     }
 
                                     Rectangle {
-                                        visible: !cityRow.home && !cityRow.look.rule.dashed
-                                        width: parent.width
-                                        height: 1
-                                        color: cityRow.look.rule.color || box.style.text
-                                    }
-
-                                    Root.Dashed {
-                                        visible: !cityRow.home && cityRow.look.rule.dashed
+                                        visible: !cityRow.home
                                         width: parent.width
                                         height: 1
                                         color: cityRow.look.rule.color || box.style.text

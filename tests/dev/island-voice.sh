@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-# The island's notification speaks in each theme's voice: Blueprint's [ APP ] and T+0S over a cyan summary, Paper's serif, Artboard's tile.
+# The island's notification: the app and now over the summary beside a 40 px tile, drawn solid in the scheme's island fill with ink that reads on it in every colorscheme.
 {
 source "$(dirname "$0")/lib.sh"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 state_is() { island | jq -e "$1" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
+in_scheme() { "$repo/bin/dots" colorscheme "$1" >/dev/null; until_ok 3000 eval "shell_status | jq -e --arg t '$1' '.theme == \$t and .transition == \"\"' >/dev/null"; sleep 0.3; }
 # A notification the shell shows once its morph has settled, so its boxes are where they stay.
 shown() { until_ok 3000 state_is "$1 and .mode == \"notification\" and .animating == false"; }
 # Pixels of geometry $1 within $5 of r g b.
@@ -37,108 +36,77 @@ drawn_contrast() {
     console.log((ratios[9] ?? 1).toFixed(2), "#" + fillKey.toString(16).padStart(6, "0"));
   '
 }
+readable() { node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$1"; }
+# Whether drawn colour $1 is within 3 of each channel of $2, the scheme's island fill.
+fill_is() { local f=$((16#${1#\#})) w=$((16#${2#\#})) i; for i in 16 8 0; do (((f >> i & 255) - (w >> i & 255) <= 3 && (w >> i & 255) - (f >> i & 255) <= 3)) || return 1; done; }
+# A toast in the current scheme, and its summary's drawn contrast and fill.
+toast() {
+  notify-send -a Chromium "Download complete" "report-october.pdf · 2.4 MB"
+  shown '.note.summary == "Download complete"'
+  read -r ratio fill < <(drawn_contrast "$(geo summaryBox)")
+}
 # Notify with an app name notify-send would not send as given; the newest notification replaces the shown one, so each check waits for its own summary.
 notify_as() { gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications --method org.freedesktop.Notifications.Notify "$1" 0 "" "$2" "${3:-}" '[]' '{}' 5000 >/dev/null; }
 
 until_ok 5000 shell_status >/dev/null
 
-in_theme blueprint
-notify-send "Download complete" "report-october.pdf · 2.4 MB"
-shown '.note.summary == "DOWNLOAD COMPLETE"'
-echo "     note: $(island | jq -c .note)"
-check "blueprint: the island reads [ NOTIFY-SEND ] and T+0S over DOWNLOAD COMPLETE" state_is '.note.app == "[ NOTIFY-SEND ]" and .note.age == "T+0S"'
-# While a notification shows, the clock's minute tick and its 5 s hold are the only timers: nothing counts T+0S up.
-check "blueprint: while the notification shows, status reports two timers, the clock and the hold" eval 'shell_status | jq -e ".timers == 2" >/dev/null'
-cyan=$(near "$(geo summaryBox)" 127 227 240 10)
-check "blueprint: the summary's pixels read #7FE3F0 ($cyan px)" test "$cyan" -gt 150
-
-notify_as "" "no app"
-shown '.note.summary == "NO APP"'
-check "blueprint: an empty app name draws no empty brackets" state_is '.note.app == "" and .note.bracketsShown == false'
-
-long="App $(printf 'long%.0s' {1..60})"
-notify_as "$long" "long app"
-shown '.note.summary == "LONG APP"'
-echo "     note: $(island | jq -c .note)"
-check "blueprint: a long app name elides inside its brackets, short of T+0S" state_is '.note.appElided and .note.bracketsShown and .note.bracketEnd < .note.ageStart'
-
-# Any app can send a newline or a bidi override; the island keeps app and summary to one line each and draws the body in its spelt order.
-notify_as $'two\nlines' $'Download\ncomplete' $'x\u202Eyz'
-shown '.note.summary == "DOWNLOAD COMPLETE"'
-echo "     note: $(island | jq -c '.note | {app, summaryLines, body, cardBottom, boxBottom}')"
-check "blueprint: a newline in the app or summary stays on one line each" state_is '.note.app == "[ TWO LINES ]" and .note.summaryLines == 1'
-check "blueprint: the body draws in its spelt order and inside the island" state_is '.note.body == "xyz" and .note.cardBottom <= .note.boxBottom'
-
-in_theme hi-fi
-notify-send -a Chromium "Download complete" "report-october.pdf · 2.4 MB"
-shown '.note.summary == "DOWNLOAD COMPLETE"'
-echo "     note: $(island | jq -c .note)"
-check "hi-fi: the island reads CHROMIUM and NOW over DOWNLOAD COMPLETE, with no brackets drawn" state_is '.note.app == "CHROMIUM" and .note.age == "NOW" and .note.bracketsShown == false'
-check "hi-fi: nothing the island reports holds a bracket ($(island | marked | head -3 | paste -sd'|'))" eval '[ -z "$(island | marked)" ]'
-# The text must read on what is drawn behind it: amber summary on the dark glass #141617, not on an ink slab.
-glass=$(near "$(geo summaryBox)" 20 22 23 6)
-amber=$(near "$(geo summaryBox)" 250 189 47 12)
-cream=$(near "$(geo summaryBox)" 235 219 178 10)
-check "hi-fi: the summary is amber #FABD2F ($amber px) on dark glass #141617 ($glass px), with no cream fill ($cream px)" test "$amber" -gt 100 -a "$glass" -gt 200 -a "$cream" -lt 20
-# Ink at 6 % over the glass blends to about #212220 in the row under the top border.
-lit=$(near "$(geo highlightBox)" 33 34 32 4)
-dark=$(near "$(geo highlightBox)" 20 22 23 3)
-check "hi-fi: the row under the top border is the highlight ($lit px), not bare glass ($dark px)" test "$lit" -gt 300 -a "$dark" -lt 20
-check "hi-fi: the tuning scale is drawn along the bottom edge ($(island | jq -c .note.scale))" state_is '.note.scale.ticks > 40 and .note.scale.box.y + .note.scale.box.h <= .note.boxBottom'
-# The ticks are amber at 50 % and 28 % over the glass, and the pointer is red #FB4934.
-ticks=$(( $(near "$(geo scale.box)" 135 106 35 12) + $(near "$(geo scale.box)" 84 69 30 12) ))
-red=$(near "$(geo scale.box)" 251 73 52 8)
-check "hi-fi: the scale reads amber ticks ($ticks px) and a red pointer ($red px)" test "$ticks" -gt 100 -a "$red" -gt 12
-
-notify_as Chromium "$(printf 'Tuned %.0s' {1..34})end"
-shown '(.note.summary | startswith("TUNED TUNED"))'
-echo "     note: $(island | jq -c '.note | {summaryBox, scale, islandBox, boxBottom}')"
-check "hi-fi: a 200-character summary stays inside the island, above the scale" state_is '.note.summaryBox.y + .note.summaryBox.h <= .note.scale.box.y and .note.summaryBox.x + .note.summaryBox.w <= .note.islandBox.x + .note.islandBox.w and .note.scale.box.y + .note.scale.box.h <= .note.boxBottom'
-ticks=$(( $(near "$(geo scale.box)" 135 106 35 12) + $(near "$(geo scale.box)" 84 69 30 12) ))
-red=$(near "$(geo scale.box)" 251 73 52 8)
-check "hi-fi: under a long summary the scale still reads its ticks ($ticks px) and red pointer ($red px)" test "$ticks" -gt 100 -a "$red" -gt 12
-
-in_theme paper
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'
-check "paper: the island reads NOTIFY-SEND and NOW in caps" state_is '.note.app == "NOTIFY-SEND" and .note.age == "NOW"'
-check "paper: the summary draws in Instrument Serif at 24 px ($(island | jq -c .note.summaryFont))" state_is '.note.summaryFont == ["Instrument Serif", 24]'
+echo "     note: $(island | jq -c .note)"
+check "the island reads the app and now" state_is '.note.app == "notify-send" and .note.age == "now"'
+# While a notification shows, the clock's minute tick and its 5 s hold are the only timers: nothing counts now up.
+check "while the notification shows, status reports two timers, the clock and the hold" eval 'shell_status | jq -e ".timers == 2" >/dev/null'
+check "the notification shows a 40 px tile with its glyph" state_is '.note.tileBox.w == 40 and .note.tileBox.h == 40 and .note.glyph == "N"'
+tile=$(near "$(geo tileBox)" 43 47 54 4)
+check "the tile at the notification's left reads #2B2F36 ($tile of 1600 px)" test "$tile" -gt 1000
 
 notify_as "" "no app"
 shown '.note.summary == "no app"'
-check "paper: an empty app name draws no empty caps" state_is '.note.app == ""'
+check "an empty app name draws nothing in its place" state_is '.note.app == ""'
 
-in_theme artboard
-notify-send "Download complete" "report-october.pdf · 2.4 MB"
+long="App $(printf 'long%.0s' {1..60})"
+notify_as "$long" "long app"
+shown '.note.summary == "long app"'
+check "a long app name elides short of now" state_is '.note.appElided and .note.appEnd < .note.ageStart'
+
+# Any app can send a newline or a bidi override; the island keeps app and summary to one line each and draws the body in its spelt order.
+notify_as $'two\nlines' $'Download\ncomplete' $'x‮yz'
 shown '.note.summary == "Download complete"'
-echo "     note: $(island | jq -c .note)"
-check "artboard: the island reads the app and now, muted" state_is '.note.app == "notify-send" and .note.age == "now"'
-check "artboard: the notification shows a 40 px tile with its glyph" state_is '.note.tileBox.w == 40 and .note.tileBox.h == 40 and .note.glyph == "N"'
-tile=$(near "$(geo tileBox)" 43 47 54 4)
-check "artboard: the tile at the notification's left reads #2B2F36 ($tile of 1600 px)" test "$tile" -gt 1000
+echo "     note: $(island | jq -c '.note | {app, summaryLines, body, cardBottom, boxBottom}')"
+check "a newline in the app or summary stays on one line each" state_is '.note.app == "two lines" and .note.summaryLines == 1'
+check "the body draws in its spelt order and inside the island" state_is '.note.body == "xyz" and .note.cardBottom <= .note.boxBottom'
+
 # notify-send -i sends a path as the image-path hint, not as the app icon.
 notify-send -i /usr/share/icons/hicolor/48x48/apps/foot.png "With icon"
 shown '.note.summary == "With icon"'
-check "artboard: an icon sent as a path draws in the tile instead of the letter" state_is '.note.tileBox != null and .note.glyph == null'
-check "artboard: the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
-# Frost is a dark plain theme: its island is glass, not its light ink, so Artboard's layout reads on it.
-in_theme frost
-notify-send -a Chromium "Download complete" "report-october.pdf · 2.4 MB"
-shown '.note.summary == "Download complete"'
-echo "     note: $(island | jq -c '.note | {app, age, summaryColor, tileBox, glyph, bodyBox}')"
-check "frost: the card reads Chromium and now over a #eceff4 title" state_is '.note.app == "Chromium" and .note.age == "now" and .note.summaryColor == "#eceff4"'
-check "frost: the notification shows a 32 px tile" state_is '.note.tileBox.w == 32 and .note.tileBox.h == 32'
-read -r ratio fill < <(drawn_contrast "$(geo bodyBox)")
-check "frost: the muted body reads at 4.5:1 or more against the glass drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
-read -r ratio fill < <(drawn_contrast "$(geo summaryBox)")
-check "frost: the summary reads at 4.5:1 or more against the island drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
-# Frost's glass is #3B4252 at 85 % over the #2E3440 paper, #394050 where nothing shows through.
-glass_fill() { local f=$((16#${fill#\#})) w=$((16#394050)) i; for i in 16 8 0; do (((f >> i & 255) - (w >> i & 255) <= 8 && (w >> i & 255) - (f >> i & 255) <= 8)) || return 1; done; }
-check "frost: that fill is Frost's glass over its paper, near #394050, not its light ink ($fill)" glass_fill
+check "an icon sent as a path draws in the tile instead of the letter" state_is '.note.tileBox != null and .note.glyph == null'
+check "the tile sits at the card's left" state_is '.note.tileBox != null and .note.tileBox.x < .note.summaryBox.x'
+
+# Each scheme draws the toast solid in its island fill, with a summary that reads on it.
+toast
+check "artboard: the summary reads at 4.5:1 or more on the island ($ratio on $fill)" readable "$ratio"
+check "artboard: the island is solid #15171B ($fill)" fill_is "$fill" '#15171B'
+in_scheme catppuccin-mocha
+toast
+check "catppuccin-mocha: the summary reads at 4.5:1 or more on the island ($ratio on $fill)" readable "$ratio"
+check "catppuccin-mocha: the island is solid #1E1E2E ($fill)" fill_is "$fill" '#1E1E2E'
+in_scheme github-light
+toast
+check "github-light: the summary reads at 4.5:1 or more on the island ($ratio on $fill)" readable "$ratio"
+check "github-light: the island is solid #1F2328 ($fill)" fill_is "$fill" '#1F2328'
+in_scheme gruvbox-dark
+toast
+check "gruvbox-dark: the summary reads at 4.5:1 or more on the island ($ratio on $fill)" readable "$ratio"
+check "gruvbox-dark: the island is solid #282828 ($fill)" fill_is "$fill" '#282828'
+in_scheme rose-pine-dawn
+toast
+check "rose-pine-dawn: the summary reads at 4.5:1 or more on the island ($ratio on $fill)" readable "$ratio"
+check "rose-pine-dawn: the island is solid #575279 ($fill)" fill_is "$fill" '#575279'
+
 # Each notification above replaced the one before; the last one's 5 s end before the timers are counted.
 until_ok 6000 state_is '.mode == "rest"'
 status=$(shell_status)
-check "status still reports one running timer: T+0S is the age at arrival" eval 'jq -e ".timers == 1" <<<"$status" >/dev/null'
+check "status still reports one running timer: now is the age at arrival" eval 'jq -e ".timers == 1" <<<"$status" >/dev/null'
 
 exit $((fails > 0))
 }
