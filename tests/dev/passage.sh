@@ -74,7 +74,7 @@ shot artboard-ayah
 on_drawn 2026-11-04 '.ref == "সহীহ বুখারী ৬৮০৭"'
 check "it draws bukhari:6807 under Hadith, its Bangla and reference as deen names it in $bengali with no Arabic line ($(drawn '[.label, .ar, .ref, .family.bn, .bn[0:30]]'))" \
   drawn_is '.label == "Hadith" and .ar == "" and .bn_pron == "" and (.bn | startswith("সাহল ইবনু সা‘দ")) and .ref == "সহীহ বুখারী ৬৮০৭" and .family.bn == $bengali and .family.ref == $bengali'
-# Noto Sans Bengali has no comma, colon or brackets; a monospace fallback drew them wide and apart from their words.
+# Noto Sans Bengali has no comma, colon or parentheses; a monospace fallback drew them wide and apart from their words.
 check "its punctuation draws at a proportional width, under a third of an em ($(drawn .bnComma))" drawn_is '.bnComma > 0 and .bnComma < 0.34'
 shot artboard-hadith
 on_drawn 2026-11-01 '.ref == "হিসনুল মুসলিম ২৩৫"'
