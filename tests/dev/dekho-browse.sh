@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# f opens Dekho's Browse from Home empty and from a Title page with its kind, genre and language as chips; each facet key asks the fake for its filter and the rows redraw from its answer; x clears; each board's look.
+# f opens Dekho's Browse from Home empty and from a Title page with its kind, genre and language as chips; each facet key asks the fake for its filter and the rows redraw from its answer; x clears; the board's look.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -15,8 +15,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 chips() { dekho_state | jq -c '[.browse.chips[].text]'; }
 titles() { dekho_state | jq -c '[.browse.rows[].title]'; }
@@ -129,9 +127,9 @@ check "it asks for series in Drama, English ($(asked)) and draws the fake's answ
 check "each row draws its language and genres, as the board's last two columns ($(dekho_state | jq -c '.browse.rows[0] | [.title, .language, .genres]'))" \
   dekho_is '.browse.rows[0] | .language == "English" and .genres == "Drama · Mystery"'
 check "the header reads where it came from and the chips are marked prefilled ($(dekho_state | jq -c '.browse | [.from, .prefilled]'))" \
-  dekho_is '.browse.from == "from The Long Tide" and .browse.prefilled == "PREFILLED FROM THE LONG TIDE"'
+  dekho_is '.browse.from == "from The Long Tide" and .browse.prefilled == "prefilled from The Long Tide"'
 check "the facets read Popular, Drama, English and Any for the rest, and the kind tab Series ($(dekho_state | jq -c '[.browse.facets[] | .value]'))" \
-  dekho_is '[.browse.facets[] | .value] == ["Popular", "Drama", "English", "Any", "Any", "Any"] and .browse.kinds == [{"text": "All", "current": false}, {"text": "Movies", "current": false}, {"text": "SERIES", "current": true}]'
+  dekho_is '[.browse.facets[] | .value] == ["Popular", "Drama", "English", "Any", "Any", "Any"] and .browse.kinds == [{"text": "All", "current": false}, {"text": "Movies", "current": false}, {"text": "Series", "current": true}]'
 check "no chip or row reads a two-letter code" no_code
 
 step() {
@@ -189,30 +187,14 @@ wtype -k Escape
 until_ok 1000 dekho_is '.page == "title"'
 check "esc on Browse goes back to the Title page it came from ($(dekho_state | jq -c '[.page, .title.name]'))" dekho_is '.page == "title" and .title.name == "The Long Tide"'
 
-# Each board's own detail, on Browse from The Long Tide.
+# The board's own detail, on Browse from The Long Tide.
 wtype f
 until_ok 3000 dekho_is '.page == "browse" and (.browse.chips | length) == 3 and (.browse.rows | length) > 0'
-check "paper: Browse is set in Instrument Serif and the chips filled #F3E6CF, as the Paper board draws them ($(dekho_state | jq -c '.browse.look'))" \
-  dekho_is '.browse.look.pageFont == "Instrument Serif" and (.browse.look.chipFill | ascii_downcase) == "#f3e6cf" and .browse.look.chipRadius == 0'
-until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
-check "paper: the poster fills its hatched place square, and a null or gone one keeps the hatch ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
-  dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 0 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: chips are rounded 13 px on #EEF1FF and kind tabs 10 px, as the Artboard board draws them ($(dekho_state | jq -c '.browse.look'))" \
+check "chips are rounded 13 px on #EEF1FF and kind tabs 10 px ($(dekho_state | jq -c '.browse.look'))" \
   dekho_is '.browse.look.chipRadius == 13 and (.browse.look.chipFill | ascii_downcase) == "#eef1ff" and .browse.look.kindRadius == 10 and .browse.prefilled == "prefilled from The Long Tide" and .browse.kinds[2].text == "Series"'
 until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
-check "artboard: the poster is masked to its grey tile's 6 px corners, and a null or gone one keeps the tile ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
+check "the poster is masked to its grey tile's 6 px corners, and a null or gone one keeps the tile ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
   dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 6 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the header and the prefilled mark are capitals in brackets, kinds in capitals, rules dashed, as the Blueprint board writes them ($(dekho_state | jq -c '.browse | [.from, .prefilled, [.kinds[].text], .look.ruleDashed]'))" \
-  dekho_is '.browse.from == "FROM THE LONG TIDE" and .browse.prefilled == "[PREFILLED FROM THE LONG TIDE]" and [.browse.kinds[].text] == ["ALL", "MOVIES", "SERIES"] and .browse.look.ruleDashed and .browse.count == "9 TITLES"'
-until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
-check "blueprint: the poster fills its crossed box square, and a null or gone one keeps the cross ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
-  dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 0 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "title"'

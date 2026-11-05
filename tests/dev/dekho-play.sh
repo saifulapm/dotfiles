@@ -24,8 +24,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 rel() { dekho_state | jq -c ".releases$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
@@ -68,20 +66,18 @@ until_ok 3000 dekho_is '.title.cursor == 4'
 wtype -k Return
 until_ok 3000 listed
 check "Enter on next up, S3 E4, draws the release list over the title page ($(dekho_state | jq -c '[.page, .releases.mode, .releases.header, .releases.heading, .releases.count]'))" \
-  dekho_is '.page == "title" and .releases.shown and .releases.header == "RELEASE" and .releases.heading == "The Long Tide · S3 E4 · Quay Nine" and .releases.count == "5 releases" and .chose == {"season": 3, "episode": 4}'
+  dekho_is '.page == "title" and .releases.shown and .releases.header == "Release" and .releases.heading == "The Long Tide · S3 E4 · Quay Nine" and .releases.count == "5 releases" and .chose == {"season": 3, "episode": 4}'
 check "the fake heard the releases call for S3 E4" grep -qx 'api releases --id 101 --kind tv -s 3 -e 4' "$fake_log"
 check "the first row reads Auto: let dekho decide, and nothing else ($(rel '.rows[0]'))" \
   dekho_is '.releases.rows[0] | .auto and .quality == "Auto: let dekho decide" and .name == "" and .size == "" and .seeders == "" and .audio == ""'
 check "the rows after it draw best first, by seeders then size, with quality, size, seeders and audio ($(rel '.rows[1:] | map([.quality, .size, .seeders, .audio])'))" \
   dekho_is '[.releases.rows[1:][] | [.quality, .size, .seeders, .audio]] == [["720p", "1.1 GB", "530", "EN 2.0"], ["1080p", "2.1 GB", "412", "EN 5.1"], ["720p", "614 MB", "412", ""], ["2160p", "12.4 GB", "88", "EN 5.1"], ["1080p", "8.4 GB", "37", "EN 5.1 ES 2.0"]]'
 check "the cursor is on Auto, and the best, the first release, is the only row tagged ($(rel '.rows | map([.best, .cursor])'))" \
-  dekho_is '.releases.cursor == 0 and [.releases.rows[] | .best] == ["", "BEST", "", "", "", ""] and .releases.rows[0].cursor'
+  dekho_is '.releases.cursor == 0 and [.releases.rows[] | .best] == ["", "best", "", "", "", ""] and .releases.rows[0].cursor'
 check "a release name and audio with a newline, U+202E and ESC draw on one line without them ($(rel '.rows[5] | [.name, .lines, .audio]'))" \
   dekho_is '.releases.rows[5] | .lines == 1 and .audioLines == 1 and (.name | test("[\n‮\u001b]") | not) and (.audio | test("[\n‮]") | not)'
 check "a 300-character release name draws on one elided line ($(rel '.rows[3] | [.lines, .truncated]'))" \
   dekho_is '.releases.rows[3] | .lines == 1 and .truncated'
-check "paper: the cursor row inverts in ink and the card casts Paper's hard shadow ($(rel '.look | [.cursorFill, .ink, .shadow]'))" \
-  dekho_is '.releases.look | (.cursorFill | ascii_downcase) == (.ink | ascii_downcase) and .shadow and .chamfer == false'
 
 check "no mpv window is up before the play ($(mpv_windows))" no_mpv
 wtype j
@@ -95,14 +91,14 @@ check "the fake was asked to play that release" grep -qx 'play --json --id 101 -
 fills=()
 order=$work/order
 : >"$order"
-paper_look=
+start_look=
 deadline=$(($(now_ms) + 8000))
 while (($(now_ms) < deadline)); do
   s=$(dekho_state)
   [ "$(jq -r .releases.mode <<<"$s")" = starting ] || break
   fills+=("$(jq .releases.starting.fill <<<"$s")")
   jq -r '.releases.starting.steps[].text' <<<"$s" >>"$order"
-  if [ -z "$paper_look" ] && jq -e '(.releases.starting.steps | length) > 0' <<<"$s" >/dev/null; then paper_look=$(jq -c '.releases | [.starting.release, .look.barFill, .look.accent, .look.markRadius]' <<<"$s"); fi
+  if [ -z "$start_look" ] && jq -e '(.releases.starting.steps | length) > 0' <<<"$s" >/dev/null; then start_look=$(jq -c '.releases | [.starting.release, .look.barFill, .look.accent, .look.markRadius]' <<<"$s"); fi
   jq -e '.releases.playing != null' <<<"$s" >/dev/null && break
   sleep 0.1
 done
@@ -119,8 +115,8 @@ rising() {
 }
 check "Starting's progress rose through at least two values between empty and full, never going back (${fills[*]})" rising
 check "the steps appeared in order ($steps)" test "$steps" = "Found 530 seeders|Connected to peers|Buffering the start of the file|mpv starts at 108 MB|mpv is opening"
-check "paper: the bar fills in the accent and the marks are square, under the stream's quality and size ($paper_look)" \
-  bash -c "jq -e '.[0] == \"720p · 1.1 GB\" and (.[1] | ascii_downcase) == (.[2] | ascii_downcase) and .[3] == 0' <<<'$paper_look' >/dev/null"
+check "the bar fills in the accent and the marks are circles, under the stream's quality and size ($start_look)" \
+  bash -c "jq -e '.[0] == \"720p · 1.1 GB\" and (.[1] | ascii_downcase) == (.[2] | ascii_downcase) and .[3] == 8' <<<'$start_look' >/dev/null"
 check "on playing, before mpv's window maps, Starting still draws with mpv is opening as the current step ($(rel '.starting.steps[-1]'), $(mpv_windows) mpv windows)" \
   waiting_on_mpv
 until_ok 5000 mpv_up
@@ -146,8 +142,8 @@ note_session
 check "an error before playing leaves Starting stuck no more: it draws the error on one line ($(rel .starting.fail))" fail_fills 'no source answered for this release'
 check "the progress, the steps and the swarm are gone, only the failure is drawn ($(rel '.starting.shown'))" \
   dekho_is '.releases.starting.shown == false and .releases.starting.fail.shown'
-check "the keys are r try again and esc back, in Paper's capitals ($(rel '.starting.fail.keys'))" \
-  dekho_is '.releases.starting.fail.keys == [["R", "TRY AGAIN"], ["ESC", "BACK"]]'
+check "the keys are r try again and esc back ($(rel '.starting.fail.keys'))" \
+  dekho_is '.releases.starting.fail.keys == [["r", "try again"], ["esc", "back"]]'
 before=$(plays)
 printf 'boom\nquit\xe2\x80\xaeed\x1b[31m red' >"$failing"
 wtype r
@@ -238,31 +234,21 @@ wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
 check "esc goes back to the title page" dekho_is '.page == "title" and .releases.mode == ""'
 
-# Each board's own detail, on S3 E4's list and Starting.
+# The board's own detail, on S3 E4's list and Starting.
 wtype j
 until_ok 1000 dekho_is '.title.cursor == 4'
-board() {
-  in_theme "$1"
-  until_ok 3000 dekho_is --arg v "$2" '.voice == $v'
-  wtype -k Return
-  until_ok 3000 listed
-  check "$1: $3 ($(rel .look) $(rel '.rows[1].best'))" dekho_is "$4"
-  wtype -k Return
-  until_ok 4000 buffering
-  note_session
-  check "$1: $5 ($(rel '.starting | [.percent, .down]') $(rel .look))" dekho_is "$6"
-  wtype -k Escape
-  until_ok 3000 unit_inactive
-  until_ok 1000 dekho_is '.releases.mode == ""'
-}
-board artboard plain "the card is rounded 14 px, the cursor row 10 px, and best is written small, as the Artboard board draws them" \
-  '.releases.look.cardRadius == 14 and .releases.look.cursorRadius == 10 and .releases.rows[1].best == "best" and .releases.header == "Release"' \
-  "the step marks are circles and the bar is rounded 4 px, as the Artboard board draws them" \
-  '.releases.look.markRadius == 8 and .releases.look.barRadius == 4'
-board blueprint bracket "the card's corners are cut and best reads [BEST], as the Blueprint board draws them" \
-  '.releases.look.chamfer and .releases.look.shadow == false and .releases.rows[1].best == "[BEST]" and .releases.count == "5 RELEASES"' \
-  "Starting writes its numbers in capitals, BUFFERING and MB/S DOWN, as the Blueprint board writes them" \
-  '(.releases.starting.percent | test("^BUFFERING [0-9]+%$")) and (.releases.starting.down | test("^[0-9.]+ MB/S DOWN$")) and .releases.header == "STARTING"'
+wtype -k Return
+until_ok 3000 listed
+check "the card is rounded 14 px, the cursor row 10 px, and best is written small ($(rel .look) $(rel '.rows[1].best'))" \
+  dekho_is '.releases.look.cardRadius == 14 and .releases.look.cursorRadius == 10 and .releases.rows[1].best == "best" and .releases.header == "Release"'
+wtype -k Return
+until_ok 4000 buffering
+note_session
+check "the step marks are circles and the bar is rounded 4 px ($(rel '.starting | [.percent, .down]') $(rel .look))" \
+  dekho_is '.releases.look.markRadius == 8 and .releases.look.barRadius == 4'
+wtype -k Escape
+until_ok 3000 unit_inactive
+until_ok 1000 dekho_is '.releases.mode == ""'
 
 # Continue watching resumes straight away, with no list.
 wtype -k Escape

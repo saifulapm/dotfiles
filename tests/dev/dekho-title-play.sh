@@ -24,8 +24,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
 unit_inactive() { ! unit_active; }
 stop_unit() { systemctl --user stop "$DOTS_DEKHO_UNIT.service" 2>/dev/null; until_ok 3000 unit_inactive; }
@@ -163,16 +161,9 @@ check "Enter on Play opens the list for S3 E4, the cursor's episode ($(dekho_sta
 wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
 
-# The focused button in each board's look: Paper inverts in ink, Artboard tints and rings in the accent, Blueprint fills in the accent.
-board() {
-  in_theme "$1"
-  until_ok 3000 dekho_is --arg v "$2" '.voice == $v'
-  check "$1: the focused button is drawn as $3 ($(dekho_state | jq -c '[.title.buttons[0] | .radius, .fill] + [.releases.look.ink, .releases.look.accent]'))" dekho_is "$4"
-}
-board paper caps "a square in ink" '.title.buttons[0] as $b | $b.focused and $b.radius == 0 and ($b.fill | ascii_downcase) == (.releases.look.ink | ascii_downcase)'
-board artboard plain "an 8 px rounded tint" '.title.buttons[0] as $b | $b.focused and $b.radius == 8 and ($b.fill | ascii_downcase) != (.releases.look.ink | ascii_downcase)'
-board blueprint bracket "a square in the accent, its words in capitals" '.title.buttons[0] as $b | $b.focused and $b.radius == 0 and ($b.fill | ascii_downcase) == (.releases.look.accent | ascii_downcase) and $b.text == "▶ PLAY"'
-in_theme paper
+# The focused button is tinted and ringed in the accent.
+check "the focused button is drawn as an 8 px rounded tint ($(dekho_state | jq -c '[.title.buttons[0] | .radius, .fill] + [.releases.look.ink, .releases.look.accent]'))" \
+  dekho_is '.title.buttons[0] as $b | $b.focused and $b.radius == 8 and ($b.fill | ascii_downcase) != (.releases.look.ink | ascii_downcase)'
 
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'

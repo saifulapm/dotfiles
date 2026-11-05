@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dekho is an App: its desktop entry starts its own qs process with one window in the theme, Home draws search and three rows of titles as its boards do, / finds titles, and Esc ends the process.
+# Dekho is an App: its desktop entry starts its own qs process with one window in the theme, Home draws search and three rows of titles as its board does, / finds titles, and Esc ends the process.
 {
 source "$(dirname "$0")/lib.sh"
 

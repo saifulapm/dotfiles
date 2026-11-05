@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dekho's Browse pages: the cursor on the last row loads the next page under the rows, once however often j is pressed, until the last page, where no load more row shows and nothing more is asked; Enter or a click on load more does the same; a filter change starts again at page 1 and drops a page still on its way; each board's look of the load more row.
+# Dekho's Browse pages: the cursor on the last row loads the next page under the rows, once however often j is pressed, until the last page, where no load more row shows and nothing more is asked; Enter or a click on load more does the same; a filter change starts again at page 1 and drops a page still on its way.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/dekho-pointer.bash"
@@ -12,8 +12,6 @@ cleanup() {
   pointer_stop
 }
 
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 rows() { dekho_state | jq -c '.browse | [(.rows | length), .cursor, .more.shown, .loading]'; }
 # The discover calls since the log had $1 lines; the checks run their conditions in bash -c, which needs it.
 asked_since() { tail -n +"$(($1 + 1))" "$calls" | grep '^api discover '; }
@@ -32,8 +30,8 @@ check "f opens Browse on both kinds' first pages, 20 each, with load more under 
 mark=$(wc -l <"$calls")
 wtype t
 until_ok 3000 dekho_is '(.browse.rows | length) == 20 and .browse.rows[0].title == "Film 1-01"'
-check "Movies only: page 1 draws 20 rows and a load more row reading ↵ LOAD MORE in Paper ($(rows), $(dekho_state | jq -c .browse.more))" \
-  dekho_is '(.browse.rows | length) == 20 and .browse.more.shown and .browse.more.text == "↵ LOAD MORE" and (.browse.more.cursor | not)'
+check "Movies only: page 1 draws 20 rows and a load more row reading ↵ load more ($(rows), $(dekho_state | jq -c .browse.more))" \
+  dekho_is '(.browse.rows | length) == 20 and .browse.more.shown and .browse.more.text == "↵ load more" and (.browse.more.cursor | not)'
 check "  asked as page 1 is, with no --page ($(asked))" test "$(asked)" = 'api discover --kind movie;'
 
 # The auto load: nothing before the last row, one page 2 on it.
@@ -125,16 +123,6 @@ check "d while both page 3s are on their way asks both kinds' page 1 ($(asked))"
   test "$(asked)" = 'api discover --kind movie --page 3;api discover --kind movie --year 1970-1979;api discover --kind tv --page 3;api discover --kind tv --year 1970-1979;'
 check "  and the late page 3s are dropped: 40 rows of page 1 only ($(rows), $(dekho_state | jq -c '[.browse.rows[].title | .[-4:-3]] | unique'))" \
   dekho_is '(.browse.rows | length) == 40 and ([.browse.rows[].title | test(" 1-")] | all) and (.browse.loading | not) and .browse.more.shown'
-
-# Each board's look of load more.
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: load more reads ↵ load more ($(dekho_state | jq -c .browse.more))" dekho_is '.browse.more.text == "↵ load more"'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: load more reads [↵] LOAD MORE ($(dekho_state | jq -c .browse.more))" dekho_is '.browse.more.text == "[↵] LOAD MORE"'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable|Binding loop' "$log")
 check "Dekho's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"

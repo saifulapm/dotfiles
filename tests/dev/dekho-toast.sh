@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dekho's toast: one line at the bottom for 2.4 s after w marks an episode, a Browse filter changes or a play fails to start; a second toast replaces the first; each board draws it in its card's look.
+# Dekho's toast: one line at the bottom for 2.4 s after w marks an episode, a Browse filter changes or a play fails to start; a second toast replaces the first; it draws in the card's look.
 {
 # A Return that played would start a unit on this machine's real user manager, so it gets this run's own name, stopped at the end.
 export DOTS_DEKHO_UNIT=dekho-toast-test-$$
@@ -23,8 +23,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 listed() { dekho_is '.releases.mode == "list" and (.releases.rows | length) == 5'; }
 failed() { dekho_is '.releases.mode == "starting" and .releases.starting.fail.shown'; }
@@ -35,7 +33,6 @@ toast_shown() { dekho_is '.toast.shown'; }
 toast_gone() { dekho_is '.toast.shown == false'; }
 # Waits until $2 ms after the clock reading $1.
 at() { local left=$(($1 + $2 - $(now_ms))); ((left > 0)) && sleep "$(awk -v ms="$left" 'BEGIN { print ms / 1000 }')"; return 0; }
-look() { dekho_state | jq -c '.toast.look | [.radius, .shadow, .chamfer]'; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"
@@ -117,22 +114,11 @@ rm -f "$failing"
 wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
 
-# Each board's card look, on a toast of w's.
-board() {
-  in_theme "$1"
-  until_ok 3000 dekho_is --arg v "$2" '.voice == $v'
-  wtype w
-  until_ok 3000 toast_is "$3"
-  check "$1: the toast reads $3 as written ($(dekho_state | jq -c .toast.look))" dekho_is "$4"
-}
-board artboard plain 'Marked unwatched' '.toast.look.radius == 10 and .toast.look.shadow == false and .toast.look.chamfer == false and (.toast.look.border | ascii_downcase) == (.toast.look.accent | ascii_downcase)'
-artboard_look=$(look)
-board blueprint bracket 'Marked watched' '.toast.look.chamfer and .toast.look.shadow == false'
-blueprint_look=$(look)
-board paper caps 'Marked unwatched' '.toast.look.radius == 0 and .toast.look.shadow and .toast.look.chamfer == false and (.toast.look.border | ascii_downcase) == (.toast.look.ink | ascii_downcase)'
-paper_look=$(look)
-check "the three boards draw it three ways (paper $paper_look, artboard $artboard_look, blueprint $blueprint_look)" \
-  test "$(printf '%s\n' "$paper_look" "$artboard_look" "$blueprint_look" | sort -u | wc -l)" = 3
+# The card look, on a toast of w's: rounded 10 px and ringed in the accent.
+wtype w
+until_ok 3000 toast_is 'Marked unwatched'
+check "the toast reads Marked unwatched as written, rounded and ringed in the accent ($(dekho_state | jq -c .toast.look))" \
+  dekho_is '.toast.look.radius == 10 and (.toast.look.border | ascii_downcase) == (.toast.look.accent | ascii_downcase)'
 
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'

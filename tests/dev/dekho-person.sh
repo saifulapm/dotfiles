@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enter on a crew name in Dekho's Title page opens their Person page: portrait or its placeholder, life years, birthplace, biography, credits split into directing, acting and writing with the role beside each; tab moves between the groups, Enter opens a title, f opens Browse with the person as a chip; each board's look.
+# Enter on a crew name in Dekho's Title page opens their Person page: portrait or its placeholder, life years, birthplace, biography, credits split into directing, acting and writing with the role beside each; tab moves between the groups, Enter opens a title, f opens Browse with the person as a chip; the board's look.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -15,8 +15,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 person_loaded() { dekho_is '.page == "person" and .personPage.ready'; }
 # The drawn credits, not their headings.
@@ -44,42 +42,28 @@ check "it asked the fake for her page and her portrait" \
 check "her name, with a newline, U+202E and ESC in it, draws on one line without them, in the header and the side ($(dekho_state | jq -c '[.personPage.name, .personPage.headerName]'))" \
   dekho_is '.personPage.name == "Mara Lindqvist" and .personPage.nameLines == 1 and .personPage.headerName == "Mara Lindqvist"'
 check "the years read 1978 –, the birthplace Gothenburg, Sweden ($(dekho_state | jq -c '[.personPage.subline, .personPage.place]'))" \
-  dekho_is '.personPage.subline == "1978 – · DIRECTING · ACTING · WRITING" and .personPage.place == "Gothenburg, Sweden"'
+  dekho_is '.personPage.subline == "1978 – · Directing · Acting · Writing" and .personPage.place == "Gothenburg, Sweden"'
 check "the long biography with a newline wraps inside its box in the 300 px side, never pushing the credits off ($(dekho_state | jq -c '.personPage.bio'))" \
   dekho_is '.personPage.bio.lines > 5 and (.personPage.bio.text | test("\n") | not) and .personPage.bio.fits and .personPage.bio.width < .personPage.bio.panel and .personPage.creditsShown'
 until_ok 3000 dekho_is '.personPage.portrait.image'
 check "the portrait the fake prefetched draws in the placeholder's place ($(dekho_state | jq -c .personPage.portrait))" \
   dekho_is '.personPage.portrait.image and .personPage.portrait.placeholder == false'
 check "three groups draw with their headings and counts ($(heads))" \
-  dekho_is '[.personPage.lines[] | select(.head) | [.text, .count]] == [["DIRECTING", "3"], ["ACTING", "3"], ["WRITING", "2"]] and .personPage.count == "FILMOGRAPHY · 8 CREDITS"'
+  dekho_is '[.personPage.lines[] | select(.head) | [.text, .count]] == [["Directing", "3"], ["Acting", "3"], ["Writing", "2"]] and .personPage.count == "Filmography · 8 credits"'
 check "each credit has its role beside it, an actor's part after \"as\" ($(credits '.role'))" \
   dekho_is '[.personPage.lines[] | select(.head | not) | [.group, .title, .role, .vote]] == [["directing", "The Long Tide", "Director", "★ 8.1"], ["directing", "Night Ferry", "Director", "★ 7.3"], ["directing", "Seven Stations", "Director", "★ 7.6"], ["acting", "A Quiet Verdict", "as Judge Hale", "★ 7.8"], ["acting", "Salt Road", "as Nora Vell", "★ 7.4"], ["acting", "Copper Hill", "as Dr. Anya Rask", "★ 7.1"], ["writing", "Night Ferry", "Screenplay", "★ 7.3"], ["writing", "The Long Tide", "Creator", "★ 8.1"]] and ([.personPage.lines[] | select(.head | not) | .titleLines, .roleLines] | all(. == 1))'
 check "the cursor starts on her first credit, The Long Tide, directing ($(dekho_state | jq -c '[.personPage.cursor, .personPage.group]'))" \
   dekho_is '.personPage.cursor == 0 and .personPage.group == "directing"'
-check "paper: her name is set in Instrument Serif, as the Paper board sets it ($(dekho_state | jq -c .personPage.look.nameFont))" \
-  dekho_is '.personPage.look.nameFont == "Instrument Serif"'
 posters() { dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster.file]'; }
 until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
 check "each credit with a poster the fake holds draws its own in the 18 x 27 place, under directing, acting and writing ($(posters))" \
-  dekho_is '[.personPage.lines[] | select(.head | not) | [.group, .title, .poster.file]] == [["directing", "The Long Tide", "c101.jpg"], ["directing", "Night Ferry", "c102.jpg"], ["directing", "Seven Stations", ""], ["acting", "A Quiet Verdict", ""], ["acting", "Salt Road", "c105.jpg"], ["acting", "Copper Hill", "c106.jpg"], ["writing", "Night Ferry", "c102.jpg"], ["writing", "The Long Tide", "c101.jpg"]] and ([.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | all(.width == 18 and .height == 27 and .radius == 0))'
+  dekho_is '[.personPage.lines[] | select(.head | not) | [.group, .title, .poster.file]] == [["directing", "The Long Tide", "c101.jpg"], ["directing", "Night Ferry", "c102.jpg"], ["directing", "Seven Stations", ""], ["acting", "A Quiet Verdict", ""], ["acting", "Salt Road", "c105.jpg"], ["acting", "Copper Hill", "c106.jpg"], ["writing", "Night Ferry", "c102.jpg"], ["writing", "The Long Tide", "c101.jpg"]] and ([.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | all(.width == 18 and .height == 27 and .radius == 4))'
 check "a null poster (Seven Stations) and a gone one (A Quiet Verdict) keep the empty mark ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | [.title, .poster.shown]]'))" \
   dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown | not) | .title] == ["Seven Stations", "A Quiet Verdict"]'
 check "a credit poster decodes at no more than twice its drawn 18 x 27 ($(dekho_state | jq -c '.personPage.lines[1].poster'))" \
   dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.decodedWidth > 0 and .decodedHeight > 0 and (([.decodedWidth / .width, .decodedHeight / .height] | min) <= 2))'
 check "all the credits' posters came from one prefetch call, each path once, the gone one asked and left out" \
   bash -c "[ \$(grep -c '/c101.jpg' '$calls') = 1 ] && grep -qx 'api prefetch --size w342 /c101.jpg /c102.jpg /gone104.jpg /c105.jpg /c106.jpg' '$calls'"
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
-check "artboard: a credit's poster is masked to its grey tile's 4 px corners ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster | [.shown, .radius]] | unique'))" \
-  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.radius == 4 and .width == 18 and .height == 27)'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-until_ok 3000 dekho_is '[.personPage.lines[] | select(.head | not) | select(.poster.shown)] | length == 6'
-check "blueprint: a credit's poster fills its crossed box square ($(dekho_state | jq -c '[.personPage.lines[] | select(.head | not) | .poster | [.shown, .radius]] | unique'))" \
-  dekho_is '[.personPage.lines[] | select(.head | not) | .poster | select(.shown)] | length == 6 and all(.radius == 0 and .width == 18 and .height == 27)'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 
 wtype -k Tab
 until_ok 1000 dekho_is '.personPage.group == "acting"'
@@ -118,17 +102,9 @@ until_ok 3000 dekho_is '.personPage.tmdbId == 1002'
 check "a person with no portrait draws the placeholder with TE ($(dekho_state | jq -c .personPage.portrait))" \
   dekho_is '.personPage.portrait.placeholder and .personPage.portrait.image == false and .personPage.portrait.initials == "TE" and .personPage.portrait.width == 120 and .personPage.portrait.height == 120'
 check "the years of the dead read 1931 – 2004, with no birthplace or biography and one group ($(dekho_state | jq -c '[.personPage.subline, .personPage.place, .personPage.bio.text]'))" \
-  dekho_is '.personPage.subline == "1931 – 2004 · WRITING" and .personPage.place == "" and .personPage.bio.text == "" and ([.personPage.lines[] | select(.head) | .text] == ["WRITING"])'
-check "paper: the placeholder is hatched, as the Paper board draws it ($(dekho_state | jq -c .personPage.look))" \
-  dekho_is '.personPage.look.hatch and (.personPage.look.cross | not) and .personPage.look.portraitRadius == 0'
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: the portrait is a circle and the credit row rounded 10 px, headings in sentence case, as the Artboard board draws them ($(dekho_state | jq -c '[.personPage.look.portraitRadius, .personPage.look.rowRadius, .personPage.subline, .personPage.button]'))" \
-  dekho_is '.personPage.look.portraitRadius == 60 and .personPage.look.rowRadius == 10 and .personPage.subline == "1931 – 2004 · Writing" and .personPage.button == "f filter the library by Tomas" and ([.personPage.lines[] | select(.head) | .text] == ["Writing"])'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the placeholder is a crossed box, the key and the kind in brackets and capitals, as the Blueprint board writes them ($(dekho_state | jq -c '[.personPage.look.cross, .personPage.button, .personPage.lines[1].kind]'))" \
-  dekho_is '.personPage.look.cross and (.personPage.look.hatch | not) and .personPage.button == "[F] FILTER THE LIBRARY BY TOMAS" and .personPage.lines[1].kind == "FILM" and .personPage.subline == "1931 – 2004 · WRITING"'
+  dekho_is '.personPage.subline == "1931 – 2004 · Writing" and .personPage.place == "" and .personPage.bio.text == "" and ([.personPage.lines[] | select(.head) | .text] == ["Writing"])'
+check "the portrait is a circle and the credit row rounded 10 px, the key and the kind in lower case ($(dekho_state | jq -c '[.personPage.look.portraitRadius, .personPage.look.rowRadius, .personPage.button, .personPage.lines[1].kind]'))" \
+  dekho_is '.personPage.look.portraitRadius == 60 and .personPage.look.rowRadius == 10 and .personPage.button == "f filter the library by Tomas" and .personPage.lines[1].kind == "film"'
 
 wtype /
 until_ok 1000 dekho_is '.page == "home" and .search.focused'

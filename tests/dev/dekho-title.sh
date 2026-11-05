@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enter on a title in Dekho's Home opens its Title page: the cursor on the episode next up, later episodes dimmed with their air date, w marking watched, people to open, and each board's look.
+# Enter on a title in Dekho's Home opens its Title page: the cursor on the episode next up, later episodes dimmed with their air date, w marking watched, people to open, and the board's look.
 {
 # A Return that played by mistake would start a unit on this machine's real user manager, so it gets this run's own name, stopped at the end.
 export DOTS_DEKHO_UNIT=dekho-play-title-test-$$
@@ -21,8 +21,6 @@ dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
 dekho_pids() { session_qs_pids "-p $dekho_qml"; }
 no_dekho_process() { [ -z "$(dekho_pids)" ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 ep() { dekho_state | jq -c ".title.episodes[$1]"; }
 layout() { dekho_state | jq -c .title.layout; }
@@ -58,8 +56,8 @@ until_ok 3000 stills_asked
 check "each season's stills came from one w342 prefetch of its own ($(grep -c '^api prefetch --size w342 /s101-' "$DOTS_DEV_DIR/dekho.log") calls)" stills_asked
 check "the season tab opens on S3, the season holding next up, past S1 and S2 all watched ($(dekho_state | jq -c '.title.tabs'))" \
   dekho_is '.title.season == 3 and .title.tabs == [{"text": "S1", "current": false}, {"text": "S2", "current": false}, {"text": "S3", "current": true}, {"text": "S4", "current": false}]'
-check "the cursor is on E4, the first aired episode not watched, and its row reads NEXT UP ($(ep 3))" \
-  dekho_is '.title.cursor == 4 and .title.episodes[3].cursor and .title.episodes[3].tag == "NEXT UP" and ([.title.episodes[] | select(.tag != "")] | length) == 1'
+check "the cursor is on E4, the first aired episode not watched, and its row reads next up ($(ep 3))" \
+  dekho_is '.title.cursor == 4 and .title.episodes[3].cursor and .title.episodes[3].tag == "next up" and ([.title.episodes[] | select(.tag != "")] | length) == 1'
 check "the count reads 3 of 8 watched ($(dekho_state | jq -c .title.count))" dekho_is '.title.count == "3 of 8 watched"'
 airs="airs $(LC_ALL=C date -d '+7 days' '+%-d %b')"
 check "E5, a week from today, reads \"$airs\" and is drawn dimmed in the muted colour ($(ep 4))" \
@@ -76,7 +74,7 @@ check "the 300-character overview with a newline wraps to at most 3 lines, elide
   dekho_is '.title.overview.lines <= 3 and .title.overview.truncated and (.title.overview.text | test("\n") | not) and .title.episodesShown'
 until_ok 3000 dekho_is '.title.slot.shown'
 check "the poster draws in the picture's place, not the backdrop ($(dekho_state | jq -c .title.slot))" \
-  dekho_is '.title.slot | .shown and .file == "p101.jpg" and .width == 220 and .height == 300 and .radius == 0'
+  dekho_is '.title.slot | .shown and .file == "p101.jpg" and .width == 220 and .height == 300 and .radius == 14'
 until_ok 3000 dekho_is '.title.crew[0].face.shown and .title.cast[2].face.shown'
 check "each crew chip draws its person's face in its 20 px square, a null and a gone profile keep the mark ($(dekho_state | jq -c '[.title.crew[].face | [.shown, .file]]'))" \
   dekho_is '[.title.crew[].face | [.shown, .file, .width, .height]] == [[true, "f101-1001.jpg", 20, 20], [false, "", 20, 20], [false, "", 20, 20]]'
@@ -109,7 +107,7 @@ check "the fake heard the mark for S3 E4" grep -qx 'api watched --id 101 -s 3 -e
 wtype w
 until_ok 3000 dekho_is '.title.episodes[3].watched == false'
 check "w again unmarks it ($(dekho_state | jq -c '[.title.episodes[3].watched, .title.count]'))" \
-  dekho_is '.title.episodes[3].watched == false and .title.count == "3 of 8 watched" and .title.episodes[3].tag == "NEXT UP"'
+  dekho_is '.title.episodes[3].watched == false and .title.count == "3 of 8 watched" and .title.episodes[3].tag == "next up"'
 
 wtype -k Tab
 until_ok 1000 dekho_is '.title.zone == "crew"'
@@ -144,27 +142,15 @@ check "/ goes to Home's search field ($(dekho_state | jq -c '[.page, .search.foc
 wtype -k Escape
 until_ok 1000 dekho_is '.search.focused == false'
 
-# Each board's own detail, on The Long Tide's page; leaving the search put the cursor back on Continue watching, where Enter would play.
+# The board's own detail, on The Long Tide's page; leaving the search put the cursor back on Continue watching, where Enter would play.
 wtype jl
 until_ok 1000 dekho_is '.focus == {"row": "series", "col": 1}'
 wtype -k Return
 until_ok 3000 title_loaded
-check "paper: an aired date is set in Instrument Serif italic, as the Paper board sets it ($(dekho_state | jq -c '.title.look | {datedFont, datedItalic}'))" \
-  dekho_is '.title.look.datedFont == "Instrument Serif" and .title.look.datedItalic and .title.episodes[4].font == "Maple Mono"'
-check "paper: the poster fills the hatched place square ($(dekho_state | jq -c .title.slot))" dekho_is '.title.slot | .shown and .file == "p101.jpg" and .radius == 0'
-series_paper=$(layout)
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: the poster is masked to the grey tile's 14 px corners ($(dekho_state | jq -c .title.slot))" dekho_is '.title.slot | .shown and .file == "p101.jpg" and .radius == 14'
-check "artboard: season tabs are rounded 10 px and the tag reads next up, as the Artboard board draws them ($(dekho_state | jq -c '[.title.look.tabRadius, .title.episodes[3].tag]'))" \
+check "the poster is masked to the grey tile's 14 px corners ($(dekho_state | jq -c .title.slot))" dekho_is '.title.slot | .shown and .file == "p101.jpg" and .radius == 14'
+check "season tabs are rounded 10 px and the tag reads next up ($(dekho_state | jq -c '[.title.look.tabRadius, .title.episodes[3].tag]'))" \
   dekho_is '.title.look.tabRadius == 10 and .title.episodes[3].tag == "next up" and .title.count == "3 of 8 watched"'
-series_artboard=$(layout)
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the tag reads [NEXT UP] and a date to come AIRS, as the Blueprint board writes them ($(dekho_state | jq -c '[.title.episodes[3].tag, .title.episodes[4].date, .title.count]'))" \
-  dekho_is --arg airs "${airs^^}" '.title.episodes[3].tag == "[NEXT UP]" and .title.episodes[4].date == $airs and .title.count == "3 OF 8 WATCHED"'
-check "blueprint: the poster fills the crossed box square ($(dekho_state | jq -c .title.slot))" dekho_is '.title.slot | .shown and .file == "p101.jpg" and .radius == 0'
-series_blueprint=$(layout)
+series_layout=$(layout)
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 
@@ -173,19 +159,9 @@ wtype jhh
 until_ok 1000 dekho_is '.focus == {"row": "movies", "col": 0}'
 wtype -k Return
 until_ok 3000 dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'
-check "blueprint: a film's page draws the series page's header and its block under it (film $(layout), series $series_blueprint)" film_layout_is "$series_blueprint"
-check "blueprint: a title with neither poster nor backdrop keeps the crossed box ($(dekho_state | jq -c '[.title.slot, .title.look.cross]'))" \
-  dekho_is '(.title.slot | .shown == false and .file == "" and .width == 220 and .height == 300) and .title.look.cross'
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: a film's page draws the series page's header and its block under it (film $(layout), series $series_artboard)" film_layout_is "$series_artboard"
-check "artboard: a title with neither poster nor backdrop keeps the grey tile and its picture icon ($(dekho_state | jq -c '[.title.slot, .title.look.icon]'))" \
-  dekho_is '(.title.slot | .shown == false and .file == "") and .title.look.icon'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
-check "paper: a film's page draws the series page's header and its block under it (film $(layout), series $series_paper)" film_layout_is "$series_paper"
-check "paper: a title with neither poster nor backdrop keeps the hatch ($(dekho_state | jq -c '[.title.slot, .title.look.hatch]'))" \
-  dekho_is '(.title.slot | .shown == false and .file == "") and .title.look.hatch'
+check "a film's page draws the series page's header and its block under it (film $(layout), series $series_layout)" film_layout_is "$series_layout"
+check "a title with neither poster nor backdrop keeps the grey tile and its picture icon ($(dekho_state | jq -c '[.title.slot, .title.look.icon]'))" \
+  dekho_is '(.title.slot | .shown == false and .file == "" and .width == 220 and .height == 300) and .title.look.icon'
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 

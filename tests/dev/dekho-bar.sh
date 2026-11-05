@@ -24,8 +24,6 @@ dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_gone() { [ "$(dekho_windows)" = 0 ]; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
 unit_inactive() { ! unit_active; }
 note_session() { dekho_state | jq -r .releases.session >>"$sessions"; }
@@ -111,20 +109,10 @@ wtype -k Return
 until_ok 3000 dekho_is '.page == "person"'
 check "a person's page shows the bar ($(bar))" bar_on person "Seven Stations (2026)" ""
 
-# The bar in each board's look: Paper's inked tag, Artboard's tinted pill, Blueprint's bracketed accent tag in its mono face.
+# The bar's look: the tag in a pill of the accent's tint.
 look() { dekho_state | jq -c '[.bar.tag, .bar.look, .releases.look.ink, .releases.look.accent]'; }
-check "paper: the tag reads NOW PLAYING on ink ($(look))" \
-  dekho_is '.bar.tag == "NOW PLAYING" and (.bar.look.tagFill | ascii_downcase) == (.releases.look.ink | ascii_downcase) and .bar.look.tagRadius == 0'
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: the tag reads Now playing in a rounded pill ($(look))" \
+check "the tag reads Now playing in a rounded pill ($(look))" \
   dekho_is '.bar.tag == "Now playing" and .bar.look.tagRadius == 8 and (.bar.look.tagFill | ascii_downcase) != (.releases.look.ink | ascii_downcase)'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the tag reads [NOW PLAYING], unfilled, in the mono face ($(look))" \
-  dekho_is '.bar.tag == "[NOW PLAYING]" and .bar.look.tagFill == "#00000000" and (.bar.look.font | test("Mono"))'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 
 # Closed and reopened mid-play, Dekho adopts the run: the bar within 1 s of its first frame, and no second play.
 wtype -k Escape

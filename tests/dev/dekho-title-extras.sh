@@ -7,8 +7,6 @@ source "$(dirname "$0")/dekho-pointer.bash"
 chromium_log=$DOTS_DEV_DIR/chromium.log
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 film_loaded() { dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 links() { dekho_state | jq -c '[.title.links[] | [.text, .url]]'; }
 opened() { grep -cx "$1" "$chromium_log" 2>/dev/null; }
 opened_once() { [ "$(opened "$1")" = 1 ]; }
@@ -58,17 +56,9 @@ check "a click on TMDB opened its page in Chromium and moved the cursor onto it 
   bash -c "[ \$(grep -cx 'https://www.themoviedb.org/tv/101' '$chromium_log') = 1 ] && [ \$(wc -l <'$chromium_log') = 2 ]"
 check "the cursor is on the TMDB link ($(dekho_state | jq -c '[.title.zone, .title.links[0].focused]'))" dekho_is '.title.zone == "links" and .title.links[0].focused'
 
-# Each board's own words: Paper sets them as written, Artboard too, Blueprint upper-cases them.
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: the links read TMDB and IMDb and the tagline as written ($(links))" \
-  dekho_is '[.title.links[].text] == ["TMDB", "IMDb"] and .title.tagline.text == "The water remembers." and .title.tagline.shown'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the links read TMDB and IMDB, upper-cased ($(links))" dekho_is '[.title.links[].text] == ["TMDB", "IMDB"] and .title.tagline.shown and .title.tagline.lines == 1'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
-check "paper: the links read TMDB and IMDb ($(links))" dekho_is '[.title.links[].text] == ["TMDB", "IMDb"]'
+# The links and the tagline read as written.
+check "the links read TMDB and IMDb and the tagline as written ($(links))" \
+  dekho_is '[.title.links[].text] == ["TMDB", "IMDb"] and .title.tagline.text == "The water remembers." and .title.tagline.shown and .title.tagline.lines == 1'
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 
@@ -80,14 +70,6 @@ check "a tagline with a newline, U+202E and ESC and 300 more characters draws on
   dekho_is '.title.tagline | .shown and .lines == 1 and .truncated and (.text | length) > 300 and (.text | startswith("Every harbour keeps a light burning")) and (.text | test("[\u0001-\u001f\u007f‮]") | not)'
 check "a javascript: homepage and a missing imdb id show only TMDB ($(links))" \
   dekho_is '[.title.links[] | [.kind, .url]] == [["tmdb", "https://www.themoviedb.org/tv/300"]]'
-for theme in artboard blueprint; do
-  in_theme "$theme"
-  until_ok 3000 dekho_is '.voice != "caps"'
-  check "$theme: the forged tagline still draws on one line and no Homepage link ($(dekho_state | jq -c '[.title.tagline.lines, [.title.links[].kind]]'))" \
-    dekho_is '.title.tagline.shown and .title.tagline.lines == 1 and ([.title.links[].kind] == ["tmdb"])'
-done
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 wtype -k Escape
 until_ok 1000 dekho_is '.page == "home"'
 
@@ -108,12 +90,6 @@ until_ok 1000 dekho_is '.title.links[2].focused'
 wtype -k Return
 until_ok 3000 opened_once https://example.org/a-quiet-verdict
 check "Enter on Homepage opened the film's own site in Chromium ($(tail -1 "$chromium_log"))" opened_once https://example.org/a-quiet-verdict
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the film's links read TMDB, IMDB and HOMEPAGE, and still no tagline ($(links))" \
-  dekho_is '[.title.links[].text] == ["TMDB", "IMDB", "HOMEPAGE"] and .title.tagline.shown == false'
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
 
 # The cursor left on the film's third link must not outlive it: The Long Tide has two, and Tab to them focuses TMDB.
 wtype -k Escape

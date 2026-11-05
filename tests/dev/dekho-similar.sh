@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dekho's Title page ends in MORE LIKE THIS: up to 10 similar titles as Home's cards with posters, the last Tab zone, h/l moving along it, Enter or a click opening a title that esc comes back from, and no row for a title without similar titles.
+# Dekho's Title page ends in More like this: up to 10 similar titles as Home's cards with posters, the last Tab zone, h/l moving along it, Enter or a click opening a title that esc comes back from, and no row for a title without similar titles.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/dekho-pointer.bash"
@@ -8,8 +8,6 @@ fake_log=$DOTS_DEV_DIR/dekho.log
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 named() { dekho_is --arg n "$1" '.page == "title" and .title.name == $n and (.title.similar.cards | length) > 0'; }
 film_loaded() { dekho_is '.page == "title" and .title.name == "A Quiet Verdict" and (.title.crew | length) == 3'; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 similar() { dekho_state | jq -c '.title.similar | {head, shown, cursor, top, bottom, cards: [.cards[] | [.title[0:24], .lines, .shown, .poster.shown, .poster.file]]}'; }
 where() { dekho_state | jq -c '[.title.name, .title.zone, .title.similar.cursor]'; }
 # Every card drawn with its w342 poster, and as many drawn on screen as the row's five columns hold.
@@ -27,7 +25,7 @@ until_ok 3000 dekho_is '(.rows.series | length) == 10'
 click_on series:1
 until_ok 3000 title_loaded
 until_ok 3000 dekho_is '.title.similar.cards[0].poster.shown and .title.similar.cards[9].poster.shown'
-check "The Long Tide draws MORE LIKE THIS with 10 of its 12 similar titles, each with its poster, 5 on screen ($(similar | head -c 400))" row_drawn "MORE LIKE THIS"
+check "The Long Tide draws More like this with 10 of its 12 similar titles, each with its poster, 5 on screen ($(similar | head -c 400))" row_drawn "More like this"
 check "their posters came from one w342 prefetch of the 10 drawn" posters_asked
 check "the series page draws its episodes, and the row below them ($(dekho_state | jq -c '[.title.episodesShown, .title.layout.episodesBottom, .title.similar.top, .title.similar.bottom]'))" \
   dekho_is '.title.episodesShown and (.title.layout.episodesBottom | type) == "number" and .title.similar.top >= .title.layout.episodesBottom and .title.similar.bottom > .title.similar.top + 60'
@@ -71,26 +69,14 @@ for round in 1 2; do
   check "round $round: esc comes back to The Long Tide in the similar zone, the cursor on Harbour Lights and its card on screen ($(where))" \
     dekho_is '.page == "title" and .title.name == "The Long Tide" and .title.tmdbId == 101 and .title.zone == "similar" and .title.similar.cursor == 5 and .title.similar.cards[5].shown and .title.similar.cards[5].title == "Harbour Lights"'
 done
-until_ok 3000 row_drawn "MORE LIKE THIS"
-check "the row is drawn again whole ($(similar | head -c 200))" row_drawn "MORE LIKE THIS"
-
-# Each board's own heading, on the same cards.
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
 until_ok 3000 row_drawn "More like this"
-check "artboard: the heading reads More like this over 10 cards, 5 on screen ($(similar | head -c 200))" row_drawn "More like this"
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-until_ok 3000 row_drawn "MORE LIKE THIS"
-check "blueprint: the heading reads MORE LIKE THIS over 10 cards, 5 on screen ($(similar | head -c 200))" row_drawn "MORE LIKE THIS"
-in_theme paper
-until_ok 3000 dekho_is '.voice == "caps"'
+check "the row is drawn again whole ($(similar | head -c 200))" row_drawn "More like this"
 
 # A click on a card opens it: A Quiet Verdict, a film with no similar titles, draws no row and Tab never stops on one.
 click_on title-similar:1
 until_ok 3000 film_loaded
 check "a click on A Quiet Verdict's card opened its page ($(where))" dekho_is '.title.name == "A Quiet Verdict" and .title.tmdbId == 400'
-check "a film with no similar titles draws no MORE LIKE THIS ($(dekho_state | jq -c '.title.similar | {shown, n: (.cards | length)}'))" \
+check "a film with no similar titles draws no More like this ($(dekho_state | jq -c '.title.similar | {shown, n: (.cards | length)}'))" \
   dekho_is '.title.similar.shown == false and (.title.similar.cards | length) == 0'
 zones=
 for _ in 1 2 3 4 5 6; do

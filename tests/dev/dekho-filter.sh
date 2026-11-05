@@ -23,8 +23,6 @@ dekho_state() { timeout 0.5 qs ipc -p "$dekho_qml" call dekho state 2>/dev/null;
 dekho_is() { dekho_state | jq -e "$@" >/dev/null 2>&1; }
 dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] | length'; }
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 title_loaded() { dekho_is '.page == "title" and .title.season > 0 and (.title.episodes | length) > 0'; }
 rel() { dekho_state | jq -c ".releases$1"; }
 unit_active() { systemctl --user is-active --quiet "$DOTS_DEKHO_UNIT.service"; }
@@ -65,12 +63,12 @@ until_ok 3000 dekho_is '.title.cursor == 4'
 wtype -k Return
 until_ok 3000 listed
 check "the list opens with no filter field ($(rel .filter))" dekho_is '.releases.filter | .text == "" and .shown == false and .focused == false'
-check "the keys end in ctrl+f filter ($(rel '.starting.fail.keys[-1]'))" dekho_is '.releases.starting.fail.keys[-1] == ["CTRL+F", "FILTER"]'
+check "the keys end in ctrl+f filter ($(rel '.starting.fail.keys[-1]'))" dekho_is '.releases.starting.fail.keys[-1] == ["ctrl+f", "filter"]'
 
 ctrl_f
 check "Ctrl+F shows the field with the focus, the rows unchanged ($(rel .filter))" \
   dekho_is '.releases.filter.shown and .releases.filter.focused and (.releases.rows | length) == 6'
-check "paper: the field draws in Maple Mono, the board's body font ($(rel .filter.family))" dekho_is '.releases.filter.family == "Maple Mono"'
+check "the field draws in Maple Mono, the board's body font ($(rel .filter.family))" dekho_is '.releases.filter.family == "Maple Mono"'
 
 type_filter 1080
 check "1080 leaves Auto first and the two 1080p releases, best first ($(rel '.rows | map([.auto, .quality, .seeders])'))" \
@@ -124,18 +122,6 @@ check "reopened, the list has no filter field and all six rows ($(rel ' | [.filt
   dekho_is '.releases.filter.text == "" and .releases.filter.shown == false and .releases.filter.focused == false and (.releases.rows | length) == 6'
 wtype -k Escape
 until_ok 1000 dekho_is '.releases.mode == ""'
-
-# The field draws in each board's body font.
-for theme in artboard blueprint; do
-  in_theme "$theme"
-  wtype -k Return
-  until_ok 3000 listed
-  ctrl_f
-  check "$theme: the field draws in Maple Mono, the board's body font ($(rel .filter))" \
-    dekho_is '.releases.filter.shown and .releases.filter.family == "Maple Mono"'
-  wtype -k Escape
-  until_ok 1000 dekho_is '.releases.mode == ""'
-done
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable|Binding loop' "$log")
 check "Dekho's log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
