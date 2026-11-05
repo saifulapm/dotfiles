@@ -23,7 +23,7 @@ export function rank(entries, query) {
     .map((x) => x.e);
 }
 
-const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands', 'r ': 'reminder' };
+const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands', 'r ': 'reminder', 'c ': 'colorschemes' };
 
 export function parseQuery(text) {
   const mode = PREFIXES[text.slice(0, 2)];
@@ -96,3 +96,27 @@ export function convertRows(q, now, zones) {
   const c = zones ? convert(q, now, zones) : null;
   return c ? [{ title: `${c.from} = ${c.to}`, detail: c.day || c.utc, copy: c.time, glyph: '=' }] : [];
 }
+
+// Accents folded and case dropped, so `rose` finds Rosé Pine.
+const fold = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// themes.json's schemes by title, matched on the title, then the family as a keyword; each row draws paper, surface, accent and ANSI 1, 2, 3 and 5.
+export function schemeRows(schemes, q, current, bin) {
+  const entries = schemes.map((s) => ({
+    name: fold(s.title),
+    keywords: [fold(s.family)],
+    row: {
+      title: s.title,
+      detail: s.mode,
+      name: s.name,
+      current: s.name === current,
+      swatches: [s.color.paper, s.color.surface, s.color.accent].concat([1, 2, 3, 5].map((i) => s.color.ansi[i])),
+      exec: [bin ? `${bin}/dots` : 'dots', 'colorscheme', s.name],
+      stamp: true,
+    },
+  }));
+  return rows(entries, fold(q));
+}
+
+// A stamped row's command runs under the key press time, which dots colorscheme times its switch from.
+export const stampedExec = (row, now) => (row.stamp ? ['env', `DOTS_SWITCH_T0=${now}`].concat(row.exec) : row.exec);

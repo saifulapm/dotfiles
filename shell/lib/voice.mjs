@@ -6,7 +6,7 @@ import { captureText } from './island.mjs';
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
 
-export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
+export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder', 'colorschemes'];
 
 // Each mode's prefix and the word the footer gives it.
 const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'calculator'], ['>', 'commands']];

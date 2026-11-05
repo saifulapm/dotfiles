@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec } from './launcher.mjs';
 
 const app = (name, keywords = []) => ({ id: name.toLowerCase(), name, genericName: '', keywords });
 const names = (entries) => entries.map((e) => e.name);
@@ -33,12 +33,16 @@ test('parseQuery reads the mode from the prefix', () => {
   assert.deepEqual(parseQuery('> lo'), { mode: 'commands', q: 'lo' });
   assert.deepEqual(parseQuery('w '), { mode: 'windows', q: '' });
   assert.deepEqual(parseQuery('r 20m tea'), { mode: 'reminder', q: '20m tea' });
+  assert.deepEqual(parseQuery('c moc'), { mode: 'colorschemes', q: 'moc' });
+  assert.deepEqual(parseQuery('c '), { mode: 'colorschemes', q: '' });
 });
 
 test('a prefix letter without its space stays an app search', () => {
   assert.deepEqual(parseQuery('w'), { mode: 'apps', q: 'w' });
   assert.deepEqual(parseQuery('wine'), { mode: 'apps', q: 'wine' });
   assert.deepEqual(parseQuery('=1'), { mode: 'apps', q: '=1' });
+  assert.deepEqual(parseQuery('c'), { mode: 'apps', q: 'c' });
+  assert.deepEqual(parseQuery('code'), { mode: 'apps', q: 'code' });
 });
 
 test('windows rank by title then app_id, as rows with the window id', () => {
@@ -146,4 +150,64 @@ test('a key with no text or a control character in the overview types nothing', 
   assert.equal(overviewChar('\r', {}), '');
   assert.equal(overviewChar('\t', {}), '');
   assert.equal(overviewChar('\u007f', {}), '');
+});
+
+// themes.json's entries, as the shell reads them: each scheme's tokens with its title and family.
+const scheme = (name, title, family, mode, n = 0) => ({
+  name, title, family, mode,
+  color: { paper: `#00000${n}`, surface: `#11111${n}`, accent: `#22222${n}`, ink: '#FFFFFF', ansi: Array.from({ length: 16 }, (_, i) => `#${String(i).padStart(2, '0')}000${n}`) },
+});
+const SCHEMES = [
+  scheme('artboard', 'Artboard', 'Artboard', 'light', 1),
+  scheme('catppuccin-mocha', 'Catppuccin Mocha', 'Catppuccin', 'dark', 2),
+  scheme('catppuccin-latte', 'Catppuccin Latte', 'Catppuccin', 'light', 3),
+  scheme('rose-pine', 'Rosé Pine', 'Rosé Pine', 'dark', 4),
+  scheme('rose-pine-moon', 'Rosé Pine Moon', 'Rosé Pine', 'dark', 5),
+  scheme('rose-pine-dawn', 'Rosé Pine Dawn', 'Rosé Pine', 'light', 6),
+  scheme('gruvbox-dark', 'Gruvbox Dark', 'Gruvbox', 'dark', 7),
+  scheme('gruvbox-material-dark', 'Gruvbox Material Dark', 'Gruvbox Material', 'dark', 8),
+  scheme('tokyo-night', 'Tokyo Night', 'Tokyo Night', 'dark', 9),
+];
+const titles = (rows) => rows.map((r) => r.title);
+
+test('c with nothing typed lists every scheme by title', () => {
+  assert.deepEqual(titles(schemeRows(SCHEMES, '', 'artboard')), [
+    'Artboard', 'Catppuccin Latte', 'Catppuccin Mocha', 'Gruvbox Dark', 'Gruvbox Material Dark', 'Rosé Pine', 'Rosé Pine Dawn', 'Rosé Pine Moon', 'Tokyo Night',
+  ]);
+});
+
+test('typing filters by title: moc leaves Catppuccin Mocha alone', () => {
+  assert.deepEqual(titles(schemeRows(SCHEMES, 'moc', 'artboard')), ['Catppuccin Mocha']);
+});
+
+test('a family name lists all its variants, and rose finds Rosé with its accent folded', () => {
+  assert.deepEqual(titles(schemeRows(SCHEMES, 'rose', 'artboard')), ['Rosé Pine', 'Rosé Pine Dawn', 'Rosé Pine Moon']);
+  assert.deepEqual(titles(schemeRows(SCHEMES, 'ROSÉ', 'artboard')), ['Rosé Pine', 'Rosé Pine Dawn', 'Rosé Pine Moon']);
+  assert.deepEqual(titles(schemeRows(SCHEMES, 'gruvbox', 'artboard')), ['Gruvbox Dark', 'Gruvbox Material Dark']);
+  assert.deepEqual(titles(schemeRows([scheme('x', 'Latte', 'Catppuccin', 'light')], 'catpp', '')), ['Latte']);
+});
+
+test('a row says light or dark and draws paper, surface, accent and ANSI 1, 2, 3 and 5', () => {
+  const [row] = schemeRows(SCHEMES, 'mocha', 'artboard');
+  assert.equal(row.name, 'catppuccin-mocha');
+  assert.equal(row.detail, 'dark');
+  assert.deepEqual(row.swatches, ['#000002', '#111112', '#222222', '#010002', '#020002', '#030002', '#050002']);
+});
+
+test('only the current scheme is marked', () => {
+  const rows = schemeRows(SCHEMES, '', 'artboard');
+  assert.deepEqual(rows.filter((r) => r.current).map((r) => r.name), ['artboard']);
+  assert.deepEqual(schemeRows(SCHEMES, '', 'nope').filter((r) => r.current), []);
+});
+
+test('Enter on a row runs dots colorscheme from the bin beside the shell', () => {
+  const [row] = schemeRows(SCHEMES, 'moc', 'artboard', '/b');
+  assert.deepEqual(row.exec, ['/b/dots', 'colorscheme', 'catppuccin-mocha']);
+  assert.equal(row.stamp, true);
+});
+
+// dots colorscheme times the switch from DOTS_SWITCH_T0, so the key press stamps it, not the row.
+test('a stamped row runs under env with the key press time; any other row runs as it is', () => {
+  assert.deepEqual(stampedExec({ exec: ['/b/dots', 'colorscheme', 'nord'], stamp: true }, 1234), ['env', 'DOTS_SWITCH_T0=1234', '/b/dots', 'colorscheme', 'nord']);
+  assert.deepEqual(stampedExec({ exec: ['dots', 'sync'] }, 1234), ['dots', 'sync']);
 });

@@ -34,8 +34,8 @@ test("a dark scheme's lit row and pill draw in its own tint, its words moved tow
 });
 
 test('every mode is named in the plain voice', () => {
-  assert.deepEqual(MODES, ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder']);
-  assert.deepEqual(MODES.map((m) => look('artboard').label.text(m)), ['Apps', 'Windows', 'Clipboard', 'Emoji', 'Calculator', 'Commands', 'Reminder']);
+  assert.deepEqual(MODES, ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder', 'colorschemes']);
+  assert.deepEqual(MODES.map((m) => look('artboard').label.text(m)), ['Apps', 'Windows', 'Clipboard', 'Emoji', 'Calculator', 'Commands', 'Reminder', 'Colorschemes']);
 });
 
 test('the apps legend names the five prefixes, then the moving keys in one short tail', () => {
