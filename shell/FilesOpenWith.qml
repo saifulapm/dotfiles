@@ -19,11 +19,11 @@ Item {
     property var found: null
     property int at: 0
     readonly property var apps: found ? found.apps : []
-    readonly property string voice: look.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property var head: F.openWithHead(voice, targets.length, found ? found.description : null, apps.length)
-    readonly property var keyPairs: look.keys([["↵", "open"], ["j/k", "move"], ["shift+↵", "make default"], ["esc", ""]])
+    readonly property var head: F.openWithHead(targets.length, found ? found.description : null, apps.length)
+    readonly property var keyPairs: [["↵", "open"], ["j/k", "move"], ["shift+↵", "make default"], ["esc", ""]].map(([k, w]) => ({
+                key: k,
+                word: w
+            }))
 
     visible: false
     z: 10
@@ -131,16 +131,6 @@ Item {
         color: Qt.alpha(root.c.surface ?? "white", 0.72)
     }
 
-    // Paper's hard ink shadow.
-    Rectangle {
-        visible: root.voice === "caps"
-        x: card.x + 6
-        y: card.y + 6
-        width: card.width
-        height: card.height
-        color: root.c.ink ?? "black"
-    }
-
     Rectangle {
         id: card
         x: (parent.width - width) / 2
@@ -148,9 +138,9 @@ Item {
         width: 560
         height: cardColumn.implicitHeight
         color: root.c.surface ?? "white"
-        radius: root.plain ? 14 : 0
-        border.width: root.bracket ? 1 : 1.5
-        border.color: root.voice === "caps" ? root.c.ink ?? "black" : root.c.accent ?? "blue"
+        radius: 14
+        border.width: 1.5
+        border.color: root.c.accent ?? "blue"
 
         ColumnLayout {
             id: cardColumn
@@ -167,31 +157,21 @@ Item {
                 spacing: 12
 
                 Rectangle {
-                    readonly property bool boxed: root.look.label.kind !== "header"
-                    implicitWidth: label.implicitWidth + (boxed ? 14 : 0)
-                    implicitHeight: label.implicitHeight + (boxed ? 4 : 0)
-                    radius: root.look.label.kind === "pill" ? 8 : 0
-                    color: boxed ? root.look.label.fill : "transparent"
+                    implicitWidth: label.implicitWidth + 14
+                    implicitHeight: label.implicitHeight + 4
+                    radius: 8
+                    color: root.look.label.fill
 
                     Text {
                         id: label
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: root.look.heading("Open with")
-                        color: parent.boxed ? root.look.label.color : root.c.accent ?? "blue"
+                        text: "Open with"
+                        color: root.look.label.color
                         font.family: root.look.small.font
-                        font.pixelSize: root.plain ? 12 : 10
-                        font.weight: root.voice === "caps" ? Font.Normal : root.plain ? Font.Medium : Font.Bold
-                        font.letterSpacing: root.plain ? 0 : 1.4
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
                     }
-                }
-                Text {
-                    visible: root.bracket
-                    textFormat: Text.PlainText
-                    text: "//"
-                    color: root.c.muted ?? "gray"
-                    font.family: root.fonts.mono ?? ""
-                    font.pixelSize: 10
                 }
                 Text {
                     id: title
@@ -201,9 +181,9 @@ Item {
                     maximumLineCount: 1
                     elide: Text.ElideRight
                     color: root.c.ink ?? "black"
-                    font.family: root.bracket ? root.fonts.mono ?? "" : root.fonts.ui ?? ""
-                    font.pixelSize: root.bracket ? 12 : root.plain ? 16 : 15
-                    font.weight: root.plain ? Font.Medium : Font.Normal
+                    font.family: root.fonts.ui ?? ""
+                    font.pixelSize: 16
+                    font.weight: Font.Medium
                 }
                 Text {
                     id: count
@@ -211,8 +191,7 @@ Item {
                     text: root.found ? root.head.count : ""
                     color: root.look.small.color
                     font.family: root.look.small.font
-                    font.pixelSize: root.bracket ? 10 : 11
-                    font.letterSpacing: root.bracket ? 1.6 : 0
+                    font.pixelSize: 11
                 }
             }
 
@@ -236,7 +215,7 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool isCurrent: index === root.at
-                        readonly property var words: F.appText(root.voice, modelData, root.look.engraved === true)
+                        readonly property var words: F.appText(modelData)
                         function drawn() {
                             return {
                                 app: modelData.id,
@@ -268,9 +247,9 @@ Item {
                                 maximumLineCount: 1
                                 elide: Text.ElideRight
                                 color: appRow.isCurrent ? root.look.cursor.text : root.c.ink ?? "black"
-                                font.family: root.bracket ? root.fonts.mono ?? "" : root.fonts.ui ?? ""
-                                font.pixelSize: root.plain ? 15 : 14
-                                font.weight: appRow.isCurrent && root.bracket ? Font.Bold : Font.Medium
+                                font.family: root.fonts.ui ?? ""
+                                font.pixelSize: 15
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: subText
@@ -280,34 +259,32 @@ Item {
                                 maximumLineCount: 1
                                 elide: Text.ElideRight
                                 color: appRow.isCurrent ? root.look.cursor.detail : root.c.muted ?? "gray"
-                                font.family: root.bracket ? root.fonts.mono ?? "" : root.fonts.ui ?? ""
-                                font.pixelSize: root.bracket ? 10 : 11
-                                font.letterSpacing: root.bracket ? 1.4 : 0
+                                font.family: root.fonts.ui ?? ""
+                                font.pixelSize: 11
                             }
                         }
 
-                        // Paper boxes the badge in the row's inverse, Artboard fills a pill in ink, Blueprint writes it bare.
+                        // The default's badge, a pill filled in ink.
                         Rectangle {
                             id: badge
                             visible: badgeText.text !== ""
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.right: parent.right
                             anchors.rightMargin: 14
-                            implicitWidth: badgeText.implicitWidth + (root.bracket ? 0 : 14)
+                            implicitWidth: badgeText.implicitWidth + 14
                             implicitHeight: badgeText.implicitHeight + 4
-                            radius: root.plain ? 8 : 0
-                            color: root.bracket ? "transparent" : root.plain ? root.c.ink ?? "black" : appRow.isCurrent ? root.look.cursor.text : root.c.ink ?? "black"
+                            radius: 8
+                            color: root.c.ink ?? "black"
 
                             Text {
                                 id: badgeText
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: appRow.words.badge
-                                color: root.bracket ? (appRow.isCurrent ? root.look.cursor.text : root.c.accent ?? "blue") : root.plain ? root.c.surface ?? "white" : appRow.isCurrent ? root.look.cursor.fill : root.c.surface ?? "white"
-                                font.family: root.bracket ? root.fonts.mono ?? "" : root.fonts.ui ?? ""
-                                font.pixelSize: root.bracket ? 10 : 11
-                                font.weight: root.bracket ? Font.Bold : root.plain ? Font.Medium : Font.Normal
-                                font.letterSpacing: root.bracket ? 1.2 : 0
+                                color: root.c.surface ?? "white"
+                                font.family: root.fonts.ui ?? ""
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
                             }
                         }
                     }
@@ -357,7 +334,7 @@ Item {
                             id: keyText
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: root.bracket ? root.c.accent ?? "blue" : root.c.ink ?? "black"
+                            color: root.c.ink ?? "black"
                             font.family: root.fonts.mono ?? ""
                             font.pixelSize: 11
                             font.weight: Font.Medium
@@ -368,8 +345,7 @@ Item {
                             text: modelData.word
                             color: root.look.small.color
                             font.family: root.look.small.font
-                            font.pixelSize: root.plain ? 11 : 10
-                            font.letterSpacing: root.plain ? 0 : 1.4
+                            font.pixelSize: 11
                         }
                     }
                 }

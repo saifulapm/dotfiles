@@ -8,10 +8,9 @@ import "lib/picker.mjs" as P
 Scope {
     id: watch
 
-    property string voice
     readonly property string user: Quickshell.env("USER")
     property string mounts: ""
-    readonly property var drives: F.drives(voice, mounts, user)
+    readonly property var drives: F.drives(mounts, user)
     // Mounts that change while they are being read are read again.
     property bool stale: false
     // Why the last eject failed, on one line; a failed drive stays listed.

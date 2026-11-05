@@ -9,7 +9,7 @@ import "lib/tailscale.mjs" as T
 Item {
     id: share
 
-    // What Files hands over: the theme's colours and faces, and the voice's look.
+    // What Files hands over: the theme's colours and faces, and the list's look.
     property var c: ({})
     property var fonts: ({})
     property var look
@@ -25,11 +25,11 @@ Item {
 
     // dots-taildrop-send beside the shell's bin/, started detached so the send outlives Files' window.
     readonly property string sendBin: Quickshell.shellDir + "/../bin/dots-taildrop-send"
-    readonly property string voice: look.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property var head: F.shareHead(voice, paths.length, bytes)
-    readonly property var keyPairs: look.keys([["↵", "send with Taildrop"], ["j/k", "move"], ["esc", ""]])
+    readonly property var head: F.shareHead(paths.length, bytes)
+    readonly property var keyPairs: [["↵", "send with Taildrop"], ["j/k", "move"], ["esc", ""]].map(([k, w]) => ({
+                key: k,
+                word: w
+            }))
 
     anchors.fill: parent
     visible: shown
@@ -130,9 +130,9 @@ Item {
         width: 480
         height: cardColumn.implicitHeight + 2 * border.width
         color: share.c.surface ?? "white"
-        radius: share.plain ? 14 : 0
-        border.width: share.bracket ? 1 : 1.5
-        border.color: share.plain || share.bracket ? share.c.accent ?? "red" : share.c.ink ?? "black"
+        radius: 14
+        border.width: 1.5
+        border.color: share.c.accent ?? "red"
 
         ColumnLayout {
             id: cardColumn
@@ -150,21 +150,19 @@ Item {
                 spacing: 12
 
                 Rectangle {
-                    readonly property bool boxed: share.look.label.kind !== "header"
-                    implicitWidth: labelText.implicitWidth + (boxed ? 14 : 0)
-                    implicitHeight: labelText.implicitHeight + (boxed ? 4 : 0)
-                    radius: share.look.label.kind === "pill" ? 8 : 0
-                    color: boxed ? share.look.label.fill : "transparent"
+                    implicitWidth: labelText.implicitWidth + 14
+                    implicitHeight: labelText.implicitHeight + 4
+                    radius: 8
+                    color: share.look.label.fill
 
                     Text {
                         id: labelText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: share.head.label
-                        color: parent.boxed ? share.look.label.color : share.c.accent
+                        color: share.look.label.color
                         font.family: share.look.small.font
                         font.pixelSize: 10
-                        font.letterSpacing: share.plain ? 0 : 1.4
                     }
                 }
                 Text {
@@ -175,8 +173,8 @@ Item {
                     maximumLineCount: 1
                     elide: Text.ElideRight
                     color: share.c.ink ?? "black"
-                    font.family: share.bracket ? share.fonts.mono ?? "" : share.fonts.ui ?? ""
-                    font.pixelSize: share.bracket ? 12 : 15
+                    font.family: share.fonts.ui ?? ""
+                    font.pixelSize: 15
                 }
                 Text {
                     id: tagText
@@ -208,7 +206,7 @@ Item {
                         id: rowItem
                         required property var modelData
                         required property int index
-                        readonly property var say: F.shareRow(share.voice, modelData)
+                        readonly property var say: F.shareRow(modelData)
                         readonly property bool isCurrent: index === share.selected
                         readonly property bool online: modelData.online
                         // An offline row stays dimmed under the cursor too: Enter on it does nothing.
@@ -239,7 +237,7 @@ Item {
                             Rectangle {
                                 implicitWidth: 10
                                 implicitHeight: 10
-                                radius: share.plain ? 5 : 0
+                                radius: 5
                                 color: rowItem.online ? rowItem.ink : "transparent"
                                 border.width: rowItem.online ? 0 : 1.5
                                 border.color: rowItem.ink
@@ -256,7 +254,7 @@ Item {
                                     maximumLineCount: 1
                                     elide: Text.ElideRight
                                     color: rowItem.ink
-                                    font.family: share.bracket ? share.fonts.mono ?? "" : share.fonts.ui ?? ""
+                                    font.family: share.fonts.ui ?? ""
                                     font.pixelSize: 14
                                     font.weight: rowItem.online ? Font.Medium : Font.Normal
                                 }
@@ -315,7 +313,7 @@ Item {
                             id: keyText
                             textFormat: Text.PlainText
                             text: keyPair.modelData.key
-                            color: share.bracket ? share.c.accent ?? "red" : share.c.ink ?? "black"
+                            color: share.c.ink ?? "black"
                             font.family: share.fonts.mono ?? ""
                             font.pixelSize: 11
                             font.weight: Font.Medium
