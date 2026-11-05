@@ -1,14 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseToml } from './toml.mjs';
-import { checkTokens, validateTheme } from './theme.mjs';
+import { schemeTokens } from './colorscheme-file.mjs';
 import { parseStatus, offlineText, stateText, tailscaleKeys, toggleFailedText, tailscaleLook } from './tailscale.mjs';
 
 const recorded = readFileSync(new URL('../../dev/tailscale-status.json', import.meta.url), 'utf8');
 // 2026-10-21 08:00 UTC: fedora was last seen 55 days before, the old Mac mini 42.
 const NOW = Date.parse('2026-10-21T08:00:00Z');
-const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
 const status = (patch) => JSON.stringify(Object.assign(JSON.parse(recorded), patch));
 
 test('the recorded status gives this device and five machines, three online', () => {
@@ -74,38 +72,23 @@ test('the key strip is the board\'s for on and off; a state with no toggle offer
   assert.deepEqual(tailscaleKeys(plain, 'down'), [['esc', '']]);
 });
 
-test("each theme's badge is its board's: Paper's green square, Artboard's #6C83FF dot on ink, Blueprint's boxed dot", () => {
-  const [paper, artboard, blueprint] = ['paper', 'artboard', 'blueprint'].map((n) => tailscaleLook(theme(n)));
-  assert.deepEqual(paper.badge(true), { text: 'ON', color: '#1C1915', fill: 'transparent', border: '#1C1915', dashed: false, radius: 0, dot: { size: 7, fill: '#3D6B3A', line: 'transparent', radius: 0 } });
-  assert.deepEqual(paper.badge(false), { text: 'OFF', color: '#575653', fill: 'transparent', border: '#575653', dashed: false, radius: 0, dot: { size: 7, fill: 'transparent', line: '#575653', radius: 0 } });
-  assert.deepEqual(artboard.badge(true), { text: 'ON', color: '#FFFFFF', fill: '#15171B', border: 'transparent', dashed: false, radius: 8, dot: { size: 6, fill: '#6C83FF', line: 'transparent', radius: 3 } });
-  assert.deepEqual(artboard.badge(false), { text: 'OFF', color: '#57606A', fill: '#F2F3F6', border: 'transparent', dashed: false, radius: 8, dot: { size: 6, fill: 'transparent', line: '#8A909B', radius: 3 } });
-  assert.deepEqual(blueprint.badge(true), { text: '● ON', color: '#7FE3F0', fill: 'transparent', border: '#7FE3F0', dashed: false, radius: 0, dot: null });
-  assert.deepEqual(blueprint.badge(false), { text: '○ OFF', color: '#80A4C2', fill: 'transparent', border: '#80A4C2', dashed: true, radius: 0, dot: null });
+test('the badge is a #6C83FF dot on an ink chip when on, an outlined dot on a tile when off', () => {
+  const look = tailscaleLook(schemeTokens('artboard'));
+  assert.deepEqual(look.badge(true), { text: 'ON', color: '#FFFFFF', fill: '#15171B', radius: 8, dot: { size: 6, fill: '#6C83FF', line: 'transparent', radius: 3 } });
+  assert.deepEqual(look.badge(false), { text: 'OFF', color: '#57606A', fill: '#F2F3F6', radius: 8, dot: { size: 6, fill: 'transparent', line: '#8A909B', radius: 3 } });
 });
 
-test("each theme words a machine's state and the list's count as its board does", () => {
-  const [paper, artboard, blueprint] = ['paper', 'artboard', 'blueprint'].map((n) => tailscaleLook(theme(n)));
+test("a machine's state reads online with a green dot, or its age; its detail is its address or offline", () => {
+  const look = tailscaleLook(schemeTokens('artboard'));
   const nuc = { name: 'nuc', ip: '100.88.14.3', online: true, age: '' };
   const fedora = { name: 'fedora', ip: '', online: false, age: '55d' };
-  assert.deepEqual([paper.status(nuc), paper.status(fedora)], [{ word: 'online', dot: '#3D6B3A' }, { word: 'offline 55d', dot: 'transparent' }]);
-  assert.deepEqual([artboard.status(nuc), artboard.status(fedora)], [{ word: 'online', dot: '#1E8E5A' }, { word: '55d', dot: 'transparent' }]);
-  assert.deepEqual([blueprint.status(nuc), blueprint.status(fedora)], [{ word: '● ONLINE', dot: null }, { word: '○ OFFLINE', dot: null }]);
-  assert.deepEqual([artboard.detail(nuc), artboard.detail(fedora), blueprint.detail(fedora)], ['100.88.14.3', 'offline', '55D']);
-  assert.deepEqual([paper.count(3, 2), artboard.count(3, 2), blueprint.count(3, 2)], ['3 ONLINE', '', '3 ONLINE · 2 OFFLINE']);
-  assert.deepEqual([paper.words('This device'), artboard.words('This device'), blueprint.words('Machines')], ['THIS DEVICE', 'This device', 'MACHINES']);
-  assert.deepEqual([paper.stateLine('off'), artboard.stateLine('off'), blueprint.stateLine('off')], ['Tailscale is off', 'Tailscale is off', 'TAILSCALE IS OFF']);
+  assert.deepEqual([look.status(nuc), look.status(fedora)], [{ word: 'online', dot: '#1E8E5A' }, { word: '55d', dot: 'transparent' }]);
+  assert.deepEqual([look.detail(nuc), look.detail(fedora)], ['100.88.14.3', 'offline']);
+  assert.equal(look.dotLine, '#8A909B');
 });
 
-test("Frost's badge and marks read its dark board colours: bar dot, tile chip, outline, online", () => {
-  const frost = tailscaleLook(checkTokens(validateTheme(theme('frost'))));
-  assert.equal(frost.badge(true).dot.fill, '#88C0D0');
-  // ON sits on the ink fill, so its text is the surface: never white on Frost's light ink.
-  assert.equal(frost.badge(true).color, '#3B4252');
-  assert.equal(frost.badge(false).fill, '#434C5E');
-  assert.equal(frost.badge(false).dot.line, '#AEB7C6');
-  assert.equal(frost.status({ online: true }).dot, '#A3BE8C');
-  assert.equal(frost.dotLine, '#AEB7C6');
+test("ON's text is the surface it sits on in a dark scheme too, never white on light ink", () => {
+  assert.equal(tailscaleLook(schemeTokens('gruvbox-dark')).badge(true).color, '#282828');
 });
 
 test('a refused toggle reads its first line from tailscale, on one line', () => {

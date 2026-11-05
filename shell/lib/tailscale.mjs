@@ -55,48 +55,14 @@ export function tailscaleKeys(look, state) {
   return look.keys([['esc', '']]);
 }
 
-// Paper's green square, which no token carries; the plain boards' badge dot, online dot, outline grey and badge chip come from the theme's plain tones.
-const MARKS = { caps: { online: '#3D6B3A' } };
-
-// How the surface's own parts read under a theme: the ON or OFF badge, a machine's state word and mark, the count, and the one-line states.
+// How the surface's own parts read under a colorscheme: the ON or OFF badge, and a machine's state word, mark and detail. The badge dot, online dot, outline grey and badge chip come from the plain tones.
 export function tailscaleLook(tokens) {
   const c = tokens.color;
-  const voice = tokens.type.voice;
-  const say = (s) => (voice === 'plain' ? s : s.toUpperCase());
-  if (voice === 'plain') {
-    const tones = plainTones(tokens);
-    const m = { on: tones.bar, online: tones.online, outline: tones.outline, chip: tones.tile };
-    return {
-      voice,
-      words: say,
-      badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? c.surface : c.muted, fill: on ? c.ink : m.chip, border: 'transparent', dashed: false, radius: 8, dot: { size: 6, fill: on ? m.on : 'transparent', line: on ? 'transparent' : m.outline, radius: 3 } }),
-      status: (row) => ({ word: row.online ? 'online' : row.age, dot: row.online ? m.online : 'transparent' }),
-      dotLine: m.outline,
-      detail: (row) => (row.online ? row.ip : 'offline'),
-      count: () => '',
-      stateLine: stateText,
-    };
-  }
-  if (voice === 'bracket') {
-    return {
-      voice,
-      words: say,
-      badge: (on) => ({ text: on ? '● ON' : '○ OFF', color: on ? c.accent : c.muted, fill: 'transparent', border: on ? c.accent : c.muted, dashed: !on, radius: 0, dot: null }),
-      status: (row) => ({ word: row.online ? '● ONLINE' : '○ OFFLINE', dot: null }),
-      dotLine: c.muted,
-      detail: (row) => (row.online ? row.ip : row.age.toUpperCase()),
-      count: (online, offline) => `${online} ONLINE · ${offline} OFFLINE`,
-      stateLine: (state) => stateText(state).toUpperCase(),
-    };
-  }
+  const tones = plainTones(tokens);
   return {
-    voice,
-    words: say,
-    badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? c.ink : c.muted, fill: 'transparent', border: on ? c.ink : c.muted, dashed: false, radius: 0, dot: { size: 7, fill: on ? MARKS.caps.online : 'transparent', line: on ? 'transparent' : c.muted, radius: 0 } }),
-    status: (row) => ({ word: row.online ? 'online' : `offline ${row.age}`.trim(), dot: row.online ? MARKS.caps.online : 'transparent' }),
-    dotLine: c.muted,
-    detail: (row) => row.ip,
-    count: (online) => `${online} ONLINE`,
-    stateLine: stateText,
+    badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? c.surface : c.muted, fill: on ? c.ink : tones.tile, radius: 8, dot: { size: 6, fill: on ? tones.bar : 'transparent', line: on ? 'transparent' : tones.outline, radius: 3 } }),
+    status: (row) => ({ word: row.online ? 'online' : row.age, dot: row.online ? tones.online : 'transparent' }),
+    dotLine: tones.outline,
+    detail: (row) => (row.online ? row.ip : 'offline'),
   };
 }

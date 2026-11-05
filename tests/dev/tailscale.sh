@@ -15,8 +15,6 @@ ts_state() { timeout 0.5 dots-call tailscale state 2>/dev/null; }
 state_is() { ts_state | jq -e "$@" >/dev/null 2>&1; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 clip() { timeout 1 wl-paste -n 2>/dev/null; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 open_ts() { niri msg action spawn -- dots-call tailscale toggle; until_ok 3000 state_is '.open and .listed and .settled and .keyboard'; }
 close_ts() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
@@ -53,9 +51,9 @@ open_ts
 echo "     tailscale: $(ts_state | jq -c '{state, online, rows: [.rows[] | [.name, .ip, .status]], device, heading, badge, hint}')"
 check "Mod+T opens the list from tailscale status: 5 rows, 3 online, on" state_is '.state == "on" and .online == 3 and (.rows | length) == 5'
 check "the rows are online by name, then offline most recently seen first" state_is '[.rows[].name] == ["iphone", "mini", "nuc", "saifuls-mac-mini", "fedora"]'
-check "online rows draw their address, offline ones none and their age in days" state_is '[.rows[].ip] == ["100.95.3.21", "100.72.40.9", "100.88.14.3", "", ""] and (.rows[4].status | test("^offline \\d+d$"))'
+check "online rows draw their address, offline ones none and their age in days" state_is '[.rows[].ip] == ["100.95.3.21", "100.72.40.9", "100.88.14.3", "", ""] and (.rows[4].status | test("^\\d+d$"))'
 check "this device is drawn: macbook, 100.101.7.12, taila27604.ts.net" state_is '.device == {name: "macbook", ip: "100.101.7.12", tailnet: "taila27604.ts.net"}'
-check "the key strip reads ↵ COPY IP · S SEND FILES · T TURN OFF · ESC" state_is '.hint == "↵ COPY IP · S SEND FILES · T TURN OFF · ESC"'
+check "the key strip reads ↵ copy ip · s send files · t turn off · esc" state_is '.hint == "↵ copy ip · s send files · t turn off · esc"'
 check "while open, the surface watches tailscale" watchers
 
 cursor_to nuc
@@ -140,16 +138,10 @@ check "a 200-character name draws on one line, elided inside its row" state_is '
 edit_status 'del(.Peer["nodekey:06"], .Peer["nodekey:07"])'
 until_ok 3000 state_is '(.rows | length) == 5'
 
-for t in "paper|TAILSCALE|#3D6B3A|25|49" "artboard|Tailscale|#6C83FF|10|36" "blueprint|TAILSCALE // TAILNET|#7FE3F0|80|900"; do
-  IFS='|' read -r name heading colour lo hi <<<"$t"
-  close_ts
-  in_theme "$name"
-  open_ts
-  check "$name: the panel is drawn 640 px wide ($(ts_state | jq -c .cardBox.w))" state_is '.cardBox.w == 640'
-  check "$name: the heading reads $heading and the badge ON ($(ts_state | jq -c '[.heading, .badge]'))" state_is --arg h "$heading" '.heading == $h and (.badge | test("ON$"))'
-  px=$(near "$(badge_geo)" "$colour")
-  check "$name: the badge draws $colour ($px px, between $lo and $hi)" test "$px" -ge "$lo" -a "$px" -le "$hi"
-done
+check "the panel is drawn 640 px wide ($(ts_state | jq -c .cardBox.w))" state_is '.cardBox.w == 640'
+check "the heading reads Tailscale and the badge ON ($(ts_state | jq -c '[.heading, .badge]'))" state_is '.heading == "Tailscale" and .badge == "ON"'
+px=$(near "$(badge_geo)" "#6C83FF")
+check "the badge's dot draws #6C83FF ($px px, between 10 and 36)" test "$px" -ge 10 -a "$px" -le 36
 
 close_ts
 check "within 30 s of Esc no tailscale debug watch-ipn is left" until_ok 30000 eval '! watchers'

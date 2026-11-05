@@ -7,7 +7,7 @@ import "." as Root
 import "lib/voice.mjs" as L
 import "lib/tailscale.mjs" as T
 
-// The tailnet as a list in each theme's voice: this device, the machines with their online state, or one line when Tailscale is not on; tailscale runs only while it shows.
+// The tailnet as a list: this device, the machines with their online state, or one line when Tailscale is not on; tailscale runs only while it shows.
 Item {
     id: panel
 
@@ -28,18 +28,13 @@ Item {
 
     readonly property string sendBin: Quickshell.shellDir + "/../bin/dots-taildrop-send"
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the panel draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var tones: L.plainTones(theme.tokens)
-    readonly property var marks: T.tailscaleLook(theme.tokens ?? { color: {}, type: { voice: "caps" } })
+    readonly property var marks: T.tailscaleLook(theme.tokens ?? { color: {} })
     readonly property bool isOn: status.state === "on"
     readonly property var rows: isOn ? status.machines : []
     readonly property var current: rows[selected] ?? null
-    readonly property bool caps: look.voice === "caps"
-    readonly property bool plain: look.voice === "plain"
-    readonly property bool bracket: look.voice === "bracket"
     readonly property Root.Motion motion: Root.Motion {
         shown: panel.shown
         tokens: panel.theme.tokens
@@ -138,7 +133,7 @@ Item {
             offlineLine: offlineLine.visible ? offlineLine.text : "",
             line: stateLine.visible ? stateLine.text : "",
             device: device.visible ? { name: deviceName.text, ip: deviceIp.text, tailnet: deviceTailnet.text } : null,
-            heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
+            heading: pill.text,
             badge: badgeText.text,
             badgeBox: { x: a.x, y: a.y, w: badgeBox.width * card.scale, h: badgeBox.height * card.scale },
             hint: keys.join(" · "),
@@ -148,7 +143,6 @@ Item {
             settled: motion.settled,
             drawing: panel.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             keyboard: panel.Window.active
         });
     }
@@ -249,34 +243,16 @@ Item {
             width: parent.width
             spacing: 0
 
-            // The heading in the launcher's label idiom, and the ON or OFF badge across from it.
+            // The heading in the launcher's pill, and the ON or OFF badge across from it.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 18 : bracket ? 22 : 20
+                Layout.leftMargin: 18
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: plain ? 16 : bracket ? 12 : 18
-                Layout.bottomMargin: plain ? 16 : bracket ? 0 : 14
+                Layout.topMargin: 16
+                Layout.bottomMargin: 16
                 spacing: 12
 
                 Rectangle {
-                    visible: look.label.kind === "chip"
-                    implicitWidth: chip.implicitWidth + 14
-                    implicitHeight: chip.implicitHeight + 6
-                    color: look.label.fill
-                    Text {
-                        id: chip
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: look.heading("tailscale", "")
-                        color: look.label.color
-                        font.family: fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
-                    }
-                }
-
-                Rectangle {
-                    visible: look.label.kind === "pill"
                     implicitWidth: pill.implicitWidth + 18
                     implicitHeight: pill.implicitHeight + 6
                     radius: 8
@@ -293,17 +269,6 @@ Item {
                     }
                 }
 
-                Text {
-                    id: header
-                    visible: look.label.kind === "header"
-                    textFormat: Text.PlainText
-                    text: look.heading("tailscale", "tailnet")
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-
                 Item {
                     Layout.fillWidth: true
                 }
@@ -311,34 +276,24 @@ Item {
                 Rectangle {
                     id: badgeBox
                     readonly property var badge: marks.badge(isOn)
-                    implicitWidth: badgeRow.implicitWidth + (plain ? 18 : 16)
-                    implicitHeight: badgeRow.implicitHeight + (plain ? 6 : 4)
+                    implicitWidth: badgeRow.implicitWidth + 18
+                    implicitHeight: badgeRow.implicitHeight + 6
                     radius: badge.radius
                     color: badge.fill
-                    border.width: badge.dashed ? 0 : 1
-                    border.color: badge.border
-
-                    Root.Dashed {
-                        visible: badgeBox.badge.dashed
-                        frame: true
-                        anchors.fill: parent
-                        color: badgeBox.badge.border
-                    }
 
                     Row {
                         id: badgeRow
                         anchors.centerIn: parent
-                        spacing: plain ? 6 : 7
+                        spacing: 6
 
                         Rectangle {
-                            visible: !!badgeBox.badge.dot
                             anchors.verticalCenter: parent.verticalCenter
-                            width: badgeBox.badge.dot ? badgeBox.badge.dot.size : 0
+                            width: badgeBox.badge.dot.size
                             height: width
-                            radius: badgeBox.badge.dot ? badgeBox.badge.dot.radius : 0
-                            color: badgeBox.badge.dot ? badgeBox.badge.dot.fill : "transparent"
-                            border.width: badgeBox.badge.dot && badgeBox.badge.dot.line !== "transparent" ? 1.5 : 0
-                            border.color: badgeBox.badge.dot ? badgeBox.badge.dot.line : "transparent"
+                            radius: badgeBox.badge.dot.radius
+                            color: badgeBox.badge.dot.fill
+                            border.width: badgeBox.badge.dot.line !== "transparent" ? 1.5 : 0
+                            border.color: badgeBox.badge.dot.line
                         }
                         Text {
                             id: badgeText
@@ -346,27 +301,24 @@ Item {
                             text: badgeBox.badge.text
                             color: badgeBox.badge.color
                             font.family: fonts.ui
-                            font.pixelSize: plain ? 11 : 10
-                            font.letterSpacing: plain ? 0 : 1.4
-                            font.weight: plain ? Font.Medium : bracket ? Font.Bold : Font.Normal
+                            font.pixelSize: 11
+                            font.letterSpacing: 0
+                            font.weight: Font.Medium
                         }
                     }
                 }
             }
 
-            Rule {
-                visible: !bracket
-            }
+            Rule {}
 
             // This device: its name, address and tailnet, kept while Tailscale is off.
             Item {
                 id: device
                 visible: !!status.self
                 Layout.fillWidth: true
-                implicitHeight: deviceColumn.implicitHeight + (plain ? 16 : bracket ? 26 : 34)
+                implicitHeight: deviceColumn.implicitHeight + 16
 
                 Rectangle {
-                    visible: plain
                     x: 18
                     y: 12
                     width: parent.width - 36
@@ -377,40 +329,28 @@ Item {
 
                 ColumnLayout {
                     id: deviceColumn
-                    x: plain ? 32 : bracket ? 22 : 20
-                    y: plain ? 12 : bracket ? 12 : 16
+                    x: 32
+                    y: 12
                     width: parent.width - 2 * x
-                    spacing: plain ? 0 : bracket ? 6 : 10
-
-                    Text {
-                        visible: !plain
-                        textFormat: Text.PlainText
-                        text: marks.words("This device")
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
+                    spacing: 0
 
                     RowLayout {
                         Layout.fillWidth: true
-                        Layout.topMargin: plain ? 12 : 0
-                        Layout.bottomMargin: plain ? 12 : 0
-                        spacing: plain ? 12 : 18
+                        Layout.topMargin: 12
+                        Layout.bottomMargin: 12
+                        spacing: 12
 
                         Tile {
-                            visible: plain
                             color: tones.card
                             glyph: "laptop"
                             ink: c.muted
                         }
 
                         ColumnLayout {
-                            Layout.fillWidth: plain
+                            Layout.fillWidth: true
                             spacing: 2
 
                             Text {
-                                visible: plain
                                 textFormat: Text.PlainText
                                 text: "This device"
                                 color: c.muted
@@ -419,111 +359,59 @@ Item {
                             }
                             Text {
                                 id: deviceName
-                                Layout.fillWidth: plain
-                                Layout.maximumWidth: plain ? Infinity : 300
+                                Layout.fillWidth: true
                                 textFormat: Text.PlainText
                                 text: look.title(status.self ? status.self.name : "")
                                 elide: Text.ElideRight
                                 color: c.ink
-                                font.family: caps ? fonts.display : fonts.ui
-                                font.pixelSize: caps ? 34 : bracket ? 22 : 15
-                                font.weight: caps ? Font.Normal : bracket ? Font.Bold : Font.Medium
-                                font.letterSpacing: bracket ? 0.9 : 0
+                                font.family: fonts.ui
+                                font.pixelSize: 15
+                                font.weight: Font.Medium
+                                font.letterSpacing: 0
                             }
                         }
 
                         ColumnLayout {
-                            Layout.fillWidth: bracket
                             spacing: 2
 
                             Text {
                                 id: deviceIp
-                                Layout.alignment: caps ? Qt.AlignLeft : Qt.AlignRight
-                                Layout.fillWidth: bracket
-                                horizontalAlignment: caps ? Text.AlignLeft : Text.AlignRight
+                                Layout.alignment: Qt.AlignRight
+                                horizontalAlignment: Text.AlignRight
                                 textFormat: Text.PlainText
                                 text: status.self ? status.self.ip : ""
-                                color: bracket ? (isOn ? c.accent : c.muted) : caps && !isOn ? c.muted : c.ink
+                                color: c.ink
                                 font.family: fonts.ui
                                 font.pixelSize: 15
-                                font.weight: bracket ? Font.Normal : Font.Medium
+                                font.weight: Font.Medium
                             }
+                            // The tailnet under the address.
                             Text {
-                                visible: plain
+                                id: deviceTailnet
                                 Layout.alignment: Qt.AlignRight
                                 textFormat: Text.PlainText
-                                text: deviceTailnet.text
+                                text: status.self ? status.self.tailnet : ""
                                 color: c.muted
                                 font.family: fonts.ui
                                 font.pixelSize: 12
                             }
                         }
-
-                        Item {
-                            visible: caps
-                            Layout.fillWidth: true
-                        }
-
-                        // Paper writes the tailnet in italic serif at the row's end; Artboard under the address, Blueprint on a row of its own.
-                        Text {
-                            id: deviceTailnet
-                            visible: caps
-                            textFormat: Text.PlainText
-                            text: bracket ? (status.self ? status.self.tailnet : "").toUpperCase() : status.self ? status.self.tailnet : ""
-                            color: c.muted
-                            font.family: fonts.display
-                            font.pixelSize: 16
-                            font.italic: true
-                        }
-                    }
-
-                    RowLayout {
-                        visible: bracket
-                        spacing: 12
-
-                        Text {
-                            textFormat: Text.PlainText
-                            text: "TAILNET"
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: look.small.size
-                            font.letterSpacing: look.small.spacing
-                        }
-                        Text {
-                            textFormat: Text.PlainText
-                            text: deviceTailnet.text
-                            color: isOn ? c.ink : c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 12
-                        }
                     }
                 }
             }
 
-            Rule {
-                visible: device.visible && !plain
-            }
-
-            // The list's head: MACHINES and how many are online, as each board counts them.
+            // The list's head.
             RowLayout {
                 visible: isOn
                 Layout.fillWidth: true
-                Layout.leftMargin: bracket ? 22 : 20
+                Layout.leftMargin: 20
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: plain ? 12 : bracket ? 12 : 14
+                Layout.topMargin: 12
 
                 Text {
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: marks.words("Machines")
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-                Text {
-                    textFormat: Text.PlainText
-                    text: marks.count(status.online, status.machines.length - status.online)
+                    text: "Machines"
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size
@@ -539,7 +427,7 @@ Item {
                 Column {
                     id: list
                     y: 8
-                    x: caps ? 0 : bracket ? 10 : 8
+                    x: 8
                     width: parent.width - 2 * x
 
                     Repeater {
@@ -559,7 +447,7 @@ Item {
                                 const right = nameText.mapToItem(rowItem, nameText.width, 0).x;
                                 return {
                                     name: nameText.text,
-                                    ip: online ? (plain ? detailText.text : ipText.text) : "",
+                                    ip: online ? detailText.text : "",
                                     status: statusText.text,
                                     lines: nameText.lineCount,
                                     elided: nameText.truncated,
@@ -568,29 +456,18 @@ Item {
                                 };
                             }
                             width: list.width
-                            implicitHeight: row.implicitHeight + (caps ? 22 : bracket ? 20 : 16)
+                            implicitHeight: row.implicitHeight + 16
                             radius: look.cursor.radius
                             color: isCurrent ? look.cursor.fill : "transparent"
 
                             RowLayout {
                                 id: row
                                 anchors.fill: parent
-                                anchors.leftMargin: caps ? 20 : 12
+                                anchors.leftMargin: 12
                                 anchors.rightMargin: anchors.leftMargin
-                                spacing: plain ? 12 : 14
-
-                                Text {
-                                    visible: !plain
-                                    textFormat: Text.PlainText
-                                    text: bracket ? look.number(rowItem.index) : "▸"
-                                    color: bracket ? (rowItem.isCurrent ? look.cursor.text : c.muted) : rowItem.isCurrent ? look.cursor.marker : "transparent"
-                                    font.family: bracket ? look.name.font : fonts.ui
-                                    font.pixelSize: bracket ? 13 : 15
-                                    font.bold: bracket && rowItem.isCurrent
-                                }
+                                spacing: 12
 
                                 Tile {
-                                    visible: plain
                                     color: rowItem.isCurrent ? tones.card : look.tile.fill
                                     glyph: rowItem.modelData.phone ? "phone" : "box"
                                     ink: rowItem.isCurrent ? look.cursor.text : rowItem.online ? c.muted : marks.dotLine
@@ -610,12 +487,11 @@ Item {
                                         color: rowItem.textColor
                                         font.family: look.name.font
                                         font.pixelSize: 15
-                                        font.weight: rowItem.isCurrent ? look.cursor.weight : plain && !rowItem.online ? Font.Normal : look.name.weight
-                                        font.letterSpacing: bracket ? 0.6 : 0
+                                        font.weight: rowItem.isCurrent ? look.cursor.weight : !rowItem.online ? Font.Normal : look.name.weight
+                                        font.letterSpacing: 0
                                     }
                                     Text {
                                         id: detailText
-                                        visible: plain
                                         textFormat: Text.PlainText
                                         text: marks.detail(rowItem.modelData)
                                         color: c.muted
@@ -624,30 +500,17 @@ Item {
                                     }
                                 }
 
-                                Text {
-                                    id: ipText
-                                    visible: caps
-                                    Layout.preferredWidth: 120
-                                    textFormat: Text.PlainText
-                                    text: rowItem.modelData.ip
-                                    color: rowItem.textColor
-                                    font.family: fonts.ui
-                                    font.pixelSize: 13
-                                }
-
-                                // The state mark and word: Paper's square and italic serif, Artboard's dot, Blueprint's ● or ○ in caps.
+                                // The state dot and word.
                                 Row {
-                                    Layout.preferredWidth: caps ? 110 : implicitWidth
-                                    layoutDirection: caps ? Qt.RightToLeft : Qt.LeftToRight
-                                    spacing: plain ? 6 : 8
+                                    Layout.preferredWidth: implicitWidth
+                                    spacing: 6
 
                                     Rectangle {
-                                        visible: rowItem.mark.dot !== null && !caps
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 7
                                         height: 7
-                                        radius: plain ? 3.5 : 0
-                                        color: rowItem.mark.dot ?? "transparent"
+                                        radius: 3.5
+                                        color: rowItem.mark.dot
                                         border.width: rowItem.online ? 0 : 1.5
                                         border.color: marks.dotLine
                                     }
@@ -655,37 +518,15 @@ Item {
                                         id: statusText
                                         textFormat: Text.PlainText
                                         text: rowItem.mark.word
-                                        color: caps ? (rowItem.isCurrent ? c.paper : rowItem.online ? c.ink : c.muted) : bracket && rowItem.online && !rowItem.isCurrent ? c.accent : bracket ? rowItem.textColor : c.muted
-                                        font.family: caps ? fonts.display : fonts.ui
-                                        font.pixelSize: caps ? 16 : 11
-                                        font.italic: caps
-                                        font.letterSpacing: bracket ? 1.3 : 0
+                                        color: c.muted
+                                        font.family: fonts.ui
+                                        font.pixelSize: 11
+                                        font.letterSpacing: 0
                                     }
-                                    // Paper's square sits before its word, which the right-to-left row puts here.
-                                    Rectangle {
-                                        visible: caps
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 7
-                                        height: 7
-                                        color: rowItem.isCurrent && rowItem.online ? c.surface : rowItem.mark.dot ?? "transparent"
-                                        border.width: rowItem.online ? 0 : 1
-                                        border.color: marks.dotLine
-                                    }
-                                }
-
-                                Text {
-                                    visible: bracket
-                                    Layout.preferredWidth: 120
-                                    horizontalAlignment: Text.AlignRight
-                                    textFormat: Text.PlainText
-                                    text: marks.detail(rowItem.modelData)
-                                    color: rowItem.textColor
-                                    font.family: fonts.mono
-                                    font.pixelSize: 13
                                 }
 
                                 Rectangle {
-                                    visible: plain && rowItem.isCurrent
+                                    visible: rowItem.isCurrent
                                     implicitWidth: 22
                                     implicitHeight: 18
                                     radius: 6
@@ -721,18 +562,17 @@ Item {
                 }
             }
 
-            // Off, logged out, starting or tailscaled away: one line where the list goes, Artboard's beside a power tile.
+            // Off, logged out, starting or tailscaled away: one line where the list goes, beside a power tile.
             RowLayout {
                 visible: !isOn && listed
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 20 : 22
+                Layout.leftMargin: 20
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: caps ? 56 : bracket ? 26 : 28
-                Layout.bottomMargin: caps ? 60 : bracket ? 28 : 28
+                Layout.topMargin: 28
+                Layout.bottomMargin: 28
                 spacing: 12
 
                 Tile {
-                    visible: plain
                     color: look.tile.fill
                     glyph: "power"
                     ink: c.muted
@@ -740,27 +580,25 @@ Item {
                 Text {
                     id: stateLine
                     Layout.fillWidth: true
-                    horizontalAlignment: caps ? Text.AlignHCenter : Text.AlignLeft
                     textFormat: Text.PlainText
-                    text: marks.stateLine(status.state)
-                    color: plain ? c.muted : c.ink
-                    font.family: caps ? fonts.display : fonts.ui
-                    font.pixelSize: caps ? 30 : 15
-                    font.italic: caps
-                    font.letterSpacing: bracket ? 0.6 : 0
+                    text: T.stateText(status.state)
+                    color: c.muted
+                    font.family: fonts.ui
+                    font.pixelSize: 15
+                    font.letterSpacing: 0
                 }
             }
 
             Rule {}
 
-            // The key strip as Pass draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key strip as Pass draws it, each pair in a chip.
             Flow {
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 14 : bracket ? 22 : 20
+                Layout.leftMargin: 14
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: plain ? 10 : 12
-                Layout.bottomMargin: bracket ? 14 : Layout.topMargin
-                spacing: plain ? 8 : 14
+                Layout.topMargin: 10
+                Layout.bottomMargin: Layout.topMargin
+                spacing: 8
 
                 Repeater {
                     id: keyRepeater
@@ -771,15 +609,15 @@ Item {
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pair.implicitWidth + (plain ? 14 : 0)
-                        height: pair.implicitHeight + (plain ? 6 : 0)
+                        width: pair.implicitWidth + 14
+                        height: pair.implicitHeight + 6
                         radius: 6
                         color: look.chip.fill
 
                         Row {
                             id: pair
                             anchors.centerIn: parent
-                            spacing: plain ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText
@@ -808,20 +646,14 @@ Item {
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 
-    // Artboard's 32 px tile with a line glyph: a laptop, a machine, a phone or the power mark.
+    // A 32 px tile with a line glyph: a laptop, a machine, a phone or the power mark.
     component Tile: Rectangle {
         id: tile
         property string glyph: "box"
