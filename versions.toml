@@ -41,41 +41,41 @@ sha256 = "2b487180fe5a0146008919b2e5d17f08c1f1bc38ded5ace45fcb9834cde6c051"
 
 [[pin]]
 name = "nerd-symbols"
-version = "3.5.0"
+version = "3.5.1"
 repo = "ryanoasis/nerd-fonts"
 install = "~/.local/share/fonts/nerd-symbols, foot's icon fallback"
 url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v{version}/NerdFontsSymbolsOnly.tar.xz"
-sha256 = "b7ef2283462b435f1fe91d729dc412d5dbe34269dd2c7f4e1d803e4105c8d883"
+sha256 = "01172f37db8543edb102e5cb5c64101c9f4686630804d49b419aa07b23a69996"
 
 [[pin]]
 name = "kakoune"
-version = "be31e203e2948031bdde6cb573cfafa75158e228"
+version = "f5ad4bfdb64c0df6b2c507103732a44234b0bb2a"
 repo = "saifulapm/kakoune"
 track = "commit"
 install = "~/.local/bin/kak and ~/.local/share/kak, built from source"
 check = "kak -version"
 url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
-sha256 = "839647ab05d5877a30a2248ac8cf701f2f00508114e0fc8e5848ddd249f06c80"
+sha256 = "dfee3ae8ff4a4a5d671be032db8463f8b72798535183d2bdaf9331b22550cd7a"
 
 [[pin]]
 name = "amx"
-version = "e904687e3ee6fe4ba0960195adde3e02a2b53972"
+version = "c44f9a85abc3d0570792f1249bf66f2a2febdf9a"
 repo = "saifulapm/amx"
 track = "commit"
 install = "~/.local/bin/amx, built with cargo"
 runs = "amx --version"
 url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
-sha256 = "88c0b3db4b619050e4d4edbb8bd4210bd6757c538a58b5fe378cd1daf652f590"
+sha256 = "64b35b6c4b320cb66fdeec82897b6254d35c43f157b2d68c7f450094cf312fa7"
 
 [[pin]]
 name = "workflow"
-version = "56cfc88f76839a8514a630b4ca1d696d4b9d11c1"
+version = "aac1868bb8329f0fe97b66f79988002cb5035474"
 repo = "saifulapm/workflow"
 track = "commit"
 install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
 runs = "mem --version && workflow --version && hub --version"
 url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
-sha256 = "1b72561183b0edff683637c3bd35cb12f9075714d9c439b4092e5b9f057a1121"
+sha256 = "016c081f5ef9e7eab7761bd3adc3a924d62072d2a385d036f602759ae933c0b2"
 
 [[pin]]
 name = "pxy"
@@ -141,20 +141,20 @@ sha256.x86_64 = "eb7a028c4a5ce331c2f355add8e2b807a7d697fe4495f7e1965786a4f6bcd5b
 
 [[pin]]
 name = "avd-fw"
-version = "0.1"
+version = "0.2"
 repo = "AsahiLinux/avd-fw"
 install = "/usr/lib/firmware/updates/apple/avd-fw-*.bin on the Macs, the video decoder's firmware"
 url = "https://github.com/AsahiLinux/avd-fw/archive/v{version}/avd-fw-{version}.tar.gz"
-sha256 = "2e131244275cb15c94243e41eec8a2a665ec895cfe3a818181549db991e62c67"
+sha256 = "b83813636b2e52771a629aa46e0a9d86831965ad49c5acaf74eab91ba7c7203d"
 
 [[pin]]
 name = "libva-v4l2-request"
-version = "cfe6c2ab1b5346d1e973625d01b79fcb648fcf5e"
+version = "0e54d318004e204d2f73818c96e89c4642178351"
 repo = "sofus13/libva-v4l2_request"
 track = "commit"
 install = "/usr/lib64/dri/v4l2_request_drv_video.so and its asahi_drv_video.so link on the Macs, VA-API over the decoder"
 url = "https://github.com/sofus13/libva-v4l2_request/archive/{version}.tar.gz"
-sha256 = "ffa02cc58ce904de09ec66697221d3c0f3ca0253dd8cdfadd07765ef687e2713"
+sha256 = "90e38019e76760d8ad11f04878331a90b56d18257f85f620daf57b10e50c71c4"
 
 [[pin]]
 name = "elfeed-kak"
