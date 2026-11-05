@@ -26,14 +26,13 @@ deen_pids() { session_qs_pids "-p $deen_qml"; }
 no_deen_process() { [ -z "$(deen_pids)" ]; }
 logged() { grep -qxF -- "$1" "$calls"; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 # A backend script as $1 answers in place of the fake deen.
 open_deen() { niri msg action spawn -- sh -c "${1:+DOTS_DEEN=$1 }exec $exec_line >>'$log' 2>&1"; }
 no_data="Bangla data is not on this machine: gh auth login, then dots update"
 
-in_theme paper
+until_ok 3000 status_theme artboard
 open_deen
 until_ok 5000 deen_up
 check "Deen opens ($(deen_windows) window)" deen_up
@@ -51,7 +50,7 @@ check "the top reads 7 due today and 2 new, 1 of 7 ($(mem '[.count, .line]'))" \
   mem_is '.memorise.count == "7 due today" and .memorise.line == "2 new · 1 of 7 · self-graded, nothing is recorded"'
 check "the card shows only the first half of 1:2's words with two blanks and the recite line ($(mem '.card | [.arabic, .blanks, .recite, .hint]'))" \
   mem_is --arg cue "$cue12" '.memorise.card | .arabic == $cue and .blanks == 2 and .recite == "Recite the rest aloud. No microphone: you judge yourself." and .hint == "space reveal the rest" and .pron == "" and .meaning == "" and .ratings == []'
-check "the heading names the surah in Bangla from api surahs, its reference in Bangla digits ($(mem .card.heading))" mem_is '.memorise.card.heading == "সূরা আল-ফাতিহা ১:২" and .memorise.card.badge == "1 · RECALL"'
+check "the heading names the surah in Bangla from api surahs, its reference in Bangla digits ($(mem .card.heading))" mem_is '.memorise.card.heading == "সূরা আল-ফাতিহা ১:২" and .memorise.card.badge == "1 · recall"'
 check "the card draws in Amiri or Noto Naskh Arabic ($(mem .card.arabicFont))" mem_is '.memorise.card.arabicFont == .arabic'
 
 wtype 3
@@ -64,15 +63,16 @@ until_ok 2000 mem_is '.memorise.revealed == true'
 # Zakaria's 1:2, whose হাম্‌দ and আল্লাহ্‌র keep the zero-width non-joiner after their hasanta.
 bn12=$(printf 'সকল ‘হাম্\u200cদ’ আল্লাহ্\u200cর , যিনি সৃষ্টিকুলের রব')
 check "space reveals the whole ayah, its Bangla pronunciation and its Bangla meaning ($(mem '.card | [.arabic, .pron, .meaning]'))" \
-  mem_is --arg full "$full12" --arg bn "$bn12" '.memorise.card | .arabic == $full and .pron == "আলহামদু লিল্লা-হি রাব্বিল ‘আ-লামী-ন" and .meaning == $bn and .badge == "2 · REVEALED" and .blanks == 0'
+  mem_is --arg full "$full12" --arg bn "$bn12" '.memorise.card | .arabic == $full and .pron == "আলহামদু লিল্লা-হি রাব্বিল ‘আ-লামী-ন" and .meaning == $bn and .badge == "2 · revealed" and .blanks == 0'
 check "the pronunciation draws on one uncut line ($(mem '.card | [.pronLines, .pronTruncated]'))" mem_is '.memorise.card.pronLines == 1 and .memorise.card.pronTruncated == false'
 no_english() { ! deen_state | jq -c .memorise | grep -q 'praise'; }
 check "and no English line: 1:2's 'praise' is nowhere in Memorise's state" no_english
-check "paper: the heading, the pronunciation and the meaning draw in Noto Serif Bengali ($(mem '.card | [.headingFamily, .pronFamily, .meaningFamily]'))" \
-  mem_is '.memorise.card | [.headingFamily, .pronFamily, .meaningFamily] == ["Noto Serif Bengali", "Noto Serif Bengali", "Noto Serif Bengali"]'
+check "the Memorise card draws the heading, the pronunciation and the meaning in Noto Sans Bengali ($(mem '.card | [.headingFamily, .pronFamily, .meaningFamily]'))" \
+  mem_is '.memorise.card | [.headingFamily, .pronFamily, .meaningFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
 check "the four ratings read the card's next ($(mem '.card.ratings | map([.key, .word, .next])'))" \
   mem_is '.memorise.card.ratings | map([.key, .word, .next]) == [["1","again","10 min"],["2","hard","1 day"],["3","good","1 day"],["4","easy","1 day"]]'
-check "Paper heads the ratings in capitals ($(mem .card.ask))" mem_is '.memorise.card.ask == "HOW DID IT GO · NEXT REVIEW"'
+check "a rounded white card with an accent outline, tinted badge and rounded tiles ($(mem '.card | [.radius, .border, .fill, .borderColor, .badgeFill, .badge, .ask]'))" \
+  mem_is '.memorise.card | .radius == 14 and .border == 1.5 and .fill == "#ffffff" and .borderColor == "#3d5afe" and .badgeFill == "#eef1ff" and .badge == "2 · revealed" and .ask == "How did it go · next review" and (.ratings | all(.radius == 12))'
 
 wtype 3
 until_ok 2000 mem_is '.memorise.count == "6 due today"'
@@ -106,29 +106,7 @@ check "a 200 character meaning wraps and is not cut ($(mem '.card | [.meaningLin
 check "and its long pronunciation, a fused run with no space in it, wraps inside the card and is not cut ($(mem '.card | [.pronLines, .pronTruncated, .pronOverflow]'))" \
   mem_is '(.memorise.card.pron | startswith("ইহদিনাস")) and .memorise.card.pronLines > 1 and .memorise.card.pronTruncated == false and .memorise.card.pronOverflow == false'
 
-check "paper: a square card with a 2px ink border and square rating tiles ($(mem '.card | [.radius, .border, .fill]'))" \
-  mem_is '.memorise.card | .radius == 0 and .border == 2 and .fill == "#00000000" and (.ratings | all(.radius == 0))'
-
-in_theme artboard
-until_ok 3000 deen_is '.voice == "plain"'
-check "artboard: a rounded white card with an accent outline, tinted badge and rounded tiles ($(mem '.card | [.radius, .border, .fill, .borderColor, .badgeFill, .badge, .ask]'))" \
-  mem_is '.memorise.card | .radius == 14 and .border == 1.5 and .fill == "#ffffff" and .borderColor == "#3d5afe" and .badgeFill == "#eef1ff" and .badge == "2 · revealed" and .ask == "How did it go · next review" and (.ratings | all(.radius == 12))'
-check "artboard: the count reads in sentence case ($(mem '[.count, .line]'))" mem_is '.memorise.count == "5 due today"'
-check "artboard: the heading, the pronunciation and the meaning draw in Noto Sans Bengali ($(mem '.card | [.headingFamily, .pronFamily, .meaningFamily]'))" \
-  mem_is '.memorise.card | [.headingFamily, .pronFamily, .meaningFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
-
-in_theme blueprint
-until_ok 3000 deen_is '.voice == "bracket"'
-check "blueprint: a square 1px card in the accent, bracketed badge, capitals and the mono face ($(mem '.card | [.radius, .border, .borderColor, .badge, .ask, .askFont]'))" \
-  mem_is '.memorise.card | .radius == 0 and .border == 1 and .borderColor == "#7fe3f0" and .badge == "[2 · REVEALED]" and .ask == "HOW DID IT GO · NEXT REVIEW" and .askFont == "Maple Mono"'
-check "blueprint: the count and the ratings read in capitals and the key strip in brackets ($(mem '[.count, .card.ratings[0].next, .keys[0]]'))" \
-  mem_is '.memorise.count == "5 DUE TODAY" and .memorise.card.ratings[0].next == "10 MIN" and .memorise.keys[0] == ["[SPACE]","REVEAL"] and .memorise.keys[7] == ["[ESC]","CLOSE"]'
-check "blueprint: the heading, the pronunciation and the meaning draw in Noto Sans Bengali ($(mem '.card | [.headingFamily, .pronFamily, .meaningFamily]'))" \
-  mem_is '.memorise.card | [.headingFamily, .pronFamily, .meaningFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
-
-in_theme paper
-until_ok 3000 deen_is '.voice == "caps"'
-check "paper: the key strip reads SPACE REVEAL to ESC CLOSE ($(mem .keys))" mem_is '.memorise.keys[0] == ["SPACE","REVEAL"] and (.memorise.keys | length) == 8'
+check "the key strip reads space reveal to esc close ($(mem .keys))" mem_is '.memorise.keys[0] == ["space","reveal"] and .memorise.keys[7] == ["esc","close"] and (.memorise.keys | length) == 8'
 
 wtype -k Escape
 until_ok 3000 deen_gone
