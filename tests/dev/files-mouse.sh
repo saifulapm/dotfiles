@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Files by mouse: a click selects one row, Shift and Ctrl clicks extend it, a double click opens, a drag starts only past 6 px and carries the selection, the wheel scrolls without moving it, and no click acts behind a question or a card.
+# Files by mouse: a click selects one row, Shift and Ctrl clicks extend it, a double click opens, a drag starts only past 6 px and carries the selection, the wheel scrolls without moving it, a click on a place opens it, and no click acts behind a question or a card.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -170,6 +170,17 @@ point wheel 3
 after=$(files_box n020.txt | jq .y)
 check "three notches down scroll the list ($before -> $after)" test "$(jq -n "$before - $after >= 150")" = true
 check "and the selection stays ($(files_state | jq -c '[.cursor, .marked]'))" files_is '.cursor == "n005.txt" and .marked == ["n003.txt", "n004.txt", "n005.txt"]'
+
+# A click on a place opens it as Enter does; behind a question it does nothing.
+wtype d
+until_ok 2000 files_is '.asking == "trash"'
+at place:Downloads
+point sleep 300
+check "a click on a place behind the trash question opens nothing ($(files_state | jq -c .folder))" files_is '(.folder | endswith("/many")) and .asking == "trash"'
+wtype -k Escape
+until_ok 2000 files_is '.asking == ""'
+at place:Downloads
+check "a click on the Downloads place opens it ($(files_state | jq -c '[.folder, .side]'))" until_ok 2000 files_is '.listed and (.folder | endswith("/Downloads")) and .side == "list"'
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"

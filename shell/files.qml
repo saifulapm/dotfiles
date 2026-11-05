@@ -452,8 +452,9 @@ ShellRoot {
         dragChip.grabToImage(r => app.chipUrl = r.url);
     }
 
-    // No click acts on a row while a question, a field or a card holds the keys, nor before the folder's rows land.
-    readonly property bool rowsClickable: listed && !ops.failed && asking === "" && !finding && !jumping && !renaming && !openWith.visible && !share.shown
+    // No click acts while a question, a field or a card holds the keys, and none on a row before the folder's rows land.
+    readonly property bool keysFree: !ops.failed && asking === "" && !finding && !jumping && !renaming && !openWith.visible && !share.shown
+    readonly property bool rowsClickable: listed && keysFree
 
     // A click on row i selects as a file manager's does: alone, from the cursor with Shift, one more or less with Ctrl.
     function clickRow(i, mods) {
@@ -474,6 +475,15 @@ ShellRoot {
             return;
         side = "list";
         selected = i;
+        choose();
+    }
+
+    // A click on place i opens it as Enter on it does.
+    function clickPlace(i) {
+        if (!keysFree)
+            return;
+        side = "places";
+        placeAt = i;
         choose();
     }
 
@@ -1963,6 +1973,11 @@ ShellRoot {
             implicitHeight: 38
             radius: 10
             color: placeRow.atCursor || placeRow.here ? look.cursor.fill : "transparent"
+
+            Click {
+                name: "place:" + placeRow.place.label
+                onTapped: app.clickPlace(placeRow.at)
+            }
 
             Item {
                 id: placeIconBox

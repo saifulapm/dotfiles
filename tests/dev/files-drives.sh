@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# In Files, a drive mounted under /run/media/$USER lists under Drives with its size and an e badge within 3 s; Enter on it opens its folder, and e on it unmounts it, deletes the loop device and takes it off the list within 3 s.
+# In Files, a drive mounted under /run/media/$USER lists under Drives with its size and an e badge within 3 s; Enter or a click on it opens its folder, and e on it unmounts it, deletes the loop device and takes it off the list within 3 s.
 {
 source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/pointer.bash"
 
 files_qml=$repo/shell/files.qml
 work=$(mktemp -d)
@@ -17,6 +18,7 @@ udisks() { env -u DBUS_SYSTEM_BUS_ADDRESS udisksctl "$@" --no-user-interaction; 
 # The loop device goes whatever happened, but only while it is still this check's image: an eject frees its number for another.
 ours() { [ -n "$loop" ] && [ "$(losetup -n -O BACK-FILE "$loop" 2>/dev/null)" = "$img" ]; }
 cleanup() {
+  pointer_stop
   niri msg action close-window >/dev/null 2>&1
   [ -n "${automounter:-}" ] && kill "$automounter" 2>/dev/null
   if ours; then
@@ -72,6 +74,16 @@ wtype -k Return
 until_ok 2000 files_is --arg m "$mnt" '.listed and .folder == $m'
 check "tab to the drive and Enter opens its mount folder ($(files_state | jq -c '{folder, side}'))" \
   files_is --arg m "$mnt" '.folder == $m and .side == "list"'
+
+# A click on the drive opens its folder too, as Enter on it does.
+wtype h
+until_ok 2000 files_is --arg m "$mnt" '.listed and .folder != $m'
+until_ok 2000 app_placed files
+p=$(app_spot files "$(timeout 0.5 qs ipc -p "$files_qml" call files box place:TESTUSB)")
+# shellcheck disable=SC2086
+point click $p
+check "a click on the drive opens its mount folder ($(files_state | jq -c '{folder, side}'))" \
+  until_ok 2000 files_is --arg m "$mnt" '.listed and .folder == $m and .side == "list"'
 
 wtype -k Tab
 until_ok 1000 files_is --argjson at "$at" '.side == "places" and .placeAt == $at'
