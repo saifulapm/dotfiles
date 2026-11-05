@@ -15,6 +15,7 @@ Item {
     // The shell makes Control in its warm-up, before anyone opens it; the sections that probe the system wait for this.
     property bool opened: false
     property int current: 0
+    property real wheelRest: 0
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -72,12 +73,15 @@ Item {
         section.key({ key: Qt.Key_Return, modifiers: 0, text: "" });
     }
 
-    // A wheel turn over a level row selects it and takes the h or l step its key() handles.
+    // A wheel turn over a level row selects it and takes one h or l step its key() handles for each whole notch; wheelRest holds a touchpad's part of one.
     function turnRow(index, angle) {
-        const dir = Lib.wheelDir(angle);        if (!section.levels || section.typing || dir === 0)
+        if (!section.levels || section.typing)
             return;
+        const t = Lib.wheelSteps(wheelRest, angle);
+        wheelRest = t.rest;
         section.selected = index;
-        section.key({ key: dir > 0 ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
+        for (let i = 0; i < Math.abs(t.steps); i++)
+            section.key({ key: t.steps > 0 ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
     }
 
     // An item's box in window coordinates.

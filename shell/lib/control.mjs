@@ -13,9 +13,11 @@ export function stepVolume(volume, dir) {
   return Math.max(0, Math.min(100, pct)) / 100;
 }
 
-// A wheel event's step on a level row: a notch up (positive angle) is the l key, a notch down the h key.
-export function wheelDir(angle) {
-  return Math.sign(angle);
+// A wheel event over a level row: each whole notch, 120 of Qt's angle, is one step, up the l key and down the h key; a touchpad's smaller angles add up in rest, so a swipe steps as far as the notches it adds up to.
+export function wheelSteps(rest, angle) {
+  const total = rest + angle;
+  const steps = Math.trunc(total / 120);
+  return { steps, rest: total - steps * 120 };
 }
 
 export function audioRow(node) {
