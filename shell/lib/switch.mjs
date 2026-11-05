@@ -1,7 +1,7 @@
 // A colorscheme switch: the paper and open surfaces crossfade from the old colours to the new.
 import { springCurve, ease } from './island.mjs';
 
-// 260 ms, a frame inside the 280 ms budget, as the shell's own stamps add one (lesson 2026-11-04).
+// 260 ms, a frame inside the 280 ms budget, since the shell's own start and end stamps read about a frame over the animation.
 export const SWITCH = { kind: 'fade', ms: 260 };
 
 // Every pair crossfades; the same scheme again replaces the paper with no transition, which Paper.qml decides before asking.

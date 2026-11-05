@@ -80,7 +80,7 @@ export function windowLook(tokens, focused) {
   return { fill: c.surface, frame: { width: 1, color: focused ? c.ink : qtColor(tokens.niri.border_inactive ?? c.line) }, radius: 0 };
 }
 
-// A name in the terminal line keeps what fits its window: blueprint, nine letters, is the longest whole.
+// A name in the terminal line keeps what fits its window: nine letters whole, a longer one cut.
 const short = (n) => (n.length > 9 ? n.slice(0, 8) + '…' : n);
 
 // Four lines of a shell session in the theme's ANSI colours: blue paths, a red prompt, a green pass, yellow hashes.

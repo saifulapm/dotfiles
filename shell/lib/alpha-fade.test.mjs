@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Qt.alpha(c, a) sets c's alpha to a rather than scaling it, so a fade written with it draws a translucent colour near solid mid-fade (m78, Frost's glass); a fade scales the colour's own alpha instead.
+// Qt.alpha(c, a) sets c's alpha to a rather than scaling it, so a fade written with it draws a translucent colour near solid mid-fade (m78); a fade scales the colour's own alpha instead.
 const shell = new URL('..', import.meta.url).pathname;
 const FADING = /\b(pose|progress|fade)/i;
 

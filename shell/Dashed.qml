@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Shapes
 
-// A dashed rule along the top, or a dashed frame, as Blueprint draws its rules and done cards.
+// A dashed rule along the top, or a dashed frame, as DNS Shield draws its add row and timed badge.
 Shape {
     id: dashed
 

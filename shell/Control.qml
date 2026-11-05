@@ -162,7 +162,7 @@ Item {
                     id: tabRepeater
                     model: Lib.TITLES
 
-                    // The current tab takes the launcher's mode label: Paper's ink chip, Artboard's tint pill, Blueprint's cyan cursor.
+                    // The current tab takes the launcher's mode label, its tint pill.
                     Rectangle {
                         required property string modelData
                         required property int index
@@ -384,7 +384,7 @@ Item {
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1

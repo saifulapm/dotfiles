@@ -18,7 +18,7 @@ niri msg action spawn -- dots-call themes toggle
 until_ok 3000 state_is '.open and .settled'
 check "the picker opens with nothing played" state_is '.played == null'
 
-# The 260 ms crossfade reads a frame or so over between its own start and end stamps (lesson 2026-11-04).
+# The 260 ms crossfade reads a frame or so over between its own start and end stamps.
 wtype 3
 until_ok 1000 played github-light
 check "3 puts the cursor on github-light" state_is '.selected == "github-light"'

@@ -29,7 +29,7 @@ export const arabicFamily = (families) => (families.indexOf('Amiri') >= 0 ? 'Ami
 
 export const bengaliFamily = 'Noto Sans Bengali';
 
-// Drawn as it is in every theme: Blueprint's capitals would change the commands it names.
+// Drawn as it is: capitals would change the commands it names.
 export const NO_DATA = 'Bangla data is not on this machine: gh auth login, then dots update';
 
 const NO_TEXT = ['cannot read the Quran text at ', 'cannot read the duas at '];

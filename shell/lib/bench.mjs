@@ -24,7 +24,7 @@ export function report(m, b) {
     line('files cold', m.filesColdMs, 'ms', '≤', b.coldMs, m.filesColdMs <= b.coldMs),
     line('timers', m.timers, '', '=', b.timers, m.timers === b.timers),
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
-    // Read with Blueprint on, the theme whose grid paper is the costliest to draw: m1's 0.02 % plus 0.05.
+    // Read at rest on the dot paper: m1's 0.02 % plus 0.05.
     line('idle cpu', m.cpu, '%', '≤', b.idleCpu, Number(m.cpu) <= b.idleCpu),
     // Files is an App, its own qs process: a first frame and an RSS of its own, and no process once its window closes.
     line('app 1st frame', m.appFirstFrameMs, 'ms', '≤', b.appFirstFrameMs, m.appFirstFrameMs <= b.appFirstFrameMs),

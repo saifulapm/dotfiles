@@ -168,7 +168,7 @@ FocusScope {
                 Layout.preferredWidth: 300
                 Layout.fillHeight: true
 
-                // The search field: Paper's and Blueprint's ruled box, Artboard's filled pill.
+                // The search field: a filled pill.
                 Rectangle {
                     id: fieldBox
                     anchors.left: parent.left

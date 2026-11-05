@@ -8,7 +8,7 @@ unset TMUX
 rest_in() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 until_ok 5000 rest_in catppuccin-mocha
 
-# Timed by the shell's own stamps, with nothing polling inside the timed window (lessons 2026-11-01, 2026-11-04).
+# Timed by the shell's own stamps, with nothing polling inside the timed window, since a poll there stretches what it times.
 to=catppuccin-mocha
 for i in 1 2 3 4 5; do
   [ "$to" = rose-pine-dawn ] && to=catppuccin-mocha || to=rose-pine-dawn
