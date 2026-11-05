@@ -73,7 +73,7 @@ Item {
         return JSON.stringify({
             open: shown,
             selected: selected,
-            rows: list.map(r => ({ kind: r.kind, id: r.id, text: r.text })),
+            rows: list.map(r => ({ kind: r.kind, id: r.id, text: r.text, done: r.done })),
             active: G.activeGoals(store).map(g => g.title),
             done: G.doneGoals(store).map(g => g.title),
             count: count,
@@ -129,6 +129,15 @@ Item {
 
     function move(by) {
         selected = Math.max(0, Math.min(list.length - 1, selected + by));
+    }
+
+    // A click selects the row under it, then a goal or done heading folds as Enter does and a task ticks as Space does.
+    function clickRow(index) {
+        selected = index;
+        if (row?.kind === "task")
+            tick();
+        else
+            fold();
     }
 
     function fold() {
@@ -364,6 +373,11 @@ Item {
                                         font.family: block.head.kind === "done" ? fonts.mono : fonts.display
                                         font.pixelSize: block.head.kind === "done" ? 11 : 18
                                         font.letterSpacing: block.head.kind === "done" ? 1.2 : 0
+
+                                        Root.Click {
+                                            name: "goals-row:" + block.modelData.row
+                                            onTapped: view.clickRow(block.modelData.row)
+                                        }
                                     }
                                     Text {
                                         visible: block.head.kind === "goal"
@@ -404,6 +418,7 @@ Item {
                                     model: block.modelData.tasks
 
                                     Text {
+                                        id: task
                                         required property var modelData
                                         readonly property bool on: view.selected === modelData.row
                                         Layout.fillWidth: true
@@ -416,6 +431,11 @@ Item {
                                         font.family: fonts.ui
                                         font.pixelSize: 14
                                         font.weight: on ? Font.DemiBold : Font.Normal
+
+                                        Root.Click {
+                                            name: "goals-row:" + task.modelData.row
+                                            onTapped: view.clickRow(task.modelData.row)
+                                        }
                                     }
                                 }
                             }
