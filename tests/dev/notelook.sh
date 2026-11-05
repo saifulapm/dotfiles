@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Notes draws each theme's design: an empty Notes shows one line of keys, and the selected card is outlined in the accent.
+# Notes draws the one design: an empty Notes shows one line of keys, and the selected card is outlined in the accent.
 {
 source "$(dirname "$0")/lib.sh"
 
 notes_state() { timeout 0.5 qs ipc call notes state 2>/dev/null; }
 notes_is() { notes_state | jq -e "$1" >/dev/null; }
 notes_focused() { niri msg -j windows | jq -e 'any(.[]; .title == "Notes" and .is_focused)' >/dev/null; }
-# The pixels of a 7 px strip across the selected card's left edge, one "r g b" per line; niri's window offset can lag a theme switch by a few px.
+# The pixels of a 7 px strip across the selected card's left edge, one "r g b" per line.
 edge_rgbs() {
   local win rect
   win=$(niri msg -j windows | jq -c '.[] | select(.title == "Notes") | .layout | [(.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]), (.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1])]')
@@ -35,21 +35,8 @@ wtype -k Return
 until_ok 2000 notes_is '.count == 1'
 wtype -k Tab
 until_ok 2000 notes_is '.selectedRect != null'
-check "the selected card is outlined in Paper's #C8381E" is_accent '#C8381E'
-for t in artboard:#3D5AFE blueprint:#7FE3F0; do
-  legacy_theme "${t%%:*}" >/dev/null 2>&1
-  until_ok 2000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"${t%%:*}\"' >/dev/null"
-  sleep 0.3
-  check "the selected card is outlined in ${t%%:*}'s ${t#*:}" is_accent "${t#*:}"
-done
-check "blueprint: the sections hint and the checkboxes keep their brackets ($(notes_state | jq -c '[.keyHint, .checkbox]'))" notes_is '.keyHint == "[⌃K]" and .checkbox == "brackets"'
-
-# Hi-Fi draws Blueprint's layout without the marks; the one note here is plain words with no bracket.
-legacy_theme hi-fi >/dev/null 2>&1
-until_ok 2000 bash -c "timeout 0.5 qs ipc call shell status | jq -e '.theme == \"hi-fi\"' >/dev/null"
-sleep 0.3
-check "hi-fi: the sections hint is bare and the checkboxes are circles ($(notes_state | jq -c '[.keyHint, .checkbox]'))" notes_is '.keyHint == "⌃K" and .checkbox == "circle"'
-check "hi-fi: nothing Notes reports holds a bracket ($(notes_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(notes_state | marked)" ]'
+check "the selected card is outlined in the accent #3D5AFE" is_accent '#3D5AFE'
+check "the sections hint reads plain ($(notes_state | jq -c .keyHint))" notes_is '.keyHint == "⌃K"'
 
 exit $((fails > 0))
 }
