@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Effects
 import "." as Root
 import "lib/passage.mjs" as P
 import "lib/deen.mjs" as D
@@ -12,8 +11,7 @@ Item {
     required property var passage
     readonly property var look: P.look(tokens)
     readonly property var text: passage.text
-    // The sheet's own voice, so an outgoing sheet keeps its theme's words until it goes.
-    readonly property var voiced: P.voiced(tokens.type.voice, text.kind, text.ref, tokens.type.engraved === true)
+    readonly property var voiced: P.voiced(text.kind, text.ref)
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property real side: look.pad[1]
     // An ayah, hadith or dua day draws Bangla; a quote, its fallback too, draws English.
@@ -23,16 +21,15 @@ Item {
     function drawn() {
         const a = block.mapToItem(null, 0, 0);
         const b = block.mapToItem(null, block.width, block.height);
-        const label = look.frame === "card" ? frameLabel : stackLabel;
         return {
-            label: label.text,
+            label: frameLabel.text,
             ar: arText.visible ? arText.text : "",
             bn_pron: pronText.visible ? pronText.text : "",
             bn: bnText.visible ? bnText.text : "",
             en: enText.visible ? enText.text : "",
             ref: refText.text,
             family: {
-                label: label.fontInfo.family,
+                label: frameLabel.fontInfo.family,
                 ar: arText.visible ? arText.fontInfo.family : "",
                 bn_pron: pronText.visible ? pronText.fontInfo.family : "",
                 bn: bnText.visible ? bnText.fontInfo.family : "",
@@ -60,10 +57,9 @@ Item {
         // A passage taller than the paper less 96 px each side, the island's and the margins' room, draws smaller as a whole.
         scale: Math.min(1, (words.height - 192) / height)
 
-        // Artboard: a selected artboard, the card ringed in the accent with its four handles.
+        // A selected artboard, the card ringed in the accent with its four handles.
         Root.Surface {
             anchors.fill: parent
-            visible: words.look.frame === "card"
             tokens: words.tokens
             role: "card"
             restyle: ({ frame: { width: 2, color: words.tokens.color.accent } })
@@ -71,39 +67,12 @@ Item {
 
         Text {
             id: frameLabel
-            visible: words.look.frame === "card"
             y: -height - 13
             textFormat: Text.PlainText
             text: words.voiced.label
             color: words.look.label.color
             font.family: words.look.label.font
             font.pixelSize: words.look.label.size
-        }
-
-        // Blueprint: crop marks at the block's corners.
-        Repeater {
-            model: words.look.frame === "marks" ? [[0, 0], [1, 0], [0, 1], [1, 1]] : []
-
-            Item {
-                required property var modelData
-                x: modelData[0] * (block.width - width)
-                y: modelData[1] * (block.height - height)
-                width: 22
-                height: 22
-
-                Rectangle {
-                    y: parent.modelData[1] * (parent.height - height)
-                    width: parent.width
-                    height: 1
-                    color: words.tokens.color.accent
-                }
-                Rectangle {
-                    x: parent.modelData[0] * (parent.width - width)
-                    width: 1
-                    height: parent.height
-                    color: words.tokens.color.accent
-                }
-            }
         }
 
         Column {
@@ -114,23 +83,10 @@ Item {
             spacing: words.look.gap
 
             Text {
-                id: stackLabel
-                visible: words.look.frame !== "card"
-                width: stack.width
-                horizontalAlignment: words.look.frame === "none" ? Text.AlignHCenter : Text.AlignLeft
-                textFormat: Text.PlainText
-                text: words.voiced.label
-                color: words.look.label.color
-                font.family: words.look.label.font
-                font.pixelSize: words.look.label.size
-                font.letterSpacing: words.look.label.spacing
-            }
-
-            Text {
                 id: arText
                 visible: words.text.ar !== ""
                 width: stack.width
-                horizontalAlignment: words.look.ar.align === "center" ? Text.AlignHCenter : Text.AlignRight
+                horizontalAlignment: Text.AlignRight
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.ar
@@ -138,24 +94,13 @@ Item {
                 font.family: words.arabic
                 font.pixelSize: words.look.ar.size
                 lineHeight: 1.5
-                // Blueprint's ink glows; the layer is made only for a theme that asks for it.
-                layer.enabled: words.look.ar.glow !== ""
-                layer.effect: MultiEffect {
-                    shadowEnabled: true
-                    shadowColor: words.look.ar.glow || "transparent"
-                    shadowOpacity: 0.35
-                    shadowBlur: 1
-                    blurMax: 22
-                    shadowHorizontalOffset: 0
-                    shadowVerticalOffset: 0
-                }
             }
 
             Text {
                 id: pronText
                 visible: words.text.bn_pron !== ""
                 width: stack.width
-                horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
+                horizontalAlignment: Text.AlignLeft
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.bn_pron
@@ -166,12 +111,12 @@ Item {
                 lineHeight: words.look.pron.size * words.look.pron.height
             }
 
-            // The meaning in Bangla, upright in every theme.
+            // The meaning in Bangla, upright.
             Text {
                 id: bnText
                 visible: words.bangla
                 width: stack.width
-                horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
+                horizontalAlignment: Text.AlignLeft
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.bn
@@ -186,13 +131,12 @@ Item {
                 id: enText
                 visible: words.text.en !== ""
                 width: stack.width
-                horizontalAlignment: words.look.en.align === "center" ? Text.AlignHCenter : Text.AlignLeft
+                horizontalAlignment: Text.AlignLeft
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.en
                 color: words.tokens.color.ink
                 font.family: words.look.en.font
-                font.italic: words.look.en.italic
                 font.pixelSize: words.look.en.size
                 // A fixed pitch, as the boards' CSS line-height, so a glyph from a fallback face such as ﷺ opens no line wider.
                 lineHeightMode: Text.FixedHeight
@@ -200,60 +144,21 @@ Item {
             }
 
             Rectangle {
-                visible: words.look.rule !== null
-                x: words.look.rule && words.look.rule.width > 0 ? (stack.width - width) / 2 : 0
-                width: words.look.rule && words.look.rule.width > 0 ? words.look.rule.width : stack.width
+                width: stack.width
                 height: 1
-                color: words.look.rule ? words.look.rule.color : "transparent"
+                color: words.look.rule.color
             }
 
-            // Blueprint's reference sits on a dimension line with end ticks across the block; the others are a plain line of text.
-            Item {
+            Text {
+                id: refText
                 width: stack.width
-                height: words.look.ref.dimension ? 29 : refText.implicitHeight
-
-                Rectangle {
-                    visible: words.look.ref.dimension
-                    y: Math.round(parent.height / 2)
-                    width: parent.width
-                    height: 1
-                    color: words.look.ref.color
-                }
-                Repeater {
-                    model: words.look.ref.dimension ? [0, 1] : []
-
-                    Rectangle {
-                        required property int modelData
-                        x: modelData * (stack.width - 1)
-                        y: (parent.height - height) / 2
-                        width: 1
-                        height: 22
-                        color: words.look.ref.color
-                    }
-                }
-                Rectangle {
-                    visible: words.look.ref.dimension
-                    anchors.centerIn: refText
-                    width: refText.implicitWidth + 38
-                    height: parent.height
-                    color: words.tokens.color.paper
-                }
-
-                Text {
-                    id: refText
-                    width: words.look.ref.dimension ? Math.min(implicitWidth, stack.width - 60) : stack.width
-                    x: words.look.ref.dimension ? (stack.width - width) / 2 : 0
-                    anchors.verticalCenter: parent.verticalCenter
-                    horizontalAlignment: words.look.ref.align === "center" ? Text.AlignHCenter : Text.AlignLeft
-                    elide: Text.ElideRight
-                    textFormat: Text.PlainText
-                    text: words.voiced.ref
-                    color: words.look.ref.color
-                    font.family: words.bangla ? words.look.bnRef.font : words.look.ref.font
-                    font.pixelSize: words.bangla ? words.look.bnRef.size : words.look.ref.size
-                    // Spacing would break Bangla's conjuncts apart.
-                    font.letterSpacing: words.bangla ? 0 : words.look.ref.spacing
-                }
+                horizontalAlignment: Text.AlignLeft
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
+                text: words.voiced.ref
+                color: words.look.ref.color
+                font.family: words.bangla ? words.look.bnRef.font : words.look.ref.font
+                font.pixelSize: words.bangla ? words.look.bnRef.size : words.look.ref.size
             }
         }
     }

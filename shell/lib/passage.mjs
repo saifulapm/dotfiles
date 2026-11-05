@@ -1,8 +1,7 @@
-// The daily passage: the list's lines read, the day's pick, deen's answer shaped to draw, and its label and reference line in each voice.
+// The daily passage: the list's lines read, the day's pick, deen's answer shaped to draw, and its label and reference line.
 import { answer, bengaliFamily, oneLine } from './deen.mjs';
 import { bnDigits, reference } from './deen-hadith.mjs';
 import { pad2 } from './margins.mjs';
-import { mark } from './voice.mjs';
 
 export const KINDS = ['ayah', 'hadith', 'dua', 'quote'];
 
@@ -111,62 +110,24 @@ export function overLimit(d) {
 // The list's limits, which a day's answer from deen keeps too, or the day falls back.
 export const within = (d) => d !== null && overLimit(d) === null;
 
-// Paper's tracked capitals, Artboard's frame label, Blueprint's brackets and capitals.
-export function voiced(voice, kind, ref, engraved = false) {
-  if (voice === 'plain') return { label: kind.charAt(0).toUpperCase() + kind.slice(1), ref };
-  if (voice === 'bracket') return { label: mark(engraved, kind.toUpperCase()), ref: ref.toUpperCase() };
-  return { label: kind.toUpperCase(), ref };
-}
+// The card's frame label in sentence case, over the reference as written.
+export const voiced = (kind, ref) => ({ label: kind.charAt(0).toUpperCase() + kind.slice(1), ref });
 
-// Each theme's passage as its board draws it, in logical pixels on a 2048 px wide output: Paper's epigraph, Artboard's selected card, Blueprint's drawing with crop marks; a day in Bangla draws its pronunciation, meaning and reference in the theme's Bengali face, unspaced.
+// The passage as a selected card, in logical pixels on a 2048 px wide output; a day in Bangla draws its pronunciation, meaning and reference in the Bengali face, unspaced.
 export function look(tokens) {
   const c = tokens.color;
   const t = tokens.type;
-  const bengali = bengaliFamily(t.voice);
-  if (t.voice === 'plain') {
-    return {
-      frame: 'card',
-      width: 992,
-      pad: [64, 77, 51],
-      gap: 29,
-      label: { font: t.ui, size: 18, spacing: 0, color: c.accent },
-      ar: { size: 74, align: 'right', glow: '' },
-      en: { font: t.ui, size: 29, italic: false, height: 1.55, align: 'left' },
-      rule: { width: -1, color: c.line },
-      ref: { font: t.ui, size: 19, spacing: 0, color: c.muted, align: 'left', dimension: false },
-      pron: { font: bengali, size: 24, height: 1.6, color: c.muted },
-      bn: { font: bengali, size: 30, height: 1.6 },
-      bnRef: { font: bengali, size: 21 },
-    };
-  }
-  if (t.voice === 'bracket') {
-    return {
-      frame: 'marks',
-      width: 1024,
-      pad: [58, 64, 58],
-      gap: 29,
-      label: { font: t.ui, size: 18, spacing: 3, color: c.danger },
-      ar: { size: 77, align: 'right', glow: c.accent },
-      en: { font: t.ui, size: 27, italic: false, height: 1.6, align: 'left' },
-      rule: null,
-      ref: { font: t.ui, size: 18, spacing: 3.6, color: c.accent, align: 'center', dimension: true },
-      pron: { font: bengali, size: 24, height: 1.6, color: c.accent },
-      bn: { font: bengali, size: 29, height: 1.6 },
-      bnRef: { font: bengali, size: 21 },
-    };
-  }
   return {
-    frame: 'none',
-    width: 1024,
-    pad: [0, 0, 0],
-    gap: 35,
-    label: { font: t.ui, size: 18, spacing: 5, color: c.accent },
-    ar: { size: 86, align: 'center', glow: '' },
-    en: { font: t.display, size: 51, italic: true, height: 1.25, align: 'center' },
-    rule: { width: 48, color: c.ink },
-    ref: { font: t.display, size: 27, spacing: 0, color: c.muted, align: 'center', dimension: false },
-    pron: { font: bengali, size: 30, height: 1.5, color: c.muted },
-    bn: { font: bengali, size: 43, height: 1.5 },
-    bnRef: { font: bengali, size: 24 },
+    width: 992,
+    pad: [64, 77, 51],
+    gap: 29,
+    label: { font: t.ui, size: 18, color: c.accent },
+    ar: { size: 74 },
+    en: { font: t.ui, size: 29, height: 1.55 },
+    rule: { color: c.line },
+    ref: { font: t.ui, size: 19, color: c.muted },
+    pron: { font: bengaliFamily, size: 24, height: 1.6, color: c.muted },
+    bn: { font: bengaliFamily, size: 30, height: 1.6 },
+    bnRef: { font: bengaliFamily, size: 21 },
   };
 }

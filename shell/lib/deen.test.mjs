@@ -32,10 +32,8 @@ test('Arabic draws in Amiri where it is installed, else in Noto Naskh Arabic', (
   assert.equal(D.arabicFamily(['Maple Mono', 'Noto Naskh Arabic']), 'Noto Naskh Arabic');
 });
 
-test('Bangla draws in Noto Serif Bengali on Paper, and in Noto Sans Bengali on Artboard and Blueprint', () => {
-  assert.equal(D.bengaliFamily('caps'), 'Noto Serif Bengali');
-  assert.equal(D.bengaliFamily('plain'), 'Noto Sans Bengali');
-  assert.equal(D.bengaliFamily('bracket'), 'Noto Sans Bengali');
+test('Bangla draws in Noto Sans Bengali', () => {
+  assert.equal(D.bengaliFamily, 'Noto Sans Bengali');
 });
 
 test('a tab without its Bangla data says how to get it', () => {

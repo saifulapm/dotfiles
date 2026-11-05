@@ -25,7 +25,7 @@ Scope {
     property var surahsFor: null
     // What the sheets draw, with the kind it is and whether it stands in for a day deen could not answer; null until deen answers, and a new pick clears it, so no sheet draws another day's text.
     property var text: null
-    readonly property var voiced: text && theme.tokens ? P.voiced(theme.tokens.type.voice, text.kind, text.ref, theme.tokens.type.engraved === true) : null
+    readonly property var voiced: text ? P.voiced(text.kind, text.ref) : null
 
     onPickChanged: read()
     Component.onCompleted: read()
