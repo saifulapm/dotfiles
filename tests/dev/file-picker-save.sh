@@ -53,7 +53,7 @@ check "Enter answers the edited name ($(cat "$out/edit" 2>/dev/null))" answer_is
 
 ask replace "$(request "$docs")"
 shown
-check "the file already there holds the cursor and reads EXISTS ($(pk_state | jq -c '[.rows[.selected].name, .rows[.selected].tag]'))" state_is '.rows[.selected].name == "report.pdf" and (.rows[.selected].tag | test("exists"; "i"))'
+check "the file already there holds the cursor and reads exists ($(pk_state | jq -c '[.rows[.selected].name, .rows[.selected].tag]'))" state_is '.rows[.selected].name == "report.pdf" and (.rows[.selected].tag | test("exists"; "i"))'
 wtype -k Return
 until_ok 2000 state_is '.question'
 check "Enter on a name that exists asks first ($(pk_state | jq -c '[.question, .hint]'))" state_is '.question and (.hint | test("report.pdf exists"; "i"))'
@@ -97,25 +97,17 @@ for i in 1 2 3 4 5; do
   until_ok 3000 answered "path-$i"
 done
 
-# Each theme writes the heading and the question in its voice; the file's name keeps its case.
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "paper|SAVE AS · ${app^^}|report.pdf exists · ↵ REPLACE · ESC KEEP" \
-  "artboard|Save as · $app|report.pdf exists · ↵ replace · esc keep" \
-  "blueprint|SAVE AS // ${app^^}|! report.pdf EXISTS · [↵] REPLACE · [ESC] KEEP"; do
-  IFS='|' read -r name heading question <<<"$t"
-  in_theme "$name"
-  ask "theme-$name" "$(request "$docs")"
-  shown
-  check "$name: the heading reads $heading and the field report.pdf ($(pk_state | jq -c '[.heading, .name]'))" state_is --arg h "$heading" '.heading == $h and .name == "report.pdf"'
-  wtype -k Return
-  until_ok 2000 state_is '.question'
-  check "$name: the question reads $question ($(pk_state | jq -c .hint))" state_is --arg q "$question" '.hint == $q'
-  wtype -k Escape
-  until_ok 2000 state_is '.question | not'
-  wtype -k Escape
-  until_ok 3000 answered "theme-$name"
-done
+# The heading and the question; the file's name keeps its case.
+ask words "$(request "$docs")"
+shown
+check "the heading reads Save as · $app and the field report.pdf ($(pk_state | jq -c '[.heading, .name]'))" state_is --arg h "Save as · $app" '.heading == $h and .name == "report.pdf"'
+wtype -k Return
+until_ok 2000 state_is '.question'
+check "the question reads report.pdf exists · ↵ replace · esc keep ($(pk_state | jq -c .hint))" state_is '.hint == "report.pdf exists · ↵ replace · esc keep"'
+wtype -k Escape
+until_ok 2000 state_is '.question | not'
+wtype -k Escape
+until_ok 3000 answered words
 
 exit $((fails > 0))
 }

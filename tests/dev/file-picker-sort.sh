@@ -29,13 +29,12 @@ answered() { [ -e "$out/$1" ]; }
 shown() { until_ok 4000 state_is '.open and .settled and .listed'; }
 names() { pk_state | jq -c '[.sort, [.rows[].name], .rows[.selected].name]'; }
 sort_key() { wtype -M ctrl , -m ctrl; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 
 ask first "$(request open "$dir")"
 shown
 check "a request opens on date, newest first, folders on top ($(names))" \
   state_is '.sort == "modified" and [.rows[].name] == ["z-dir/", "y-dir/", "b-new.txt", "c-mid.txt", "a-old.txt"]'
-check "and the strip says so ($(pk_state | jq -c .hint))" state_is '.hint | contains("⌃, SORT: DATE")'
+check "and the strip says so ($(pk_state | jq -c .hint))" state_is '.hint | contains("ctrl+, sort: date")'
 wtype -k Down -k Down -k Down
 until_ok 1000 state_is '.rows[.selected].name == "c-mid.txt"'
 sort_key
@@ -69,11 +68,9 @@ check "a folder request skips size: name, then date ($(names))" state_is '.sort 
 wtype -k Escape
 until_ok 3000 answered folder
 
-legacy_theme artboard >/dev/null
-until_ok 3000 status_theme artboard
 ask arrow "$(request open "$dir")"
 shown
-check "artboard arrows Modified while the rows sort by date ($(pk_state | jq -c .heads))" state_is '.heads == ["Name", "Size", "Modified ↓"]'
+check "the head arrows Modified while the rows sort by date ($(pk_state | jq -c .heads))" state_is '.heads == ["Name", "Size", "Modified ↓"]'
 sort_key
 until_ok 1000 state_is '.sort == "name"'
 check "and Name once they sort by name ($(pk_state | jq -c .heads))" state_is '.heads == ["Name ↑", "Size", "Modified"]'

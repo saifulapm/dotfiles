@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The picker in each theme's idiom: the preview's meta lines with the size read from the image's header, the heading chips, the folder and save path rows, the several-files key strip, and a heading that never pushes the query out of the card.
+# The picker as its board draws it: the preview's meta lines with the size read from the image's header, the heading chips, the folder and save path rows, the several-files key strip, and a heading that never pushes the query out of the card.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -20,9 +20,6 @@ for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do truncate -s 2800000 "$loo
 : >"$look/pick/notes.txt"
 : >"$look/save/notes.md"
 : >"$look/save/report.pdf"
-mkdir -p "$look/hifi"
-: >"$look/hifi/[draft].md"
-: >"$look/hifi/notes.txt"
 
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 state_is() { pk_state | jq -e "$@" >/dev/null 2>&1; }
@@ -48,7 +45,7 @@ cursor_to() {
   return 1
 }
 mark() { wtype -M ctrl -k space -m ctrl; }
-preview_of() { pk_state | jq -c '{previewName, preview, previewHead, previewBadge, previewLines}'; }
+preview_of() { pk_state | jq -c '{previewName, preview, previewBadge, previewLines}'; }
 # Every drawn box lies inside the card.
 inside='. as $s | [.boxes[] | select(. != null)] | all(.x >= 0 and .y >= 0 and .x + .width <= $s.cardSize[0] + 0.5 and .y + .height <= $s.cardSize[1] + 0.5)'
 # A row's drawn mark, name colour, the colour under it and their WCAG contrast, from theme.mjs.
@@ -63,89 +60,57 @@ row_look() {
 ratio_at_least() { row_look "$2" | jq -e --argjson min "$1" '.contrast >= $min' >/dev/null; }
 long=$(printf 'chrome-%0193d' 0)
 
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-iso='^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}$'
-dotted='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4} · [0-9]{2}:[0-9]{2}$'
-comma='^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4}, [0-9]{2}:[0-9]{2}$'
-for t in "paper|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|||$dotted|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ⌃, SORT: NAME · ESC|SAVE IN|3 ITEMS|1 PLACE|✓|" \
-  "artboard|,,|1600 × 1200 px|640 × 480 px||PNG|$comma|3 marked|folders only|2 folders · files hidden|Name ↑,Items,Modified|↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: name · esc||3 items|→ Downloads|✓|" \
-  "blueprint|DIMENSIONS,SIZE,MODIFIED|1600 × 1200|640 × 480|PREVIEW IMAGE||$iso|3 MARKED|FOLDERS ONLY|2 FOLDERS · FILES HIDDEN|NAME,ITEMS,MODIFIED|[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: NAME · [ESC]|> FOLDER|3 ITEMS|1 PLACE|[x]|[ ]"; do
-  IFS='|' read -r name labels png jpg head badge date marked only folders heads strip lead items match on off <<<"$t"
-  in_theme "$name"
+# The preview: the header's size, not the bounded one Qt decoded, as bare values; no dimensions for a PDF.
+ask preview "$(request open "$look/shots")"
+shown
+cursor_to Photo.jpg
+check "a 640 x 480 JPEG draws 640 × 480 px ($(until_ok 3000 state_is '.previewDims != ""'; preview_of))" state_is '.previewDims == "640 × 480 px" and .previewName == "Photo.jpg"'
+cursor_to Report.pdf
+check "a PDF draws no dimensions line and no picture ($(until_ok 2000 state_is '.previewName == "Report.pdf"'; preview_of))" until_ok 2000 state_is '.previewName == "Report.pdf" and .preview == false and .previewDims == "" and .previewLines[0:1] == ["184 KB"] and (.previewLines | length) == 2'
+check "the PDF's badge reads PDF" state_is '.previewBadge == "PDF"'
 
-  # The preview: the header's size, not the bounded one Qt decoded, in the theme's labels; no dimensions for a PDF.
-  ask "preview-$name" "$(request open "$look/shots")"
-  shown
-  cursor_to Photo.jpg
-  check "$name: a 640 x 480 JPEG draws $jpg ($(until_ok 3000 state_is '.previewDims != ""'; preview_of))" state_is --arg d "$jpg" '.previewDims == $d and .previewName == "Photo.jpg"'
-  cursor_to Report.pdf
-  check "$name: a PDF draws no dimensions line and no picture ($(until_ok 2000 state_is '.previewName == "Report.pdf"'; preview_of))" until_ok 2000 state_is '.previewName == "Report.pdf" and .preview == false and .previewDims == "" and (.previewLines | length) == 2 and .previewLines[0].value == "184 KB"'
-  [ "$name" = blueprint ] && check "blueprint: the PDF's head reads PREVIEW FILE" state_is '.previewHead == "PREVIEW FILE"'
-  [ "$name" = artboard ] && check "artboard: the PDF's badge reads PDF" state_is '.previewBadge == "PDF"'
+cursor_to Wide-Shot.png
+until_ok 3000 state_is '.preview and .previewDims != ""'
+check "a 1600 x 1200 PNG draws 1600 × 1200 px, the name in real case ($(preview_of))" state_is '.preview and .previewDims == "1600 × 1200 px" and .previewLines[0] == "1600 × 1200 px" and .previewName == "Wide-Shot.png"'
+check "the date has a comma before the time" state_is '.previewLines[2] | test("^[0-9]{1,2} [A-Z][a-z]{2} [0-9]{4}, [0-9]{2}:[0-9]{2}$")'
+check "the badge reads PNG" state_is '.previewBadge == "PNG"'
 
-  cursor_to Wide-Shot.png
-  until_ok 3000 state_is '.preview and .previewDims != ""'
-  check "$name: a 1600 x 1200 PNG draws $png ($(preview_of))" state_is --arg d "$png" '.preview and .previewDims == $d and .previewLines[0].value == $d'
-  check "$name: its lines are labelled '$labels', the name in real case" state_is --arg l "$labels" '([.previewLines[].label] | join(",")) == $l and .previewName == "Wide-Shot.png"'
-  check "$name: the date reads in the theme's form" state_is --arg r "$date" '.previewLines[2].value | test($r)'
-  check "$name: the head reads '$head' and the badge '$badge'" state_is --arg h "$head" --arg b "$badge" '.previewHead == $h and .previewBadge == $b'
-  [ "$name" = paper ] && check "paper: the name is set in the serif at 24 px ($(pk_state | jq -c .previewNameFont))" state_is '.previewNameFont[1] == 24'
-
-  # Several files: the marked chip and the key strip.
-  wtype -k Escape
-  until_ok 3000 answered "preview-$name"
-  ask "multi-$name" "$(request open "$look/shots" true)"
-  shown
-  check "$name: a several-files request keys $strip ($(pk_state | jq -c .hint))" state_is --arg s "$strip" '.hint == $s'
-  check "$name: and no chip while nothing is marked" state_is '.chip == ""'
-  for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do
-    cursor_to "$n"
-    mark
-  done
-  check "$name: three marked files chip the heading $marked ($(pk_state | jq -c '[.chip, .marked]'))" until_ok 1000 state_is --arg c "$marked" '.chip == $c'
-  # IMG_2039 is marked and off the cursor, Photo.jpg is an unmarked file.
-  check "$name: a marked row off the cursor draws its name at contrast 4.5 or more ($(row_look IMG_2039.HEIC))" ratio_at_least 4.5 IMG_2039.HEIC
-  check "$name: a marked file draws '$on' and an unmarked one '$off' ($(row_look IMG_2039.HEIC) $(row_look Photo.jpg))" state_is --arg on "$on" --arg off "$off" '(.rows[] | select(.name == "IMG_2039.HEIC") | .mark) == $on and (.rows[] | select(.name == "Photo.jpg") | .mark) == $off'
-  cancel "multi-$name"
-
-  # A folder request: its chip, the path row's count and the Items head.
-  ask "folder-$name" "$(request folder "$look/pick")"
-  shown
-  check "$name: a folder request chips the heading $only, counts $folders, heads $heads ($(pk_state | jq -c '[.chip, .count, .heads]'))" state_is --arg c "$only" --arg n "$folders" --arg h "$heads" '.chip == $c and .count == $n and (.heads | join(",")) == $h'
-  cancel "folder-$name"
-
-  # Save: the path row's lead and count.
-  ask "save-$name" "$(request save "$look/save")"
-  shown
-  check "$name: the save path row reads '$lead' ~/... '$items' ($(pk_state | jq -c '[.pathLead, .path, .count]'))" state_is --arg l "$lead" --arg n "$items" '.pathLead == $l and .count == $n'
-  cancel "save-$name"
-
-  # A 200-character app id: the heading chip elides so the query and its match stay in the card.
-  ask "long-$name" "$(request open "$look/shots" false "$long")"
-  shown
-  wtype down
-  until_ok 3000 state_is '.match != ""'
-  check "$name: a 200-character app elides the heading and keeps the query and '$match' in the card ($(pk_state | jq -c '{headingTruncated, typed, match, cardSize, boxes}'))" state_is --arg m "$match" ".headingTruncated and (.typed | endswith(\"down\")) and .match == \$m and ($inside)"
-  # Artboard draws the heading again as the frame label above the card; it elides at the card's right edge.
-  [ "$name" = artboard ] && check "artboard: a 200-character app elides the frame label inside the card ($(pk_state | jq -c '{frameLabel, cardBox}'))" state_is '.frameLabel.visible and .frameLabel.truncated and .frameLabel.box.x + .frameLabel.box.w <= .cardBox.x + .cardBox.w + 0.5'
-  cancel "long-$name"
+# Several files: the marked chip and the key strip.
+wtype -k Escape
+until_ok 3000 answered preview
+ask multi "$(request open "$look/shots" true)"
+shown
+check "a several-files request keys the strip as typed ($(pk_state | jq -c .hint))" state_is '.hint == "↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: name · esc"'
+check "and no chip while nothing is marked" state_is '.chip == ""'
+for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do
+  cursor_to "$n"
+  mark
 done
+check "three marked files chip the heading 3 marked ($(pk_state | jq -c '[.chip, .marked]'))" until_ok 1000 state_is '.chip == "3 marked"'
+# IMG_2039 is marked and off the cursor, Photo.jpg is an unmarked file.
+check "a marked row off the cursor draws its name at contrast 4.5 or more ($(row_look IMG_2039.HEIC))" ratio_at_least 4.5 IMG_2039.HEIC
+check "a marked file draws ✓ and an unmarked one nothing ($(row_look IMG_2039.HEIC) $(row_look Photo.jpg))" state_is '(.rows[] | select(.name == "IMG_2039.HEIC") | .mark) == "✓" and (.rows[] | select(.name == "Photo.jpg") | .mark) == ""'
+cancel multi
 
-# Hi-Fi draws Blueprint's layout with no marks around the words the shell writes; a file named [draft].md keeps its own brackets.
-in_theme hi-fi
-ask "multi-hi-fi" "$(request open "$look/hifi" true)"
+# A folder request: its chip, the path row's count and the Items head.
+ask folder "$(request folder "$look/pick")"
 shown
-cursor_to '[draft].md'
-mark
-check "hi-fi: the several-files strip keys ↵ OPEN ... ⌃␣ SELECT · ESC ($(pk_state | jq -c .hint))" state_is '.hint == "↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ⌃, SORT: NAME · ESC"'
-check "hi-fi: a marked file draws ✓ and the file keeps its brackets ($(row_look '[draft].md'))" until_ok 1000 state_is '(.rows[] | select(.name == "[draft].md") | .mark) == "✓"'
-check "hi-fi: nothing the picker reports holds a bracket but a file name ($(pk_state | marked | grep -vxF '[draft].md' | head -3 | paste -sd'|'))" eval '[ -z "$(pk_state | marked | grep -vxF "[draft].md")" ]'
-cancel "multi-hi-fi"
-ask "folder-hi-fi" "$(request folder "$look/pick")"
+check "a folder request chips the heading folders only, counts 2 folders, heads Name ↑, Items, Modified ($(pk_state | jq -c '[.chip, .count, .heads]'))" state_is '.chip == "folders only" and .count == "2 folders · files hidden" and .heads == ["Name ↑", "Items", "Modified"]'
+cancel folder
+
+# Save: the path row's count.
+ask save "$(request save "$look/save")"
 shown
-check "hi-fi: a folder request holds no bracket either ($(pk_state | marked | head -3 | paste -sd'|'))" eval '[ -z "$(pk_state | marked)" ]'
-cancel "folder-hi-fi"
+check "the save path row counts 3 items ($(pk_state | jq -c '[.path, .count]'))" state_is '.count == "3 items"'
+cancel save
+
+# A 200-character app id: the heading chip elides so the query and its match stay in the card.
+ask long "$(request open "$look/shots" false "$long")"
+shown
+wtype down
+until_ok 3000 state_is '.match != ""'
+check "a 200-character app elides the heading and keeps the query and its match in the card ($(pk_state | jq -c '{headingTruncated, typed, match, cardSize, boxes}'))" state_is ".headingTruncated and (.typed | endswith(\"down\")) and .match == \"→ Downloads\" and ($inside)"
+cancel long
 
 exit $((fails > 0))
 }

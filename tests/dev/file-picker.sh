@@ -132,23 +132,16 @@ wtype -k Escape
 until_ok 3000 answered forged
 ask bare "$(request "$dl" '' '')"
 shown
-check "a request with no app reads just Open file ($(pk_state | jq -c .heading))" state_is '.heading == "OPEN FILE"'
+check "a request with no app reads just Open file ($(pk_state | jq -c .heading))" state_is '.heading == "Open file"'
 wtype -k Escape
 until_ok 3000 answered bare
 
-# Each theme writes the heading in its voice; Blueprint's caps are for labels, never for file names.
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "paper|OPEN FILE · ${app^^}" "artboard|Open file · $app" "blueprint|OPEN FILE // ${app^^}"; do
-  IFS='|' read -r name heading <<<"$t"
-  in_theme "$name"
-  ask "theme-$name" "$(request "$dl")"
-  shown
-  check "$name: the heading reads $heading ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "$heading" '.heading == $h'
-  check "$name: IMG_2041.HEIC is drawn in its real case" state_is 'any(.rows[]; .name == "IMG_2041.HEIC")'
-  wtype -k Escape
-  until_ok 3000 answered "theme-$name"
-done
+ask named "$(request "$dl")"
+shown
+check "the heading reads Open file · $app ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "Open file · $app" '.heading == $h'
+check "IMG_2041.HEIC is drawn in its real case" state_is 'any(.rows[]; .name == "IMG_2041.HEIC")'
+wtype -k Escape
+until_ok 3000 answered named
 
 until_ok 3000 state_is '.drawing == false'
 check "the picker is still loaded right after it closes" state_is '.loaded'

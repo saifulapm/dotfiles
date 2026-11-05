@@ -123,25 +123,17 @@ for i in 1 2 3 4 5; do
   until_ok 3000 answered "relist-$i"
 done
 
-# Each theme heads both cards in its voice and writes the folder strip.
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-for t in "paper|OPEN FILES · ${app^^}|CHOOSE FOLDER · ${app^^}|↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ⌃, SORT: NAME · ESC" \
-  "artboard|Open files · $app|Choose folder · $app|↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: name · esc" \
-  "blueprint|OPEN FILES // ${app^^}|CHOOSE FOLDER // ${app^^}|[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [⌃,] SORT: NAME · [ESC]"; do
-  IFS='|' read -r name multi folder strip <<<"$t"
-  in_theme "$name"
-  ask "multi-$name" "$(request open "$dl" true)"
-  shown
-  check "$name: several files head the card $multi ($(pk_state | jq -c .heading))" state_is --arg h "$multi" '.heading == $h'
-  wtype -k Escape
-  until_ok 3000 answered "multi-$name"
-  ask "folder-$name" "$(request folder "$pick")"
-  shown
-  check "$name: a folder request heads the card $folder and keys $strip ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "$folder" --arg s "$strip" '.heading == $h and .hint == $s'
-  wtype -k Escape
-  until_ok 3000 answered "folder-$name"
-done
+# Both cards' headings and the folder strip.
+ask heads-multi "$(request open "$dl" true)"
+shown
+check "several files head the card Open files · $app ($(pk_state | jq -c .heading))" state_is --arg h "Open files · $app" '.heading == $h'
+wtype -k Escape
+until_ok 3000 answered heads-multi
+ask heads-folder "$(request folder "$pick")"
+shown
+check "a folder request heads the card Choose folder · $app and keys the folder strip ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "Choose folder · $app" '.heading == $h and .hint == "↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: name · esc"'
+wtype -k Escape
+until_ok 3000 answered heads-folder
 
 exit $((fails > 0))
 }
