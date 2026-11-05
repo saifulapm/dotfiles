@@ -1,0 +1,34 @@
+# UI and code colours from rebelot/kanagawa.nvim's own base16 port (extras/base16/kanagawa.yaml), paper its wave bg_dim (lua/kanagawa/themes.lua); the ANSI 16 are its foot theme (extras/foot/kanagawa-wave.ini).
+[meta]
+name = "kanagawa-wave"
+title = "Kanagawa Wave"
+family = "Kanagawa"
+variant = "dark"
+source = "https://github.com/rebelot/kanagawa.nvim"
+licence = "MIT"
+
+[color]
+paper = "#181820"
+surface = "#1F1F28"
+ink = "#DCD7BA"
+muted = "#C8C093"
+line = "#223249"
+accent = "#7E9CD8"
+danger = "#C34043"
+ok = "#98BB6C"
+ansi = [
+  "#090618", "#C34043", "#76946A", "#C0A36E", "#7E9CD8", "#957FB8", "#6A9589", "#C8C093",
+  "#727169", "#E82424", "#98BB6C", "#E6C384", "#7FB4CA", "#938AA9", "#7AA89F", "#DCD7BA",
+]
+
+[syntax]
+keyword = "#957FB8"
+function = "#7E9CD8"
+string = "#98BB6C"
+type = "#DCA561"
+value = "#FFA066"
+variable = "#C34043"
+attribute = "#FFA066"
+meta = "#D27E99"
+builtin = "#7FB4CA"
+comment = "#727169"

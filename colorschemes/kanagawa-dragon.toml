@@ -1,0 +1,34 @@
+# UI and code colours from rebelot/kanagawa.nvim's own base16 port (extras/base16/kanagawa_dragon.yaml), with paper, muted, line and comment its dragon bg_dim, fg_dim, bg_visual and syn.comment (lua/kanagawa/themes.lua), since the port gives muted a blue; the ANSI 16 are its foot theme (extras/foot/kanagawa-dragon.ini).
+[meta]
+name = "kanagawa-dragon"
+title = "Kanagawa Dragon"
+family = "Kanagawa"
+variant = "dark"
+source = "https://github.com/rebelot/kanagawa.nvim"
+licence = "MIT"
+
+[color]
+paper = "#12120F"
+surface = "#181616"
+ink = "#C5C9C5"
+muted = "#C8C093"
+line = "#223249"
+accent = "#8BA4B0"
+danger = "#C4746E"
+ok = "#8A9A7B"
+ansi = [
+  "#0D0C0C", "#C4746E", "#8A9A7B", "#C4B28A", "#8BA4B0", "#A292A3", "#8EA4A2", "#C8C093",
+  "#A6A69C", "#E46876", "#87A987", "#E6C384", "#7FB4CA", "#938AA9", "#7AA89F", "#C5C9C5",
+]
+
+[syntax]
+keyword = "#A292A3"
+function = "#8BA4B0"
+string = "#8A9A7B"
+type = "#C4B28A"
+value = "#E46876"
+variable = "#C4746E"
+attribute = "#E46876"
+meta = "#7AA89F"
+builtin = "#8EA4A2"
+comment = "#737C73"
