@@ -12,32 +12,14 @@ dekho_windows() { niri msg -j windows | jq '[.[] | select(.app_id == "dekho")] |
 dekho_up() { [ "$(dekho_windows)" = 1 ] && dekho_is '.firstFrameMs != null'; }
 dekho_id() { niri msg -j windows | jq -r '[.[] | select(.app_id == "dekho")][0].id'; }
 
-# The virtual pointer is built for this run; each line it reads, it answers done.
-ptr_dir=$DOTS_DEV_DIR/pointer
-mkdir -p "$ptr_dir"
-wayland-scanner client-header "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$ptr_dir/wlr-virtual-pointer-unstable-v1-client-protocol.h"
-wayland-scanner private-code "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$ptr_dir/protocol.c"
-gcc -I"$ptr_dir" -o "$ptr_dir/pointer" "$repo/dev/pointer.c" "$ptr_dir/protocol.c" -lwayland-client || exit 1
-read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
-mkfifo "$ptr_dir/in"
-"$ptr_dir/pointer" "$ow" "$oh" <"$ptr_dir/in" >"$ptr_dir/log" 2>&1 &
-ptr=$!
-exec 7>"$ptr_dir/in"
-# A check's own cleanup calls this first.
+source "$(dirname "${BASH_SOURCE[0]}")/pointer.bash"
+# A check's own cleanup calls this first; it also drops Dekho's scratch dir.
+eval "shared_$(declare -f pointer_stop)"
 pointer_stop() {
-  exec 7>&- 2>/dev/null
-  kill "$ptr" 2>/dev/null
+  shared_pointer_stop
   rm -rf "$work"
 }
 cleanup() { pointer_stop; }
-done_count() { grep -c "^done $1" "$ptr_dir/log"; }
-done_more() { test "$(done_count "$1")" -gt "$2"; }
-point() {
-  local n
-  n=$(done_count "$1")
-  echo "$*" >&7
-  until_ok 15000 done_more "$1" "$n"
-}
 
 # Tiled windows report no position, so Dekho floats at 20,20 on the output, where its content starts.
 dekho_at=

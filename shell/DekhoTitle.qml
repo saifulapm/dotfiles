@@ -711,7 +711,7 @@ FocusScope {
                                 font.weight: Font.Medium
                                 maximumLineCount: 1
                             }
-                            DekhoClick {
+                            Click {
                                 name: "title-button:" + modelData.id
                                 onTapped: page.pick("buttons", modelData.id)
                             }
@@ -761,7 +761,7 @@ FocusScope {
                                 font.pixelSize: 12
                                 maximumLineCount: 1
                             }
-                            DekhoClick {
+                            Click {
                                 name: "title-link:" + modelData.id
                                 onTapped: page.pick("links", index)
                             }
@@ -806,7 +806,7 @@ FocusScope {
                                 font.pixelSize: 12
                                 maximumLineCount: 1
                             }
-                            DekhoClick {
+                            Click {
                                 name: parent.language ? "title-language" : "title-genre:" + parent.index
                                 onTapped: parent.language ? page.browseBy(null, parent.modelData) : page.browseBy(parent.modelData, null)
                             }
@@ -868,7 +868,7 @@ FocusScope {
                                 role: modelData.role
                                 focused: page.zone === "crew" && page.crewCol === index
 
-                                DekhoClick {
+                                Click {
                                     name: "title-crew:" + parent.index
                                     onTapped: page.pick("crew", parent.index)
                                 }
@@ -900,7 +900,7 @@ FocusScope {
                                 role: modelData.character
                                 focused: page.zone === "cast" && page.castCol === page.castStart + index
 
-                                DekhoClick {
+                                Click {
                                     name: "title-cast:" + parent.index
                                     onTapped: page.pick("cast", parent.index)
                                 }
@@ -967,7 +967,7 @@ FocusScope {
                                 font.pixelSize: 12
                                 font.weight: tab.current ? Font.Medium : Font.Normal
                             }
-                            DekhoClick {
+                            Click {
                                 name: "title-season:" + tab.index
                                 onTapped: page.pick("seasons", tab.index)
                             }
@@ -1371,7 +1371,7 @@ FocusScope {
                 font.pixelSize: 12
             }
         }
-        DekhoClick {
+        Click {
             name: "title-episode:" + ep.index
             onTapped: page.pick("episodes", ep.index)
         }

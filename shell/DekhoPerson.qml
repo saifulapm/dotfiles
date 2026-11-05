@@ -554,7 +554,7 @@ FocusScope {
                                     anchors.fill: parent
                                     visible: !ln.head
 
-                                    DekhoClick {
+                                    Click {
                                         name: "person-credit:" + ln.modelData.index
                                         onTapped: page.pick(ln.modelData.index)
                                     }

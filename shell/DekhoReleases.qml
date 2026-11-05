@@ -964,7 +964,7 @@ FocusScope {
             }
         }
 
-        DekhoClick {
+        Click {
             name: "release:" + rel.index
             onTapped: page.pick(rel.index)
         }

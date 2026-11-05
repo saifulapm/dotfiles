@@ -141,7 +141,7 @@ ColumnLayout {
         border.width: focused ? 1.5 : 0
         border.color: page.c.accent ?? "black"
 
-        DekhoClick {
+        Click {
             name: card.row + ":" + card.index
             onTapped: card.tapped()
         }

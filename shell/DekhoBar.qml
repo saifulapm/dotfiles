@@ -104,7 +104,7 @@ Item {
                 color: bar.look.tile.fill
 
                 // A click on the key stops the film as the key does.
-                DekhoClick {
+                Click {
                     name: "bar-stop"
                     onTapped: bar.dekho.stopPlay()
                 }

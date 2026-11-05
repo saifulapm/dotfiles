@@ -437,7 +437,7 @@ FocusScope {
                             font.pixelSize: 12
                             font.weight: kindTab.current ? Font.Medium : Font.Normal
                         }
-                        DekhoClick {
+                        Click {
                             name: "browse-kind:" + kindTab.modelData
                             onTapped: page.tapKind(kindTab.modelData)
                         }
@@ -538,7 +538,7 @@ FocusScope {
                         }
                     }
                     // Named by the facet's own word, the one the toast and the key's cycle go by.
-                    DekhoClick {
+                    Click {
                         name: "browse-facet:" + facetBox.modelData[1].toLowerCase()
                         onTapped: page.tapFacet(facetBox.modelData[1].toLowerCase())
                     }
@@ -730,7 +730,7 @@ FocusScope {
                                 lit: resultRow.cursor
                                 cells: [D.title(resultRow.modelData.title), String(resultRow.modelData.year || ""), D.stars(resultRow.modelData.vote)].concat(page.words.hitCells(resultRow.modelData))
                             }
-                            DekhoClick {
+                            Click {
                                 name: "browse-row:" + resultRow.index
                                 onTapped: page.pickRow(resultRow.index)
                             }
@@ -791,7 +791,7 @@ FocusScope {
                                 }
                             }
                         }
-                        DekhoClick {
+                        Click {
                             name: "browse-more"
                             onTapped: page.pickRow(page.results.length)
                         }
@@ -934,7 +934,7 @@ FocusScope {
                         radius: 10
                         color: cursor ? page.look.label.fill : "transparent"
 
-                        DekhoClick {
+                        Click {
                             name: "browse-person:" + personRow.index
                             onTapped: page.pickPerson(personRow.index)
                         }

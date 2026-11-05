@@ -3,6 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "services" as Services
+import "lib/click.mjs" as ClickLib
 import "lib/launcher.mjs" as LauncherLib
 import "lib/status.mjs" as Status
 
@@ -149,6 +150,11 @@ ShellRoot {
 
     Root.Ipc {
         target: "shell"
+
+        // Where a click area is drawn on the surfaces' output, {x, y, w, h}, or null when none by that name shows.
+        function box(name: string): string {
+            return surfacesLoader.item ? ClickLib.boxJson(surfacesLoader.item.contentItem, name) : "null";
+        }
 
         function status(): string {
             procStatus.reload();
