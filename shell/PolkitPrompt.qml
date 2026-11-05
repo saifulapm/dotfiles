@@ -24,8 +24,6 @@ Item {
         seen = asked
 
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the prompt draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
@@ -77,7 +75,7 @@ Item {
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
         return JSON.stringify({
-            heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
+            heading: pill.text,
             hint: hint.join("  "),
             open: shown,
             motion: motion.curves?.kind ?? null,
@@ -86,7 +84,6 @@ Item {
             drawing: prompt.visible,
             frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             message: flow?.message ?? "",
             drawnMessage: messageText.text,
             prompt: flow?.inputPrompt ?? "",
@@ -134,43 +131,13 @@ Item {
             width: parent.width
             spacing: 0
 
-            // The title in the launcher's label idiom: Paper's ink chip, Artboard's pill, Blueprint's header line.
+            // The title in the launcher's pill.
             RowLayout {
                 Layout.fillWidth: true
                 Layout.margins: 20
                 Layout.bottomMargin: 10
 
-                Text {
-                    id: header
-                    visible: prompt.look.label.kind === "header"
-                    textFormat: Text.PlainText
-                    Layout.fillWidth: true
-                    text: prompt.look.heading("authenticate", "")
-                    color: prompt.look.small.color
-                    font.family: prompt.look.small.font
-                    font.pixelSize: prompt.look.small.size
-                    font.letterSpacing: prompt.look.small.spacing
-                }
-
                 Rectangle {
-                    visible: prompt.look.label.kind === "chip"
-                    implicitWidth: chip.implicitWidth + 14
-                    implicitHeight: chip.implicitHeight + 6
-                    color: prompt.look.label.fill
-                    Text {
-                        id: chip
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: prompt.look.heading("authenticate", "")
-                        color: prompt.look.label.color
-                        font.family: prompt.fonts.ui
-                        font.pixelSize: 10
-                        font.letterSpacing: 1.4
-                    }
-                }
-
-                Rectangle {
-                    visible: prompt.look.label.kind === "pill"
                     implicitWidth: pill.implicitWidth + 18
                     implicitHeight: pill.implicitHeight + 6
                     radius: 8
@@ -255,13 +222,13 @@ Item {
                 font.letterSpacing: 1.2
             }
 
-            // The key hint as the launcher's legend draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key hint as the launcher's legend draws it, each pair in a chip.
             Row {
                 visible: !prompt.seen?.supplementaryMessage
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
                 Layout.bottomMargin: 16
-                spacing: prompt.look.legend("").chips ? 8 : 14
+                spacing: 8
 
                 Repeater {
                     id: hintRepeater
@@ -272,15 +239,15 @@ Item {
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pairRow.implicitWidth + (prompt.look.legend("").chips ? 14 : 0)
-                        height: pairRow.implicitHeight + (prompt.look.legend("").chips ? 6 : 0)
+                        width: pairRow.implicitWidth + 14
+                        height: pairRow.implicitHeight + 6
                         radius: 6
                         color: prompt.look.chip.fill
 
                         Row {
                             id: pairRow
                             anchors.centerIn: parent
-                            spacing: prompt.look.legend("").chips ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText
