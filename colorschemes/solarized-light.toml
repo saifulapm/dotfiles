@@ -1,0 +1,34 @@
+# UI and code colours from altercation/solarized's palette and light roles (README.md): surface base3, muted and comment base1, line base2, meta magenta; ink is base00 #657B83 moved in OKLCH lightness to #5F757C, 4.13:1 to 4.50:1 on base3; paper is base3 darkened 0.06 in OKLCH lightness, as base2 is the line; the ANSI 16 are its xresources/solarized with the light base swap.
+[meta]
+name = "solarized-light"
+title = "Solarized Light"
+family = "Solarized"
+variant = "light"
+source = "https://github.com/altercation/solarized"
+licence = "MIT"
+
+[color]
+paper = "#E9E2CF"
+surface = "#FDF6E3"
+ink = "#5F757C"
+muted = "#93A1A1"
+line = "#EEE8D5"
+accent = "#268BD2"
+danger = "#DC322F"
+ok = "#859900"
+ansi = [
+  "#EEE8D5", "#DC322F", "#859900", "#B58900", "#268BD2", "#D33682", "#2AA198", "#073642",
+  "#FDF6E3", "#CB4B16", "#93A1A1", "#839496", "#657B83", "#6C71C4", "#586E75", "#002B36",
+]
+
+[syntax]
+keyword = "#6C71C4"
+function = "#268BD2"
+string = "#859900"
+type = "#B58900"
+value = "#CB4B16"
+variable = "#DC322F"
+attribute = "#CB4B16"
+meta = "#D33682"
+builtin = "#2AA198"
+comment = "#93A1A1"
