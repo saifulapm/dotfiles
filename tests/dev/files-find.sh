@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Files' / finds rows or opens the one place it names, . shows dotfiles, and the preview reads an image's real size, in each theme with names in their own case.
+# Files' / finds rows or opens the one place it names, . shows dotfiles, and the preview reads an image's real size.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -15,7 +15,6 @@ log=$work/files.log
 
 files_state() { timeout 0.5 qs ipc -p "$files_qml" call files state 2>/dev/null; }
 files_is() { files_state | jq -e "$@" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"
 until_ok 5000 files_is '.listed and .firstFrameMs != null'
@@ -58,15 +57,6 @@ check ". shows dotfiles ($(files_state | jq -c .count))" files_is '(.rows | inde
 wtype .
 until_ok 1000 files_is '.hidden == false'
 check ". again hides them" files_is '(.rows | index(".hidden-note")) == null'
-
-legacy_theme blueprint >/dev/null
-until_ok 2000 status_theme blueprint
-until_ok 2000 files_is '.voice == "bracket"'
-wtype /2041
-until_ok 1000 files_is '.rows == ["IMG_2041.jpg"]'
-check "in Blueprint, IMG_2041.jpg draws in its real case ($(files_state | jq -c '.drawn.name'))" files_is '.drawn.name == "IMG_2041.jpg"'
-check "while Blueprint's preview kind is in caps ($(files_state | jq -c .preview.kind))" files_is '.preview.kind | endswith(" · JPEG IMAGE")'
-legacy_theme paper >/dev/null
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"

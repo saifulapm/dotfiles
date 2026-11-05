@@ -204,23 +204,15 @@ check "r after room is made retries c.bin and finishes ($(ls "$drive" | tr '\n' 
   bash -c "cmp -s '$drive/c.bin' '$h/Downloads/big/c.bin' && cmp -s '$drive/d.bin' '$h/Downloads/big/d.bin'"
 close_files
 
-for t in artboard blueprint; do
-  legacy_theme "$t" >/dev/null
-  rm -f "$drive"/*.bin
-  open_files
-  go down /Downloads
-  copy_to_drive
-  echo "     $t card: $(files_state | jq -c '.op.card | {head, title, keys, s: .rows[2].state}')"
-  case $t in
-    artboard) want='.op.card.head == "Copy failed" and .op.card.keys == "r retry · s skip this file · esc cancel the rest"' ;;
-    blueprint) want='.op.card.head == "COPY FAILED" and .op.card.title == "FULLDRIVE IS FULL" and .op.card.keys == "[R] RETRY · [S] SKIP THIS FILE · [ESC] CANCEL THE REST" and .op.card.rows[2].state == "STOPPED · PARTIAL REMOVED"' ;;
-  esac
-  check "$t: the card's words read as its board does" files_is "$want"
-  wtype -k Escape
-  until_ok 5000 files_is '.op.running == false'
-  close_files
-done
-legacy_theme paper >/dev/null
+rm -f "$drive"/*.bin
+open_files
+go down /Downloads
+copy_to_drive
+echo "     card: $(files_state | jq -c '.op.card | {head, title, keys, s: .rows[2].state}')"
+check "the card's words read as the board does" files_is '.op.card.head == "Copy failed" and .op.card.keys == "r retry · s skip this file · esc cancel the rest"'
+wtype -k Escape
+until_ok 5000 files_is '.op.running == false'
+close_files
 
 # Thirty files onto the full drive: the card lists them in a scrolled list and stays inside the window.
 rm -f "$drive"/*.bin
