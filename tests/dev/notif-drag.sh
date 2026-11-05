@@ -7,8 +7,6 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 note_is() { island | jq -e "$1" >/dev/null; }
 centre() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 centre_is() { centre | jq -e "$1" >/dev/null; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 open_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 3000 centre_is '.open and .settled and .cursorBox != null'; }
 close_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 2000 centre_is '.open == false and .drawing == false'; }
 # Pixels of geometry $1 within $5 of r g b; with_cursor=1 takes the pointer and its drag image too.
@@ -89,7 +87,6 @@ drag_to_target() {
 send_files() { notify-send -a Tailscale -h "string:x-dots-files:$1" "Taildrop · 1 file" "${1##*/}"; }
 toast_for() { until_ok 3000 note_is ".mode == \"notification\" and .note.summary == \"$1\" and .animating == false"; }
 
-in_theme paper
 send_files "$heic"
 toast_for "Taildrop · 1 file"
 check "the toast draws a chip reading HEIC ($(island | jq -c .note.chip))" note_is '.note.chip == "HEIC"'
@@ -131,14 +128,11 @@ point move "$((x + 30))" "$((y + 60))" 10
 point move "$tx" "$ty" 30
 until_ok 2000 note_is '.note.dragging'
 sleep 0.3
-check "while dragged the toast reports the empty slot ($(island | jq -c '[.note.chipEmpty, .note.frame]'))" note_is '.note.chipEmpty and (.note.frame | .[0] == 1.5 and (.[1] | ascii_downcase) == "#c8381e")'
-top=$(island | jq -c '.note.chipBox as $c | {x: ($c.x - 200), y: (.note.boxBottom - 1), w: 100, h: 1}')
-frame=$(near "$(geo "$top")" 200 56 30 40)
-check "the toast's bottom edge draws the 1.5 px accent frame ($frame of 100 px)" test "$frame" -gt 80
-fill=$(near "$(geo "$(island | jq -c .note.chipBox)")" 250 246 236 12)
-dash=$(near "$(geo "$(island | jq -c .note.chipBox)")" 241 233 216 30)
-check "the chip's slot is a dashed outline, not the surface tag ($fill surface px, $dash paper px)" test "$fill" -lt 20 -a "$dash" -gt 30
-image=$(with_cursor=1 near "$((tx - 30)),$((ty - 30)) 200x80" 250 246 236 6)
+check "while dragged the toast reports the empty slot and draws no frame ($(island | jq -c '[.note.chipEmpty, .note.frame]'))" note_is '.note.chipEmpty and .note.frame[0] == 0'
+tile=$(near "$(geo "$(island | jq -c .note.chipBox)")" 43 47 54 12)
+dash=$(near "$(geo "$(island | jq -c .note.chipBox)")" 108 131 255 40)
+check "the chip's slot is a dashed outline, not the toast tag ($tile tile px, $dash dash px)" test "$tile" -lt 20 -a "$dash" -gt 30
+image=$(with_cursor=1 near "$((tx - 30)),$((ty - 30)) 200x80" 255 255 255 6)
 check "the drag image, the chip on the surface, follows the pointer ($image px)" test "$image" -gt 200
 until_ok 7000 since_more "$shown" 6000
 check "6 s after it showed, the toast is still shown mid-drag" note_is '.mode == "notification"'
@@ -150,10 +144,9 @@ until_ok 8000 bash -c "! timeout 0.5 qs ipc call island state | jq -e '.mode == 
 left=$(($(now_ms) - dropped))
 check "the toast leaves about 5 s after the drop (${left} ms)" test "$left" -gt 4000 -a "$left" -lt 6500
 
-# Each theme draws the chip; Paper's and Artboard's fills and Blueprint's cyan outline are only the shell's.
-for t in paper:#FAF6EC:#FAF6EC artboard:#2B2F36:#FFFFFF blueprint:#7FE3F0:#0A1526; do
+# The chip draws on the toast and on the cursor row in the one design's fills.
+for t in artboard:#2B2F36:#FFFFFF; do
   IFS=: read -r name toast row <<<"$t"
-  in_theme "$name"
   send_files "$heic"
   toast_for "Taildrop · 1 file"
   box=$(island | jq -c .note.chipBox)
@@ -170,7 +163,6 @@ for t in paper:#FAF6EC:#FAF6EC artboard:#2B2F36:#FFFFFF blueprint:#7FE3F0:#0A152
 done
 
 # The centre covers the output while open, so its row's drag must let the pointer through to the window under it.
-in_theme paper
 send_files "$heic"
 toast_for "Taildrop · 1 file"
 open_centre
