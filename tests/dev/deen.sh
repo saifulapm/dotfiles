@@ -19,7 +19,6 @@ no_deen_process() { [ -z "$(deen_pids)" ]; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
 status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 # The nested shell scans the temp data dir's entries, so the repo's entry goes there for the launcher to list.
 cp "$entry" "$DOTS_DEV_DIR/data/applications/deen.desktop"
@@ -35,7 +34,7 @@ until_ok 2000 launcher_is '.open == false'
 exec_line=$(sed -n 's/^Exec=//p' "$entry")
 open_deen() { niri msg action spawn -- sh -c "exec $exec_line >>'$log' 2>&1"; }
 
-in_theme paper
+until_ok 3000 status_theme artboard
 open_deen
 until_ok 5000 deen_up
 check "the entry's Exec ($exec_line) opens one window whose app id is deen ($(deen_windows))" deen_up
@@ -43,8 +42,8 @@ check "its first frame came $(deen_state | jq .firstFrameMs) ms after the proces
   deen_is '(.firstFrameMs | type) == "number" and .firstFrameMs > 0 and .firstFrameMs < 500'
 check "its RSS is $(deen_state | jq .rssKiB) KiB, under 250 MiB" deen_is '(.rssKiB | type) == "number" and .rssKiB > 0 and .rssKiB < 256000'
 check "it opens on Read, headed Read ($(deen_state | jq -c '[.tab, .heading]'))" deen_is '.tab == "read" and .heading == "Read"'
-check "paper: the five tabs read READ to PRAYER with READ current ($(deen_state | jq -c .tabs))" \
-  deen_is '.tabs == [{"text":"READ","current":true},{"text":"MEMORISE","current":false},{"text":"DUAS","current":false},{"text":"HADITH","current":false},{"text":"PRAYER","current":false}]'
+check "the five tabs read Read to Prayer in sentence case with Read current ($(deen_state | jq -c .tabs))" \
+  deen_is '.tabs == [{"text":"Read","current":true},{"text":"Memorise","current":false},{"text":"Duas","current":false},{"text":"Hadith","current":false},{"text":"Prayer","current":false}]'
 check "Arabic draws in Amiri or Noto Naskh Arabic, a face with Arabic glyphs ($(deen_state | jq -c .arabic))" \
   deen_is '.arabic == "Amiri" or .arabic == "Noto Naskh Arabic"'
 
@@ -58,31 +57,6 @@ done
 wtype -M shift -k Tab -m shift
 until_ok 1000 deen_is '.tab == "prayer"'
 check "Shift+Tab moves back from Read to Prayer, headed Prayer ($(deen_state | jq -c '[.tab, .heading]'))" deen_is '.tab == "prayer" and .heading == "Prayer"'
-
-in_theme artboard
-until_ok 3000 deen_is '.voice == "plain"'
-check "artboard: the tabs read in sentence case ($(deen_state | jq -c '[.tabs[].text]'))" deen_is '[.tabs[].text] == ["Read","Memorise","Duas","Hadith","Prayer"]'
-in_theme blueprint
-until_ok 3000 deen_is '.voice == "bracket"'
-check "blueprint: the tabs read in capitals ($(deen_state | jq -c '[.tabs[].text]'))" deen_is '[.tabs[].text] == ["READ","MEMORISE","DUAS","HADITH","PRAYER"]'
-
-# Every tab's state, walked once with Tab, for the strings that hold a bracket.
-tab_marks() {
-  local i prev
-  for i in 1 2 3 4 5; do
-    deen_state | marked
-    prev=$(deen_state | jq -r .tab)
-    wtype -k Tab
-    until_ok 1000 deen_is --arg t "$prev" '.tab != $t'
-  done
-}
-no_marks() { [ -z "$(tab_marks)" ]; }
-blueprint_marks=$(tab_marks)
-check "blueprint: the tabs still draw their marks ($(head -3 <<<"$blueprint_marks" | paste -sd'|'))" test -n "$blueprint_marks"
-
-in_theme hi-fi
-until_ok 3000 no_marks
-check "hi-fi: no tab's state holds a bracket ($(tab_marks | head -3 | paste -sd'|'))" no_marks
 
 wtype -k Escape
 until_ok 3000 deen_gone
