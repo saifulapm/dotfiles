@@ -11,7 +11,7 @@ test("rose-pine-dawn locks into Artboard's card: a 96 px bold Maple Mono clock i
     kind: 'card',
     status: { text: 'Locked', color: '#575279' },
     clock: { family: 'Maple Mono', px: 96, bold: true, tracking: -4.8, fill: '#575279', stroke: 'transparent' },
-    date: { format: 'dddd, d MMMM', caps: false, family: 'Maple Mono', px: 12, italic: false, tracking: 0, color: '#766893' },
+    date: { format: 'dddd, d MMMM', caps: false, family: 'Maple Mono', px: 12, italic: false, tracking: 0, color: '#7D6795' },
     prompt: '',
     hint: 'Password for saiful · ↵ to unlock',
   });

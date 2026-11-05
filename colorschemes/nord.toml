@@ -1,4 +1,4 @@
-# UI and code colours from nordtheme/nord's palette (src/nord.css) in the tinted-theming base16 "Nord" slots, accent nord8, which nord.css names the palette's accent; the ANSI 16 are nordtheme/alacritty's (src/nord.yaml). Nord has no background darker than nord0, so paper is surface darkened 0.06 in OKLCH lightness.
+# UI and code colours from nordtheme/nord's palette (src/nord.css) in the tinted-theming base16 "Nord" slots, accent nord8, which nord.css names the palette's accent; the ANSI 16 are nordtheme/alacritty's (src/nord.yaml). Nord has no background darker than nord0, so paper is surface darkened 0.06 in OKLCH lightness. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "nord"
 title = "Nord"
@@ -14,21 +14,21 @@ ink = "#E5E9F0"
 muted = "#D8DEE9"
 line = "#434C5E"
 accent = "#88C0D0"
-danger = "#BF616A"
+danger = "#E17F87"
 ok = "#A3BE8C"
 ansi = [
-  "#3B4252", "#BF616A", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B48EAD", "#88C0D0", "#E5E9F0",
-  "#4C566A", "#BF616A", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B48EAD", "#8FBCBB", "#ECEFF4",
+  "#3B4252", "#E17F87", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B690AF", "#88C0D0", "#E5E9F0",
+  "#727D92", "#E17F87", "#A3BE8C", "#EBCB8B", "#81A1C1", "#B690AF", "#8FBCBB", "#ECEFF4",
 ]
 
 [syntax]
-keyword = "#B48EAD"
+keyword = "#B690AF"
 function = "#81A1C1"
 string = "#A3BE8C"
 type = "#EBCB8B"
-value = "#D08770"
-variable = "#BF616A"
-attribute = "#D08770"
-meta = "#5E81AC"
+value = "#D38972"
+variable = "#E17F87"
+attribute = "#D38972"
+meta = "#7A9ECA"
 builtin = "#88C0D0"
-comment = "#4C566A"
+comment = "#727D92"

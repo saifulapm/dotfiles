@@ -1,4 +1,4 @@
-# UI and code colours from scottmckendry/cyberdream.nvim's own base16 (extras/base16/cyberdream.yaml); the ANSI 16 are its kitty extra's (extras/kitty/cyberdream.conf). Cyberdream has no background darker than bg (bg_alt #1E2124 is lighter), so paper is surface darkened 0.06 in OKLCH lightness.
+# UI and code colours from scottmckendry/cyberdream.nvim's own base16 (extras/base16/cyberdream.yaml); the ANSI 16 are its kitty extra's (extras/kitty/cyberdream.conf). Cyberdream has no background darker than bg (bg_alt #1E2124 is lighter), so paper is surface darkened 0.06 in OKLCH lightness. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "cyberdream"
 title = "Cyberdream"
@@ -18,7 +18,7 @@ danger = "#FF6E5E"
 ok = "#5EFF6C"
 ansi = [
   "#16181A", "#FF6E5E", "#5EFF6C", "#F1FF5E", "#5EA1FF", "#BD5EFF", "#5EF1FF", "#FFFFFF",
-  "#3C4048", "#FF6E5E", "#5EFF6C", "#F1FF5E", "#5EA1FF", "#BD5EFF", "#5EF1FF", "#FFFFFF",
+  "#60646D", "#FF6E5E", "#5EFF6C", "#F1FF5E", "#5EA1FF", "#BD5EFF", "#5EF1FF", "#FFFFFF",
 ]
 
 [syntax]

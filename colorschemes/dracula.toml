@@ -1,4 +1,4 @@
-# UI and code colours from the Dracula spec (draculatheme.com/spec) in the tinted-theming base24 "Dracula" slots, paper the spec's Background Dark; muted and meta are that base24's base04 and base0F, which Dracula does not define. The ANSI 16 are dracula/alacritty's (dracula.toml), the spec's ANSI palette.
+# UI and code colours from the Dracula spec (draculatheme.com/spec) in the tinted-theming base24 "Dracula" slots, paper the spec's Background Dark; muted and meta are that base24's base04 and base0F, which Dracula does not define. The ANSI 16 are dracula/alacritty's (dracula.toml), the spec's ANSI palette. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "dracula"
 title = "Dracula"
@@ -29,6 +29,6 @@ type = "#F1FA8C"
 value = "#FFB86C"
 variable = "#FF5555"
 attribute = "#FFB86C"
-meta = "#993333"
+meta = "#DE716C"
 builtin = "#8BE9FD"
 comment = "#6272A4"

@@ -1,4 +1,4 @@
-# UI and code colours are sainnhe/gruvbox-material's dark "medium" background and "material" foreground (autoload/gruvbox_material.vim), the code ones as colors/gruvbox-material.vim's syntax groups use them; paper is its bg_dim and line its window separator bg5. The ANSI 16 are its terminal colours (colors/gruvbox-material.vim), attribute and meta the tinted-theming base16 "Gruvbox Material Dark, Medium" base09 and 0F.
+# UI and code colours are sainnhe/gruvbox-material's dark "medium" background and "material" foreground (autoload/gruvbox_material.vim), the code ones as colors/gruvbox-material.vim's syntax groups use them; paper is its bg_dim and line its window separator bg5. The ANSI 16 are its terminal colours (colors/gruvbox-material.vim), attribute and meta the tinted-theming base16 "Gruvbox Material Dark, Medium" base09 and 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "gruvbox-material-dark"
 title = "Gruvbox Material Dark"
@@ -10,7 +10,7 @@ licence = "MIT"
 [color]
 paper = "#1B1B1B"
 surface = "#282828"
-ink = "#D4BE98"
+ink = "#DAC49E"
 muted = "#A89984"
 line = "#5A524C"
 accent = "#7DAEA3"
@@ -18,7 +18,7 @@ danger = "#EA6962"
 ok = "#A9B665"
 ansi = [
   "#5A524C", "#EA6962", "#A9B665", "#D8A657", "#7DAEA3", "#D3869B", "#89B482", "#D4BE98",
-  "#5A524C", "#EA6962", "#A9B665", "#D8A657", "#7DAEA3", "#D3869B", "#89B482", "#D4BE98",
+  "#786F69", "#EA6962", "#A9B665", "#D8A657", "#7DAEA3", "#D3869B", "#89B482", "#D4BE98",
 ]
 
 [syntax]
@@ -29,6 +29,6 @@ type = "#D8A657"
 value = "#D3869B"
 variable = "#7DAEA3"
 attribute = "#E78A4E"
-meta = "#BD6F3E"
+meta = "#CA7B4A"
 builtin = "#D8A657"
 comment = "#928374"

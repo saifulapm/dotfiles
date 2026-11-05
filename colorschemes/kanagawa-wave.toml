@@ -1,4 +1,4 @@
-# UI and code colours from rebelot/kanagawa.nvim's own base16 port (extras/base16/kanagawa.yaml), paper its wave bg_dim (lua/kanagawa/themes.lua); the ANSI 16 are its foot theme (extras/foot/kanagawa-wave.ini).
+# UI and code colours from rebelot/kanagawa.nvim's own base16 port (extras/base16/kanagawa.yaml), paper its wave bg_dim (lua/kanagawa/themes.lua); the ANSI 16 are its foot theme (extras/foot/kanagawa-wave.ini). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "kanagawa-wave"
 title = "Kanagawa Wave"
@@ -14,11 +14,11 @@ ink = "#DCD7BA"
 muted = "#C8C093"
 line = "#223249"
 accent = "#7E9CD8"
-danger = "#C34043"
+danger = "#E05B5B"
 ok = "#98BB6C"
 ansi = [
-  "#090618", "#C34043", "#76946A", "#C0A36E", "#7E9CD8", "#957FB8", "#6A9589", "#C8C093",
-  "#727169", "#E82424", "#98BB6C", "#E6C384", "#7FB4CA", "#938AA9", "#7AA89F", "#DCD7BA",
+  "#090618", "#E05B5B", "#76946A", "#C0A36E", "#7E9CD8", "#957FB8", "#6A9589", "#C8C093",
+  "#727169", "#FB3C36", "#98BB6C", "#E6C384", "#7FB4CA", "#938AA9", "#7AA89F", "#DCD7BA",
 ]
 
 [syntax]
@@ -27,7 +27,7 @@ function = "#7E9CD8"
 string = "#98BB6C"
 type = "#DCA561"
 value = "#FFA066"
-variable = "#C34043"
+variable = "#E05B5B"
 attribute = "#FFA066"
 meta = "#D27E99"
 builtin = "#7FB4CA"

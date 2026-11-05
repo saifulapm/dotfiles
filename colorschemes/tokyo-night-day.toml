@@ -1,4 +1,4 @@
-# UI and code colours are folke/tokyonight.nvim's day palette (extras/lua/tokyonight_day.lua), the code ones as its highlight groups use them (lua/tokyonight/groups/base.lua, treesitter.lua); the ANSI 16 are its foot extra (extras/foot/tokyonight_day.ini).
+# UI and code colours are folke/tokyonight.nvim's day palette (extras/lua/tokyonight_day.lua), the code ones as its highlight groups use them (lua/tokyonight/groups/base.lua, treesitter.lua); the ANSI 16 are its foot extra (extras/foot/tokyonight_day.ini). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "tokyo-night-day"
 title = "Tokyo Night Day"
@@ -10,25 +10,25 @@ licence = "Apache-2.0"
 [color]
 paper = "#D0D5E3"
 surface = "#E1E2E7"
-ink = "#3760BF"
-muted = "#6172B0"
+ink = "#284FAC"
+muted = "#52629F"
 line = "#C4C8DA"
-accent = "#2E7DE9"
-danger = "#F52A65"
-ok = "#587539"
+accent = "#0961CB"
+danger = "#C9024C"
+ok = "#516D32"
 ansi = [
-  "#B4B5B9", "#F52A65", "#587539", "#8C6C3E", "#2E7DE9", "#9854F1", "#007197", "#6172B0",
-  "#A1A6C5", "#F52A65", "#587539", "#8C6C3E", "#2E7DE9", "#9854F1", "#007197", "#3760BF",
+  "#B4B5B9", "#C9024C", "#516D32", "#7F5F31", "#0961CB", "#833BD8", "#066D91", "#6172B0",
+  "#7A7F9D", "#C9024C", "#516D32", "#7F5F31", "#0961CB", "#833BD8", "#066D91", "#3760BF",
 ]
 
 [syntax]
 keyword = "#7847BD"
-function = "#2E7DE9"
-string = "#587539"
-type = "#188092"
-value = "#B15C00"
+function = "#0961CB"
+string = "#516D32"
+type = "#016F80"
+value = "#9B5104"
 variable = "#3760BF"
-attribute = "#387068"
-meta = "#007197"
-builtin = "#F52A65"
-comment = "#848CB5"
+attribute = "#366E66"
+meta = "#066D91"
+builtin = "#C9024C"
+comment = "#787FA8"

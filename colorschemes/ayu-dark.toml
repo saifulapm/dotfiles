@@ -1,4 +1,4 @@
-# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Dark" (paper its base10), as ayu-theme/ayu-colors computes its own (themes/dark.yaml); accent is that file's common.accent.tint.
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Dark" (paper its base10), as ayu-theme/ayu-colors computes its own (themes/dark.yaml); accent is that file's common.accent.tint. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "ayu-dark"
 title = "Ayu Dark"
@@ -18,7 +18,7 @@ danger = "#F07178"
 ok = "#AAD94C"
 ansi = [
   "#0B0E14", "#F07178", "#AAD94C", "#FFB454", "#59C2FF", "#D2A6FF", "#95E6CB", "#E6E1CF",
-  "#3E4B59", "#F07178", "#AAD94C", "#FFB454", "#59C2FF", "#D2A6FF", "#95E6CB", "#F2F0E7",
+  "#52606F", "#F07178", "#AAD94C", "#FFB454", "#59C2FF", "#D2A6FF", "#95E6CB", "#F2F0E7",
 ]
 
 [syntax]
@@ -31,4 +31,4 @@ variable = "#F07178"
 attribute = "#FF8F40"
 meta = "#E6B450"
 builtin = "#95E6CB"
-comment = "#3E4B59"
+comment = "#52606F"

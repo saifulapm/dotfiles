@@ -42,9 +42,11 @@ test('the tmux session drops amx\'s prefix, turns the accent while the prefix ke
   assert.match(tmuxOpt(dark, 'status-right'), /^#\(dots-agents a89984 83a598 ebdbb2\)/);
 });
 
-test('the active tmux pane border is the ink frame, in single lines', () => {
-  assert.match(renderTmux(light), /^set -g pane-active-border-style "fg=#1f2328"$/m);
-  assert.match(renderTmux(dark), /^set -g pane-active-border-style "fg=#ebdbb2"$/m);
+test("every tmux border, the active pane's too, is the quiet frame, in single lines", () => {
+  for (const t of [light, dark]) {
+    const frame = t.niri.border_inactive.toLowerCase();
+    for (const k of ['pane-border', 'pane-active-border', 'popup-border', 'menu-border']) assert.equal(tmuxOpt(t, `${k}-style`), `fg=${frame}`, `${t.name} ${k}`);
+  }
   for (const k of ['pane', 'popup', 'menu']) assert.match(renderTmux(dark), new RegExp(`^set -g ${k}-border-lines single$`, 'm'), k);
 });
 
@@ -84,7 +86,7 @@ test('kakoune draws its status line and info flat and its menu on a 6% ink tint,
 
 test('kakoune colours code from the scheme\'s syntax table', () => {
   const kak = renderKak(dark);
-  assert.match(kak, /^face global keyword rgb:fb4934\+b$/m);
+  assert.match(kak, /^face global keyword rgb:ff4f39\+b$/m);
   assert.match(kak, /^face global string rgb:b8bb26$/m);
   assert.match(kak, /^face global comment rgb:928374\+i$/m);
 });
@@ -159,7 +161,7 @@ test('colors.fish sets fish and fzf colours', () => {
   assert.match(fish, /^set -g fish_color_normal ebdbb2$/m);
   // The prompt draws the directory and a failed status in these.
   assert.match(fish, /^set -g fish_color_cwd 83a598$/m);
-  assert.match(fish, /^set -g fish_color_status fb4934$/m);
+  assert.match(fish, /^set -g fish_color_status ff4f39$/m);
   assert.match(fish, /^set -gx FZF_DEFAULT_OPTS "--color=fg:#ebdbb2,bg:#282828,hl:#83a598/m);
 });
 
@@ -170,7 +172,7 @@ test('yazi theme sets the keys yazi 26.9 reads', () => {
   assert.match(y, /^hovered = \{ fg = "#282828", bg = "lightblue" \}$/m);
   assert.match(y, /^\[mode\]$/m);
   assert.match(y, /^\[status\]$/m);
-  assert.match(y, /^border_style = \{ fg = "#3c3836" \}$/m);
+  assert.match(y, /^border_style = \{ fg = "#433f3b" \}$/m);
   // Named colours follow the terminal palette, so a running yazi recolours live.
   const named = y.match(/"[a-z]+"/g).length;
   const hex = y.match(/"#[0-9a-f]{6}"/g).length;
@@ -348,4 +350,58 @@ test('the wl-kbptr config draws its labels in ink and the theme\'s face, picks i
   assert.match(k, /^pointer_color=#83a598ff$/m);
   assert.doesNotMatch(k, /^\[general\]/m);
   assert.match(renderKbptr(light), /^unselectable_bg_color=#e8eaed99$/m);
+});
+
+// Every pair of text and ground an app theme draws reads at 4.5:1 in every scheme.
+const kakFace = (out, name) => {
+  const m = out.match(new RegExp(`^face global ${name} rgb:([0-9a-f]{6})(?:,rgb:([0-9a-f]{6}))?`, 'm'));
+  return [m[1], m[2]].map((x) => (x ? '#' + x : undefined));
+};
+const tmuxPair = (t, name) => {
+  const m = tmuxOpt(t, name).match(/fg=(#[0-9a-f]{6}),bg=(#[0-9a-f]{6})/);
+  return [m[1], m[2]];
+};
+const zathuraPair = (out, k) => [`${k}-fg`, `${k}-bg`].map((o) => out.match(new RegExp(`^set ${o} "(#[0-9a-f]{6})"$`, 'm'))[1]);
+const yaziPair = (out, k) => { const m = out.match(new RegExp(`^${k} = \\{ fg = "(#[0-9a-f]{6})", bg = "(#[0-9a-f]{6})"`, 'm')); return m ? [m[1], m[2]] : null; };
+
+test('every text and ground pair the app themes draw reads at 4.5:1 in every scheme', () => {
+  const bad = [];
+  const need = (name, what, fg, bg, min = 4.5) => { const r = contrast(fg, bg); if (r < min) bad.push(`${name} ${what} ${r.toFixed(2)}`); };
+  for (const name of schemeNames()) {
+    const t = loadScheme(name);
+    for (const k of ['menu-style', 'menu-selected-style', 'message-style', 'message-command-style', 'mode-style', 'copy-mode-match-style', 'copy-mode-current-match-style']) need(name, `tmux ${k}`, ...tmuxPair(t, k));
+    const kak = renderKak(t);
+    const menuBg = kakFace(kak, 'MenuBackground')[1];
+    need(name, 'kak MenuInfo', kakFace(kak, 'MenuInfo')[0], menuBg);
+    need(name, 'kak MenuBackground', ...kakFace(kak, 'MenuBackground'));
+    for (const k of ['PrimarySelection', 'MenuForeground', 'Error', 'StatusCursor', 'MatchingChar', 'LineNumbers', 'StatusLineInfo']) need(name, `kak ${k}`, ...kakFace(kak, k));
+    const z = renderZathura(t);
+    for (const k of ['statusbar', 'inputbar', 'index', 'index-active', 'completion', 'completion-group', 'completion-highlight', 'notification', 'notification-error', 'notification-warning']) need(name, `zathura ${k}`, ...zathuraPair(z, k));
+    const y = renderYazi(t);
+    for (const k of ['hovered', 'tab_active', 'tab_inactive', 'normal_main', 'normal_alt', 'select_main', 'unset_main']) {
+      const p = yaziPair(y, k);
+      if (p) need(name, `yazi ${k}`, ...p);
+    }
+    const o = JSON.parse(renderClaude(t)).overrides;
+    const bg = t.color.surface.toLowerCase();
+    need(name, 'claude inactive', o.inactive, bg);
+    for (const k of ['diffAdded', 'diffRemoved', 'diffAddedWord', 'diffRemovedWord', 'userMessageBackground', 'selectionBg']) need(name, `claude text on ${k}`, o.text, o[k]);
+    const v = JSON.parse(renderPi(t)).vars;
+    for (const k of ['selectedBackground', 'panel', 'panelPending', 'panelSuccess', 'panelError', 'highlight']) need(name, `pi text on ${k}`, v.foreground, v[k]);
+  }
+  assert.deepEqual(bad, []);
+});
+
+test("the coding agents' borders, helix's split and yazi's frame are the quiet frame in every scheme", () => {
+  for (const name of schemeNames()) {
+    const t = loadScheme(name);
+    const frame = t.niri.border_inactive.toLowerCase();
+    const o = JSON.parse(renderClaude(t)).overrides;
+    assert.equal(o.promptBorder, frame, `${name} claude`);
+    const v = JSON.parse(renderPi(t)).vars;
+    assert.deepEqual([v.border, v.borderMuted], [frame, frame], `${name} pi`);
+    assert.equal(JSON.parse(renderPi(t)).colors.borderAccent, 'border', `${name} pi accent border`);
+    assert.match(renderHelix(t), new RegExp(`^"ui.window" = "${frame}"$`, 'm'), `${name} helix`);
+    assert.match(renderYazi(t), new RegExp(`^border_style = \\{ fg = "${frame}" \\}$`, 'm'), `${name} yazi`);
+  }
 });

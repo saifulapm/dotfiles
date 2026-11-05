@@ -1,4 +1,4 @@
-# UI and code colours from the tinted-theming base16 "selenized-dark", whose values are jan-warchol/selenized's own (the-values.md); the ANSI 16 are its alacritty theme (terminals/alacritty/selenized-dark.toml). Selenized has no background darker than bg_0, so paper is surface darkened 0.06 in OKLCH lightness.
+# UI and code colours from the tinted-theming base16 "selenized-dark", whose values are jan-warchol/selenized's own (the-values.md); the ANSI 16 are its alacritty theme (terminals/alacritty/selenized-dark.toml). Selenized has no background darker than bg_0, so paper is surface darkened 0.06 in OKLCH lightness. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "selenized-dark"
 title = "Selenized Dark"
@@ -10,24 +10,24 @@ licence = "MIT"
 [color]
 paper = "#002C38"
 surface = "#103C48"
-ink = "#ADBCBC"
-muted = "#72898F"
+ink = "#BDCCCC"
+muted = "#8CA4AA"
 line = "#2D5B69"
-accent = "#4695F7"
-danger = "#FA5750"
+accent = "#56A1FF"
+danger = "#FE756B"
 ok = "#75B938"
 ansi = [
-  "#184956", "#FA5750", "#75B938", "#DBB32D", "#4695F7", "#F275BE", "#41C7B9", "#72898F",
-  "#2D5B69", "#FF665C", "#84C747", "#EBC13D", "#58A3FF", "#FF84CD", "#53D6C7", "#CAD8D9",
+  "#184956", "#FE756B", "#75B938", "#DBB32D", "#56A1FF", "#F275BE", "#41C7B9", "#72898F",
+  "#2D5B69", "#FE766B", "#84C747", "#EBC13D", "#58A3FF", "#FF84CD", "#53D6C7", "#CAD8D9",
 ]
 
 [syntax]
-keyword = "#AF88EB"
-function = "#4695F7"
+keyword = "#B48DF0"
+function = "#56A1FF"
 string = "#75B938"
 type = "#DBB32D"
 value = "#ED8649"
-variable = "#FA5750"
+variable = "#FE756B"
 attribute = "#ED8649"
 meta = "#F275BE"
 builtin = "#41C7B9"

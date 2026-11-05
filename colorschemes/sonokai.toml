@@ -1,4 +1,4 @@
-# sainnhe/sonokai's default palette (autoload/sonokai.vim), placed as colors/sonokai.vim uses it, since Sonokai has no base16: paper bg_dim, line the Visual bg4, muted and comment grey, and the code colours its own groups (Keyword and PreProc red, Function green, String yellow, Type and TSAttribute blue, Number and TSVariableBuiltin purple, TSVariable fg). The ANSI 16 are its terminal_color_0 to 15, which put orange in the cyan slots.
+# sainnhe/sonokai's default palette (autoload/sonokai.vim), placed as colors/sonokai.vim uses it, since Sonokai has no base16: paper bg_dim, line the Visual bg4, muted and comment grey, and the code colours its own groups (Keyword and PreProc red, Function green, String yellow, Type and TSAttribute blue, Number and TSVariableBuiltin purple, TSVariable fg). The ANSI 16 are its terminal_color_0 to 15, which put orange in the cyan slots. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "sonokai"
 title = "Sonokai"
@@ -11,7 +11,7 @@ licence = "MIT"
 paper = "#222327"
 surface = "#2C2E34"
 ink = "#E2E2E3"
-muted = "#7F8490"
+muted = "#9095A1"
 line = "#414550"
 accent = "#76CCE0"
 danger = "#FC5D7C"

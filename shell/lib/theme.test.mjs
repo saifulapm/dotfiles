@@ -143,7 +143,7 @@ test('foot\'s own chrome takes the scheme too: cursor, selection, URLs, labels, 
   assert.match(ini, /^cursor=282828 83A598$/m);
   assert.match(ini, /^selection-background=83A598$/m);
   assert.match(ini, /^urls=83A598$/m);
-  assert.match(ini, /^regular1=CC241D$/m);
+  assert.match(ini, /^regular1=FA5547$/m);
 });
 
 test('the footclient overrides say what the fragment says, one per line', () => {

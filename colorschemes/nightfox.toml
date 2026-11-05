@@ -1,4 +1,4 @@
-# UI and code colours from EdenEast/nightfox.nvim's own base16 (extra/nightfox/base16.yaml), paper its bg0 (lua/nightfox/palette/nightfox.lua); the ANSI 16 are its kitty extra's (extra/nightfox/kitty.conf).
+# UI and code colours from EdenEast/nightfox.nvim's own base16 (extra/nightfox/base16.yaml), paper its bg0 (lua/nightfox/palette/nightfox.lua); the ANSI 16 are its kitty extra's (extra/nightfox/kitty.conf). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "nightfox"
 title = "Nightfox"
@@ -11,14 +11,14 @@ licence = "MIT"
 paper = "#131A24"
 surface = "#192330"
 ink = "#CDCECF"
-muted = "#71839B"
+muted = "#798BA3"
 line = "#29394F"
 accent = "#719CD6"
-danger = "#C94F6D"
+danger = "#DC607D"
 ok = "#81B29A"
 ansi = [
-  "#393B44", "#C94F6D", "#81B29A", "#DBC074", "#719CD6", "#9D79D6", "#63CDCF", "#DFDFE0",
-  "#575860", "#D16983", "#8EBAA4", "#E0C989", "#86ABDC", "#BAA1E2", "#7AD5D6", "#E4E4E5",
+  "#393B44", "#DC607D", "#81B29A", "#DBC074", "#719CD6", "#9D79D6", "#63CDCF", "#DFDFE0",
+  "#6B6C74", "#D16983", "#8EBAA4", "#E0C989", "#86ABDC", "#BAA1E2", "#7AD5D6", "#E4E4E5",
 ]
 
 [syntax]
@@ -27,8 +27,8 @@ function = "#719CD6"
 string = "#81B29A"
 type = "#DBC074"
 value = "#F4A261"
-variable = "#C94F6D"
+variable = "#DC607D"
 attribute = "#F4A261"
 meta = "#D67AD2"
 builtin = "#63CDCF"
-comment = "#575860"
+comment = "#6B6C74"

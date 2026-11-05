@@ -1,4 +1,4 @@
-# Greys and paper from nyoom-engineering/oxocarbon.nvim's dark palette (lua/oxocarbon/init.lua: base00 to base06 as its blend_hex gives them, paper its float colour "blend"); its own base08 to base15 are not base16 roles, so danger, ok, accent and the code colours are the tinted-theming base16 "Oxocarbon Dark" ones. The ANSI 16 are init.lua's terminal_color_0 to 15 as upstream sets them, red and green slots included.
+# Greys and paper from nyoom-engineering/oxocarbon.nvim's dark palette (lua/oxocarbon/init.lua: base00 to base06 as its blend_hex gives them, paper its float colour "blend"); its own base08 to base15 are not base16 roles, so danger, ok, accent and the code colours are the tinted-theming base16 "Oxocarbon Dark" ones. The ANSI 16 are init.lua's terminal_color_0 to 15 as upstream sets them, red and green slots included. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "oxocarbon"
 title = "Oxocarbon"
@@ -18,7 +18,7 @@ danger = "#EE5396"
 ok = "#42BE65"
 ansi = [
   "#262626", "#33B1FF", "#BE95FF", "#42BE65", "#78A9FF", "#82CFFF", "#3DDBD9", "#F2F2F2",
-  "#525252", "#33B1FF", "#BE95FF", "#42BE65", "#78A9FF", "#82CFFF", "#08BDBA", "#FFFFFF",
+  "#636363", "#33B1FF", "#BE95FF", "#42BE65", "#78A9FF", "#82CFFF", "#08BDBA", "#FFFFFF",
 ]
 
 [syntax]
@@ -31,4 +31,4 @@ variable = "#EE5396"
 attribute = "#FF7EB6"
 meta = "#82CFFF"
 builtin = "#3DDBD9"
-comment = "#525252"
+comment = "#636363"

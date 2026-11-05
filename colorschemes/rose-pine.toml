@@ -1,4 +1,4 @@
-# UI and code colours are rose-pine/neovim's main palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as main's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine" base08, 0B, 09, 0F.
+# UI and code colours are rose-pine/neovim's main palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as main's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "rose-pine"
 title = "Rosé Pine"
@@ -15,20 +15,20 @@ muted = "#908CAA"
 line = "#403D52"
 accent = "#C4A7E7"
 danger = "#EB6F92"
-ok = "#31748F"
+ok = "#4789A5"
 ansi = [
-  "#26233A", "#EB6F92", "#31748F", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
-  "#6E6A86", "#EB6F92", "#31748F", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
+  "#26233A", "#EB6F92", "#4789A5", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
+  "#6E6A86", "#EB6F92", "#4789A5", "#F6C177", "#9CCFD8", "#C4A7E7", "#EBBCBA", "#E0DEF4",
 ]
 
 [syntax]
-keyword = "#31748F"
+keyword = "#4789A5"
 function = "#EBBCBA"
 string = "#F6C177"
 type = "#9CCFD8"
 value = "#EBBCBA"
 variable = "#E0DEF4"
 attribute = "#F6C177"
-meta = "#524F67"
+meta = "#817E98"
 builtin = "#EB6F92"
 comment = "#6E6A86"

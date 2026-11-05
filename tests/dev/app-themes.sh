@@ -102,8 +102,9 @@ wtype -k Tab
 sleep 0.3
 check "Tab shows zathura's index in place of the page" test "$(window_sum)" != "$document"
 "$repo/bin/dots" colorscheme catppuccin-mocha
-until_ok 1000 pixel_is $side_x $page_y "$(token paper)"
-check "with the index open, zathura's background is Catppuccin Mocha's paper ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token paper)"
+# The index sits on the surface, where its words read as they do in the status bar.
+until_ok 1000 pixel_is $side_x $page_y "$(token surface)"
+check "with the index open, zathura's background is Catppuccin Mocha's surface ($(pixel $side_x $page_y))" pixel_is $side_x $page_y "$(token surface)"
 wtype -k Tab
 sleep 0.3
 wtype /

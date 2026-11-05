@@ -1,4 +1,4 @@
-# UI and code colours are catppuccin/palette's Frappé (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-frappe.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Frappe" base08, 0B, 09, 0F.
+# UI and code colours are catppuccin/palette's Frappé (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-frappe.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Frappe" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "catppuccin-frappe"
 title = "Catppuccin Frappé"
@@ -18,7 +18,7 @@ danger = "#E78284"
 ok = "#A6D189"
 ansi = [
   "#51576D", "#E78284", "#A6D189", "#E5C890", "#8CAAEE", "#F4B8E4", "#81C8BE", "#B5BFE2",
-  "#626880", "#E78284", "#A6D189", "#E5C890", "#8CAAEE", "#F4B8E4", "#81C8BE", "#A5ADCE",
+  "#777D96", "#E78284", "#A6D189", "#E5C890", "#8CAAEE", "#F4B8E4", "#81C8BE", "#A5ADCE",
 ]
 
 [syntax]

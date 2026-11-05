@@ -1,4 +1,4 @@
-# UI and code colours from altercation/solarized's palette and dark roles (README.md): surface base03, ink base0, muted and comment base01, line base02, meta magenta; paper is base03 darkened 0.06 in OKLCH lightness, as Solarized has no darker background; the ANSI 16 are its xresources/solarized.
+# UI and code colours from altercation/solarized's palette and dark roles (README.md): surface base03, ink base0, muted and comment base01, line base02, meta magenta; paper is base03 darkened 0.06 in OKLCH lightness, as Solarized has no darker background; the ANSI 16 are its xresources/solarized. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "solarized-dark"
 title = "Solarized Dark"
@@ -10,25 +10,25 @@ licence = "MIT"
 [color]
 paper = "#001C27"
 surface = "#002B36"
-ink = "#839496"
-muted = "#586E75"
+ink = "#8B9C9E"
+muted = "#7A9198"
 line = "#073642"
-accent = "#268BD2"
-danger = "#DC322F"
+accent = "#3193DB"
+danger = "#FA5149"
 ok = "#859900"
 ansi = [
-  "#073642", "#DC322F", "#859900", "#B58900", "#268BD2", "#D33682", "#2AA198", "#EEE8D5",
-  "#002B36", "#CB4B16", "#586E75", "#657B83", "#839496", "#6C71C4", "#93A1A1", "#FDF6E3",
+  "#073642", "#FA5149", "#859900", "#B58900", "#3193DB", "#EF529A", "#2AA198", "#EEE8D5",
+  "#002B36", "#E76535", "#7A9198", "#7A9199", "#839496", "#7F86DB", "#93A1A1", "#FDF6E3",
 ]
 
 [syntax]
-keyword = "#6C71C4"
-function = "#268BD2"
+keyword = "#7F86DB"
+function = "#3193DB"
 string = "#859900"
 type = "#B58900"
-value = "#CB4B16"
-variable = "#DC322F"
-attribute = "#CB4B16"
-meta = "#D33682"
+value = "#E76535"
+variable = "#FA5149"
+attribute = "#E76535"
+meta = "#EF529A"
 builtin = "#2AA198"
-comment = "#586E75"
+comment = "#5D737A"

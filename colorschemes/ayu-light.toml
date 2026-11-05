@@ -1,4 +1,4 @@
-# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Light", as ayu-theme/ayu-colors computes most of its own (themes/light.yaml); paper is that file's surface.sunk and accent its common.accent.tint.
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Light", as ayu-theme/ayu-colors computes most of its own (themes/light.yaml); paper is that file's surface.sunk and accent its common.accent.tint. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "ayu-light"
 title = "Ayu Light"
@@ -10,25 +10,25 @@ licence = "MIT"
 [color]
 paper = "#EBEEF0"
 surface = "#F8F9FA"
-ink = "#5C6166"
-muted = "#8A9199"
+ink = "#575C61"
+muted = "#6D737B"
 line = "#D2D4D8"
-accent = "#F29718"
-danger = "#F07171"
-ok = "#6CBF49"
+accent = "#A56403"
+danger = "#C4494D"
+ok = "#378304"
 ansi = [
-  "#F8F9FA", "#F07171", "#6CBF49", "#F2AE49", "#399EE6", "#A37ACC", "#4CBF99", "#5C6166",
-  "#A0A6AC", "#F07171", "#6CBF49", "#F2AE49", "#399EE6", "#A37ACC", "#4CBF99", "#404447",
+  "#F8F9FA", "#C4494D", "#378304", "#9D6806", "#0578BA", "#8A61B1", "#028262", "#5C6166",
+  "#8B9197", "#C4494D", "#378304", "#9D6806", "#0578BA", "#8A61B1", "#028262", "#404447",
 ]
 
 [syntax]
-keyword = "#A37ACC"
-function = "#399EE6"
-string = "#6CBF49"
-type = "#F2AE49"
-value = "#FA8D3E"
-variable = "#F07171"
-attribute = "#FA8D3E"
-meta = "#E6BA7E"
-builtin = "#4CBF99"
-comment = "#A0A6AC"
+keyword = "#8A61B1"
+function = "#0578BA"
+string = "#378304"
+type = "#9D6806"
+value = "#B45A05"
+variable = "#C4494D"
+attribute = "#B45A05"
+meta = "#946B30"
+builtin = "#028262"
+comment = "#8B9197"

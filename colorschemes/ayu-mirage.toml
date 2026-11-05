@@ -1,4 +1,4 @@
-# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Mirage", as ayu-theme/ayu-colors computes most of its own (themes/mirage.yaml); paper is that file's surface.sunk and accent its common.accent.tint.
+# UI colours, code colours and the ANSI 16 from the tinted-theming base24 "Ayu Mirage", as ayu-theme/ayu-colors computes most of its own (themes/mirage.yaml); paper is that file's surface.sunk and accent its common.accent.tint. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "ayu-mirage"
 title = "Ayu Mirage"
@@ -11,14 +11,14 @@ licence = "MIT"
 paper = "#181C26"
 surface = "#1F2430"
 ink = "#CCCAC2"
-muted = "#707A8C"
+muted = "#808B9D"
 line = "#323844"
 accent = "#FFCC66"
 danger = "#F28779"
 ok = "#D5FF80"
 ansi = [
   "#1F2430", "#F28779", "#D5FF80", "#FFD173", "#73D0FF", "#D4BFFF", "#95E6CB", "#CCCAC2",
-  "#4A5059", "#F28779", "#D5FF80", "#FFD173", "#73D0FF", "#D4BFFF", "#95E6CB", "#F3F4F5",
+  "#676E77", "#F28779", "#D5FF80", "#FFD173", "#73D0FF", "#D4BFFF", "#95E6CB", "#F3F4F5",
 ]
 
 [syntax]
@@ -31,4 +31,4 @@ variable = "#F28779"
 attribute = "#FFAD66"
 meta = "#F27983"
 builtin = "#95E6CB"
-comment = "#4A5059"
+comment = "#676E77"

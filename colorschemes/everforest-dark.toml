@@ -1,4 +1,4 @@
-# UI and code colours from sainnhe/everforest's medium dark palette (autoload/everforest.vim): paper bg_dim, surface bg0, ink fg, muted grey2, line its VertSplit bg4, comment grey1 and meta its PreProc purple; the ANSI 16 are its terminal colours (colors/everforest.vim).
+# UI and code colours from sainnhe/everforest's medium dark palette (autoload/everforest.vim): paper bg_dim, surface bg0, ink fg, muted grey2, line its VertSplit bg4, comment grey1 and meta its PreProc purple; the ANSI 16 are its terminal colours (colors/everforest.vim). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "everforest-dark"
 title = "Everforest Dark"
@@ -10,7 +10,7 @@ licence = "MIT"
 [color]
 paper = "#232A2E"
 surface = "#2D353B"
-ink = "#D3C6AA"
+ink = "#D8CBAE"
 muted = "#9DA9A0"
 line = "#4F585E"
 accent = "#7FBBB3"
@@ -18,7 +18,7 @@ danger = "#E67E80"
 ok = "#A7C080"
 ansi = [
   "#475258", "#E67E80", "#A7C080", "#DBBC7F", "#7FBBB3", "#D699B6", "#83C092", "#D3C6AA",
-  "#475258", "#E67E80", "#A7C080", "#DBBC7F", "#7FBBB3", "#D699B6", "#83C092", "#D3C6AA",
+  "#737E85", "#E67E80", "#A7C080", "#DBBC7F", "#7FBBB3", "#D699B6", "#83C092", "#D3C6AA",
 ]
 
 [syntax]

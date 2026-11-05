@@ -1,4 +1,4 @@
-# Board colours for the UI and code; the ANSI 16 are rose-pine/alacritty's (dist/rose-pine-dawn.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine Dawn" base08, 0B, 09, 0F.
+# Board colours for the UI and code; the ANSI 16 are rose-pine/alacritty's (dist/rose-pine-dawn.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine Dawn" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "rose-pine-dawn"
 title = "Rosé Pine Dawn"
@@ -11,24 +11,24 @@ licence = "MIT"
 paper = "#F2E9E1"
 surface = "#FAF4ED"
 ink = "#575279"
-muted = "#797593"
+muted = "#716D8B"
 line = "#DFDAD9"
-accent = "#907AA9"
-danger = "#B4637A"
+accent = "#7D6795"
+danger = "#A7576E"
 ok = "#286983"
 ansi = [
-  "#F2E9E1", "#B4637A", "#286983", "#EA9D34", "#56949F", "#907AA9", "#D7827E", "#575279",
-  "#9893A5", "#B4637A", "#286983", "#EA9D34", "#56949F", "#907AA9", "#D7827E", "#575279",
+  "#F2E9E1", "#A7576E", "#286983", "#9D6306", "#3B7984", "#7D6795", "#A95956", "#575279",
+  "#908B9D", "#A7576E", "#286983", "#9D6306", "#3B7984", "#7D6795", "#A95956", "#575279",
 ]
 
 [syntax]
 keyword = "#286983"
-function = "#D7827E"
-string = "#EA9D34"
-type = "#56949F"
-value = "#D7827E"
+function = "#A95956"
+string = "#9D6306"
+type = "#3B7984"
+value = "#A95956"
 variable = "#575279"
-attribute = "#EA9D34"
-meta = "#CECACD"
-builtin = "#B4637A"
-comment = "#9893A5"
+attribute = "#9D6306"
+meta = "#736F72"
+builtin = "#A7576E"
+comment = "#908B9D"

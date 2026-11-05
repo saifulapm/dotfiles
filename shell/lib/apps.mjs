@@ -1,16 +1,27 @@
 // Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, imv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
-import { plainTones } from './voice.mjs';
+import { plainTones, readable } from './voice.mjs';
 
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
+// The quiet frame niri and the shell's cards draw, for every app's borders.
+const frameOf = (t) => lower(t.niri.border_inactive);
+// The most of x the surface takes on, up to share, while ink still reads at 4.5:1 on it.
+const inkShare = (ink, surface, x, share) => {
+  let s = share;
+  while (s > 0 && contrast(ink, mix(surface, x, s)) < 4.5) s = Math.round((s - 0.01) * 100) / 100;
+  return Math.max(0, s);
+};
 
 
 // The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: an accent dot before the current window.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
+  const frame = frameOf(t);
+  // A message sits on the paper, where a scheme's ink may read less well than on its surface.
+  const onPaper = (x) => lower(readable(x, c.paper, t.mode === 'dark' ? '#FFFFFF' : '#000000'));
   const say = (mods, name) => `#{${mods}:${name}}`;
   const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
   const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
@@ -25,16 +36,16 @@ export function renderTmux(t) {
     `set -g window-status-current-format "${current}"`,
     `set -g window-status-separator "#[fg=${muted}]    "`,
     'set -g pane-border-lines single',
-    `set -g pane-border-style "fg=${line}"`,
-    `set -g pane-active-border-style "fg=${ink}"`,
+    `set -g pane-border-style "fg=${frame}"`,
+    `set -g pane-active-border-style "fg=${frame}"`,
     'set -g popup-border-lines single',
-    `set -g popup-border-style "fg=${ink}"`,
+    `set -g popup-border-style "fg=${frame}"`,
     'set -g menu-border-lines single',
-    `set -g menu-border-style "fg=${ink}"`,
+    `set -g menu-border-style "fg=${frame}"`,
     `set -g menu-style "fg=${ink},bg=${surface}"`,
     `set -g menu-selected-style "fg=${surface},bg=${accent}"`,
-    `set -g message-style "fg=${ink},bg=${paper}"`,
-    `set -g message-command-style "fg=${danger},bg=${paper}"`,
+    `set -g message-style "fg=${onPaper(c.ink)},bg=${paper}"`,
+    `set -g message-command-style "fg=${onPaper(c.danger)},bg=${paper}"`,
     `set -g mode-style "fg=${surface},bg=${accent}"`,
     `set -g copy-mode-match-style "fg=${ink},bg=${line}"`,
     `set -g copy-mode-current-match-style "fg=${surface},bg=${accent}"`,
@@ -83,7 +94,7 @@ export function renderKak(t) {
     ['LineNumbersWrapped', `${rgb(c.line)},${rgb(c.surface)}+i`],
     ['MenuForeground', `${rgb(c.surface)},${rgb(c.accent)}`],
     ['MenuBackground', `${rgb(c.ink)},${rgb(tint)}`],
-    ['MenuInfo', `${rgb(c.muted)}`],
+    ['MenuInfo', `${rgb(readable(c.muted, tint, c.ink))}`],
     ['Information', `${rgb(c.ink)},${rgb(c.surface)}`],
     ['Error', `${rgb(c.surface)},${rgb(c.danger)}`],
     ['DiagnosticError', `${rgb(c.danger)}`],
@@ -142,7 +153,7 @@ export function renderHelix(t) {
     ['ui.help', style(ink, tint)],
     ['ui.menu', style(ink, tint)],
     ['ui.menu.selected', style(surface, accent)],
-    ['ui.window', `"${line}"`],
+    ['ui.window', `"${frameOf(t)}"`],
     ['ui.highlight', style(null, tint)],
     ['ui.virtual.whitespace', `"${line}"`],
     ['ui.virtual.indent-guide', `"${line}"`],
@@ -210,7 +221,7 @@ export function renderYazi(t) {
     '[mgr]',
     `cwd = { fg = "${accent}" }`,
     `hovered = { fg = "${surface}", bg = "${accent}" }`,
-    `border_style = { fg = "${line}" }`,
+    `border_style = { fg = "${frameOf(t)}" }`,
     `tab_active = { fg = "${surface}", bg = "${accent}" }`,
     `tab_inactive = { fg = "${ink}", bg = "${line}" }`,
     `marker_selected = { fg = "${ok}", bg = "${ok}" }`,
@@ -218,7 +229,7 @@ export function renderYazi(t) {
     '',
     '[mode]',
     `normal_main = { fg = "${surface}", bg = "${accent}", bold = true }`,
-    `normal_alt = { fg = "${accent}", bg = "${line}" }`,
+    `normal_alt = { fg = "${lower(readable(c.accent, c.line, c.ink))}", bg = "${line}" }`,
     `select_main = { fg = "${surface}", bg = "${ok}", bold = true }`,
     `select_alt = { fg = "${ok}", bg = "${line}" }`,
     `unset_main = { fg = "${surface}", bg = "${danger}", bold = true }`,
@@ -372,8 +383,8 @@ export function renderZathura(t) {
   const c = t.color;
   const [ink, muted, paper, surface, accent, danger] = [c.ink, c.muted, c.paper, c.surface, c.accent, c.danger].map(lower);
   const pairs = [
-    ['default', paper, ink], ['statusbar', surface, ink], ['inputbar', surface, ink], ['index', paper, ink], ['index-active', accent, surface],
-    ['completion', surface, ink], ['completion-group', paper, muted], ['completion-highlight', accent, surface],
+    ['default', paper, ink], ['statusbar', surface, ink], ['inputbar', surface, ink], ['index', surface, ink], ['index-active', accent, surface],
+    ['completion', surface, ink], ['completion-group', surface, muted], ['completion-highlight', accent, surface],
     ['notification', surface, ink], ['notification-error', danger, surface], ['notification-warning', accent, surface],
   ];
   const lines = [];
@@ -420,16 +431,20 @@ export function renderClaude(t) {
   const { a, ink, muted, line, surface, accent, danger, ok, on } = agentColors(t);
   const shimmer = (x) => mix(x, ink, 0.35);
   const orange = mix(a[1], a[3], 0.5);
+  const frame = frameOf(t);
+  // Text on a tint keeps reading: each tint is as strong as ink allows, a changed word's at least twice its line's.
+  const word = (x) => inkShare(ink, surface, x, 0.32);
+  const tinted = (x, share) => on(x, inkShare(ink, surface, x, share));
   const overrides = {
     claude: accent, claudeShimmer: mix(accent, ink, 0.35), text: ink, inverseText: surface,
-    inactive: mix(ink, surface, 0.4), inactiveShimmer: mix(ink, surface, 0.25), subtle: muted,
+    inactive: mix(ink, surface, readableShare(ink, surface, 0.4)), inactiveShimmer: mix(ink, surface, readableShare(ink, surface, 0.25)), subtle: muted,
     suggestion: a[6], permission: a[4], permissionShimmer: mix(a[4], ink, 0.35), remember: a[3],
     success: ok, error: danger, warning: a[3], warningShimmer: mix(a[3], ink, 0.35), merged: a[5],
-    promptBorder: accent, promptBorderShimmer: mix(accent, ink, 0.35), planMode: a[6], autoAccept: a[3],
+    promptBorder: frame, promptBorderShimmer: mix(frame, ink, 0.35), planMode: a[6], autoAccept: a[3],
     bashBorder: a[11], ide: a[14],
-    diffAdded: on(ok, 0.15), diffRemoved: on(danger, 0.15), diffAddedDimmed: on(ok, 0.08), diffRemovedDimmed: on(danger, 0.08),
-    diffAddedWord: on(ok, 0.32), diffRemovedWord: on(danger, 0.32),
-    userMessageBackground: on(ink, 0.06), userMessageBackgroundHover: on(ink, 0.1),
+    diffAdded: on(ok, Math.min(0.15, word(ok) / 2)), diffRemoved: on(danger, Math.min(0.15, word(danger) / 2)), diffAddedDimmed: on(ok, 0.08), diffRemovedDimmed: on(danger, 0.08),
+    diffAddedWord: on(ok, word(ok)), diffRemovedWord: on(danger, word(danger)),
+    userMessageBackground: tinted(ink, 0.06), userMessageBackgroundHover: on(ink, 0.1),
     bashMessageBackgroundColor: on(ink, 0.06), memoryBackgroundColor: on(ink, 0.06), selectionBg: line,
     rate_limit_fill: accent, rate_limit_empty: on(ink, 0.2), briefLabelYou: a[3], briefLabelClaude: accent,
     autoAcceptShimmer: shimmer(a[3]), skill: a[5], effortUltra: a[5], fastMode: orange, fastModeShimmer: shimmer(orange),
@@ -448,7 +463,7 @@ export function renderClaude(t) {
 
 // pi's roles point at vars, so a theme only sets the vars.
 const PI_COLORS = {
-  accent: 'accent', border: 'border', borderAccent: 'accent', borderMuted: 'borderMuted', success: 'color2', error: 'color1',
+  accent: 'accent', border: 'border', borderAccent: 'border', borderMuted: 'borderMuted', success: 'color2', error: 'color1',
   warning: 'color3', muted: 'mutedText', dim: 'dimText', text: 'foreground', thinkingText: 'dimText', selectedBg: 'selectedBackground',
   userMessageBg: 'panel', userMessageText: 'foreground', customMessageBg: 'panel', customMessageText: 'foreground',
   customMessageLabel: 'accent', toolPendingBg: 'panelPending', toolSuccessBg: 'panelSuccess', toolErrorBg: 'panelError',
@@ -471,11 +486,12 @@ const readableShare = (ink, surface, share) => {
 
 export function renderPi(t) {
   const { a, ink, line, surface, accent, danger, ok, on } = agentColors(t);
+  const tinted = (x, share) => on(x, inkShare(ink, surface, x, share));
   const dim = readableShare(ink, surface, 0.39);
   const vars = {
-    background: surface, foreground: ink, accent, selectionBackground: line, selectionForeground: ink, selectedBackground: on(accent, 0.22),
-    panel: on(ink, 0.06), panelAlt: on(ink, 0.1), panelPending: on(accent, 0.12), panelSuccess: on(ok, 0.12), panelError: on(danger, 0.12),
-    border: on(ink, 0.3), borderMuted: on(ink, 0.2), mutedText: mix(ink, surface, Math.min(0.34, dim - 0.05)), dimText: mix(ink, surface, dim), highlight: on(a[3], 0.2),
+    background: surface, foreground: ink, accent, selectionBackground: line, selectionForeground: ink, selectedBackground: on(accent, inkShare(ink, surface, accent, 0.22)),
+    panel: tinted(ink, 0.06), panelAlt: on(ink, 0.1), panelPending: tinted(accent, 0.12), panelSuccess: tinted(ok, 0.12), panelError: tinted(danger, 0.12),
+    border: frameOf(t), borderMuted: frameOf(t), mutedText: mix(ink, surface, Math.min(0.34, dim - 0.05)), dimText: mix(ink, surface, dim), highlight: tinted(a[3], 0.2),
   };
   a.forEach((hex, i) => (vars['color' + i] = hex));
   // Code takes the theme's syntax table, as kak and helix do.

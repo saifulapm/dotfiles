@@ -15,7 +15,7 @@ export function surfaceStyle(tokens, role) {
   return {
     fill: slab ? c.ink : c.surface,
     text: slab ? slabText(c) : c.ink,
-    frame: { width: islandish(role) ? 0 : 1, color: islandish(role) ? c.ink : c.line },
+    frame: { width: islandish(role) ? 0 : 1, color: islandish(role) ? c.ink : tokens.niri?.border_inactive ?? c.line },
     wash: 0.72,
   };
 }

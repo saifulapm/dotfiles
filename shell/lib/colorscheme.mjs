@@ -1,5 +1,6 @@
 // A colorscheme holds colour only; every scheme wears the one design below, which the renderers take as a theme.
 import { contrast, validateTheme } from './theme.mjs';
+import { mix } from './notes-look.mjs';
 
 export const DEFAULT = 'artboard';
 
@@ -25,7 +26,21 @@ export function validateColorscheme(doc) {
   for (const k of KEYS.syntax) if (!HEX.test(syntax[k] ?? '')) fail(`syntax.${k}: "${syntax[k]}" is not #RRGGBB`);
   const ratio = contrast(color.ink, color.surface);
   if (ratio < 4.5) fail(`contrast of ink on surface is ${ratio.toFixed(2)}:1, under 4.5:1`);
+  // Every colour drawn as text reads on the surface: words at 4.5:1, a comment and the ANSI hues at 3:1; ink reads on line too, the selection's ground.
+  const floor = (what, hex, ground, min) => { const r = contrast(hex, ground); if (r < min) fail(`${what}: contrast ${r.toFixed(2)}:1 on ${ground === color.line ? 'line' : 'surface'}, under ${min}:1`); };
+  floor('ink on line', color.ink, color.line, 4.5);
+  for (const k of ['muted', 'accent', 'danger', 'ok']) floor(`color.${k}`, color[k], color.surface, 4.5);
+  for (const k of KEYS.syntax) floor(`syntax.${k}`, syntax[k], color.surface, k === 'comment' ? 3 : 4.5);
+  // Slots 0, 7, 8 and 15 are black, white and their bright pair, which some schemes draw as grounds.
+  color.ansi.forEach((hex, i) => { if (![0, 7, 8, 15].includes(i)) floor(`color.ansi ${i}`, hex, color.surface, 3); });
   return Object.assign({}, meta, { color: Object.assign({}, color, { ansi: [...color.ansi] }), syntax: Object.assign({}, syntax) });
+}
+
+// The frame: the line, moved toward ink until it shows at 1.4:1 on the surface, so no scheme's windows and cards go frameless.
+function frameOf(c) {
+  let share = 0;
+  while (share < 1 && contrast(mix(c.line, c.ink, share), c.surface) < 1.4) share = Math.round((share + 0.02) * 100) / 100;
+  return share ? mix(c.line, c.ink, share).toUpperCase() : c.line;
 }
 
 // The design system: Artboard's dots, geometry and spring, square, a quiet 1 px line frame on every window and surface, no shadow, Maple Mono in the plain voice.
@@ -38,7 +53,7 @@ export function designOf(s) {
     paper: { spacing: 16, dot: s.color.line },
     type: { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 },
     niri: {
-      gaps: 28, border: 1, border_inactive: s.color.line,
+      gaps: 28, border: 1, border_inactive: frameOf(s.color),
       tab_position: 'top', tab_width: 4, tab_gap: 8, tab_length: 0.3, tab_gaps: 8,
     },
   };

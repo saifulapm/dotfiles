@@ -49,7 +49,8 @@ check "the switch names no app that missed it ($(cat "$XDG_STATE_HOME/dots/theme
 switch_ms=$(jq -r .ms "$XDG_STATE_HOME/dots/theme-switch.json")
 check "theme-switch.json records artboard to catppuccin-mocha in ${switch_ms} ms" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.from == "artboard" and .to == "catppuccin-mocha" and .ms <= 300'
 kdl=$XDG_STATE_HOME/dots/theme-out/niri.kdl
-check "niri's fragment frames the focused window in Catppuccin Mocha's line" grep -q 'active-color "#313244"' "$kdl"
+# Mocha's line #313244 shows at only 1.30:1 on its surface, so the frame is floored to #37394B.
+check "niri's fragment frames the focused window in Catppuccin Mocha's floored line" grep -q 'active-color "#37394B"' "$kdl"
 check "every window survives with its id ($before)" test "$(windows)" = "$before"
 
 # A start stamp that is not a time in ms is ignored, never evaluated.

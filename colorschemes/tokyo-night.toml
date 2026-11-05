@@ -1,4 +1,4 @@
-# UI and code colours are folke/tokyonight.nvim's night palette (extras/lua/tokyonight_night.lua), the code ones as its highlight groups use them (lua/tokyonight/groups/base.lua, treesitter.lua); the ANSI 16 are its foot extra (extras/foot/tokyonight_night.ini).
+# UI and code colours are folke/tokyonight.nvim's night palette (extras/lua/tokyonight_night.lua), the code ones as its highlight groups use them (lua/tokyonight/groups/base.lua, treesitter.lua); the ANSI 16 are its foot extra (extras/foot/tokyonight_night.ini). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "tokyo-night"
 title = "Tokyo Night"
@@ -18,7 +18,7 @@ danger = "#F7768E"
 ok = "#9ECE6A"
 ansi = [
   "#15161E", "#F7768E", "#9ECE6A", "#E0AF68", "#7AA2F7", "#BB9AF7", "#7DCFFF", "#A9B1D6",
-  "#414868", "#F7768E", "#9ECE6A", "#E0AF68", "#7AA2F7", "#BB9AF7", "#7DCFFF", "#C0CAF5",
+  "#5E6687", "#F7768E", "#9ECE6A", "#E0AF68", "#7AA2F7", "#BB9AF7", "#7DCFFF", "#C0CAF5",
 ]
 
 [syntax]
@@ -31,4 +31,4 @@ variable = "#C0CAF5"
 attribute = "#73DACA"
 meta = "#7DCFFF"
 builtin = "#F7768E"
-comment = "#565F89"
+comment = "#5C658F"

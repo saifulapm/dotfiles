@@ -1,4 +1,4 @@
-# UI and code colours are rose-pine/neovim's moon palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as moon's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine-moon.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine Moon" base08, 0B, 09, 0F.
+# UI and code colours are rose-pine/neovim's moon palette (lua/rose-pine/palette.lua), set as rose-pine-dawn.toml sets dawn's; paper is _nc, its darker background, as moon's overlay is lighter than base. The ANSI 16 are rose-pine/alacritty's (dist/rose-pine-moon.toml), danger, ok, attribute and meta the tinted-theming base16 "Rosé Pine Moon" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "rose-pine-moon"
 title = "Rosé Pine Moon"
@@ -15,20 +15,20 @@ muted = "#908CAA"
 line = "#44415A"
 accent = "#C4A7E7"
 danger = "#EB6F92"
-ok = "#3E8FB0"
+ok = "#4293B4"
 ansi = [
-  "#393552", "#EB6F92", "#3E8FB0", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
-  "#6E6A86", "#EB6F92", "#3E8FB0", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
+  "#393552", "#EB6F92", "#4293B4", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
+  "#6E6A86", "#EB6F92", "#4293B4", "#F6C177", "#9CCFD8", "#C4A7E7", "#EA9A97", "#E0DEF4",
 ]
 
 [syntax]
-keyword = "#3E8FB0"
+keyword = "#4293B4"
 function = "#EA9A97"
 string = "#F6C177"
 type = "#9CCFD8"
 value = "#EA9A97"
 variable = "#E0DEF4"
 attribute = "#F6C177"
-meta = "#56526E"
+meta = "#8B87A6"
 builtin = "#EB6F92"
 comment = "#6E6A86"

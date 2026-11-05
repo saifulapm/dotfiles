@@ -20,9 +20,8 @@ function isolated(state) {
 }
 
 const artboard = readFileSync(join(repo, 'colorschemes/artboard.toml'), 'utf8');
-// Artboard turned dark, and Artboard with grey ink on white, which the contrast check refuses.
-const night = artboard.replace('name = "artboard"', 'name = "night"').replace('variant = "light"', 'variant = "dark"')
-  .replace('paper = "#E4E6EA"', 'paper = "#0D1117"').replace('surface = "#FFFFFF"', 'surface = "#161B22"').replace('ink = "#15171B"', 'ink = "#E6EDF3"');
+// A dark scheme under its own name, and Artboard with grey ink on white, which the contrast check refuses.
+const night = readFileSync(join(repo, 'colorschemes/github-dark.toml'), 'utf8').replace('name = "github-dark"', 'name = "night"');
 const faint = artboard.replace('name = "artboard"', 'name = "faint"').replace('ink = "#15171B"', 'ink = "#9AA0A6"');
 
 // bin/dots finds its repo from its own path, so a copy of it renders the schemes beside it, the test's own among them.

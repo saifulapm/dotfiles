@@ -1,4 +1,4 @@
-# UI and code colours from the tinted-theming base24 "Flexoki Dark" (Steph Ango's, matching kepano/flexoki _generators/src/palette.ts); the ANSI 16 are kepano/flexoki's kitty theme (kitty/flexoki_dark.conf). Flexoki has no background darker than black #100F0F (base24 base10 #1C1B1A is lighter), so paper is surface darkened 0.06 in OKLCH lightness.
+# UI and code colours from the tinted-theming base24 "Flexoki Dark" (Steph Ango's, matching kepano/flexoki _generators/src/palette.ts); the ANSI 16 are kepano/flexoki's kitty theme (kitty/flexoki_dark.conf). Flexoki has no background darker than black #100F0F (base24 base10 #1C1B1A is lighter), so paper is surface darkened 0.06 in OKLCH lightness. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "flexoki-dark"
 title = "Flexoki Dark"
@@ -14,11 +14,11 @@ ink = "#CECDC3"
 muted = "#878580"
 line = "#282726"
 accent = "#4385BE"
-danger = "#D14D41"
+danger = "#D34F43"
 ok = "#879A39"
 ansi = [
-  "#100F0F", "#AF3029", "#66800B", "#AD8301", "#205EA6", "#A02F6F", "#24837B", "#878580",
-  "#6F6E69", "#D14D41", "#879A39", "#D0A215", "#4385BE", "#CE5D97", "#3AA99F", "#CECDC3",
+  "#100F0F", "#D15146", "#6B8515", "#AD8301", "#407DC7", "#C5518F", "#2C8981", "#878580",
+  "#6F6E69", "#D34F43", "#879A39", "#D0A215", "#4385BE", "#CE5D97", "#3AA99F", "#CECDC3",
 ]
 
 [syntax]
@@ -27,8 +27,8 @@ function = "#4385BE"
 string = "#879A39"
 type = "#D0A215"
 value = "#DA702C"
-variable = "#D14D41"
+variable = "#D34F43"
 attribute = "#DA702C"
 meta = "#CE5D97"
 builtin = "#3AA99F"
-comment = "#575653"
+comment = "#61605D"

@@ -1,4 +1,4 @@
-# UI and code colours from rebelot/kanagawa.nvim's lotus theme (lua/kanagawa/colors.lua and themes.lua), each slot taken from the lotus role the project's wave base16 port uses (bg, bg_dim, fg, fg_dim, bg_visual, syn.*, vcs.*), as no base16 or base24 Lotus exists; the ANSI 16 are its foot theme (extras/foot/kanagawa-lotus.ini).
+# UI and code colours from rebelot/kanagawa.nvim's lotus theme (lua/kanagawa/colors.lua and themes.lua), each slot taken from the lotus role the project's wave base16 port uses (bg, bg_dim, fg, fg_dim, bg_visual, syn.*, vcs.*), as no base16 or base24 Lotus exists; the ANSI 16 are its foot theme (extras/foot/kanagawa-lotus.ini). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "kanagawa-lotus"
 title = "Kanagawa Lotus"
@@ -14,21 +14,21 @@ ink = "#545464"
 muted = "#43436C"
 line = "#C9CBD1"
 accent = "#4D699B"
-danger = "#D7474B"
-ok = "#6F894E"
+danger = "#C3333B"
+ok = "#597238"
 ansi = [
-  "#1F1F28", "#C84053", "#6F894E", "#77713F", "#4D699B", "#B35B79", "#597B75", "#545464",
-  "#8A8980", "#D7474B", "#6E915F", "#836F4A", "#6693BF", "#624C83", "#5E857A", "#43436C",
+  "#1F1F28", "#BF374C", "#597238", "#716B39", "#4D699B", "#A44E6C", "#4F706B", "#545464",
+  "#88877E", "#C3333B", "#517343", "#7B6743", "#416D97", "#624C83", "#4B7166", "#43436C",
 ]
 
 [syntax]
 keyword = "#624C83"
 function = "#4D699B"
-string = "#6F894E"
-type = "#DE9800"
-value = "#CC6D00"
-variable = "#D7474B"
-attribute = "#CC6D00"
-meta = "#B35B79"
-builtin = "#6693BF"
-comment = "#8A8980"
+string = "#597238"
+type = "#8F6105"
+value = "#A25601"
+variable = "#C3333B"
+attribute = "#A25601"
+meta = "#A44E6C"
+builtin = "#416D97"
+comment = "#88877E"

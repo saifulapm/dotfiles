@@ -1,4 +1,4 @@
-# UI and code colours from EdenEast/nightfox.nvim's own base16 (extra/dawnfox/base16.yaml), paper its bg0 (lua/nightfox/palette/dawnfox.lua); the ANSI 16 are its kitty extra's (extra/dawnfox/kitty.conf). Comment is that base16's base03, the purple #5F5695, as upstream maps it.
+# UI and code colours from EdenEast/nightfox.nvim's own base16 (extra/dawnfox/base16.yaml), paper its bg0 (lua/nightfox/palette/dawnfox.lua); the ANSI 16 are its kitty extra's (extra/dawnfox/kitty.conf). Comment is that base16's base03, the purple #5F5695, as upstream maps it. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "dawnfox"
 title = "Dawnfox"
@@ -11,24 +11,24 @@ licence = "MIT"
 paper = "#EBE5DF"
 surface = "#FAF4ED"
 ink = "#575279"
-muted = "#A8A3B3"
+muted = "#736E7D"
 line = "#EBDFE4"
 accent = "#286983"
-danger = "#B4637A"
-ok = "#618774"
+danger = "#A7576E"
+ok = "#537866"
 ansi = [
-  "#575279", "#B4637A", "#618774", "#EA9D34", "#286983", "#907AA9", "#56949F", "#E5E9F0",
-  "#5F5695", "#C26D85", "#629F81", "#EEA846", "#2D81A3", "#9A80B9", "#5CA7B4", "#E6EBF3",
+  "#575279", "#A7576E", "#537866", "#9D6306", "#286983", "#7D6795", "#3B7984", "#E5E9F0",
+  "#5F5695", "#A8566E", "#407C60", "#9B6505", "#22799A", "#7F659D", "#2C7A87", "#E6EBF3",
 ]
 
 [syntax]
-keyword = "#907AA9"
+keyword = "#7D6795"
 function = "#286983"
-string = "#618774"
-type = "#EA9D34"
-value = "#D7827E"
-variable = "#B4637A"
-attribute = "#D7827E"
-meta = "#D685AF"
-builtin = "#56949F"
+string = "#537866"
+type = "#9D6306"
+value = "#A95956"
+variable = "#A7576E"
+attribute = "#A95956"
+meta = "#A35780"
+builtin = "#3B7984"
 comment = "#5F5695"

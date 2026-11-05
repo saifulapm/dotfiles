@@ -11,7 +11,7 @@ const repo = new URL('../..', import.meta.url).pathname;
 const cli = new URL('./colorscheme-render.mjs', import.meta.url).pathname;
 const read = (name) => parseToml(readFileSync(join(repo, 'colorschemes', `${name}.toml`), 'utf8'));
 
-// The approved board's colours: exact, uppercase, and they win over each project's own palette.
+// The approved board's colours: exact, uppercase, and they win over each project's own palette; a text colour that read under its floor is lifted, and a frame too faint on its surface is floored.
 const BOARD = {
   'github-light': {
     title: 'GitHub Light', family: 'GitHub', variant: 'light',
@@ -22,16 +22,19 @@ const BOARD = {
     title: 'Catppuccin Mocha', family: 'Catppuccin', variant: 'dark',
     color: { paper: '#11111B', surface: '#1E1E2E', ink: '#CDD6F4', muted: '#A6ADC8', line: '#313244', accent: '#89B4FA' },
     syntax: { keyword: '#CBA6F7', function: '#89B4FA', string: '#A6E3A1', type: '#F9E2AF', value: '#FAB387', variable: '#CDD6F4', comment: '#9399B2', builtin: '#F38BA8' },
+    frame: '#37394B',
   },
   'gruvbox-dark': {
     title: 'Gruvbox Dark', family: 'Gruvbox', variant: 'dark',
     color: { paper: '#1D2021', surface: '#282828', ink: '#EBDBB2', muted: '#A89984', line: '#3C3836', accent: '#83A598' },
-    syntax: { keyword: '#FB4934', function: '#B8BB26', string: '#B8BB26', type: '#FABD2F', value: '#D3869B', variable: '#83A598', comment: '#928374', builtin: '#FE8019' },
+    syntax: { keyword: '#FF4F39', function: '#B8BB26', string: '#B8BB26', type: '#FABD2F', value: '#D3869B', variable: '#83A598', comment: '#928374', builtin: '#FE8019' },
+    frame: '#433F3B',
   },
   'rose-pine-dawn': {
     title: 'Rosé Pine Dawn', family: 'Rosé Pine', variant: 'light',
-    color: { paper: '#F2E9E1', surface: '#FAF4ED', ink: '#575279', muted: '#797593', line: '#DFDAD9', accent: '#907AA9' },
-    syntax: { keyword: '#286983', function: '#D7827E', string: '#EA9D34', type: '#56949F', value: '#D7827E', variable: '#575279', comment: '#9893A5', builtin: '#B4637A' },
+    color: { paper: '#F2E9E1', surface: '#FAF4ED', ink: '#575279', muted: '#716D8B', line: '#DFDAD9', accent: '#7D6795' },
+    syntax: { keyword: '#286983', function: '#A95956', string: '#9D6306', type: '#3B7984', value: '#A95956', variable: '#575279', comment: '#908B9D', builtin: '#A7576E' },
+    frame: '#D4CFD1',
   },
 };
 
@@ -61,7 +64,8 @@ for (const [name, want] of Object.entries(BOARD)) {
   test(`${name} renders a 1px line frame on every window, no shadow, and its mode`, (t) => {
     const out = render(t, name);
     const kdl = readFileSync(join(out, 'niri.kdl'), 'utf8').replace(/\s+/g, ' ');
-    assert.ok(kdl.includes(`border { on width 1 active-color "${want.color.line}" inactive-color "${want.color.line}" }`), kdl);
+    const frame = want.frame ?? want.color.line;
+    assert.ok(kdl.includes(`border { on width 1 active-color "${frame}" inactive-color "${frame}" }`), kdl);
     assert.ok(kdl.includes('shadow { off }'));
     assert.equal(JSON.parse(readFileSync(join(out, 'shell.json'), 'utf8')).mode, want.variant);
   });

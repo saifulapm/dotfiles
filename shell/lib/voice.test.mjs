@@ -29,7 +29,7 @@ test("a dark scheme's lit row and pill draw in its own tint, its words moved tow
   assert.deepEqual([g.label.color, g.cursor.detail, g.cursor.fill, g.cursor.text], ['#8DAA9B', '#AFA089', '#353A38', '#8DAA9B']);
   assert.deepEqual([g.name.color, g.detail.color, g.chip.key, g.keyChip.cursorFill], ['#EBDBB2', '#A89984', '#EBDBB2', '#282828']);
   const r = look('rose-pine-dawn');
-  assert.deepEqual([r.label.color, r.cursor.detail, r.keyChip.cursorFill], ['#6B608A', '#666285', '#FAF4ED']);
+  assert.deepEqual([r.label.color, r.cursor.detail, r.keyChip.cursorFill], ['#6C5E88', '#656183', '#FAF4ED']);
 });
 
 test('every mode is named in the plain voice', () => {

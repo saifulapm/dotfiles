@@ -1,4 +1,4 @@
-# UI and code colours are morhetz/gruvbox's light palette as colors/gruvbox.vim uses it; paper is light0_soft, its darker light background, as light0_hard is lighter than light0. The ANSI 16 are its g:terminal_color_N, danger, ok, attribute and meta the tinted-theming base16 "Gruvbox light, medium" base08, 0B, 09, 0F.
+# UI and code colours are morhetz/gruvbox's light palette as colors/gruvbox.vim uses it; paper is light0_soft, its darker light background, as light0_hard is lighter than light0. The ANSI 16 are its g:terminal_color_N, danger, ok, attribute and meta the tinted-theming base16 "Gruvbox light, medium" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "gruvbox-light"
 title = "Gruvbox Light"
@@ -11,24 +11,24 @@ licence = "MIT"
 paper = "#F2E5BC"
 surface = "#FBF1C7"
 ink = "#3C3836"
-muted = "#7C6F64"
+muted = "#786B60"
 line = "#EBDBB2"
 accent = "#076678"
 danger = "#9D0006"
-ok = "#79740E"
+ok = "#767006"
 ansi = [
-  "#FBF1C7", "#CC241D", "#98971A", "#D79921", "#458588", "#B16286", "#689D6A", "#7C6F64",
-  "#928374", "#9D0006", "#79740E", "#B57614", "#076678", "#8F3F71", "#427B58", "#3C3836",
+  "#FBF1C7", "#CC241D", "#727101", "#936500", "#37777A", "#A25578", "#457948", "#7C6F64",
+  "#928374", "#9D0006", "#767006", "#996205", "#076678", "#8F3F71", "#407956", "#3C3836",
 ]
 
 [syntax]
 keyword = "#9D0006"
-function = "#79740E"
-string = "#79740E"
-type = "#B57614"
+function = "#767006"
+string = "#767006"
+type = "#996205"
 value = "#8F3F71"
 variable = "#076678"
 attribute = "#AF3A03"
-meta = "#D65D0E"
+meta = "#B84D02"
 builtin = "#AF3A03"
 comment = "#928374"

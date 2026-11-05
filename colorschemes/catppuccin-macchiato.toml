@@ -1,4 +1,4 @@
-# UI and code colours are catppuccin/palette's Macchiato (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-macchiato.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Macchiato" base08, 0B, 09, 0F.
+# UI and code colours are catppuccin/palette's Macchiato (palette.json); the ANSI 16 are catppuccin/foot's (themes/catppuccin-macchiato.ini), danger, ok, attribute and meta the tinted-theming base24 "Catppuccin Macchiato" base08, 0B, 09, 0F. Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "catppuccin-macchiato"
 title = "Catppuccin Macchiato"
@@ -18,7 +18,7 @@ danger = "#ED8796"
 ok = "#A6DA95"
 ansi = [
   "#494D64", "#ED8796", "#A6DA95", "#EED49F", "#8AADF4", "#F5BDE6", "#8BD5CA", "#B8C0E0",
-  "#5B6078", "#ED8796", "#A6DA95", "#EED49F", "#8AADF4", "#F5BDE6", "#8BD5CA", "#A5ADCB",
+  "#6B7089", "#ED8796", "#A6DA95", "#EED49F", "#8AADF4", "#F5BDE6", "#8BD5CA", "#A5ADCB",
 ]
 
 [syntax]

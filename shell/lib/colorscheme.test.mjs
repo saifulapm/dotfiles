@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateColorscheme, designOf } from './colorscheme.mjs';
-import { validateTheme, renderNiri } from './theme.mjs';
+import { validateTheme, renderNiri, contrast } from './theme.mjs';
 
 const read = (name) => parseToml(readFileSync(new URL(`../../colorschemes/${name}.toml`, import.meta.url), 'utf8'));
 const artboard = () => read('artboard');
@@ -60,4 +60,26 @@ test('niri frames every window in line, focused or not, 1 px, square, with no ri
   assert.match(kdl, /gaps 28\n/);
   assert.match(kdl, /background-color "#E4E6EA"/);
   assert.match(kdl, /spring damping-ratio=0\.72 stiffness=380/);
+});
+
+test('a text colour under 4.5:1 on surface, a comment or ANSI hue under 3:1, or ink under 4.5:1 on line is refused, naming it', () => {
+  for (const [section, k, v] of [['color', 'muted', '#C0C4CA'], ['color', 'accent', '#B0C0FF'], ['syntax', 'string', '#C8D0D8'], ['syntax', 'comment', '#E0E2E6']]) {
+    const doc = artboard();
+    doc[section][k] = v;
+    assert.throws(() => validateColorscheme(doc), new RegExp(`${section}\\.${k}.*contrast`), k);
+  }
+  const hue = artboard();
+  hue.color.ansi[3] = '#F0E0A0';
+  assert.throws(() => validateColorscheme(hue), /ansi 3.*contrast/);
+  const low = artboard();
+  low.color.line = '#5A6068';
+  assert.throws(() => validateColorscheme(low), /ink on line.*contrast/);
+});
+
+test("every scheme's frame shows at 1.4:1 on its surface, its line where that already does", () => {
+  for (const f of readdirSync(new URL('../../colorschemes/', import.meta.url)).filter((f) => f.endsWith('.toml'))) {
+    const t = designOf(validateColorscheme(read(f.slice(0, -5))));
+    assert.ok(contrast(t.niri.border_inactive, t.color.surface) >= 1.4, `${f} ${contrast(t.niri.border_inactive, t.color.surface)}`);
+    if (contrast(t.color.line, t.color.surface) >= 1.4) assert.equal(t.niri.border_inactive, t.color.line, f);
+  }
 });

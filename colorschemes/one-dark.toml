@@ -1,4 +1,4 @@
-# UI and code colours from navarasu/onedark.nvim's dark style (lua/onedark/palette.lua): paper bg_d, surface bg0, ink fg, muted light_grey, line its WinSeparator bg3, comment grey and meta its PreProc purple; the ANSI 16 are its terminal colours (lua/onedark/terminal.lua).
+# UI and code colours from navarasu/onedark.nvim's dark style (lua/onedark/palette.lua): paper bg_d, surface bg0, ink fg, muted light_grey, line its WinSeparator bg3, comment grey and meta its PreProc purple; the ANSI 16 are its terminal colours (lua/onedark/terminal.lua). Text colours that read under 4.5:1 on surface, and the comment and ANSI 8 under 3:1, are moved in OKLCH lightness, keeping hue, until they do; ink also reads at 4.5:1 on line.
 [meta]
 name = "one-dark"
 title = "One Dark"
@@ -11,14 +11,14 @@ licence = "MIT"
 paper = "#21252B"
 surface = "#282C34"
 ink = "#ABB2BF"
-muted = "#848B98"
+muted = "#8C93A0"
 line = "#3B3F4C"
 accent = "#61AFEF"
-danger = "#E86671"
+danger = "#EB6973"
 ok = "#98C379"
 ansi = [
-  "#181A1F", "#E86671", "#98C379", "#E5C07B", "#61AFEF", "#C678DD", "#56B6C2", "#ABB2BF",
-  "#5C6370", "#E86671", "#98C379", "#E5C07B", "#61AFEF", "#C678DD", "#56B6C2", "#ABB2BF",
+  "#181A1F", "#EB6973", "#98C379", "#E5C07B", "#61AFEF", "#C678DD", "#56B6C2", "#ABB2BF",
+  "#6E7582", "#EB6973", "#98C379", "#E5C07B", "#61AFEF", "#C678DD", "#56B6C2", "#ABB2BF",
 ]
 
 [syntax]
@@ -27,8 +27,8 @@ function = "#61AFEF"
 string = "#98C379"
 type = "#E5C07B"
 value = "#D19A66"
-variable = "#E86671"
+variable = "#EB6973"
 attribute = "#D19A66"
 meta = "#C678DD"
 builtin = "#56B6C2"
-comment = "#5C6370"
+comment = "#6E7582"
