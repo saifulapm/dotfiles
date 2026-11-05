@@ -2,18 +2,13 @@
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const pad2 = (n) => String(n).padStart(2, '0');
 
 // Page titles are whatever a site's author wrote, so controls become spaces and bidi marks go.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 const clean = (s) => String(s || '').replace(CONTROL, ' ').replace(BIDI, '').replace(/\s+/g, ' ').trim();
 
-export function dateLines(voice, d) {
-  const day = DAYS[d.getDay()];
-  if (voice === 'bracket') return { day: day.toUpperCase(), date: `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` };
-  return { day: voice === 'caps' ? day.toUpperCase() : day, date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` };
-}
+export const dateLines = (d) => ({ day: DAYS[d.getDay()], date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` });
 
 // A host with a dotted name ending in letters, localhost or an IPv4 address opens; anything else, other schemes too, is searched for.
 const WEB = /^https?:\/\/\S+$/i;
@@ -35,7 +30,7 @@ const firstMark = (s) => (s.match(/[\p{L}\p{N}]/u) || [''])[0];
 // The Web Store Chromium puts in the top sites of a profile with no history.
 const PREPOPULATED = /^https:\/\/(chrome\.google\.com\/webstore|chromewebstore\.google\.com\/)/i;
 
-export function siteRows(sites, voice) {
+export function siteRows(sites) {
   return sites
     .filter((s) => /^https?:\/\//i.test(s.url) && !PREPOPULATED.test(s.url))
     .slice(0, 6)
@@ -43,7 +38,7 @@ export function siteRows(sites, voice) {
       const where = address(s.url);
       const title = (s.title === s.url ? '' : clean(s.title)) || where;
       const tile = firstMark(title) || firstMark(where) || '•';
-      return { n: String(i + 1), url: s.url, tile: voice === 'bracket' ? tile.toUpperCase() : tile, title, address: where };
+      return { n: String(i + 1), url: s.url, tile, title, address: where };
     });
 }
 
@@ -53,12 +48,10 @@ export function digitSite(key, field, count) {
   return !field && n > 0 && n <= count ? n - 1 : -1;
 }
 
-// The engraved voice says Blueprint's words without their marks; the page copies this file alone, so it marks its own.
-export function words(voice, engraved = false) {
-  const mark = (s) => (engraved ? s : `[${s}]`);
-  const keys = [['type', 'search'], ['↓ / tab', 'most visited'], ['1–6', 'open'], ['↵', 'go']];
-  const base = { placeholder: 'Search the web or type a URL', head: 'MOST VISITED', empty: 'NOTHING VISITED YET' };
-  if (voice === 'bracket') return Object.assign(base, { go: `${mark('↵')} GO`, keys: keys.map(([k, w]) => [mark(k.toUpperCase()), w.toUpperCase()]) });
-  if (voice === 'plain') return Object.assign(base, { go: '↵ go', head: 'Most visited', empty: 'Nothing visited yet', keys });
-  return Object.assign(base, { go: '↵ go', keys });
-}
+export const WORDS = {
+  placeholder: 'Search the web or type a URL',
+  head: 'Most visited',
+  empty: 'Nothing visited yet',
+  go: '↵ go',
+  keys: [['type', 'search'], ['↓ / tab', 'most visited'], ['1–6', 'open'], ['↵', 'go']],
+};

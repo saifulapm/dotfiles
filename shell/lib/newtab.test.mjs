@@ -1,15 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dateLines, readQuery, siteRows, digitSite, words } from './newtab.mjs';
+import { dateLines, readQuery, siteRows, digitSite, WORDS } from './newtab.mjs';
+import { readFileSync } from 'node:fs';
 
 // Friday 23 October 2026, in the afternoon.
 const FRI = new Date(2026, 9, 23, 14, 32);
 
-test('each voice writes the date as its board does', () => {
-  assert.deepEqual(dateLines('caps', FRI), { day: 'FRIDAY', date: '23 October 2026' });
-  assert.deepEqual(dateLines('bracket', FRI), { day: 'FRIDAY', date: '2026-10-23' });
-  assert.deepEqual(dateLines('plain', FRI), { day: 'Friday', date: '23 October 2026' });
-  assert.deepEqual(dateLines('bracket', new Date(2026, 0, 4)), { day: 'SUNDAY', date: '2026-01-04' });
+test('the date reads its weekday over the day, month and year', () => {
+  assert.deepEqual(dateLines(FRI), { day: 'Friday', date: '23 October 2026' });
+  assert.deepEqual(dateLines(new Date(2026, 0, 4)), { day: 'Sunday', date: '4 January 2026' });
 });
 
 test('a typed line opens as an address when it reads as one, else it is a search', () => {
@@ -42,7 +41,6 @@ test('the six most visited web sites become rows with a number, a letter tile, a
       { url: 'https://discussion.fedoraproject.org/', title: 'Fedora Discussion' },
       { url: 'https://example.com/', title: 'Seventh' },
     ],
-    'caps',
   );
   assert.deepEqual(rows, [
     { n: '1', url: 'https://github.com/saifulapm/dotfiles', tile: 'd', title: 'dotfiles', address: 'github.com/saifulapm/dotfiles' },
@@ -52,28 +50,27 @@ test('the six most visited web sites become rows with a number, a letter tile, a
     { n: '5', url: 'https://www.themoviedb.org/', tile: 'T', title: 'The Movie Database', address: 'themoviedb.org' },
     { n: '6', url: 'https://discussion.fedoraproject.org/', tile: 'F', title: 'Fedora Discussion', address: 'discussion.fedoraproject.org' },
   ]);
-  assert.equal(siteRows([{ url: 'https://github.com/', title: 'dotfiles' }], 'bracket')[0].tile, 'D');
-  assert.deepEqual(siteRows([], 'plain'), []);
+  assert.deepEqual(siteRows([]), []);
   // Chromium lists its Web Store on a profile with no history, so a fresh profile would never read empty.
-  assert.deepEqual(siteRows([{ url: 'https://chrome.google.com/webstore?hl=en', title: 'Web Store' }, { url: 'https://chromewebstore.google.com/', title: 'Chrome Web Store' }], 'plain'), []);
+  assert.deepEqual(siteRows([{ url: 'https://chrome.google.com/webstore?hl=en', title: 'Web Store' }, { url: 'https://chromewebstore.google.com/', title: 'Chrome Web Store' }]), []);
 });
 
 // A page's title is whatever its author wrote, so it is one line with no control characters or bidi marks.
 test('a forged or missing title still draws one line and a letter tile', () => {
   const forged = 'x\ny\u001bz\u0007q\u0085w\u202Ev\u200Eu' + 'A'.repeat(300);
-  const [row] = siteRows([{ url: 'https://evil.example/\u202Egnp.exe', title: forged }], 'plain');
+  const [row] = siteRows([{ url: 'https://evil.example/\u202Egnp.exe', title: forged }]);
   assert.equal(row.title, 'x y z q wvu' + 'A'.repeat(300));
   assert.equal(row.tile, 'x');
   assert.equal(row.address, 'evil.example/gnp.exe');
-  assert.deepEqual(siteRows([{ url: 'https://www.themoviedb.org/movie', title: '' }], 'plain')[0], {
+  assert.deepEqual(siteRows([{ url: 'https://www.themoviedb.org/movie', title: '' }])[0], {
     n: '1', url: 'https://www.themoviedb.org/movie', tile: 't', title: 'themoviedb.org/movie', address: 'themoviedb.org/movie',
   });
-  assert.equal(siteRows([{ url: 'https://8.8.8.8/', title: '\u202E\u0000 ' }], 'bracket')[0].tile, '8');
+  assert.equal(siteRows([{ url: 'https://8.8.8.8/', title: '\u202E\u0000 ' }])[0].tile, '8');
   // Chromium gives a page with no title its URL as the title.
-  assert.deepEqual(siteRows([{ url: 'http://localhost:8000/notes.html?v=2', title: 'http://localhost:8000/notes.html?v=2' }], 'plain')[0], {
+  assert.deepEqual(siteRows([{ url: 'http://localhost:8000/notes.html?v=2', title: 'http://localhost:8000/notes.html?v=2' }])[0], {
     n: '1', url: 'http://localhost:8000/notes.html?v=2', tile: 'l', title: 'localhost:8000/notes.html?v=2', address: 'localhost:8000/notes.html?v=2',
   });
-  assert.equal(siteRows([{ url: 'https://example.com/', title: '— «»' }], 'plain')[0].tile, 'e');
+  assert.equal(siteRows([{ url: 'https://example.com/', title: '— «»' }])[0].tile, 'e');
 });
 
 test('1 to 6 open a row only while the field is empty and the row is there', () => {
@@ -86,17 +83,14 @@ test('1 to 6 open a row only while the field is empty and the row is there', () 
   assert.equal(digitSite('a', '', 6), -1);
 });
 
-test('each voice labels the field, the list and the keys as its board does', () => {
-  assert.deepEqual(words('caps'), {
-    go: '↵ go', head: 'MOST VISITED', empty: 'NOTHING VISITED YET', placeholder: 'Search the web or type a URL',
-    keys: [['type', 'search'], ['↓ / tab', 'most visited'], ['1–6', 'open'], ['↵', 'go']],
-  });
-  assert.deepEqual(words('bracket'), {
-    go: '[↵] GO', head: 'MOST VISITED', empty: 'NOTHING VISITED YET', placeholder: 'Search the web or type a URL',
-    keys: [['[TYPE]', 'SEARCH'], ['[↓ / TAB]', 'MOST VISITED'], ['[1–6]', 'OPEN'], ['[↵]', 'GO']],
-  });
-  assert.deepEqual(words('plain'), {
+test('the page labels the field, the list and the keys in sentence case', () => {
+  assert.deepEqual(WORDS, {
     go: '↵ go', head: 'Most visited', empty: 'Nothing visited yet', placeholder: 'Search the web or type a URL',
     keys: [['type', 'search'], ['↓ / tab', 'most visited'], ['1–6', 'open'], ['↵', 'go']],
   });
+});
+
+test("the page's stylesheet draws no shadow", () => {
+  const css = readFileSync(new URL('../newtab/newtab.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /box-shadow/);
 });

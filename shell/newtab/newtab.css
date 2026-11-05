@@ -1,70 +1,38 @@
 /* Chromium's new-tab page as the boards draw it; theme.css, which dots colorscheme renders, sets the colours, fonts and paper. */
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; }
-body { display: flex; justify-content: center; padding: 86px 16px 32px; color: var(--ink); font-family: var(--ui), monospace; }
-main { width: 640px; max-width: 100%; display: flex; flex-direction: column; gap: 26px; position: relative; }
+body { display: flex; justify-content: center; padding: 64px 16px 32px; color: var(--ink); font-family: var(--ui), monospace; }
+/* A card on the dots, labelled like a frame, with rounded rows and key chips. */
+main { width: 640px; max-width: 100%; display: flex; flex-direction: column; gap: 22px; position: relative; padding: 28px 32px 24px; background: var(--surface); border-radius: 14px; }
 main[hidden] { display: none; }
+main::before { content: "New Tab"; position: absolute; left: 0; top: -20px; font-size: 11px; font-weight: 500; color: var(--accent); }
 
-.when { display: flex; flex-direction: column; gap: 6px; }
-#day { font-size: 10px; letter-spacing: 0.14em; color: var(--muted); }
-#date { font-family: var(--display), serif; font-size: 55px; font-weight: 400; line-height: 1.05; }
+.when { display: flex; flex-direction: column; gap: 4px; }
+#day { font-size: 13px; font-weight: 500; color: var(--muted); }
+#date { font-family: var(--display), serif; font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
 
-.field { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: var(--surface); border: 2px solid var(--accent); box-shadow: 4px 4px 0 var(--accent); color: var(--ink); }
+.field { display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 16px; border-radius: 14px; outline: 2px solid var(--accent); background: var(--field); color: var(--muted); }
 .field svg { flex-shrink: 0; }
 #q { flex-grow: 1; min-width: 0; padding: 0; border: none; outline: none; background: transparent; font: inherit; font-size: 17px; color: var(--ink); caret-color: var(--accent); }
 #q::placeholder { color: var(--muted); opacity: 1; }
-.go { flex-shrink: 0; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.go { flex-shrink: 0; padding: 2px 7px; border-radius: 6px; background: var(--tint); font-size: 11px; font-weight: 500; color: var(--deep); white-space: nowrap; }
 
-.list { display: flex; flex-direction: column; }
-.head { padding-bottom: 8px; font-size: 10px; letter-spacing: 0.14em; color: var(--muted); }
-#sites { display: flex; flex-direction: column; border-bottom: 1px solid var(--line); }
+.list { display: flex; flex-direction: column; gap: 2px; }
+.head { padding: 0 12px 6px; font-size: 12px; color: var(--muted); }
+#sites { display: flex; flex-direction: column; gap: 2px; }
 /* The title keeps at least 40% of the row and an address takes at most 40%, so a long address never pushes its title off the line. */
-.row { display: grid; grid-template-columns: 28px 24px minmax(40%, 1fr) fit-content(40%); column-gap: 14px; align-items: center; padding: 11px 14px; border-top: 1px solid var(--line); color: inherit; text-decoration: none; outline: none; }
-.row:focus { background: var(--ink); color: var(--surface); }
+.row { display: grid; grid-template-columns: 20px 26px minmax(40%, 1fr) fit-content(40%); column-gap: 14px; align-items: center; padding: 8px 12px; border-radius: 10px; color: inherit; text-decoration: none; outline: none; }
+.row:focus { background: var(--tint); color: var(--deep); }
 .n { font-size: 12px; color: var(--muted); }
-.tile { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--ink); background: var(--tile); color: var(--ink); font-size: 11px; font-weight: 700; }
+.tile { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: var(--tile); color: var(--muted); font-size: 12px; font-weight: 500; }
 .title, .address, .empty { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.title { font-size: 14px; font-weight: 500; }
+.title { font-size: 15px; font-weight: 500; }
 .address { font-size: 12px; color: var(--muted); }
-.row:focus .n, .row:focus .address, .row:focus .tile { color: inherit; border-color: currentColor; }
-/* A focused row turns over, so its tile drops its light fill and the letter sits on the row's own colour. */
+.row:focus .n, .row:focus .address, .row:focus .tile { color: inherit; }
+/* A focused row's tile drops its light fill, so the letter sits on the row's own colour. */
 .row:focus .tile { background: transparent; }
-.empty { padding: 11px 14px; border-top: 1px solid var(--line); font-size: 12px; letter-spacing: 0.14em; color: var(--muted); }
+.empty { padding: 8px 12px; font-size: 12px; color: var(--muted); }
 
-.keys { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-.keys b { color: var(--ink); }
-
-/* Blueprint: the mono date in bold, a glowing field, dashed rules and the keys in brackets. */
-[data-voice="bracket"] #day { font-size: 12px; letter-spacing: 0.06em; }
-[data-voice="bracket"] #date { font-size: 40px; font-weight: 700; }
-[data-voice="bracket"] .field { border-width: 1px; box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent); color: var(--accent); }
-[data-voice="bracket"] #q { font-size: 16px; }
-[data-voice="bracket"] .go { font-size: 10px; letter-spacing: 0.14em; }
-[data-voice="bracket"] #sites { border-bottom-style: dashed; }
-[data-voice="bracket"] .row, [data-voice="bracket"] .empty { border-top-style: dashed; }
-[data-voice="bracket"] .row:focus { background: var(--accent); }
-[data-voice="bracket"] .n, [data-voice="bracket"] .address { letter-spacing: 0.06em; }
-[data-voice="bracket"] .tile { border-color: var(--line); color: var(--accent); font-size: 10px; letter-spacing: 0.14em; }
-[data-voice="bracket"] .keys { font-size: 11px; letter-spacing: 0.14em; }
-[data-voice="bracket"] .keys b { color: var(--accent); }
-
-/* Artboard: a white card on the dots, labelled like a frame, with rounded rows and key chips. */
-[data-voice="plain"] body { padding-top: 64px; }
-[data-voice="plain"] main { gap: 22px; padding: 28px 32px 24px; background: var(--surface); border-radius: 14px; box-shadow: 0 2px 4px rgba(21, 23, 27, 0.06), 0 24px 48px -12px rgba(21, 23, 27, 0.2); }
-[data-voice="plain"] main::before { content: "New Tab"; position: absolute; left: 0; top: -20px; font-size: 11px; font-weight: 500; color: var(--accent); }
-[data-voice="plain"] .when { gap: 4px; }
-[data-voice="plain"] #day { font-size: 13px; font-weight: 500; letter-spacing: 0; }
-[data-voice="plain"] #date { font-size: 40px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
-[data-voice="plain"] .field { height: 52px; padding: 0 16px; border: none; border-radius: 14px; outline: 2px solid var(--accent); background: var(--field); box-shadow: none; color: var(--muted); }
-[data-voice="plain"] .go { padding: 2px 7px; border-radius: 6px; background: var(--tint); color: var(--deep); font-weight: 500; }
-[data-voice="plain"] .list { gap: 2px; }
-[data-voice="plain"] .head { padding: 0 12px 6px; font-size: 12px; letter-spacing: 0; }
-[data-voice="plain"] #sites { gap: 2px; border-bottom: none; }
-[data-voice="plain"] .row { grid-template-columns: 20px 26px minmax(40%, 1fr) fit-content(40%); padding: 8px 12px; border-top: none; border-radius: 10px; }
-[data-voice="plain"] .row:focus { background: var(--tint); color: var(--deep); }
-[data-voice="plain"] .tile { width: 26px; height: 26px; border: none; border-radius: 8px; color: var(--muted); font-size: 12px; font-weight: 500; }
-[data-voice="plain"] .title { font-size: 15px; }
-[data-voice="plain"] .empty { padding: 8px 12px; border-top: none; letter-spacing: 0; }
-[data-voice="plain"] .keys { gap: 6px 8px; font-size: 11px; letter-spacing: 0; text-transform: none; }
-[data-voice="plain"] .keys span { padding: 3px 7px; border-radius: 6px; background: var(--tile); }
-[data-voice="plain"] .keys b { font-weight: 500; }
+.keys { display: flex; flex-wrap: wrap; gap: 6px 8px; font-size: 11px; color: var(--muted); }
+.keys span { padding: 3px 7px; border-radius: 6px; background: var(--tile); }
+.keys b { color: var(--ink); font-weight: 500; }

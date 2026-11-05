@@ -24,8 +24,6 @@ Item {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var sections: [audio, wifi, bluetooth, power, display, route]
     readonly property var section: sections[current]
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while Control draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var rows: section.rows
     readonly property var look: V.listLook(theme.tokens)
     readonly property var legend: look.keys(section.typing ? (section.typingKeys ?? [["↵", "join"], ["ctrl+v", "paste"], ["esc", "cancel"]]) : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
@@ -90,7 +88,6 @@ Item {
             settled: motion.settled,
             drawing: control.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             cardFill: String(card.drawnFill),
             frameLabel: card.frameLabel(),
             heading: header.visible ? header.text : "",
@@ -100,7 +97,6 @@ Item {
             ruleBox: box(topRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
-            cursorLamp: cur && cur.lamp.visible ? box(cur.lamp) : null,
             cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
             cursorDetail: cur ? Object.assign(box(cur.detailItem), { truncated: cur.detailItem.truncated }) : null,
             legend: legend.map(k => k.key + " " + k.word).join("  "),
@@ -203,7 +199,7 @@ Item {
                             color: on ? look.tab.text : c.muted
                             font.family: look.name.font
                             font.pixelSize: 13
-                            font.weight: on && look.voice === "plain" ? Font.Medium : Font.Normal
+                            font.weight: on ? Font.Medium : Font.Normal
                         }
                     }
                 }
@@ -266,8 +262,8 @@ Item {
                 Layout.fillWidth: true
                 Layout.topMargin: 8
                 Layout.bottomMargin: 8
-                // Paper's rows run edge to edge; the others sit inset as tiles.
-                Layout.leftMargin: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                // The rows sit inset as tiles.
+                Layout.leftMargin: 8
                 Layout.rightMargin: Layout.leftMargin
 
                 Repeater {
@@ -279,11 +275,10 @@ Item {
                         required property int index
                         readonly property bool on: index === control.section.selected
                         readonly property string drawnDetail: detailLabel.text
-                        readonly property Item lamp: rowLamp
                         readonly property Item nameItem: nameLabel
                         readonly property Item detailItem: detailLabel
                         // The width the name and detail share, from the row and its other parts' own widths, never the grid's, so the grid lays out once.
-                        readonly property real textWidth: row.width - (rowLamp.visible ? rowLamp.size + row.spacing : 0) - (marker.visible ? marker.implicitWidth + row.spacing : 0) - (badgeBox.visible ? badgeBox.implicitWidth + row.spacing : 0)
+                        readonly property real textWidth: row.width - (badgeBox.visible ? badgeBox.implicitWidth + row.spacing : 0)
                         width: list.width
                         implicitHeight: row.implicitHeight + 22
                         radius: look.cursor.radius
@@ -292,37 +287,14 @@ Item {
                         RowLayout {
                             id: row
                             anchors.fill: parent
-                            anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                            anchors.leftMargin: 12
                             anchors.rightMargin: anchors.leftMargin
                             spacing: 14
 
-                            // Hi-Fi's row lamp, lit on the cursor row, as the launcher's.
-                            Root.Lamp {
-                                id: rowLamp
-                                visible: control.look.slot === "lamp"
-                                tokens: control.theme.tokens
-                                light: on ? "lit" : "unlit"
-                                size: 7
-                                Layout.alignment: Qt.AlignVCenter
-                                Layout.preferredWidth: size
-                                Layout.preferredHeight: size
-                            }
-
-                            // Paper marks the cursor row with the accent's ▸.
-                            Text {
-                                id: marker
-                                visible: look.slot === "marker"
-                                textFormat: Text.PlainText
-                                text: "▸"
-                                color: on ? look.cursor.marker : "transparent"
-                                font.family: fonts.ui
-                                font.pixelSize: 15
-                            }
-
                             GridLayout {
                                 Layout.fillWidth: true
-                                // Artboard sets the detail under the name; the others put it at the right.
-                                columns: look.voice === "plain" ? 1 : 2
+                                // The detail sits under the name.
+                                columns: 1
                                 rowSpacing: 0
                                 columnSpacing: 14
 
@@ -330,8 +302,6 @@ Item {
                                     id: nameLabel
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
-                                    // Beside a long detail the name keeps its own width, up to half the row.
-                                    Layout.minimumWidth: parent.columns === 2 ? Math.min(Math.ceil(implicitWidth), textWidth / 2) : 0
                                     text: look.title(modelData.title)
                                     // A right-to-left name would otherwise set itself against the detail.
                                     horizontalAlignment: Text.AlignLeft
@@ -346,7 +316,7 @@ Item {
                                     id: detailLabel
                                     textFormat: Text.PlainText
                                     // A detail too long for the row elides in the width the name leaves it.
-                                    Layout.maximumWidth: parent.columns === 2 ? Math.max(0, textWidth - parent.columnSpacing - Math.min(Math.ceil(nameLabel.implicitWidth), textWidth / 2)) : textWidth
+                                    Layout.maximumWidth: textWidth
                                     elide: Text.ElideRight
                                     text: look.detailText(modelData.detail)
                                     color: on ? look.cursor.detail : look.detail.color
@@ -384,11 +354,11 @@ Item {
             // The keys, as chips in Artboard.
             Flow {
                 Layout.fillWidth: true
-                Layout.leftMargin: look.voice === "plain" ? 14 : 20
+                Layout.leftMargin: 14
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: look.voice === "plain" ? 10 : 12
+                Layout.topMargin: 10
                 Layout.bottomMargin: Layout.topMargin
-                spacing: look.legend("").chips ? 8 : 14
+                spacing: 8
 
                 Repeater {
                     id: legendRepeater
@@ -397,15 +367,15 @@ Item {
                     Rectangle {
                         required property var modelData
                         readonly property string label: pairKey.text + " " + pairWord.text
-                        width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
-                        height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+                        width: pair.implicitWidth + 14
+                        height: pair.implicitHeight + 6
                         radius: 6
                         color: look.chip.fill
 
                         Row {
                             id: pair
                             anchors.centerIn: parent
-                            spacing: look.legend("").chips ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: pairKey
@@ -437,12 +407,6 @@ Item {
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }

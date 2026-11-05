@@ -25,8 +25,6 @@ Item {
     readonly property string dir: Quickshell.env("DOTS_RECORDINGS_DIR") || Quickshell.env("HOME") + "/Videos/Recordings"
 
     readonly property var c: theme.color
-    // In a theme that blurs, the hint card's box is the one region the Surfaces window asks niri to blur while the picker draws.
-    readonly property var blurRegion: hintCard.glass && visible ? hintCard.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     // Plays only the picker's open and close; a recording runs with the picker gone.
@@ -82,7 +80,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), blurRegion: blurRegion ? [hintCard.regionBox()] : [], frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
@@ -158,7 +156,7 @@ Item {
         border.color: recorder.c.accent
     }
 
-    // The hint is a card in the theme's treatment: Paper's hard shadow and serif size, Artboard's frame label, Blueprint's chamfer and brackets.
+    // The hint is a card, its keys in the launcher's legend chips.
     Root.Surface {
         id: hintCard
         x: Math.min(recorder.region.x, recorder.width - width)
@@ -183,10 +181,10 @@ Item {
                 font.pixelSize: 20
             }
 
-            // The keys as the launcher's legend draws them: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The keys as the launcher's legend draws them, in chips.
             Row {
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: recorder.look.legend("").chips ? 8 : 14
+                spacing: 8
 
                 Repeater {
                     id: hintRepeater
@@ -197,15 +195,15 @@ Item {
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pairRow.implicitWidth + (recorder.look.legend("").chips ? 14 : 0)
-                        height: pairRow.implicitHeight + (recorder.look.legend("").chips ? 6 : 0)
+                        width: pairRow.implicitWidth + 14
+                        height: pairRow.implicitHeight + 6
                         radius: 6
                         color: recorder.look.chip.fill
 
                         Row {
                             id: pairRow
                             anchors.centerIn: parent
-                            spacing: recorder.look.legend("").chips ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText

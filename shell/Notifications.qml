@@ -25,8 +25,6 @@ Item {
     property real openedAt: 0
 
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the centre draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -34,7 +32,7 @@ Item {
         shown: centre.shown
         tokens: centre.theme.tokens
     }
-    // The caps voices write d and D alike, so clear all reads ⇧D.
+    // Clear all reads ⇧D, so it never reads as d.
     readonly property var legendKeys: look.keys([["j/k", "move"], ["↵", "open"], ["d", "dismiss"], ["⇧D", "clear all"], ["m", "mute"], ["i", "DND"], ["s", "stay"], ["1-3", "action"], ["/", "search"], ["esc", "close"]])
     readonly property var hintKeys: look.keys([["/", "search"], ["esc", "close"]])
     readonly property var groups: Lib.group(Lib.visible(notifs.history, query))
@@ -121,7 +119,7 @@ Item {
     function state() {
         const d = rows.length > 0 ? list.itemAtIndex(selected) : null;
         const cur = d ? d.box : null;
-        const heading = look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip;
+        const heading = pill;
         return {
             open: shown,
             query: query,
@@ -162,15 +160,12 @@ Item {
             settled: motion.settled,
             drawing: centre.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             frameLabel: card.frameLabel(),
-            headingKind: look.label.kind,
             heading: heading.text,
             headingBox: box(heading),
             ruleBox: box(headRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
-            cursorLamp: d && d.lamp.visible ? box(d.lamp) : null,
             legend: legendKeys.map(k => k.key + " " + k.word).join("  "),
             legendKeys: legendKeys.map(k => k.key),
             legendSpacing: look.small.spacing,
@@ -240,7 +235,7 @@ Item {
                 width: parent.width
                 spacing: 0
 
-                // The launcher's mode label names the centre: Paper's ink chip, Artboard's tint pill, Blueprint's header line.
+                // The launcher's mode label names the centre in its tint pill.
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: 20
@@ -250,23 +245,6 @@ Item {
                     spacing: 12
 
                     Rectangle {
-                        visible: look.label.kind === "chip"
-                        implicitWidth: chip.implicitWidth + 14
-                        implicitHeight: chip.implicitHeight + 6
-                        color: look.label.fill
-                        Text {
-                            id: chip
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: look.heading("notifications", "")
-                            color: look.label.color
-                            font.family: fonts.ui
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.4
-                        }
-                    }
-                    Rectangle {
-                        visible: look.label.kind === "pill"
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: pill.implicitHeight + 6
                         radius: 8
@@ -281,16 +259,6 @@ Item {
                             font.pixelSize: 12
                             font.weight: Font.Medium
                         }
-                    }
-                    Text {
-                        id: header
-                        visible: look.label.kind === "header"
-                        textFormat: Text.PlainText
-                        text: look.heading("notifications", "")
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
                     }
                     Text {
                         textFormat: Text.PlainText
@@ -370,7 +338,7 @@ Item {
                     Layout.rightMargin: 20
                     Layout.topMargin: 14
                     Layout.bottomMargin: 14
-                    spacing: look.legend("").chips ? 8 : 14
+                    spacing: 8
 
                     Text {
                         textFormat: Text.PlainText
@@ -403,10 +371,9 @@ Item {
                         required property int index
                         readonly property bool current: index === centre.selected
                         readonly property Item box: rowBox
-                        readonly property Item lamp: rowLamp
                         readonly property string age: ageLabel.text
                         readonly property Item headItem: headLabel
-                        readonly property Item fileChip: [beforeChip, underChip, afterChip].find(f => f.visible) ?? null
+                        readonly property Item fileChip: afterChip.visible ? afterChip : null
                         // After a restart no live notification is left behind an entry, so its row draws no chips.
                         readonly property var actionChips: current && centre.notifs.live[modelData.entry.key] ? look.keys(Lib.chipsOf(modelData.entry.actions).map(c => [c.key, V.line(c.text)])) : []
                         function actionsDrawn() { return Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn); }
@@ -454,10 +421,10 @@ Item {
                             }
                         }
 
-                        // The launcher's cursor row: Paper's runs edge to edge, the others sit inset as tiles.
+                        // The launcher's cursor row, inset as a tile.
                         Rectangle {
                             id: rowBox
-                            x: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                            x: 8
                             width: parent.width - 2 * x
                             implicitHeight: entry.implicitHeight + 20
                             radius: look.cursor.radius
@@ -466,34 +433,11 @@ Item {
                             RowLayout {
                                 id: entry
                                 anchors.fill: parent
-                                anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                                anchors.leftMargin: 12
                                 anchors.rightMargin: anchors.leftMargin
                                 anchors.topMargin: 10
                                 anchors.bottomMargin: 10
                                 spacing: 12
-
-                                // Hi-Fi's row lamp, lit on the cursor row and level with the summary, as the launcher's.
-                                Root.Lamp {
-                                    id: rowLamp
-                                    visible: centre.look.slot === "lamp"
-                                    tokens: centre.theme.tokens
-                                    light: item.current ? "lit" : "unlit"
-                                    size: 7
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.topMargin: Math.round((centre.look.name.size * 1.3 - size) / 2)
-                                    Layout.preferredWidth: size
-                                    Layout.preferredHeight: size
-                                }
-
-                                Text {
-                                    visible: look.slot === "marker"
-                                    Layout.alignment: Qt.AlignTop
-                                    textFormat: Text.PlainText
-                                    text: "▸"
-                                    color: item.current ? look.cursor.marker : "transparent"
-                                    font.family: fonts.ui
-                                    font.pixelSize: 15
-                                }
 
                                 Column {
                                     Layout.fillWidth: true
@@ -526,7 +470,7 @@ Item {
                                     Row {
                                         visible: item.actionChips.length > 0
                                         topPadding: 6
-                                        spacing: look.legend("").chips ? 8 : 14
+                                        spacing: 8
 
                                         // Only the selected row draws chips, so they take the cursor row's colours.
                                         Repeater {
@@ -539,37 +483,17 @@ Item {
                                         }
                                     }
                                 }
-                                RowChip {
-                                    id: beforeChip
-                                    place: "beforeAge"
-                                    current: item.current
-                                    note: item.modelData.entry
-                                }
-                                // Blueprint's chip sits under the age.
-                                Column {
+                                Text {
+                                    id: ageLabel
                                     Layout.alignment: Qt.AlignTop
-                                    spacing: 8
-
-                                    Text {
-                                        id: ageLabel
-                                        x: parent.width - width
-                                        textFormat: Text.PlainText
-                                        text: look.ageText(centre.openedAt - item.modelData.entry.time)
-                                        color: item.current ? look.cursor.detail : c.muted
-                                        font.family: fonts.mono
-                                        font.pixelSize: 11
-                                    }
-                                    RowChip {
-                                        id: underChip
-                                        x: parent.width - width
-                                        place: "underAge"
-                                        current: item.current
-                                        note: item.modelData.entry
-                                    }
+                                    textFormat: Text.PlainText
+                                    text: look.ageText(centre.openedAt - item.modelData.entry.time)
+                                    color: item.current ? look.cursor.detail : c.muted
+                                    font.family: fonts.mono
+                                    font.pixelSize: 11
                                 }
                                 RowChip {
                                     id: afterChip
-                                    place: "afterAge"
                                     current: item.current
                                     note: item.modelData.entry
                                 }
@@ -638,14 +562,14 @@ Item {
 
                 Rule {}
 
-                // The keys as the launcher's legend draws them: chips in Artboard, tracked caps or brackets in the others.
+                // The keys as the launcher's legend draws them, in chips.
                 Flow {
                     Layout.fillWidth: true
-                    Layout.leftMargin: look.voice === "plain" ? 14 : look.voice === "bracket" ? 22 : 20
+                    Layout.leftMargin: 14
                     Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: look.voice === "plain" ? 10 : 12
-                    Layout.bottomMargin: look.voice === "bracket" ? 14 : Layout.topMargin
-                    spacing: look.legend("").chips ? 8 : 14
+                    Layout.topMargin: 10
+                    Layout.bottomMargin: Layout.topMargin
+                    spacing: 8
 
                     Repeater {
                         model: centre.legendKeys
@@ -662,15 +586,15 @@ Item {
         readonly property string drawn: modelData.key + " " + modelData.word
         property color keyColor: look.chip.key
         property color wordColor: c.muted
-        width: pair.implicitWidth + (look.legend("").chips ? 14 : 0)
-        height: pair.implicitHeight + (look.legend("").chips ? 6 : 0)
+        width: pair.implicitWidth + 14
+        height: pair.implicitHeight + 6
         radius: 6
         color: look.chip.fill
 
         Row {
             id: pair
             anchors.centerIn: parent
-            spacing: look.legend("").chips ? 6 : 5
+            spacing: 6
 
             Text {
                 textFormat: Text.PlainText
@@ -692,29 +616,22 @@ Item {
         }
     }
 
-    // A row's chip, in the place the theme gives it; a row about no file has none.
+    // A row's chip, after its age; a row about no file has none.
     component RowChip: Root.Island.FileChip {
-        property string place: ""
         property bool current: false
         property var note: null
         Layout.alignment: Qt.AlignVCenter
         width: implicitWidth
         height: implicitHeight
-        look: chipLook.rowPlace === place ? chipLook : null
+        look: chipLook
         at: current ? chipLook.cursor : chipLook.row
         files: note?.files ?? []
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }

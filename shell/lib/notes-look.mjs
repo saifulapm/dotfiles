@@ -1,7 +1,6 @@
 // How the Notes window draws under a token set, from its primitives and type, as the three Notes designs do.
 
 import { SHELF, displayText } from './notes.mjs';
-import { mark } from './voice.mjs';
 
 const TAG_ANSI = { red: 1, orange: 3, yellow: 11, green: 2, blue: 4, purple: 5 };
 
@@ -23,31 +22,23 @@ export function tabLabels(look, names, current) {
   return names.map((name) => {
     const shown = oneLine(name);
     const pinned = name === SHELF;
-    return { name, label: pinned ? (look.voice === 'bracket' ? shown.toUpperCase() : shown) : look.sectionLabel(shown), pinned, current: name === current };
+    return { name, label: pinned ? shown : look.sectionLabel(shown), pinned, current: name === current };
   });
 }
 
 // "13:55 · text", "15:08 · image", or the file's type: the small line under a Shelf card.
-export function cardMeta(note, voice) {
+export function cardMeta(note) {
   const d = new Date(note.createdAt);
   const time = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
   const first = note.attachments[0];
   const ext = first ? (first.name.match(/\.([A-Za-z0-9]+)$/) ?? [])[1] : '';
   const kind = !first ? 'text' : note.attachments.some((a) => a.mime.indexOf('image/') === 0) ? 'image' : ext ? ext.toUpperCase() : 'file';
-  const line = `${time} · ${kind}`;
-  return voice === 'plain' ? line : line.toUpperCase();
+  return `${time} · ${kind}`;
 }
 
-export function keyPairs(tokens, keys) {
-  const voice = tokens.type.voice;
-  return keys.map(([k, what]) => {
-    const key = voice === 'bracket' ? mark(tokens.type.engraved === true, k.toUpperCase()) : voice === 'caps' ? k.toUpperCase() : k;
-    const word = voice === 'plain' ? what : what.toUpperCase();
-    return word ? `${key} ${word}` : key;
-  });
-}
+export const keyPairs = (keys) => keys.map(([k, what]) => (what ? `${k} ${what}` : k));
 
-export const keyLine = (tokens, keys) => keyPairs(tokens, keys).join('  ');
+export const keyLine = (keys) => keyPairs(keys).join('  ');
 
 // Two hex colours mixed, a share of the second into the first.
 export function mix(a, b, share) {
@@ -56,48 +47,26 @@ export function mix(a, b, share) {
   return '#' + out.join('');
 }
 
+// Notes on the one design: square, a 1 px ink frame, the plain voice.
 export function notesLook(tokens) {
   const c = tokens.color;
   const t = tokens.type;
-  const p = tokens.primitive;
-  const voice = t.voice;
-  const round = p.corner === 'round';
-  const tint = mix(c.surface, c.paper, 0.3);
-  const engraved = t.engraved === true;
   return {
-    voice,
-    engraved,
-    keyHint: voice === 'bracket' ? mark(engraved, '⌃K') : '⌃K',
-    title:
-      voice === 'bracket'
-        ? { text: 'NOTES', font: t.mono, size: 11, bold: true, color: c.accent, spacing: 1.5 }
-        : voice === 'caps'
-          ? { text: 'Notes', font: t.display, size: 30, bold: false, color: c.ink, spacing: 0 }
-          : { text: 'Notes', font: t.ui, size: 17, bold: true, color: c.ink, spacing: 0 },
-    sectionLabel: (name) => (voice === 'bracket' ? `§${name.toUpperCase()}` : voice === 'caps' ? `§ ${name}` : `# ${name}`),
-    section: { font: voice === 'caps' ? t.display : t.ui, size: voice === 'caps' ? 20 : voice === 'bracket' ? 11 : 12, italic: voice === 'caps', color: voice === 'caps' ? c.muted : c.ink, pill: round ? mix(c.surface, c.paper, 0.45) : 'transparent' },
-    pinned: { text: voice === 'plain' ? 'Pinned' : 'PINNED', color: voice === 'bracket' ? c.danger : c.accent, fill: round ? mix(c.surface, c.accent, 0.1) : 'transparent', border: round ? 0 : 1 },
-    rule: { color: voice === 'bracket' ? c.line : c.ink, width: p.frame === 'none' ? 0 : 1, dashed: voice === 'bracket' },
-    strip: { color: voice === 'caps' ? c.ink : c.line, width: 1 },
-    separator: voice === 'bracket' ? (engraved ? '·' : '//') : '',
-    small: { font: t.mono, size: voice === 'plain' ? 11 : 10, color: c.muted, spacing: voice === 'plain' ? 0 : 1.2 },
-    body: { font: voice === 'plain' ? t.ui : t.mono, size: voice === 'plain' ? 14 : 13, color: c.ink, done: c.muted },
-    composer: { font: voice === 'caps' ? t.display : voice === 'plain' ? t.ui : t.mono, size: voice === 'caps' ? 20 : 14, italic: voice === 'caps', prompt: voice === 'bracket' ? '>' : '', placeholder: voice === 'bracket' ? 'add a note or a prompt' : 'Add a note or a prompt…', fill: round ? tint : 'transparent', radius: round ? 12 : 0 },
-    checkbox: voice === 'bracket' && !engraved ? 'brackets' : 'circle',
-    radius: round ? 12 : 0,
-    // The selected card is outlined in the accent in every theme; the rest follow the frame primitive.
+    keyHint: '⌃K',
+    title: { text: 'Notes', font: t.ui, size: 17, bold: true, color: c.ink, spacing: 0 },
+    sectionLabel: (name) => `# ${name}`,
+    section: { font: t.ui, size: 12, italic: false, color: c.ink, pill: 'transparent' },
+    pinned: { text: 'Pinned', color: c.accent, fill: 'transparent', border: 1 },
+    rule: { color: c.ink, width: 1 },
+    strip: { color: c.line, width: 1 },
+    separator: '',
+    small: { font: t.mono, size: 11, color: c.muted, spacing: 0 },
+    body: { font: t.ui, size: 14, color: c.ink, done: c.muted },
+    composer: { font: t.ui, size: 14, italic: false, prompt: '', placeholder: 'Add a note or a prompt…', fill: 'transparent', radius: 0 },
+    radius: 0,
+    // The selected card is outlined 2 px in the accent; the rest in ink, or the line colour once done.
     card(selected, done) {
-      const width = selected ? (p.frame === 'glow' ? 1 : 2) : p.frame === 'none' ? 0 : 1;
-      const color = selected ? c.accent : done ? c.line : p.frame === 'glow' ? c.line : c.ink;
-      return {
-        // Opaque, so a hard shadow drawn behind shows only at its offset.
-        fill: round && !selected ? tint : c.surface,
-        border: { width, color },
-        shadow: selected && p.shadow === 'hard-offset' ? { x: 4, y: 4, color: c.accent } : null,
-        dashed: !selected && done && voice === 'bracket',
-        glow: selected && p.frame === 'glow',
-        ticks: selected && p.corner === 'cut',
-      };
+      return { fill: c.surface, border: { width: selected ? 2 : 1, color: selected ? c.accent : done ? c.line : c.ink } };
     },
   };
 }

@@ -1,6 +1,5 @@
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import QtQuick
 import QtQuick.Shapes
 import "lib/notes.mjs" as N
@@ -55,16 +54,8 @@ FloatingWindow {
     visible: shown
     implicitWidth: 420
     implicitHeight: 810
-    // A theme that blurs draws the window as glass and asks niri to blur behind its box; niri draws the border and corner.
-    readonly property bool glass: theme.tokens ? theme.tokens.niri.blur === true : false
-    color: glass ? c.glass : c.surface ?? "white"
-    BackgroundEffect.blurRegion: glass ? windowRegion : null
-
-    Region {
-        id: windowRegion
-        item: win.contentItem
-        radius: 10
-    }
+    // niri draws the border and corner.
+    color: c.surface ?? "white"
 
     // Mod+N: hidden → shown, shown → focused, focused → hidden with focus back where it was.
     function toggle() {
@@ -270,7 +261,6 @@ FloatingWindow {
         return {
             open: shown,
             fill: String(color),
-            blurRegion: glass ? [{ x: 0, y: 0, w: contentItem.width, h: contentItem.height, radius: windowRegion.radius }] : [],
             focused,
             pinned,
             mode,
@@ -281,7 +271,6 @@ FloatingWindow {
             drawnTabs: Array.from({ length: tabRepeater.count }, (_, i) => ({ text: tabRepeater.itemAt(i).drawn, current: tabRepeater.itemAt(i).modelData.current, pinned: tabRepeater.itemAt(i).modelData.pinned })),
             placeholder: placeholder.visible ? placeholder.text : null,
             keyHint: keyHint.text,
-            checkbox: look ? look.checkbox : null,
             metas: cards.map((_, i) => list.itemAtIndex(i)?.metaText ?? null),
             selected: current ? current.id : null,
             cards: cards.map(n => n.id),
@@ -353,15 +342,6 @@ FloatingWindow {
                 font.letterSpacing: win.look ? win.look.title.spacing : 0
             }
 
-            Text {
-                id: separator
-                visible: text !== ""
-                anchors.verticalCenter: parent.verticalCenter
-                textFormat: Text.PlainText
-                text: win.look ? win.look.separator : ""
-                color: win.c.muted ?? "gray"
-                font: titleText.font
-            }
 
             Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
@@ -374,7 +354,7 @@ FloatingWindow {
                     id: sectionText
                     anchors.centerIn: parent
                     // A long section name is cut short, so the key hint and the pinned mark keep their place.
-                    width: Math.min(implicitWidth, header.width - titleText.width - (separator.visible ? separator.width + header.spacing : 0) - keyHint.width - 2 * header.spacing - 18)
+                    width: Math.min(implicitWidth, header.width - titleText.width - keyHint.width - 2 * header.spacing - 18)
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
                     text: win.look ? win.look.sectionLabel(win.store.activeSection) : win.store.activeSection
@@ -389,7 +369,7 @@ FloatingWindow {
                 id: keyHint
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: win.look ? win.look.keyHint : "⌃K"
+                text: "⌃K"
                 color: win.c.muted ?? "gray"
                 font.family: win.fonts.mono ?? ""
                 font.pixelSize: 10
@@ -404,7 +384,6 @@ FloatingWindow {
             anchors.rightMargin: 18
             width: pinnedText.implicitWidth + 14
             height: pinnedText.implicitHeight + 6
-            radius: win.look && win.look.pinned.border === 0 ? 8 : 0
             color: win.look ? win.look.pinned.fill : "transparent"
             border.width: win.look ? win.look.pinned.border : 1
             border.color: win.look ? win.look.pinned.color : "red"
@@ -415,9 +394,8 @@ FloatingWindow {
                 textFormat: Text.PlainText
                 text: win.look ? win.look.pinned.text : "PINNED"
                 color: win.look ? win.look.pinned.color : "red"
-                font.family: win.look && win.look.voice === "plain" ? win.fonts.ui : win.fonts.mono ?? ""
-                font.pixelSize: win.look && win.look.voice === "plain" ? 12 : 10
-                font.letterSpacing: win.look && win.look.voice === "plain" ? 0 : 1.4
+                font.family: win.fonts.ui ?? ""
+                font.pixelSize: 12
             }
         }
 
@@ -427,13 +405,7 @@ FloatingWindow {
             anchors.topMargin: 12
             width: parent.width
             height: win.look ? win.look.rule.width : 1
-            color: win.look && !win.look.rule.dashed ? win.look.rule.color : "transparent"
-
-            Root.Dashed {
-                visible: win.look ? win.look.rule.dashed : false
-                anchors.fill: parent
-                color: win.look ? win.look.rule.color : "black"
-            }
+            color: win.look ? win.look.rule.color : "black"
         }
 
         // On Shelf, the sections as a row of tabs, Shelf pinned first and the current one in ink. It only shows them; Ctrl+K still switches, and Tab stays between the list and the composer.
@@ -539,7 +511,7 @@ FloatingWindow {
             anchors.topMargin: 8
             anchors.bottom: composerBox.top
             anchors.bottomMargin: 12
-            // The list clips at its edge, so a margin keeps a selected card's glow, ticks and shadow inside it.
+            // The list clips at its edge, so a margin keeps a selected card's 2 px outline inside it.
             x: 8
             width: parent.width - 16
             leftMargin: 8
@@ -577,26 +549,7 @@ FloatingWindow {
                     return out;
                 }
                 width: ListView.view.width - 16
-                height: content.implicitHeight + 24 + (style && style.shadow ? style.shadow.y : 0)
-
-                Rectangle {
-                    visible: !!(card.style && card.style.shadow)
-                    x: card.style && card.style.shadow ? card.style.shadow.x : 0
-                    y: card.style && card.style.shadow ? card.style.shadow.y : 0
-                    width: frame.width
-                    height: frame.height
-                    color: card.style && card.style.shadow ? card.style.shadow.color : "transparent"
-                }
-
-                // Blueprint's selected card glows and carries corner ticks, as its design draws them.
-                Rectangle {
-                    visible: !!(card.style && card.style.glow)
-                    anchors.fill: frame
-                    anchors.margins: -3
-                    color: "transparent"
-                    border.width: 3
-                    border.color: Qt.alpha(win.c.accent ?? "cyan", 0.25)
-                }
+                height: content.implicitHeight + 24
 
                 Rectangle {
                     id: frame
@@ -604,49 +557,14 @@ FloatingWindow {
                     height: content.implicitHeight + 24
                     radius: win.look ? win.look.radius : 0
                     color: card.style ? card.style.fill : "transparent"
-                    border.width: card.style && !card.style.dashed ? card.style.border.width : 0
+                    border.width: card.style ? card.style.border.width : 0
                     border.color: card.style ? card.style.border.color : "black"
-
-                    Root.Dashed {
-                        visible: !!(card.style && card.style.dashed)
-                        anchors.fill: parent
-                        frame: true
-                        color: card.style ? card.style.border.color : "black"
-                    }
 
                     Rectangle {
                         anchors.fill: parent
                         radius: parent.radius
                         visible: win.marked.indexOf(card.modelData.id) >= 0
                         color: Qt.alpha(win.c.accent ?? "red", 0.12)
-                    }
-
-                    // An L at each corner, opening inward: [left, top] says which sides it sits on.
-                    Repeater {
-                        model: card.style && card.style.ticks ? [[true, true], [false, true], [true, false], [false, false]] : []
-
-                        Item {
-                            id: tick
-                            required property var modelData
-                            x: tick.modelData[0] ? -6 : frame.width - 4
-                            y: tick.modelData[1] ? -6 : frame.height - 4
-                            width: 10
-                            height: 10
-
-                            Rectangle {
-                                x: tick.modelData[0] ? 0 : 9
-                                width: 1
-                                height: 10
-                                color: win.c.accent ?? "cyan"
-                            }
-
-                            Rectangle {
-                                y: tick.modelData[1] ? 0 : 9
-                                width: 10
-                                height: 1
-                                color: win.c.accent ?? "cyan"
-                            }
-                        }
                     }
                 }
 
@@ -673,15 +591,15 @@ FloatingWindow {
                     height: 13
 
                     Rectangle {
-                        visible: win.look && win.look.checkbox === "circle" && card.modelData.todo
+                        visible: card.modelData.todo
                         anchors.fill: parent
                         radius: width / 2
-                        color: card.modelData.done ? (win.look && win.look.voice === "plain" ? win.c.accent : win.c.ink) ?? "black" : "transparent"
+                        color: card.modelData.done ? win.c.accent ?? "black" : "transparent"
                         border.width: card.modelData.done ? 0 : 1.5
                         border.color: win.c.ink ?? "black"
 
                         Text {
-                            visible: card.modelData.done && win.look && win.look.voice === "plain"
+                            visible: card.modelData.done
                             anchors.centerIn: parent
                             textFormat: Text.PlainText
                             text: "✓"
@@ -690,21 +608,11 @@ FloatingWindow {
                             font.bold: true
                         }
                     }
-
-                    Text {
-                        visible: win.look && win.look.checkbox === "brackets" && card.modelData.todo
-                        anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        text: card.modelData.done ? "[x]" : "[ ]"
-                        color: card.modelData.done ? win.c.accent ?? "cyan" : win.c.muted ?? "gray"
-                        font.family: win.fonts.mono ?? ""
-                        font.pixelSize: 13
-                    }
                 }
 
                 Column {
                     id: content
-                    x: card.modelData.todo ? (win.look && win.look.checkbox === "brackets" ? 48 : 39) : 14
+                    x: card.modelData.todo ? 39 : 14
                     y: 12
                     width: frame.width - x - 14
                     spacing: 8
@@ -747,7 +655,7 @@ FloatingWindow {
                             required property var modelData
                             readonly property var offer: chipOffer.Drag.mimeData
                             textFormat: Text.PlainText
-                            text: (win.look && win.look.voice !== "plain" ? modelData.name.toUpperCase() : modelData.name) + " · " + Math.max(1, Math.round(modelData.size / 1024)) + " KB"
+                            text: modelData.name + " · " + Math.max(1, Math.round(modelData.size / 1024)) + " KB"
                             color: win.c.muted ?? "gray"
                             font.family: win.fonts.mono ?? ""
                             font.pixelSize: win.look ? win.look.small.size : 10
@@ -772,7 +680,7 @@ FloatingWindow {
                     Text {
                         visible: card.isSelected && card.images.length > 0
                         textFormat: Text.PlainText
-                        text: win.look ? L.keyLine(win.theme.tokens, [["y", "text"], ["⇧Y", "image"]]) : ""
+                        text: win.look ? L.keyLine([["y", "text"], ["⇧Y", "image"]]) : ""
                         color: win.c.accent ?? "red"
                         font.family: win.fonts.mono ?? ""
                         font.pixelSize: win.look ? win.look.small.size : 10
@@ -783,7 +691,7 @@ FloatingWindow {
                         id: meta
                         visible: win.onShelf
                         textFormat: Text.PlainText
-                        text: win.onShelf && win.look ? L.cardMeta(card.modelData, win.look.voice) : ""
+                        text: win.onShelf && win.look ? L.cardMeta(card.modelData) : ""
                         color: win.c.muted ?? "gray"
                         font.family: win.fonts.mono ?? ""
                         font.pixelSize: win.look ? win.look.small.size : 10
@@ -819,7 +727,7 @@ FloatingWindow {
             width: parent.width - 36
             elide: Text.ElideRight
             textFormat: Text.PlainText
-            text: win.query ? "" : win.look ? L.keyLine(win.theme.tokens, L.EMPTY_KEYS) : ""
+            text: win.query ? "" : win.look ? L.keyLine(L.EMPTY_KEYS) : ""
             color: win.c.muted ?? "gray"
             font.family: win.fonts.mono ?? ""
             font.pixelSize: win.look ? win.look.small.size : 10
@@ -891,16 +799,9 @@ FloatingWindow {
             color: win.look ? win.look.composer.fill : "transparent"
 
             Rectangle {
-                visible: win.look ? win.look.composer.radius === 0 : true
                 width: parent.width
                 height: win.look ? win.look.rule.width : 1
-                color: win.look && !win.look.rule.dashed ? win.look.rule.color : "transparent"
-
-                Root.Dashed {
-                    visible: win.look ? win.look.rule.dashed : false
-                    anchors.fill: parent
-                    color: win.look ? win.look.rule.color : "black"
-                }
+                color: win.look ? win.look.rule.color : "black"
             }
 
             Column {
@@ -914,18 +815,10 @@ FloatingWindow {
                     width: parent.width
                     spacing: 8
 
-                    Text {
-                        id: prompt
-                        visible: text !== ""
-                        textFormat: Text.PlainText
-                        text: win.look ? win.look.composer.prompt : ""
-                        color: win.c.accent ?? "cyan"
-                        font: composer.font
-                    }
 
                     TextEdit {
                         id: composer
-                        width: parent.width - (prompt.visible ? prompt.width + 8 : 0)
+                        width: parent.width
                         textFormat: TextEdit.PlainText
                         wrapMode: TextEdit.Wrap
                         color: win.c.ink ?? "black"
@@ -972,7 +865,7 @@ FloatingWindow {
                     width: parent.width
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
-                    text: win.look ? L.keyLine(win.theme.tokens, L.COMPOSER_KEYS) : ""
+                    text: win.look ? L.keyLine(L.COMPOSER_KEYS) : ""
                     color: win.c.muted ?? "gray"
                     font.family: win.fonts.mono ?? ""
                     font.pixelSize: win.look ? win.look.small.size : 10
@@ -1003,7 +896,7 @@ FloatingWindow {
                 spacing: 10
 
                 Repeater {
-                    model: win.look ? L.keyPairs(win.theme.tokens, L.KEYS) : []
+                    model: win.look ? L.keyPairs(L.KEYS) : []
 
                     Text {
                         required property string modelData

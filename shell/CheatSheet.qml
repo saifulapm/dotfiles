@@ -25,8 +25,6 @@ Item {
     property real openT0: -1
 
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the sheet draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: V.listLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
@@ -86,9 +84,7 @@ Item {
             settled: motion.settled,
             drawing: sheet.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
-            heading: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
-            headingKind: look.label.kind,
+            heading: pill.text,
             ruleBox: { x: r.x, y: r.y, w: topRule.width, h: topRule.height },
             rowKeys: rowKeys,
             legend: legend.map(p => p.keyLabel + " " + p.wordLabel).join("  "),
@@ -147,53 +143,15 @@ Item {
                 anchors.fill: parent
                 spacing: 0
 
-                // Blueprint names the sheet on a line of its own, as the launcher names its mode.
-                RowLayout {
-                    visible: look.label.kind === "header"
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 24
-                    Layout.rightMargin: 24
-                    Layout.topMargin: 12
-
-                    Text {
-                        id: header
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        text: look.heading("keys", "")
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
-                }
-
                 RowLayout {
                     Layout.fillWidth: true
                     Layout.leftMargin: 24
                     Layout.rightMargin: 24
-                    Layout.topMargin: look.label.kind === "header" ? 8 : 18
+                    Layout.topMargin: 18
                     Layout.bottomMargin: 14
                     spacing: 14
 
                     Rectangle {
-                        visible: look.label.kind === "chip"
-                        implicitWidth: chip.implicitWidth + 14
-                        implicitHeight: chip.implicitHeight + 6
-                        color: look.label.fill
-                        Text {
-                            id: chip
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: look.heading("keys", "")
-                            color: look.label.color
-                            font.family: fonts.ui
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.4
-                        }
-                    }
-
-                    Rectangle {
-                        visible: look.label.kind === "pill"
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: pill.implicitHeight + 6
                         radius: 8
@@ -238,7 +196,7 @@ Item {
                         }
                     }
                     Row {
-                        spacing: look.legend("").chips ? 8 : 14
+                        spacing: 8
                         Repeater {
                             model: look.keys([["/", "filter"], ["esc", "close"]])
                             KeyPair {}
@@ -351,18 +309,18 @@ Item {
 
                 Rule {}
 
-                // The keys every surface shares, in the launcher's legend: chips in Artboard.
+                // The keys every surface shares, in the launcher's legend chips.
                 Flow {
                     Layout.fillWidth: true
-                    Layout.leftMargin: look.voice === "plain" ? 14 : 24
+                    Layout.leftMargin: 14
                     Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: look.voice === "plain" ? 10 : 12
+                    Layout.topMargin: 10
                     Layout.bottomMargin: Layout.topMargin
-                    spacing: look.legend("").chips ? 8 : 14
+                    spacing: 8
 
                     Text {
                         textFormat: Text.PlainText
-                        height: look.legend("").chips ? implicitHeight + 6 : implicitHeight
+                        height: implicitHeight + 6
                         verticalAlignment: Text.AlignVCenter
                         text: look.tabText("inside every surface")
                         color: c.muted
@@ -381,22 +339,22 @@ Item {
         }
     }
 
-    // One key and its word as the launcher's legend draws them: a chip in Artboard, tracked caps in Paper, brackets in Blueprint.
+    // One key and its word as the launcher's legend draws them, in a chip.
     component KeyPair: Rectangle {
         id: keyPair
         required property var modelData
         readonly property string keyLabel: keyText.text
         readonly property string wordLabel: wordText.text
         readonly property real wordSpacing: wordText.font.letterSpacing
-        width: pairRow.implicitWidth + (look.legend("").chips ? 14 : 0)
-        height: pairRow.implicitHeight + (look.legend("").chips ? 6 : 0)
+        width: pairRow.implicitWidth + 14
+        height: pairRow.implicitHeight + 6
         radius: 6
         color: look.chip.fill
 
         Row {
             id: pairRow
             anchors.centerIn: parent
-            spacing: look.legend("").chips ? 6 : 5
+            spacing: 6
 
             Text {
                 id: keyText
@@ -420,16 +378,10 @@ Item {
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }

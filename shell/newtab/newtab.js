@@ -1,5 +1,5 @@
 // Chromium's new-tab page: the date, a search field with focus, and the six most visited sites.
-import { dateLines, readQuery, siteRows, digitSite, words } from './words.mjs';
+import { dateLines, readQuery, siteRows, digitSite, WORDS } from './words.mjs';
 
 // Chromium hands an overridden new tab's keys to its address bar; a tab the page opens itself takes them, so the first load only swaps itself for one.
 if (!location.search) {
@@ -19,11 +19,10 @@ function swap(tab, tries) {
 }
 
 function draw() {
-  const voice = document.documentElement.dataset.voice;
-  const w = words(voice, document.documentElement.dataset.engraved === 'true');
+  const w = WORDS;
   const q = document.getElementById('q');
   const sites = document.getElementById('sites');
-  const { day, date } = dateLines(voice, new Date());
+  const { day, date } = dateLines(new Date());
   document.getElementById('day').textContent = day;
   document.getElementById('date').textContent = date;
   q.placeholder = w.placeholder;
@@ -44,7 +43,7 @@ function draw() {
   const open = (url) => location.assign(url);
 
   chrome.topSites.get((top) => {
-    rows = siteRows(top, voice);
+    rows = siteRows(top);
     for (const r of rows) {
       const a = document.createElement('a');
       a.className = 'row';

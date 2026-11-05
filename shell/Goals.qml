@@ -3,7 +3,6 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/goals.mjs" as G
 import "lib/goals-view.mjs" as V
-import "lib/surface.mjs" as S
 
 // Active goals in your order with their tasks, then the done group; drawn in the Surfaces window, saved through the goals service.
 Item {
@@ -32,13 +31,7 @@ Item {
     readonly property var row: list[selected] ?? null
     readonly property int count: G.activeGoals(store).length
     readonly property var c: theme.color
-    // A warning's colour: danger, or in Frost ink after a danger dot.
-    readonly property var warn: theme.tokens ? V.warnLook(theme.tokens) : ({ color: c.danger, dot: "" })
-    // In a theme that blurs, the panel's box is the one region the Surfaces window asks niri to blur while Goals draws.
-    readonly property var blurRegion: panel.glass && visible ? panel.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property bool caps: S.marginStyle(theme.tokens).caps
-    readonly property bool capsTitles: theme.tokens ? theme.tokens.type.voice === "bracket" : false
     readonly property Root.Motion motion: Root.Motion {
         shown: view.shown
         tokens: view.theme.tokens
@@ -87,10 +80,9 @@ Item {
             hint: count === 0 ? "n to add a goal" : "",
             prompt: prompt ? { kind: prompt.kind, text: input.text, error: prompt.error } : null,
             confirm: confirm,
-            // The drawn warnings: the selected goal's due date, and the confirm label with its dot.
-            warn: view.warn,
+            // The drawn warnings: the selected goal's due date, and the confirm label.
             due: selBlock ? selBlock.drawnDue() : null,
-            confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), dot: promptDot.visible ? box(promptDot) : null, box: box(promptLabel) } : null,
+            confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), box: box(promptLabel) } : null,
             openMs: openMs,
             opens: opens,
             motion: motion.curves?.kind ?? null,
@@ -98,7 +90,6 @@ Item {
             settled: motion.settled,
             drawing: view.visible,
             cardBox: panel.drawnBox(),
-            blurRegion: blurRegion ? [panel.regionBox()] : [],
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: view.Window.active
         });
@@ -295,7 +286,6 @@ Item {
                         color: c.ink
                         font.family: fonts.display
                         font.pixelSize: 28
-                        font.capitalization: view.capsTitles ? Font.AllUppercase : Font.MixedCase
                     }
                     Text {
                         textFormat: Text.PlainText
@@ -346,7 +336,7 @@ Item {
                             readonly property var parts: head.kind === "goal" ? head.count.split("/").map(Number) : [0, 0]
                             // The due date as drawn, for state().
                             function drawnDue() {
-                                return { text: dueText.text, color: String(dueText.color), box: view.box(dueText), dot: dueDot.visible ? view.box(dueDot) : null };
+                                return { text: dueText.text, color: String(dueText.color), box: view.box(dueText) };
                             }
                             Layout.fillWidth: true
                             implicitHeight: inner.implicitHeight + 24
@@ -374,7 +364,6 @@ Item {
                                         color: block.head.kind === "goal" && !block.head.done ? c.ink : c.muted
                                         font.family: block.head.kind === "done" ? fonts.mono : fonts.display
                                         font.pixelSize: block.head.kind === "done" ? 11 : 18
-                                        font.capitalization: block.head.kind === "done" ? (view.caps ? Font.AllUppercase : Font.MixedCase) : view.capsTitles ? Font.AllUppercase : Font.MixedCase
                                         font.letterSpacing: block.head.kind === "done" ? 1.2 : 0
                                     }
                                     Text {
@@ -385,26 +374,14 @@ Item {
                                         font.family: fonts.mono
                                         font.pixelSize: 12
                                     }
-                                    Rectangle {
-                                        id: dueDot
-                                        visible: block.head.kind === "goal" && block.sel && view.warn.dot !== "" && (block.head.due ?? "") !== ""
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Layout.rightMargin: -4
-                                        implicitWidth: 6
-                                        implicitHeight: 6
-                                        radius: 3
-                                        color: view.warn.dot || "transparent"
-                                    }
                                     Text {
                                         id: dueText
                                         visible: block.head.kind === "goal"
                                         textFormat: Text.PlainText
                                         text: block.head.due ?? ""
-                                        color: block.sel ? view.warn.color : c.muted
+                                        color: block.sel ? c.danger : c.muted
                                         font.family: fonts.mono
                                         font.pixelSize: 12
-                                        font.capitalization: view.caps ? Font.AllUppercase : Font.MixedCase
-                                        font.letterSpacing: view.caps ? 1.2 : 0
                                     }
                                 }
 
@@ -456,21 +433,11 @@ Item {
                     Layout.bottomMargin: 12
                     spacing: 10
 
-                    Rectangle {
-                        id: promptDot
-                        visible: view.confirm && view.warn.dot !== ""
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.rightMargin: -4
-                        implicitWidth: 6
-                        implicitHeight: 6
-                        radius: 3
-                        color: view.warn.dot || "transparent"
-                    }
                     Text {
                         id: promptLabel
                         textFormat: Text.PlainText
                         text: view.confirm ? "delete? y" : !view.prompt ? "" : view.prompt.kind === "deadline" ? "deadline (3d, 5h, 2026-10-21 or empty)" : view.prompt.kind === "task" ? "task" : "goal"
-                        color: view.confirm ? view.warn.color : c.muted
+                        color: view.confirm ? c.danger : c.muted
                         font.family: fonts.ui
                         font.pixelSize: 13
                     }
@@ -492,20 +459,11 @@ Item {
                             event.accepted = true;
                         }
                     }
-                    Rectangle {
-                        visible: (view.prompt?.error ?? "") !== "" && view.warn.dot !== ""
-                        Layout.alignment: Qt.AlignVCenter
-                        Layout.rightMargin: -4
-                        implicitWidth: 6
-                        implicitHeight: 6
-                        radius: 3
-                        color: view.warn.dot || "transparent"
-                    }
                     Text {
                         visible: (view.prompt?.error ?? "") !== ""
                         textFormat: Text.PlainText
                         text: view.prompt?.error ?? ""
-                        color: view.warn.color
+                        color: c.danger
                         font.family: fonts.ui
                         font.pixelSize: 12
                     }
