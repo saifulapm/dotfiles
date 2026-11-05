@@ -76,13 +76,13 @@ test("Artboard's island note reads at 4.5:1 or more against the island's own fil
   assert.deepEqual(ratios, [7.6, 17.94, 11.35]);
 });
 
-test("every scheme's island note, lease and toast read at 4.5:1 or more against the island's own fill", () => {
+test("every scheme's island note, lease, toast and media controls read at 4.5:1 or more against the island's own fill", () => {
   for (const n of SCHEMES) {
     const t = schemeTokens(n);
     const fill = solid(surfaceStyle(t, 'island').fill);
     const note = islandLook(t);
-    for (const part of ['head', 'summary', 'body']) {
-      const ratio = contrast(solid(note[part].color), fill);
+    for (const part of ['head', 'summary', 'body', 'control']) {
+      const ratio = contrast(solid(note[part]?.color), fill);
       assert.ok(ratio >= 4.5, `${n} ${part} ${note[part].color} on ${fill}: ${ratio.toFixed(2)}`);
     }
   }

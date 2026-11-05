@@ -115,7 +115,7 @@ export function launcherLook(tokens) {
   };
 }
 
-// How the island draws a notification; every colour not named here is the island's own text colour.
+// How the island draws a notification and the media card's controls; every colour not named here is the island's own text colour.
 export function islandLook(tokens) {
   const t = (tokens || UNTHEMED).type;
   return {
@@ -129,6 +129,8 @@ export function islandLook(tokens) {
     head: { font: t.ui, size: 12, spacing: 0, color: plainTones(tokens).island.head },
     summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: plainTones(tokens).island.summary },
     body: { font: t.ui, size: 13, color: plainTones(tokens).island.body },
+    // The media card's previous, play/pause and next, in the body's tone, which every scheme keeps at 4.5:1 on the island.
+    control: { color: plainTones(tokens).island.body },
     tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
   };
 }

@@ -1801,7 +1801,7 @@ PanelWindow {
                                 required property var modelData
                                 textFormat: Text.PlainText
                                 text: modelData.text
-                                color: island.theme.tokens?.color.accent ?? box.style.text
+                                color: island.noteLook.control.color
                                 font.family: island.theme.tokens?.type.mono ?? ""
                                 font.pixelSize: 13
 

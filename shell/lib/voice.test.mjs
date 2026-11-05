@@ -100,6 +100,7 @@ test("the notification has a 40 px rounded tile, the app and now in the island's
     head: { font: 'Maple Mono', size: 12, spacing: 0, color: '#A3A9B4' },
     summary: { font: 'Maple Mono', size: 15, weight: 600, spacing: 0, color: '#FFFFFF' },
     body: { font: 'Maple Mono', size: 13, color: '#C9CED6' },
+    control: { color: '#C9CED6' },
     tile: { size: 40, radius: 12, fill: '#2B2F36' },
   });
   for (const n of SCHEMES) {
