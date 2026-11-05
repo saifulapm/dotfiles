@@ -569,18 +569,10 @@ FloatingWindow {
                 }
 
                 // The body drags its text alone, so an input it is dropped on gets the text, whatever is attached.
-                MouseArea {
+                Root.DragOut {
                     id: bodyDrag
                     anchors.fill: frame
-                    drag.target: bodyOffer
-                }
-
-                Item {
-                    id: bodyOffer
-                    Drag.active: bodyDrag.drag.active
-                    Drag.dragType: Drag.Automatic
-                    Drag.supportedActions: Qt.CopyAction
-                    Drag.mimeData: N.dragOffer(card.modelData)
+                    mime: N.dragOffer(card.modelData)
                 }
 
                 Item {
@@ -653,7 +645,7 @@ FloatingWindow {
                         Text {
                             id: chip
                             required property var modelData
-                            readonly property var offer: chipOffer.Drag.mimeData
+                            readonly property var offer: chipDrag.mime
                             textFormat: Text.PlainText
                             text: modelData.name + " · " + Math.max(1, Math.round(modelData.size / 1024)) + " KB"
                             color: win.c.muted ?? "gray"
@@ -661,18 +653,10 @@ FloatingWindow {
                             font.pixelSize: win.look ? win.look.small.size : 10
                             font.letterSpacing: win.look ? win.look.small.spacing : 0
 
-                            MouseArea {
+                            Root.DragOut {
                                 id: chipDrag
                                 anchors.fill: parent
-                                drag.target: chipOffer
-                            }
-
-                            Item {
-                                id: chipOffer
-                                Drag.active: chipDrag.drag.active
-                                Drag.dragType: Drag.Automatic
-                                Drag.supportedActions: Qt.CopyAction
-                                Drag.mimeData: N.chipOffer(chip.modelData, win.notes.attachments)
+                                mime: N.chipOffer(chip.modelData, win.notes.attachments)
                             }
                         }
                     }

@@ -163,8 +163,8 @@ PanelWindow {
     readonly property var keyLook: V.listLook(theme.tokens)
     property var noteChips: []
     onHeldNotificationChanged: noteChips = heldNotification && notifs.live[heldNotification.key] ? N.chipsOf(heldNotification.actions) : []
-    // True from a drag's start to its drop; the toast holds while it is. Drag.active falls as the platform drag takes the pointer, so its start and finish set this.
-    property bool noteDragging: false
+    // True from a drag's start to its drop; the toast holds while it is.
+    readonly property bool noteDragging: noteArea.dragging
     // The notification's hold waits while the pointer is on the box, Mod+I focuses it or a drag holds it.
     readonly property bool noteHeld: mode === "notification" && (noteArea.containsMouse || focused || noteDragging)
     onNoteHeldChanged: notifs.pause(noteHeld)
@@ -2481,7 +2481,7 @@ PanelWindow {
         }
 
         // A click opens a notification and a right click puts it away; the keyboard does the same through Mod+I.
-        MouseArea {
+        Root.DragOut {
             id: noteArea
             anchors.fill: parent
             enabled: island.mode === "notification"
@@ -2501,26 +2501,15 @@ PanelWindow {
             }
             // A file notification drags from its chip only; one with no file drags its body from anywhere.
             property bool onChip: false
+            readonly property var payload: N.dragPayload(island.heldNotification ?? { body: "" })
             onPressed: mouse => {
                 onChip = columnChip.visible && columnChip.contains(columnChip.mapFromItem(noteArea, mouse.x, mouse.y));
                 if (onChip)
                     noteFace.grab();
             }
-            drag.target: noteOffer
-        }
-
-        Item {
-            id: noteOffer
-            readonly property var payload: N.dragPayload(island.heldNotification ?? { body: "" })
-            Drag.active: noteArea.drag.active && (noteArea.onChip || payload.mime === "text/plain")
-            Drag.dragType: Drag.Automatic
-            Drag.supportedActions: Qt.CopyAction
-            Drag.mimeData: ({ [payload.mime]: payload.data })
-            Drag.imageSource: payload.mime === "text/uri-list" ? noteFace.url : ""
-            Drag.hotSpot.x: -14
-            Drag.hotSpot.y: -18
-            Drag.onDragStarted: island.noteDragging = true
-            Drag.onDragFinished: island.noteDragging = false
+            offering: onChip || payload.mime === "text/plain"
+            mime: ({ [payload.mime]: payload.data })
+            image: payload.mime === "text/uri-list" ? noteFace.url : ""
         }
 
         Item {
