@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A click on the mic slot focuses the recording app's window: the window of the recording process or its nearest parent, and of two windows of that process, the one focused last; a recorder with no window changes no focus.
+# A click on the mic slot focuses the recording app's window: the window of the recording process or its nearest parent, and of two windows of that process, the one focused last; a recorder with no window changes no focus, whatever process its stream claims.
 {
 export DOTS_DEV_WIREPLUMBER=1
 source "$(dirname "$0")/lib.sh"
@@ -69,19 +69,25 @@ click_island
 until_ok 2000 focused_is one
 check "after the other window had the focus last, the click focuses that one ($(focused_title))" focused_is one
 
-# A recorder with no window of its own, or of a parent's, leaves the focus where it is.
+# A recorder with no window of its own, or of a parent's, leaves the focus where it is, though its stream claims other's process.
 niri msg action close-window --id "$(win_id one)"
 niri msg action close-window --id "$(win_id two)"
 until_ok 3000 bash -c "! niri msg -j windows | jq -e 'any(.[]; .title == \"two\")' >/dev/null"
-kill "$server" "$(pw-dump 2>/dev/null | jq -r 'first(.[] | select(.info.props["node.name"]? == "test-chromium") | .info.props["application.process.id"])')" 2>/dev/null
+# shellcheck disable=SC2046
+kill $(pgrep -P "$server") "$server" 2>/dev/null
 until_ok 3000 mode_is rest
-pw-record -P '{ application.name = Loner node.name = test-loner }' --raw - >/dev/null 2>&1 &
+check "the foot server's recorder has ended ($(island | jq -r .text))" mode_is rest
+niri msg action spawn -- foot -c /dev/null -T plain
+until_ok 5000 has_win plain
+other_pid=$(niri msg -j windows | jq -r 'first(.[] | select(.title == "other") | .pid)')
+pw-record -P "{ application.name = Loner node.name = test-loner application.process.id = $other_pid }" --raw - >/dev/null 2>&1 &
 rec=$!
 until_ok 3000 reads "● MIC · Loner"
-focus other
+check "a windowless recorder claiming other's process reads ● MIC · Loner ($(island | jq -r .text))" reads "● MIC · Loner"
+focus plain
 click_island
-until_ok 1000 bash -c "! [ \"\$(niri msg -j windows | jq -r 'first(.[] | select(.is_focused) | .title) // \"\"')\" = other ]"
-check "a click on a recorder with no window keeps the focus on other ($(focused_title))" focused_is other
+until_ok 1000 bash -c "! [ \"\$(niri msg -j windows | jq -r 'first(.[] | select(.is_focused) | .title) // \"\"')\" = plain ]"
+check "a click on it keeps the focus on plain, not the claimed other ($(focused_title))" focused_is plain
 
 exit $((fails > 0))
 }

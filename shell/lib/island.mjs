@@ -73,11 +73,8 @@ export function micApps(streams, links, sourceId, ownPid) {
   return [...new Set(names)];
 }
 
-// The newest recording app, whose window a click on the mic slot focuses, as {pid, client}: a PulseAudio app's stream names its process, a native stream only its PipeWire client, which does; null when nothing records.
-export function micRecorder(streams, links, sourceId, ownPid) {
-  const s = recordingStreams(streams, links, sourceId, ownPid)[0];
-  return s ? { pid: Number(s.props['application.process.id'] ?? 0) || 0, client: Number(s.props['client.id'] ?? 0) || 0 } : null;
-}
+// The newest recording app's PipeWire client, whose process the shell asks pw-dump for, since a stream's own application.process.id is the app's to claim; 0 when nothing records.
+export const micClient = (streams, links, sourceId, ownPid) => Number(recordingStreams(streams, links, sourceId, ownPid)[0]?.props['client.id'] ?? 0) || 0;
 
 // The window of the first pid in chain (a process, then its parent, and so on up) that has one; of several, the one focused last, or null. niri cannot say which window of a process records.
 export function windowFor(windows, chain) {

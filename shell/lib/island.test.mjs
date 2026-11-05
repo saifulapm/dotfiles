@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls, micRecorder, windowFor } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls, micClient, windowFor } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -357,11 +357,12 @@ test('the media card names its keys, and play/pause says what a press does next'
   assert.equal(islandText('mediaCard', { mediaCard: { title: 'Track', artist: '', playing: true } }, AT), 'Track  h previous  ␣ pause  l next');
 });
 
-test("the mic slot's recorder is the newest app's process, or the PipeWire client that knows it", () => {
+test("the mic slot's recorder is the newest app's PipeWire client, which the shell asks for its process", () => {
   const streams = [rec(52, { 'application.name': 'Other', 'object.serial': '900', 'application.process.id': '5200', 'client.id': '61' }), rec(40, { 'application.name': 'Test Recorder', 'object.serial': '300', 'client.id': '44' })];
-  assert.deepEqual(micRecorder(streams, [from(MIC, 40), from(MIC, 52)], MIC, 0), { pid: 5200, client: 61 });
-  assert.deepEqual(micRecorder(streams, [from(MIC, 40)], MIC, 0), { pid: 0, client: 44 });
-  assert.equal(micRecorder(streams, [], MIC, 0), null);
+  assert.equal(micClient(streams, [from(MIC, 40), from(MIC, 52)], MIC, 0), 61);
+  assert.equal(micClient(streams, [from(MIC, 40)], MIC, 0), 44);
+  assert.equal(micClient(streams, [], MIC, 0), 0);
+  assert.equal(micClient([rec(40, { 'application.name': 'A' })], [from(MIC, 40)], MIC, 0), 0);
 });
 
 const win = (id, pid, secs) => ({ id, pid, focus_timestamp: secs === null ? null : { secs, nanos: 0 } });

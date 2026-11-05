@@ -67,7 +67,7 @@ PanelWindow {
             }))
     readonly property var micApps: I.micApps(micStreams, micLinks, micSource?.id ?? -1, Root.State.recordingPid)
     // The newest of them, whose window a click on the mic slot focuses.
-    readonly property var micRecorder: I.micRecorder(micStreams, micLinks, micSource?.id ?? -1, Root.State.recordingPid)
+    readonly property int micClient: I.micClient(micStreams, micLinks, micSource?.id ?? -1, Root.State.recordingPid)
     readonly property var mic: micApps.length ? micApps : null
     // Mod+I on LIVE opens a card of the shares, with who watches each; Enter stops every PipeWire share, Esc closes (MGX0WWS8).
     property bool sharingOpen: false
@@ -778,13 +778,12 @@ PanelWindow {
         }
     }
 
-    // The recording process (asked of its PipeWire client when its stream names none), then its parent and on up, since chromium records from a child of the process that owns its windows; the answer picks the window.
+    // The recording process, then its parent and on up, since chromium records from a child of the process that owns its windows; the answer picks the window. The process is the client's pipewire.sec.pid, which PipeWire sets from the socket; a PulseAudio app's client is pipewire-pulse's socket, so for one its application.process.id stands. pw-dump matches a serial too, so jq takes the object by its id.
     function focusRecorder() {
-        const r = micRecorder;
-        if (!r || (r.pid <= 0 && r.client <= 0))
+        if (micClient <= 0)
             return;
         ancestry.running = false;
-        ancestry.command = ["sh", "-c", 'p=$1; [ "$p" -gt 0 ] || p=$(pw-dump "$2" 2>/dev/null | grep -o \'"application.process.id": *[0-9]*\' | grep -o \'[0-9]*$\' | head -1); while [ "${p:-0}" -gt 1 ]; do echo "$p"; p=$(awk \'/^PPid:/ { print $2 }\' "/proc/$p/status" 2>/dev/null); done', "sh", String(r.pid), String(r.client)];
+        ancestry.command = ["sh", "-c", 'p=$(pw-dump "$1" 2>/dev/null | jq -r --argjson c "$1" \'first(.[] | select(.id == $c) | .info.props | if .["client.api"] == "pipewire-pulse" then .["application.process.id"] else .["pipewire.sec.pid"] end) // empty\'); while [ "${p:-0}" -gt 1 ]; do echo "$p"; p=$(awk \'/^PPid:/ { print $2 }\' "/proc/$p/status" 2>/dev/null); done', "sh", String(micClient)];
         ancestry.running = true;
     }
 
