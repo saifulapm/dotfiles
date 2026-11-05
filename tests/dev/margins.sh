@@ -11,12 +11,14 @@ niri msg action spawn -- foot -c /dev/null
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_focused
 check "foot is focused" foot_focused
+# Artboard's paper #E4E6EA, as a 10 px square's mean reads it through the dot grid: within 3 per channel.
+is_paper() { local r g b; read -r r g b <<<"$1"; ((r >= 225 && r <= 231 && g >= 227 && g <= 233 && b >= 231 && b <= 237)); }
 # Between the margin rule at y=40 and the window top at y=56 there is only paper.
 strip=$(grim -s 1 -t ppm -g "40,44 10x10" - | mean_rgb)
 echo "     margin strip with foot open: $strip"
-check "foot opens below the margins" test "$strip" = "241 233 216"
-# niri animates a window open, so the frame is polled until the window has settled.
-edge_is_ink() { edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); [ "$edge" = "28 25 21" ]; }
+check "foot opens below the margins" is_paper "$strip"
+# niri animates a window open, so the frame is polled until the window has settled. niri draws the 1 px ink #15171B a few levels lighter, from 21 23 27 to 28 30 33, so the frame reads as ink when it is that dark and that blue; foot's grey 36 36 36 beside it is neither.
+edge_is_ink() { local r g b; edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); read -r r g b <<<"$edge"; ((r >= 18 && r <= 31 && b - r >= 4)); }
 until_ok 1000 edge_is_ink
 check "niri draws foot's ink frame at x=32 ($edge)" edge_is_ink
 
@@ -31,7 +33,7 @@ until_ok 1000 bar_hidden
 check "the margins and the island hide over it" bar_hidden
 # foot's own background, not the paper, now sits where the margin rule was.
 strip=$(grim -s 1 -t ppm -g "40,30 10x10" - | mean_rgb)
-check "foot covers the margin strip ($strip)" test "$strip" != "241 233 216"
+check "foot covers the margin strip ($strip)" eval '! is_paper "$strip"'
 niri msg action maximize-window-to-edges
 bar_back() { margins | jq -e '.shown == true' >/dev/null 2>&1 && island | jq -e '.shown == true' >/dev/null 2>&1; }
 until_ok 1000 bar_back

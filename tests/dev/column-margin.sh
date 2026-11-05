@@ -9,16 +9,16 @@ plain() { niri msg action spawn -- foot -c /dev/null -T "$1" sleep 600; until_ok
 
 until_ok 5000 shell_status >/dev/null
 plain one
-check "one column draws no column" until_ok 2000 left_is "01 — FOOT"
+check "one column draws no column" until_ok 2000 left_is "Page 01 / foot — one"
 plain two
 plain three
-check "three foots, the third focused, read 01  3 / 3" until_ok 2000 left_is "01  3 / 3 — FOOT"
+check "three foots, the third focused, read Page 01  3 / 3" until_ok 2000 left_is "Page 01  3 / 3 / foot — three"
 niri msg action focus-column-left
-check "focusing a column left reads 01  2 / 3" until_ok 2000 left_is "01  2 / 3 — FOOT"
+check "focusing a column left reads Page 01  2 / 3" until_ok 2000 left_is "Page 01  2 / 3 / foot — two"
 niri msg action move-column-left
-check "moving that column left reads 01  1 / 3" until_ok 2000 left_is "01  1 / 3 — FOOT"
+check "moving that column left reads Page 01  1 / 3" until_ok 2000 left_is "Page 01  1 / 3 / foot — two"
 niri msg action close-window
-check "closing the first column leaves the focus on 1 / 2" until_ok 2000 left_is "01  1 / 2 — FOOT"
+check "closing the first column leaves the focus on 1 / 2" until_ok 2000 left_is "Page 01  1 / 2 / foot — "
 echo "     drawn: $(timeout 0.5 qs ipc call margins state | jq -c .drawn.left)"
 
 exit $((fails > 0))

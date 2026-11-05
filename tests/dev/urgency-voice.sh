@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The urgency marks in each theme's voice: !05 !07 in red, • 05  • 07 with accent dots, [!05][!07] in amber, Hi-Fi's 05 07 in muted after red lamps; with every mark drawn a long title still elides short of the island.
+# The urgency marks read • 05  • 07, accent dots before ink numbers; with every mark drawn a long title still elides short of the island.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -7,12 +7,23 @@ margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 marks_are() { margins | jq -e --arg want "$1" '.drawn.marks == $want' >/dev/null 2>&1; }
 colors_are() { margins | jq -e --argjson want "$1" '.drawn.markColors | unique == ($want | sort)' >/dev/null 2>&1; }
 focused_is() { niri msg -j focused-window | jq -e --arg t "$1" '.title == $t' >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 bells="$DOTS_DEV_DIR/bells"
 mkdir -p "$bells"
 ringer() { niri msg action spawn -- foot -c /dev/null -o bell.urgent=yes -T "$1" sh -c "until [ -e '$bells/$1' ]; do sleep 0.05; done; printf '\a'; sleep 600"; until_ok 5000 focused_is "$1"; }
 plain() { niri msg action spawn -- foot -c /dev/null -T "$1" sleep 600; until_ok 5000 focused_is "$1"; }
+read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
+# Accent #3D5AFE pixels, within 40 per channel, in the 140 px of the top-left margin before its end, where the marks sit.
+accent_px() {
+  local end
+  end=$(margins | jq '.drawn.leftEnd | floor')
+  grim -s 1 -t ppm -g "$((ox + end - 140)),$((oy + 14)) 140x22" - | node -e '
+    const b = require("fs").readFileSync(0);
+    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
+    let n = 0;
+    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - 61) <= 40 && Math.abs(px[i * 3 + 1] - 90) <= 40 && Math.abs(px[i * 3 + 2] - 254) <= 40) n++;
+    console.log(n);
+  '
+}
 
 until_ok 5000 shell_status >/dev/null
 # Workspace 1 shows a 200-character title, and 4 and 6 hold quiet feet so every number up to 7 stays.
@@ -26,46 +37,19 @@ niri msg action focus-workspace 1
 until_ok 2000 focused_is "$long"
 
 touch "$bells/ws5" "$bells/ws7"
-in_theme paper
-until_ok 3000 marks_are "!05 !07"
+until_ok 3000 marks_are "• 05  • 07"
 echo "     drawn: $(margins | jq -c .drawn)"
-check "paper: the marks read !05 !07" marks_are "!05 !07"
-check "paper: in danger #C8381E" colors_are '["#c8381e"]'
-in_theme artboard
-until_ok 2000 marks_are "• 05  • 07"
-check "artboard: the marks read • 05  • 07" marks_are "• 05  • 07"
-check "artboard: accent dots before ink numbers" colors_are '["#3d5afe","#15171b"]'
-in_theme blueprint
-until_ok 2000 marks_are "[!05][!07]"
-check "blueprint: the marks read [!05][!07]" marks_are "[!05][!07]"
-check "blueprint: in amber #FFB547" colors_are '["#ffb547"]'
-lamps_are() { margins | jq -e --argjson want "$1" '[.drawn.markLamps[].light] == $want' >/dev/null 2>&1; }
-read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
-# The mean colour at the centre of the first urgent workspace's lamp, as r g b.
-first_lamp() { margins | jq -r '.drawn.markLamps[0].box | "\(.x + .w / 2 | floor) \(.y + .h / 2 | floor)"'; }
-lamp_red() {
-  local x y r g b
-  read -r x y < <(first_lamp)
-  read -r r g b < <(grim -s 1 -t ppm -g "$((ox + x)),$((oy + y)) 1x1" - | mean_rgb)
-  ((r > 220 && g < 110 && b < 100))
-}
-in_theme hi-fi
-until_ok 2000 marks_are "05 07"
-check "hi-fi: the marks read 05 07" marks_are "05 07"
-check "hi-fi: in muted #A89984, each after a red lamp" eval 'colors_are '"'"'["#a89984"]'"'"' && lamps_are '"'"'["red","red"]'"'"''
-until_ok 1000 lamp_red
-check "hi-fi: the first lamp's centre reads red #FB4934" lamp_red
+check "the marks read • 05  • 07" marks_are "• 05  • 07"
+check "accent dots before ink numbers" colors_are '["#3d5afe","#15171b"]'
+check "the two dots draw in the accent ($(accent_px) px)" test "$(accent_px)" -ge 4
 
 touch "$bells/ws2" "$bells/ws3"
 # A Text paints past its width unless it elides, so the check reads both its box and its elision.
 short_of_island() { margins | jq -e '.drawn.leftElided and .drawn.leftEnd <= .drawn.lineEnd and .drawn.leftEnd > .drawn.lineEnd - 40' >/dev/null 2>&1; }
-for t in paper:'!02 !03 !05 +1' artboard:'• 02  • 03  • 05  +1' blueprint:'[!02][!03][!05][+1]' hi-fi:'02 03 05 +1'; do
-  in_theme "${t%%:*}"
-  until_ok 3000 marks_are "${t#*:}"
-  until_ok 2000 short_of_island
-  echo "     ${t%%:*}: $(margins | jq -c '.drawn | {marks, leftEnd, lineEnd}')"
-  check "${t%%:*}: ${t#*:} after a 200-character title that elides 8 px short of the island" eval 'marks_are "${t#*:}" && short_of_island'
-done
+until_ok 3000 marks_are "• 02  • 03  • 05  +1"
+until_ok 2000 short_of_island
+echo "     $(margins | jq -c '.drawn | {marks, leftEnd, lineEnd}')"
+check "• 02  • 03  • 05  +1 after a 200-character title that elides 8 px short of the island" eval 'marks_are "• 02  • 03  • 05  +1" && short_of_island'
 
 exit $((fails > 0))
 }
