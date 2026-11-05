@@ -2502,8 +2502,7 @@ PanelWindow {
             // A file notification drags from its chip only; one with no file drags its body from anywhere.
             property bool onChip: false
             onPressed: mouse => {
-                const chip = bodyChip.visible ? bodyChip : columnChip;
-                onChip = chip.visible && chip.contains(chip.mapFromItem(noteArea, mouse.x, mouse.y));
+                onChip = columnChip.visible && columnChip.contains(columnChip.mapFromItem(noteArea, mouse.x, mouse.y));
                 if (onChip)
                     noteFace.grab();
             }
