@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# Goals' warnings, the selected goal's due date and the delete confirm, are danger text in Paper; Frost's danger is a dot only, so there they are ink after a 6 px danger dot and read at 4.5:1 or more.
+# Goals' warnings, the selected goal's due date and the delete confirm, are plain danger text with no dot, and the due date reads at 4.5:1 or more.
 {
 source "$(dirname "$0")/lib.sh"
 
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
 open_goals() {
   until_ok 10000 desk_up
@@ -57,37 +55,21 @@ answer deadline 3d
 until_ok 2000 state_is '.active == ["Ship v2"] and .prompt == null'
 close_goals
 
-in_theme frost
 open_goals
 until_ok 2000 state_is '.due != null'
 echo "     due: $(goals_state | jq -c .due)"
-check "frost: the selected goal's due date is ink #d8dee9 after a dot ($(goals_state | jq -c '[.due.text, .due.color, .due.dot]'))" state_is '.due.color == "#d8dee9" and .due.dot.w == 6 and .due.dot.x < .due.box.x'
-dot=$(near "$(geo .due.dot)" 191 97 106 24)
-check "frost: the due date's dot draws danger #bf616a ($dot of 36 px)" test "$dot" -ge 12
+check "the selected goal's due date is danger #cf222e with no dot ($(goals_state | jq -c '[.due.text, .due.color, .due.dot]'))" state_is '.due.color == "#cf222e" and .due.dot == null'
+red=$(near "$(geo .due.box)" 207 34 46 40)
+check "the due date draws danger pixels ($red px)" test "$red" -gt 4
 read -r ratio fill < <(drawn_contrast "$(geo .due.box)")
-check "frost: the due date reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
-# Within 14, since the ink's subpixel fringes reach 167 121 95.
-red=$(near "$(geo .due.box)" 191 97 106 14)
-check "frost: no pixel of the due date draws danger red ($red px)" test "$red" -eq 0
+check "the due date reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 wtype d
 until_ok 2000 state_is '.confirm and .confirmLabel != null'
-check "frost: delete? y is ink #d8dee9 after a dot ($(goals_state | jq -c .confirmLabel))" state_is '.confirmLabel.text == "delete? y" and .confirmLabel.color == "#d8dee9" and .confirmLabel.dot.w == 6'
-dot=$(near "$(geo .confirmLabel.dot)" 191 97 106 24)
-check "frost: the confirm's dot draws danger #bf616a ($dot of 36 px)" test "$dot" -ge 12
+check "delete? y is danger with no dot ($(goals_state | jq -c .confirmLabel))" state_is '.confirmLabel.text == "delete? y" and .confirmLabel.color == "#cf222e" and .confirmLabel.dot == null'
+red=$(near "$(geo .confirmLabel.box)" 207 34 46 40)
+check "the confirm label draws danger pixels ($red px)" test "$red" -gt 4
 wtype n
 until_ok 2000 state_is '.confirm == false'
-close_goals
-
-in_theme paper
-open_goals
-until_ok 2000 state_is '.due != null'
-check "paper: the selected goal's due date is Paper's danger #c8381e with no dot ($(goals_state | jq -c '[.due.color, .due.dot]'))" state_is '.due.color == "#c8381e" and .due.dot == null'
-red=$(near "$(geo .due.box)" 200 56 30 40)
-check "paper: the due date draws vermilion pixels ($red px)" test "$red" -gt 4
-wtype d
-until_ok 2000 state_is '.confirm and .confirmLabel != null'
-check "paper: delete? y is danger with no dot ($(goals_state | jq -c .confirmLabel))" state_is '.confirmLabel.color == "#c8381e" and .confirmLabel.dot == null'
-wtype n
 close_goals
 
 errors=$(qml_errors)
