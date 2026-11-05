@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD; a click on the resting island opens its activity, the calendar when nothing is live, and a notification keeps its own click.
+# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD; a click on the resting island opens its activity, the calendar when nothing is live, and a notification keeps its own click; the media card's controls run on click and on h, Space and l.
 {
 export DOTS_DEV_FAKE_CASTS=1
 source "$(dirname "$0")/lib.sh"
@@ -29,7 +29,7 @@ island_wheel() {
 }
 click_island() {
   local at
-  at=$(island_spot island) || { echo "no island click area is drawn"; return 1; }
+  at=$(island_spot "${1:-island}") || { echo "no island click area named ${1:-island} is drawn"; return 1; }
   # shellcheck disable=SC2086
   point click $at
 }
@@ -47,9 +47,11 @@ unlock() {
 out=$DOTS_DEV_DIR/printed
 : >"$out"
 sender=
+player=
 cleanup() {
   pointer_stop
   [ -z "$sender" ] || kill "$sender" 2>/dev/null
+  [ -z "$player" ] || kill "$player" 2>/dev/null
 }
 
 until_ok 5000 shell_status >/dev/null
@@ -124,6 +126,59 @@ check "a click on LIVE opens the sharing card ($(island | jq -c '{mode, text}'))
 wtype -k Escape
 until_ok 2000 mode_is sharing
 fake_event '{"CastStopped":{"stream_id":3001}}' >/dev/null
+until_ok 3000 mode_is rest
+
+# A paused player is nothing live: a click opens the calendar, never the media card.
+"$repo/bin/dev-fake-mpris" Track Artist &
+player=$!
+until_ok 3000 mode_is playing
+busctl --user call org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Pause
+until_ok 2000 mode_is rest
+click_island
+opened calendar
+check "with the player paused a click opens the calendar ($(island | jq -r .mode))" mode_is calendar
+wtype -k Escape
+until_ok 2000 mode_is rest
+
+# With media playing, a click opens the media card; its controls run on click and it stays through a pause.
+busctl --user call org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Play
+until_ok 2000 mode_is playing
+click_island
+opened mediaCard
+reads() { [ "$(island | jq -r .text)" = "$1" ]; }
+# What playerctl status reads, straight from the player's bus property.
+status_is() { busctl --user get-property org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null | grep -qx "s \"$1\""; }
+title_is() { busctl --user get-property org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Metadata 2>/dev/null | grep -q "\"xesam:title\" s \"$1\""; }
+check "a click on the playing island opens the media card ($(island | jq -c '{mode, text}'))" reads "Track — Artist  h previous  ␣ pause  l next"
+check "and gives it the keyboard" island_focus Exclusive
+until_ok 2000 island_drawn media:playPause
+click_island media:playPause
+until_ok 2000 status_is Paused
+check "a click on pause pauses the player" status_is Paused
+until_ok 2000 reads "Track — Artist  h previous  ␣ play  l next"
+check "the card stays, offering play ($(island | jq -c '{mode, text}'))" reads "Track — Artist  h previous  ␣ play  l next"
+click_island media:next
+until_ok 2000 reads "Next — Artist  h previous  ␣ play  l next"
+check "a click on next moves to the next track" title_is Next
+click_island media:previous
+until_ok 2000 reads "Previous — Artist  h previous  ␣ play  l next"
+check "a click on previous moves back" title_is Previous
+wtype -k space
+until_ok 2000 status_is Playing
+check "Space plays it again" status_is Playing
+wtype -k l
+until_ok 2000 reads "Next — Artist  h previous  ␣ pause  l next"
+check "l moves to the next track ($(island | jq -r .text))" reads "Next — Artist  h previous  ␣ pause  l next"
+wtype -k h
+until_ok 2000 reads "Previous — Artist  h previous  ␣ pause  l next"
+check "h moves back ($(island | jq -r .text))" reads "Previous — Artist  h previous  ␣ pause  l next"
+wtype -k Escape
+until_ok 2000 mode_is playing
+check "Esc closes the card back to the playing island" mode_is playing
+check "and gives the keyboard back" island_focus None
+
+kill "$player"
+player=
 until_ok 3000 mode_is rest
 
 # An agent's lease opens the lease card.

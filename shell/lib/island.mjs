@@ -5,8 +5,8 @@ import { connectText } from './bluetooth.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-// The calendar and the sharing card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening, and a device's connect state right after the OSD (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment, and a YouTube download, which ranks just under a send, the same.
-const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'btConnect', 'toast', 'capture', 'sending', 'downloading', 'playing'];
+// The calendar, the sharing card and the media card are opened by hand, so only a question, or an agent's lease card, takes the island from them; LIVE gives way to a notification's 5 s and outranks the shell's own recording (7WVQMXDS), and an agent's lease slot, so a share shows while an agent holds the session (X1WV1TFF); the mic slot comes right after LIVE, so an agent's lease or a recording never hides an app listening, and a device's connect state right after the OSD (GA64VNHS); a send can run for minutes, so a toast, the OSD or a notification (its own Sent among them) shows over it for its moment, and a YouTube download, which ranks just under a send, the same.
+const PRIORITY = ['question', 'leaseCard', 'calendar', 'sharingCard', 'mediaCard', 'notification', 'sharing', 'mic', 'lease', 'recording', 'osd', 'btConnect', 'toast', 'capture', 'sending', 'downloading', 'playing'];
 
 export const MAX_WIDTH = 560;
 
@@ -69,6 +69,16 @@ export function micApps(streams, links, sourceId, ownPid) {
   return [...new Set(names)];
 }
 
+// The media card's controls, each with the key that runs it; play/pause says what a press does next.
+export const mediaControls = (playing) => [
+  { key: 'previous', text: 'h previous' },
+  { key: 'playPause', text: playing ? '␣ pause' : '␣ play' },
+  { key: 'next', text: 'l next' }
+];
+
+// A track as one line: Title — Artist, either alone when the other is empty.
+export const trackText = (t) => [t.title, t.artist].map((p) => oneLine(p ?? '')).filter((p) => p).join(' — ');
+
 const micText = (apps) => `● MIC · ${apps[0]}${apps.length > 1 ? ` +${apps.length - 1}` : ''}`;
 
 // What reaches brightnessctl's argv: a step like 5%+, or an absolute 1% to 100%, which the Shift brightness keys send (YD0H5332).
@@ -115,7 +125,9 @@ export function islandText(mode, slots, now) {
       return p.main + p.tail;
     }
     case 'playing':
-      return `${[slots.playing.title, slots.playing.artist].map((p) => oneLine(p ?? '')).filter((p) => p).join(' — ')}  ${clockText(now)}`;
+      return `${trackText(slots.playing)}  ${clockText(now)}`;
+    case 'mediaCard':
+      return [trackText(slots.mediaCard), ...mediaControls(slots.mediaCard.playing).map((c) => c.text)].filter((p) => p).join('  ');
     default:
       return slots.notice || clockText(now);
   }

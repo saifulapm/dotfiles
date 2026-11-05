@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -336,4 +336,23 @@ test("the media player's title and artist read as one line, whatever a video's u
   const text = islandText('playing', { playing: { title: 'Low\nTide‮\u001b Radio', artist: 'lofi⁦ archive' } }, now);
   assert.equal(text.replace(/  \S+$/, ''), 'Low Tide Radio — lofi archive');
   assert.doesNotMatch(text, /[\u0000-\u001f‪-‮⁦-⁩]/);
+});
+
+test('the media card opened by a click holds against a notification, like the sharing card', () => {
+  const card = { title: 'Track', artist: 'Artist', playing: true };
+  assert.equal(pick({ mediaCard: card, notification: note, playing: { title: 'Track', artist: 'Artist' } }), 'mediaCard');
+  assert.equal(pick({ mediaCard: card, sharingCard: [share()] }), 'sharingCard');
+  assert.equal(pick({ mediaCard: card, question }), 'question');
+  assert.equal(isCompact('mediaCard'), false);
+});
+
+test('the media card names its keys, and play/pause says what a press does next', () => {
+  assert.deepEqual(mediaControls(true), [
+    { key: 'previous', text: 'h previous' },
+    { key: 'playPause', text: '␣ pause' },
+    { key: 'next', text: 'l next' }
+  ]);
+  assert.equal(mediaControls(false)[1].text, '␣ play');
+  assert.equal(islandText('mediaCard', { mediaCard: { title: 'Low\nTide', artist: 'lofi', playing: false } }, AT), 'Low Tide — lofi  h previous  ␣ play  l next');
+  assert.equal(islandText('mediaCard', { mediaCard: { title: 'Track', artist: '', playing: true } }, AT), 'Track  h previous  ␣ pause  l next');
 });

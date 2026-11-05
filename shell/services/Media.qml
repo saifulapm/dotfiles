@@ -22,21 +22,31 @@ Scope {
     }
     readonly property var target: player ?? played.find(p => Mpris.players.values.includes(p)) ?? Mpris.players.values[0] ?? null
 
-    // The media keys: niri runs qs ipc call media <playPause|next|previous>.
+    function playPause() {
+        if (target?.canTogglePlaying)
+            target.togglePlaying();
+    }
+    function next() {
+        if (target?.canGoNext)
+            target.next();
+    }
+    function previous() {
+        if (target?.canGoPrevious)
+            target.previous();
+    }
+
+    // The media keys: niri runs qs ipc call media <playPause|next|previous>; the island's media card runs the same three.
     Root.Ipc {
         target: "media"
 
         function playPause(): void {
-            if (media.target?.canTogglePlaying)
-                media.target.togglePlaying();
+            media.playPause();
         }
         function next(): void {
-            if (media.target?.canGoNext)
-                media.target.next();
+            media.next();
         }
         function previous(): void {
-            if (media.target?.canGoPrevious)
-                media.target.previous();
+            media.previous();
         }
     }
 }

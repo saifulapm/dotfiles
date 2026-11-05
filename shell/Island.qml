@@ -27,6 +27,8 @@ PanelWindow {
     required property var notifs
     required property var questions
     required property var lock
+    // The players, which the media card reads and runs.
+    required property var media
     // A theme switch's failure, shown in place of the clock for 5 s.
     property string notice: ""
     // What the island may show; each is null while it has nothing to show. A Bluetooth pairing request asks ahead of an agent's question, since it times out.
@@ -107,6 +109,16 @@ PanelWindow {
         heldDownloading = downloading
     readonly property var downloadingLook: V.downloadingLook(theme.tokens)
     property var playing: null
+    // Opened by a click on the playing island; it reads the player the media keys run, so it stays through a pause.
+    property bool mediaOpen: false
+    readonly property var mediaCard: mediaOpen && media.target ? {
+        title: media.target.trackTitle,
+        artist: media.target.trackArtist,
+        playing: media.target.isPlaying
+    } : null
+    property var heldMediaCard: null
+    onMediaCardChanged: if (mediaCard)
+        heldMediaCard = mediaCard
     // What each part last showed, so a part can leave with its content after its slot has emptied.
     property var heldCalendar: null
     property var heldNotification: null
@@ -133,6 +145,7 @@ PanelWindow {
             lease,
             calendar,
             sharingCard,
+            mediaCard,
             notification,
             sharing,
             mic,
@@ -153,7 +166,7 @@ PanelWindow {
         modeSince = Date.now();
         holdCaptureNote();
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
-        if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard"].indexOf(mode) < 0)
+        if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way.
@@ -183,17 +196,18 @@ PanelWindow {
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
+            mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
             osd: [osdLook.width, osdLook.height]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(!!theme.tokens)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -743,11 +757,21 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
-    // A click on the resting island opens what it shows: the lease or sharing card, or the calendar when nothing is live.
-    readonly property bool clickable: ["rest", "lease", "sharing"].indexOf(mode) >= 0
+    // A click on the resting island opens what it shows: the media, lease or sharing card, or the calendar when nothing is live.
+    readonly property bool clickable: ["rest", "playing", "lease", "sharing"].indexOf(mode) >= 0
     function openActivity() {
-        if (clickable)
+        if (mode === "playing") {
+            mediaOpen = true;
+            focused = true;
+            keys.forceActiveFocus();
+        } else if (clickable) {
             focusIsland();
+        }
+    }
+
+    // The media card's previous, playPause and next, as the media keys run them.
+    function runMedia(key) {
+        media[key]();
     }
 
     // Runs the notification's default action when it has one; either way it leaves the island.
@@ -803,6 +827,7 @@ PanelWindow {
         focused = false;
         leaseOpen = false;
         sharingOpen = false;
+        mediaOpen = false;
         calendar = null;
         replying = false;
         reply.text = "";
@@ -1696,6 +1721,58 @@ PanelWindow {
             }
 
             IslandPart {
+                id: mediaCardPart
+                shown: island.part === "mediaCard"
+                key: ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.mediaCard[0]
+                height: island.sizes.mediaCard[1]
+
+                Column {
+                    id: mediaColumn
+                    x: 14
+                    y: 12
+                    width: parent.width - 28
+                    spacing: 8
+
+                    Text {
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: I.trackText(island.heldMediaCard ?? {})
+                        color: box.style.text
+                        font.family: island.theme.tokens?.type.mono ?? ""
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
+
+                    Row {
+                        spacing: 18
+
+                        Repeater {
+                            model: I.mediaControls(island.heldMediaCard?.playing ?? false)
+
+                            Text {
+                                required property var modelData
+                                textFormat: Text.PlainText
+                                text: modelData.text
+                                color: island.theme.tokens?.color.accent ?? box.style.text
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 13
+
+                                Root.Click {
+                                    name: "media:" + parent.modelData.key
+                                    onTapped: island.runMedia(parent.modelData.key)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            IslandPart {
                 id: osdPart
                 shown: island.part === "osd"
                 key: ""
@@ -2569,6 +2646,17 @@ PanelWindow {
                     } else if (event.key === Qt.Key_Escape) {
                         island.release();
                     }
+                    return;
+                }
+                if (island.mode === "mediaCard") {
+                    if (event.key === Qt.Key_Escape)
+                        island.release();
+                    else if (event.key === Qt.Key_H)
+                        island.runMedia("previous");
+                    else if (event.key === Qt.Key_L)
+                        island.runMedia("next");
+                    else if (event.key === Qt.Key_Space || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                        island.runMedia("playPause");
                     return;
                 }
                 if (island.mode === "calendar") {

@@ -159,6 +159,7 @@ Scope {
         osd: osdService.current
         btConnect: btService.current
         playing: mediaService.playing
+        media: mediaService
     }
 
     Variants {
