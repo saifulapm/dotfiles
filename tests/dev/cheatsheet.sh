@@ -28,8 +28,8 @@ check "Mod+/ shows the cheat sheet with exclusive keyboard" sheet_shown
 # Seven touchpad rows follow the binds: three swipes, two pinches and two corners.
 check "state counts $titled rows, one per titled bind, and the 7 touchpad rows" state_is --argjson n "$((titled + 7))" '.rows == $n'
 check "no row's title is cut short" state_is '.truncated == 0'
-check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ TAB") != null'
-check "the drawn rows include the Notes corner" state_is '.rowKeys | index("↗ CORNER") != null'
+check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ Tab") != null'
+check "the drawn rows include the Notes corner" state_is '.rowKeys | index("↗ corner") != null'
 check "state lists the five groups" state_is '.groups == ["SURFACES", "WORK", "WINDOWS", "SYSTEM", "TOUCHPAD"]'
 
 wtype -k Escape
