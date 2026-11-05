@@ -42,6 +42,7 @@ Scope {
     property Item clockItem: null
     property Item fieldItem: null
     property Item statusItem: null
+    property Item dateItem: null
     // just dev points this at a fake, so no check messages the phone.
     readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/../bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
@@ -156,7 +157,9 @@ Scope {
             clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null,
             fieldBox: f ? { x: r.x, y: r.y, w: f.width, h: f.height } : null,
             statusText: statusItem ? statusItem.text : "",
-            statusBox: box(statusItem)
+            statusBox: box(statusItem),
+            dateText: dateItem ? dateItem.text : "",
+            dateBox: box(dateItem)
         });
     }
 
@@ -278,7 +281,7 @@ Scope {
                 Component.onCompleted: screenLock.statusItem = statusText
             }
 
-            // Artboard's selected card: handles and outline come from Surface, the date is its frame label.
+            // Artboard's selected card, its frame from Surface; the date sits under the clock, since the one design draws no frame labels.
             Root.Surface {
                 id: card
                 x: Math.round((surface.width - width) / 2)
@@ -286,7 +289,6 @@ Scope {
                 width: 460
                 height: 36 + face.height + 22 + entry.height + 32
                 tokens: screenLock.theme.tokens
-                label: surface.date
             }
 
             Column {
@@ -307,6 +309,17 @@ Scope {
                     font.weight: Font.Bold
                     font.letterSpacing: surface.look.clock.tracking
                     Component.onCompleted: screenLock.clockItem = clockText
+                }
+
+                Text {
+                    id: dateText
+                    textFormat: Text.PlainText
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    text: surface.date
+                    color: surface.look.date.color
+                    font.family: surface.look.date.family
+                    font.pixelSize: surface.look.date.px
+                    Component.onCompleted: screenLock.dateItem = dateText
                 }
             }
 

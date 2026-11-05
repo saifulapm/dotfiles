@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Every colorscheme locks into the one lock, Artboard's card: under rose-pine-dawn the card is #FAF4ED and the clock #575279, and each of the five schemes draws the same card in its own surface and ink.
+# Every colorscheme locks into the one lock, Artboard's card: under rose-pine-dawn the card is #FAF4ED, the clock #575279 and the date under it, and each of the five schemes draws the same card in its own surface and ink.
 {
 export DOTS_DEV_SCHEME=rose-pine-dawn
 source "$(dirname "$0")/lib.sh"
@@ -59,6 +59,8 @@ fill=$(card_rgb)
 check "rose-pine-dawn: the card's fill reads #FAF4ED ($fill)" near_rgb "$fill" "250 244 237"
 ink=$(clock_ink "87 82 121")
 check "rose-pine-dawn: rows across the clock draw #575279 ($ink px)" test "$ink" -gt 10
+check "rose-pine-dawn: the date sits on the card under the clock ($(lock_state | jq -c '[.dateText, .dateBox.y - (.clockBox.y + .clockBox.h)]'))" \
+  state_is --argjson ow "$ow" --argjson oh "$oh" '.dateText != "" and .dateBox.y >= .clockBox.y + .clockBox.h and .dateBox.x >= ($ow - 460) / 2 and .dateBox.x + .dateBox.w <= ($ow + 460) / 2 and .dateBox.y + .dateBox.h <= .fieldBox.y'
 unlock
 check "rose-pine-dawn: the test password unlocks" unlocked
 

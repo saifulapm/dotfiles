@@ -1,4 +1,4 @@
-// How the lock screen draws: Artboard's selected card in every colorscheme, the clock on the card and the date as its frame label.
+// How the lock screen draws: Artboard's selected card in every colorscheme, the clock on the card and the date under it.
 
 // Lock.qml draws before the theme loads after a crash, so it needs colours of its own.
 export const FALLBACK = { paper: 'black', ink: 'white', muted: 'gray', accent: 'white', danger: 'white' };
