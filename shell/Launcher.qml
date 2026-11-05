@@ -134,7 +134,10 @@ Item {
         if (!row || !row.reminderId)
             return;
         reminders.remove(row.reminderId);
-        selected = Math.max(0, Math.min(selected, rows.length - 1));
+        // A scrolled list keeps its window on the rows that are left.
+        const s = Lib.scroll(scrollTop, selected, 0, found.length, 8);
+        scrollTop = s.top;
+        selected = s.selected;
     }
 
     function move(by) {

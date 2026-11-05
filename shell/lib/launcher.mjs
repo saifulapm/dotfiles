@@ -129,6 +129,7 @@ export function schemeList(list) {
   const out = [];
   for (const t of list) {
     try {
+      if (typeof t.name !== 'string') continue;
       const s = checkTokens(t);
       out.push(Object.assign(s, { title: typeof t.title === 'string' ? line(t.title) : s.name, family: typeof t.family === 'string' ? line(t.family) : '' }));
     } catch (e) {
@@ -138,9 +139,9 @@ export function schemeList(list) {
   return out;
 }
 
-// The selection moves over every row found, and the window of size rows follows it; selected counts from the window's top.
+// The selection moves over every row found, and the window of size rows follows it, staying full when rows go; selected counts from the window's top.
 export function scroll(top, selected, by, total, size) {
   const at = Math.max(0, Math.min(total - 1, top + selected + by));
-  const next = at < top ? at : at >= top + size ? at - size + 1 : top;
+  const next = Math.min(at < top ? at : at >= top + size ? at - size + 1 : top, Math.max(0, total - size));
   return { top: next, selected: at - next };
 }

@@ -231,7 +231,8 @@ test('schemeList keeps every rendered scheme with its title and family, and drop
   const noAnsi = { ...mocha, name: 'noansi', color: { ...mocha.color } };
   delete noAnsi.color.ansi;
   const forged = { ...rendered[0], name: 'forged', title: 'Ev\nil\u202E', family: 7 };
-  const out = schemeList([noAnsi, null, 'x', forged]);
+  const numbered = { ...rendered[0], name: 5, title: 7 };
+  const out = schemeList([noAnsi, null, 'x', forged, numbered]);
   assert.deepEqual(out.map((s) => s.name), ['forged']);
   assert.equal(out[0].title, 'Ev il');
   assert.equal(out[0].family, '');
@@ -246,4 +247,7 @@ test('the selection scrolls the eight visible rows: down past the last row moves
   assert.deepEqual(scroll(0, 0, -1, 40, 8), { top: 0, selected: 0 });
   assert.deepEqual(scroll(0, 2, 1, 3, 8), { top: 0, selected: 2 });
   assert.deepEqual(scroll(0, 0, 1, 0, 8), { top: 0, selected: 0 });
+  // A row deleted from the bottom of a scrolled list: no move, and the window comes back onto what is left.
+  assert.deepEqual(scroll(4, 7, 0, 4, 8), { top: 0, selected: 3 });
+  assert.deepEqual(scroll(2, 7, 0, 9, 8), { top: 1, selected: 7 });
 });

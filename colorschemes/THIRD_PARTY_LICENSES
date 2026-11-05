@@ -98,8 +98,7 @@ the unfilled template "Copyright [yyyy] [name of copyright owner]", so the
 licence file names no copyright holder or year. The repository has no
 NOTICE file.
 
-The full Apache License 2.0 text is to be included once in
-THIRD_PARTY_LICENSES.
+The full Apache License 2.0 text is printed once, at the end of this file.
 
 ----------------------------------------------------------------------
 Gruvbox Material (gruvbox-material-dark.toml, gruvbox-material-light.toml)
