@@ -176,6 +176,40 @@ ${body}`], { encoding: 'utf8', timeout: 3000 });
   assert.doesNotMatch(passed.stdout, /^FAIL/m);
 });
 
+// m82 and m84: an edit in the tree a check ran its shell from hot-reloaded that shell mid-check, and the red that ran proved nothing.
+test("lib.sh's EXIT trap fails a check when a file under its shell changed while it ran, and names the file", () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const fn = lib.match(/^dev_exit\(\) \{[\s\S]*?^\}/m);
+  assert.ok(fn, 'lib.sh defines dev_exit()');
+  assert.match(lib, /^shell_watch=\$\{DOTS_DEV_SHELL:-\$repo\/shell\}$/m, 'lib.sh watches the shell tree dots-dev loads');
+  assert.ok(lib.search(/^started=\$\(mktemp\)$/m) >= 0 && lib.search(/^started=\$\(mktemp\)$/m) < lib.search(/"\$repo\/bin\/dots-dev"/), 'lib.sh marks the start before dots-dev runs');
+  const root = mkdtempSync(join(tmpdir(), 'dev-exit-'));
+  try {
+    mkdirSync(join(root, 'shell/lib'), { recursive: true });
+    writeFileSync(join(root, 'shell/lib/a.mjs'), '');
+    const run = (body) =>
+      spawnSync('bash', ['-c', `set -uo pipefail
+${fn[0]}
+qml_errors() { :; }
+cleanup() { :; }
+dev_stop() { :; }
+dev_out=/nonexistent dev_log=/nonexistent
+shell_watch=${root}/shell
+fails=0
+started=$(mktemp)
+trap dev_exit EXIT
+${body}`], { encoding: 'utf8', timeout: 3000 });
+    const quiet = run('echo "ok   one"\nexit $((fails > 0))');
+    assert.equal(quiet.status, 0);
+    assert.doesNotMatch(quiet.stdout, /^FAIL/m);
+    const edited = run(`sleep 0.02\ntouch ${root}/shell/lib/a.mjs\necho "ok   one"\nexit $((fails > 0))`);
+    assert.equal(edited.status, 1);
+    assert.match(edited.stdout, /^FAIL lib\/a\.mjs changed while the check ran/m);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // qs writes its log and QML warnings to stdout, so a check that kept only Files' stderr read an empty log and its "no QML errors" passed blind (m34).
 test('every tests/dev script that starts Files keeps its stdout and stderr in one log', () => {
   const found = [];

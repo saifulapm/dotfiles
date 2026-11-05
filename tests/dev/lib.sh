@@ -74,6 +74,9 @@ flock -w 900 9 || { echo "FAIL another nested check held the lock for 15 min; he
 
 dev_out=$(mktemp)
 dev_log=$(mktemp)
+# An edit under the shell a check runs hot-reloads that shell mid-check, so the trap fails a check whose shell changed (m82, m84).
+shell_watch=${DOTS_DEV_SHELL:-$repo/shell}
+started=$(mktemp)
 # fd 9 is closed for dots-dev, so an app the nested niri spawns never holds the lock after the check ends.
 "$repo/bin/dots-dev" >"$dev_out" 2>"$dev_log" 9>&- &
 dev_pid=$!
@@ -91,7 +94,7 @@ qml_errors() {
     grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert|unavailable|Invalid property assignment|Cannot anchor'
 }
 dev_exit() {
-  local rc=$? errs=
+  local rc=$? errs= changed=
   # A script that dies part way (an unbound name, a failed command) counts no FAIL, so a summary of ok and FAIL lines would read it green.
   [ "$rc" -ne 0 ] && [ "$fails" -eq 0 ] && echo "FAIL $(basename "$0") ended with exit $rc before any check failed"
   [ -n "${DOTS_DEV_UNIT:-}" ] && errs=$(qml_errors)
@@ -100,9 +103,14 @@ dev_exit() {
     head -5 <<<"$errs"
     rc=1
   fi
+  changed=$(find "$shell_watch" -type f -newer "$started" -print -quit 2>/dev/null)
+  if [ -n "$changed" ]; then
+    echo "FAIL ${changed#"$shell_watch"/} changed while the check ran, so its shell reloaded under it: run checks from a tree nothing edits"
+    rc=1
+  fi
   cleanup
   dev_stop
-  rm -f "$dev_out" "$dev_log"
+  rm -f "$dev_out" "$dev_log" "$started"
   exit "$rc"
 }
 trap dev_exit EXIT
