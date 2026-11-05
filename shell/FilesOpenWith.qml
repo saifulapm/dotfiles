@@ -15,6 +15,8 @@ Item {
     // The rows' key handler, which gets the keys back when the list closes.
     required property Item rowKeys
 
+    // Started by path, as the nested shell runs without bin/ on PATH.
+    readonly property string appsBin: Quickshell.shellDir + "/../bin/dots-files-apps"
     property var targets: []
     property var found: null
     property int at: 0
@@ -45,7 +47,7 @@ Item {
     }
 
     function list() {
-        lister.command = ["dots-files-apps", "list"].concat(targets);
+        lister.command = [appsBin, "list"].concat(targets);
         lister.running = true;
     }
 
@@ -53,14 +55,14 @@ Item {
         if (!apps[at])
             return;
         // Detached, so the app outlives Files.
-        Quickshell.execDetached(["dots-files-apps", "open", apps[at].id].concat(targets));
+        Quickshell.execDetached([appsBin, "open", apps[at].id].concat(targets));
         close();
     }
 
     function makeDefault() {
         if (!apps[at] || setter.running)
             return;
-        setter.command = ["dots-files-apps", "default", found.type, apps[at].id];
+        setter.command = [appsBin, "default", found.type, apps[at].id];
         setter.running = true;
     }
 

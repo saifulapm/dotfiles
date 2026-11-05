@@ -34,7 +34,7 @@ Item {
     property string writeError: ""
     readonly property bool busy: cachedReader.running || reader.running || writer.running || leasesReader.running
 
-    readonly property string command: Quickshell.env("DOTS_DNS") || "dots-dns"
+    readonly property string command: Quickshell.env("DOTS_DNS") || Quickshell.shellDir + "/../bin/dots-dns"
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)

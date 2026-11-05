@@ -18,7 +18,7 @@ ShellRoot {
 
     // Process start to the window's first frame, set once.
     property var firstFrameMs: null
-    readonly property string backend: Quickshell.env("DOTS_YOUTUBE") || "dots-youtube-api"
+    readonly property string backend: Quickshell.env("DOTS_YOUTUBE") || Quickshell.shellDir + "/../bin/dots-youtube-api"
     // The sidebar's entry the list shows: search, saved, history, or playlist with the Playlist's id in playlistId.
     property string view: "search"
     property string playlistId: ""

@@ -73,7 +73,7 @@ ShellRoot {
     // A DNS Shield open whose time passed while the machine was off ends at start, whether or not DNS Shield ever opens.
     Process {
         id: dnsReconcile
-        command: [Quickshell.env("DOTS_DNS") || "dots-dns", "reconcile"]
+        command: [Quickshell.env("DOTS_DNS") || Quickshell.shellDir + "/../bin/dots-dns", "reconcile"]
     }
 
     // niri's binds call dots-call, which this answers in about 4 ms where a qs ipc client takes about 38: one request per line, its fields split by \x1f, one reply ended by \x1e.

@@ -28,7 +28,7 @@ Item {
     readonly property bool busy: registryReader.running || cachedReader.running || fetcher.running || user.running || registryRereader.running
     readonly property string dotsBin: Quickshell.shellDir + "/../bin/dots"
 
-    readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || "dots-accounts"
+    readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || Quickshell.shellDir + "/../bin/dots-accounts"
     readonly property string registryPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/claude-accounts.json"
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
