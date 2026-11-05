@@ -725,6 +725,7 @@ PanelWindow {
             return null;
         return {
             expanded: focused,
+            replying,
             lines: askText.lineCount,
             truncated: askText.truncated,
             summary: askSummary.visible ? askSummary.text : null,
@@ -757,8 +758,8 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
-    // A click on the resting island opens what it shows: the media, lease or sharing card, or the calendar when nothing is live.
-    readonly property bool clickable: ["rest", "playing", "lease", "sharing"].indexOf(mode) >= 0
+    // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, or the calendar when nothing is live.
+    readonly property bool clickable: ["rest", "playing", "lease", "sharing"].indexOf(mode) >= 0 || (mode === "question" && !focused)
     function openActivity() {
         if (mode === "playing") {
             mediaOpen = true;
@@ -766,6 +767,20 @@ PanelWindow {
             keys.forceActiveFocus();
         } else if (clickable) {
             focusIsland();
+        }
+    }
+
+    // A click on an option answers with it as its number key does, and Reply opens the reply line as r does; neither while the reply line or the file picker has the question.
+    function clickOption(index) {
+        const q = question;
+        if (!q || q.pairing || !focused || replying || attaching)
+            return;
+        askNote = "";
+        if (index === Math.min(q.options.length, 9)) {
+            replying = true;
+            reply.forceActiveFocus();
+        } else {
+            questions.answer(q.id, q.options[index]);
         }
     }
 
@@ -2471,6 +2486,11 @@ PanelWindow {
                                         color: parent.recommended ? box.style.fill : box.style.text
                                         font.family: island.theme.tokens?.type.ui ?? ""
                                         font.pixelSize: 13
+                                    }
+
+                                    Root.Click {
+                                        name: "ask:option:" + parent.index
+                                        onTapped: island.clickOption(parent.index)
                                     }
                                 }
                             }
