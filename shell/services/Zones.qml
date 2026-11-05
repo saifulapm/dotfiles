@@ -26,7 +26,7 @@ Scope {
     Process {
         id: zonesRun
         // The user manager's PATH need not have bin/, so this runs the one beside the shell.
-        command: [Quickshell.shellDir + "/../bin/dots-zones"]
+        command: [Quickshell.shellDir + "/bin/dots-zones"]
         stdout: StdioCollector {
             id: zonesOut
         }

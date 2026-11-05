@@ -100,7 +100,7 @@ Scope {
         property var target: null
         property var uris: []
         // The repo's bin is on the session PATH only through fish, so the helper is found beside the shell.
-        command: [Quickshell.shellDir + "/../bin/dots-notes-attach", notes.attachments].concat(uris)
+        command: [Quickshell.shellDir + "/bin/dots-notes-attach", notes.attachments].concat(uris)
         stdout: StdioCollector {
             id: attached
         }
