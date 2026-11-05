@@ -20,6 +20,7 @@ Item {
     // selected counts from scrollTop, the first of the eight rows drawn out of every row found.
     property int selected: 0
     property int scrollTop: 0
+    property real wheelRest: 0
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -144,6 +145,20 @@ Item {
         const s = Lib.scroll(scrollTop, selected, by, found.length, 8);
         scrollTop = s.top;
         selected = s.selected;
+    }
+
+    // The wheel moves the window of rows; wheelRest holds a touchpad's part of a row.
+    function turn(angle) {
+        const s = Lib.wheel({ top: scrollTop, selected, rest: wheelRest }, angle, found.length, 8);
+        scrollTop = s.top;
+        selected = s.selected;
+        wheelRest = s.rest;
+    }
+
+    // A click on a shown row does what Enter does on it.
+    function runRow(index) {
+        selected = index;
+        launch(false);
     }
 
     // An app is spawned through niri, so it is niri's child and outlives a shell restart; copyOnly (Shift+Enter) runs a row's copyExec instead, when it has one.
@@ -442,6 +457,13 @@ Item {
                         event.accepted = true;
                     }
 
+                    // Under the rows, so a turn anywhere over the list scrolls it; a row's click area takes no wheel.
+                    MouseArea {
+                        anchors.fill: parent
+                        acceptedButtons: Qt.NoButton
+                        onWheel: event => launcher.turn(event.angleDelta.y)
+                    }
+
                     Column {
                         id: list
                         y: 8
@@ -516,6 +538,11 @@ Item {
                                 implicitHeight: row.implicitHeight + 20
                                 radius: look.cursor.radius
                                 color: current ? look.cursor.fill : "transparent"
+
+                                Root.Click {
+                                    name: "launcher-row:" + index
+                                    onTapped: launcher.runRow(index)
+                                }
 
                                 RowLayout {
                                     id: row

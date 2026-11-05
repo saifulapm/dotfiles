@@ -145,3 +145,13 @@ export function scroll(top, selected, by, total, size) {
   const next = Math.min(at < top ? at : at >= top + size ? at - size + 1 : top, Math.max(0, total - size));
   return { top: next, selected: at - next };
 }
+
+// One wheel event over the list: a notch, 120 of Qt's angle and down when negative, moves the window three rows, a touchpad's smaller angles add up in rest; the selected row keeps its place while it stays shown, else the nearest shown row takes it.
+export function wheel(at, angle, total, size) {
+  const rest = at.rest + angle;
+  const rows = Math.trunc(-rest / 40);
+  const top = Math.max(0, Math.min(Math.max(0, total - size), at.top + rows));
+  const row = at.top + at.selected;
+  const selected = row < top ? 0 : row >= top + size ? size - 1 : row - top;
+  return { top, selected, rest: rest + rows * 40 };
+}

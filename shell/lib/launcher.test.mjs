@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll, wheel } from './launcher.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -250,4 +250,24 @@ test('the selection scrolls the eight visible rows: down past the last row moves
   // A row deleted from the bottom of a scrolled list: no move, and the window comes back onto what is left.
   assert.deepEqual(scroll(4, 7, 0, 4, 8), { top: 0, selected: 3 });
   assert.deepEqual(scroll(2, 7, 0, 9, 8), { top: 1, selected: 7 });
+});
+
+test('a wheel notch moves the window three rows and keeps the selected row while it stays shown', () => {
+  // A notch is 120 of Qt's angle, down when negative.
+  assert.deepEqual(wheel({ top: 0, selected: 5, rest: 0 }, -120, 40, 8), { top: 3, selected: 2, rest: 0 });
+  assert.deepEqual(wheel({ top: 3, selected: 2, rest: 0 }, 120, 40, 8), { top: 0, selected: 5, rest: 0 });
+  // A row that scrolls out of view hands the selection to the nearest shown row, so Enter runs a row in view.
+  assert.deepEqual(wheel({ top: 0, selected: 1, rest: 0 }, -120, 40, 8), { top: 3, selected: 0, rest: 0 });
+  assert.deepEqual(wheel({ top: 3, selected: 6, rest: 0 }, 120, 40, 8), { top: 0, selected: 7, rest: 0 });
+  // It stops at either end, and a list that fits does not move.
+  assert.deepEqual(wheel({ top: 31, selected: 0, rest: 0 }, -360, 40, 8), { top: 32, selected: 0, rest: 0 });
+  assert.deepEqual(wheel({ top: 1, selected: 0, rest: 0 }, 360, 40, 8), { top: 0, selected: 1, rest: 0 });
+  assert.deepEqual(wheel({ top: 0, selected: 2, rest: 0 }, -120, 5, 8), { top: 0, selected: 2, rest: 0 });
+});
+
+test("a touchpad's small angles add up to a row a third of a notch", () => {
+  const a = wheel({ top: 0, selected: 0, rest: 0 }, -15, 40, 8);
+  assert.deepEqual(a, { top: 0, selected: 0, rest: -15 });
+  const b = wheel(a, -30, 40, 8);
+  assert.deepEqual(b, { top: 1, selected: 0, rest: -5 });
 });
