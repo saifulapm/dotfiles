@@ -761,10 +761,9 @@ Item {
         }
     }
 
-    // A 1 px rule across the card.
-    component Rule: Rectangle {
+    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
+    component Rule: Item {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.color
     }
 }

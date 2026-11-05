@@ -42,10 +42,10 @@ test('the key strip lays out whole pairs, so a key never wraps away from its wor
   assert.equal(keyLine(KEYS), keyPairs(KEYS).join('  '));
 });
 
-test('the key strip and the header are ruled off in solid lines', () => {
+test('the key strip and the header are not ruled off', () => {
   const look = notesLook(artboard);
-  assert.deepEqual(look.strip, { color: artboard.color.line, width: 1 });
-  assert.deepEqual(look.rule, { color: artboard.color.ink, width: 1 });
+  assert.equal(look.strip, undefined);
+  assert.equal(look.rule, undefined);
 });
 
 test('the tab row lists the sections in order, Shelf pinned first and the current one marked', () => {

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control draws in the one design's list voice: a tint pill tab, a tinted rounded row with the detail under the name, a solid rule and lower-case key chips.
+# Control draws in the one design's list voice: a tint pill tab, a tinted rounded row with the detail under the name, no rule and lower-case key chips.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -39,9 +39,9 @@ check "inside the cursor row reads the tint ($tint of 64 px)" test "$tint" -eq 6
 corner=$(near "$(box_geo cursorBox 0 0 2 2)" 255 255 255 3)
 check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
 check "the legend keys are lower-case chips ($(control_state | jq -c .legend))" state_is '.legend == "tab section  j/k move  esc close" and .legendDrawn == .legend'
-# The rule under the heading is solid in the scheme's line colour #D0D7DE, so it covers a whole 300 px strip.
-rule=$(near "$(box_geo ruleBox 20 0 300 1)" 208 215 222 6)
-check "the rule is solid in the line colour ($rule of 300 px)" test "$rule" -ge 290
+# No rule runs under the heading: its 1 px slot reads the card's white across a whole 300 px strip.
+rule=$(near "$(box_geo ruleBox 20 0 300 1)" 255 255 255 3)
+check "no rule runs under the heading ($rule of 300 px read the card's white)" test "$rule" -ge 290
 close_control
 
 exit $((fails > 0))

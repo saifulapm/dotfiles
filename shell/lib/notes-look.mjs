@@ -57,8 +57,6 @@ export function notesLook(tokens) {
     sectionLabel: (name) => `# ${name}`,
     section: { font: t.ui, size: 12, italic: false, color: c.ink, pill: 'transparent' },
     pinned: { text: 'Pinned', color: c.accent, fill: 'transparent', border: 1 },
-    rule: { color: c.ink, width: 1 },
-    strip: { color: c.line, width: 1 },
     separator: '',
     small: { font: t.mono, size: 11, color: c.muted, spacing: 0 },
     body: { font: t.ui, size: 14, color: c.ink, done: c.muted },

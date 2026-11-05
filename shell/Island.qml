@@ -2197,17 +2197,10 @@ PanelWindow {
                             }
                         }
 
+                        // The gap between the month and the cities; no line divides them.
                         Item {
-                            readonly property color ink: island.clockLook.rule.color || box.style.text
                             width: 2 * island.clockLook.gap + 1
                             height: Math.max(monthGrid.height, cityColumn.height)
-
-                            Rectangle {
-                                x: island.clockLook.gap
-                                width: 1
-                                height: parent.height
-                                color: parent.ink
-                            }
                         }
 
                         Column {
@@ -2235,13 +2228,6 @@ PanelWindow {
                                             offset: offsetShown.visible ? offsetShown.text : "",
                                             day: cityDay.visible ? cityDay.text : ""
                                         };
-                                    }
-
-                                    Rectangle {
-                                        visible: !cityRow.home
-                                        width: parent.width
-                                        height: 1
-                                        color: cityRow.look.rule.color || box.style.text
                                     }
 
                                     Column {

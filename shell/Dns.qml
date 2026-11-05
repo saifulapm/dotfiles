@@ -723,10 +723,9 @@ Item {
                     }
                 }
 
-                Rectangle {
+                Item {
                     Layout.fillHeight: true
                     implicitWidth: 1
-                    color: look.rule.color
                 }
 
                 // The pane for the cursor device; an OPEN one shows only its recent blocks and the way back to Kid.
@@ -1326,11 +1325,10 @@ Item {
         }
     }
 
-    // A rule across the card.
-    component Rule: Rectangle {
+    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
+    component Rule: Item {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.color
     }
 
     // A section's head in the pane, with an optional word at the right.

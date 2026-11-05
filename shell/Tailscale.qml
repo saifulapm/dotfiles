@@ -656,11 +656,10 @@ Item {
         }
     }
 
-    // A rule across the card.
-    component Rule: Rectangle {
+    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
+    component Rule: Item {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.color
     }
 
     // A 32 px tile with a line glyph: a laptop, a machine, a phone or the power mark.

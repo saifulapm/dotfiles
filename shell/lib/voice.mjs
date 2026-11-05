@@ -107,7 +107,6 @@ export function launcherLook(tokens) {
     name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
     detail: { font: t.ui, size: 12, italic: false, color: c.muted },
     cursor: { fill: tones.tint, text: tones.deep, detail: onTint(c.muted), radius: 10, weight: 600, badge: '↵' },
-    rule: { color: c.line, dashed: false },
     small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
     tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
     chip: { fill: plainTones(tokens).tile, key: c.ink },
@@ -267,7 +266,7 @@ export function osdLook(tokens) {
   };
 }
 
-// How the calendar card's city column reads beside the month: home first and large with its mark, then a rule above each city, the offset and the day word under each name. A colour left empty is the island's own text colour.
+// How the calendar card's city column reads beside the month: home first and large with its mark, then each city, the offset and the day word under each name. A colour left empty is the island's own text colour.
 export function clockLook(tokens) {
   const t = (tokens || UNTHEMED).type;
   const text = (font, size, extra) => Object.assign({ font, size, weight: 400, spacing: 0, color: '' }, extra);
@@ -286,7 +285,6 @@ export function clockLook(tokens) {
     city: same,
     offsetText: same,
     dayText: same,
-    rule: { color: plainTones(tokens).island.tile },
     grid: {
       weekStart: 0,
       weekdays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],

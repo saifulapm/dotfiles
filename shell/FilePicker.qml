@@ -901,10 +901,9 @@ Item {
                     }
                 }
 
-                Rectangle {
+                Item {
                     Layout.fillHeight: true
                     implicitWidth: 1
-                    color: look.rule.color
                 }
 
                 // The rows: folders first, each with its size or item count and when it changed.
@@ -1171,11 +1170,10 @@ Item {
                     }
                 }
 
-                Rectangle {
+                Item {
                     visible: !picker.saving && !picker.choosingFolder
                     Layout.fillHeight: true
                     implicitWidth: 1
-                    color: look.rule.color
                 }
 
                 // The cursor file: its picture when Qt decodes it, its name, then its meta lines; hidden while a path is typed, and gone in save mode.
@@ -1357,11 +1355,10 @@ Item {
         }
     }
 
-    // A rule across the card.
-    component Rule: Rectangle {
+    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
+    component Rule: Item {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.color
     }
 
     // A name with its matched letters underlined, in three plain texts so a file's name never reads as markup; the end elides.

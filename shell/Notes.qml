@@ -426,13 +426,13 @@ FloatingWindow {
             }
         }
 
-        Rectangle {
+        // The 1 px slot under the header the cards hang from; it draws no line.
+        Item {
             id: headerRule
             anchors.top: header.bottom
             anchors.topMargin: 12
             width: parent.width
-            height: win.look ? win.look.rule.width : 1
-            color: win.look ? win.look.rule.color : "black"
+            height: 1
         }
 
         // On Shelf, the sections as a row of tabs, Shelf pinned first and the current one in ink. It only shows them; Ctrl+K still switches, and Tab stays between the list and the composer.
@@ -817,12 +817,6 @@ FloatingWindow {
             radius: win.look ? win.look.composer.radius : 0
             color: win.look ? win.look.composer.fill : "transparent"
 
-            Rectangle {
-                width: parent.width
-                height: win.look ? win.look.rule.width : 1
-                color: win.look ? win.look.rule.color : "black"
-            }
-
             Column {
                 id: composerColumn
                 x: 14
@@ -899,12 +893,6 @@ FloatingWindow {
             width: parent.width
             height: win.cards.length > 0 ? keys.implicitHeight + 20 : 0
             visible: win.cards.length > 0
-
-            Rectangle {
-                width: parent.width
-                height: win.look ? win.look.strip.width : 1
-                color: win.look ? win.look.strip.color : "black"
-            }
 
             // Whole pairs, so a key never wraps away from its word.
             Flow {

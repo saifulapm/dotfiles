@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The cheat sheet speaks in the one design's list voice: a Keys pill, a solid rule and a legend of lower-case key chips.
+# The cheat sheet speaks in the one design's list voice: a Keys pill, no rule and a legend of lower-case key chips.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -25,9 +25,9 @@ open_sheet
 check "the legend reads in lower-case chips ($(sheet_state | jq -c .legend))" state_is '.legend | contains("j/k move")'
 check "the legend is not tracked ($(sheet_state | jq -c .legendSpacing))" state_is '.legendSpacing <= 1'
 check "the heading is the pill reading Keys ($(sheet_state | jq -c .heading))" state_is '.heading == "Keys"'
-# The rule under the heading is solid in the scheme's line colour #D0D7DE, so it covers a whole 300 px strip.
-solid=$(near "$(sheet_state | jq -r '.ruleBox | "\(.x + 40 | floor),\(.y | floor) 300x1"')" 208 215 222 6)
-check "the rule under the heading is solid in the line colour ($solid of 300 px)" test "$solid" -ge 290
+# No rule runs under the heading: its 1 px slot reads the card's white across a whole 300 px strip.
+solid=$(near "$(sheet_state | jq -r '.ruleBox | "\(.x + 40 | floor),\(.y | floor) 300x1"')" 255 255 255 3)
+check "no rule runs under the heading ($solid of 300 px read the card's white)" test "$solid" -ge 290
 close_sheet
 
 exit $((fails > 0))
