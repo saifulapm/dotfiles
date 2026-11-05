@@ -487,6 +487,7 @@ Item {
                                             id: actionRepeater
                                             model: item.actionChips
                                             KeyChip {
+                                                objectName: "click:notif-chip:" + modelData.key
                                                 keyColor: look.cursor.text
                                                 wordColor: look.cursor.detail
                                             }
@@ -540,9 +541,14 @@ Item {
                                 image: payload.mime === "text/uri-list" ? rowFace.url : ""
                                 // The full-output mask drops while a row drags, so the drop reaches the window under the centre.
                                 onDraggingChanged: centre.dragging = dragging
-                                // A press and release with no drag does what Enter does on this row.
-                                onClicked: {
+                                // A press and release with no drag on an action chip runs that chip, as its number does; anywhere else on the row it does what Enter does.
+                                onClicked: mouse => {
                                     centre.selected = item.index;
+                                    for (let i = 0; i < actionRepeater.count; i++) {
+                                        const chip = actionRepeater.itemAt(i);
+                                        if (chip.contains(chip.mapFromItem(rowArea, mouse.x, mouse.y)))
+                                            return centre.runChip(chip.modelData.key);
+                                    }
                                     centre.act();
                                 }
                                 onPressed: mouse => {

@@ -229,8 +229,10 @@ Item {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
-    // A click on a row does what Enter does on it.
+    // A click on a row does what Enter does on it; while the delete question or the new entry's fields are open, the keys answer only them, so a row takes no click.
     function clickRow(i) {
+        if (mode !== "list" && mode !== "qr")
+            return;
         selected = i;
         enter();
     }

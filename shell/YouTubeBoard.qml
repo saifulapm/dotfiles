@@ -953,7 +953,7 @@ Rectangle {
                             Click {
                                 name: "yt-row:" + rowItem.index
                                 // While x asks or p's picker is open, the rows take no click, as they take no key.
-                                enabled: !board.yt.confirming && !board.yt.picking
+                                enabled: !board.yt.confirming && !board.yt.picking && !board.yt.naming
                                 onTapped: {
                                     board.yt.cursor = rowItem.index;
                                     board.yt.focusPane("list");

@@ -195,6 +195,9 @@ FloatingWindow {
 
     // A click on a card selects it and does what Enter does.
     function clickCard(index) {
+        // The section picker lies over the cards and takes the keys while it is open.
+        if (picking)
+            return;
         useList();
         selected = index;
         edit();

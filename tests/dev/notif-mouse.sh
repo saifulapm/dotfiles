@@ -64,6 +64,20 @@ check "a press moved 4 px and let go short of the drag threshold runs the row as
 until_ok 2000 closed
 kill "$sender" 2>/dev/null
 wait "$sender" 2>/dev/null
+# A click on the selected row's chip runs that chip's action, as its number does, not the default.
+: >"$out"
+notify-send -a T -A default=Open -A later=Later chipped >"$out" &
+sender=$!
+until_ok 2000 centre_is 'any(.summaries[]; . == "chipped")'
+until_ok 15000 island_rest
+open_centre
+until_ok 2000 bash -c "[ \"\$(timeout 0.5 qs ipc call shell box notif-chip:1)\" != null ]"
+click_box notif-chip:1
+until_ok 2000 printed later
+check "a click on the selected row's chip 1 runs Later, not the default ($(cat "$out"))" printed later
+until_ok 2000 closed
+kill "$sender" 2>/dev/null
+wait "$sender" 2>/dev/null
 sender=
 
 timeout 0.5 qs ipc call notifs clear >/dev/null

@@ -86,6 +86,9 @@ Item {
 
     // Enter runs nothing on a device, so a click on one moves the cursor there and its pane shows; a group row takes none.
     function clickRow(i) {
+        // While the allow field is open its Enter writes to the selected device, so the cursor stays where the field was opened.
+        if (fieldOpen)
+            return;
         const s = stops.indexOf(i);
         if (s >= 0)
             selected = s;

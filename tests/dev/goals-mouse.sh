@@ -43,6 +43,15 @@ click_box goals-row:1
 until_ok 2000 state_is '.rows[1].done == false'
 check "a second click unticks it ($(rows))" state_is '.selected == 1 and .rows[1].done == false'
 
+# While delete? asks about ch 1, a click on ch 2 neither ticks it nor moves the question onto it.
+wtype d
+until_ok 2000 state_is '.confirm'
+click_box goals-row:2
+sleep 0.4
+check "with delete? open on ch 1, a click on ch 2 ticks nothing and leaves the question on ch 1 ($(rows))" state_is '.confirm and .selected == 1 and (.rows[2].done | not)'
+wtype -k Escape
+until_ok 2000 state_is '.confirm == false'
+
 click_box goals-row:0
 until_ok 2000 state_is '(.rows | length) == 1'
 check "a click on the Read heading selects it and folds its tasks ($(rows))" state_is '.selected == 0 and [.rows[] | .kind + ":" + .text] == ["goal:Read"]'

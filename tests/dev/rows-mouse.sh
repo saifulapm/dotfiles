@@ -80,6 +80,22 @@ click_box pass-row:1
 until_ok 8000 bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = 'secret-$second' ]"
 check "a click on Pass's second row ($second) copies its password, as Enter does" test "$(clip)" = "secret-$second"
 check "and Pass closed" pass_is '.open | not'
+# While d asks whether to delete an entry, a click on a row copies nothing and the question stays.
+printf 'unchanged' | wl-copy
+niri msg action spawn -- dots-call pass toggle
+until_ok 5000 pass_is '.open and (.rows | length) == 3 and .listed'
+# d deletes from the list; in the query it would type.
+wtype -k Tab
+until_ok 2000 pass_is '.focus == "list"'
+wtype d
+until_ok 2000 pass_is '.mode == "delete"'
+click_box pass-row:2
+sleep 1
+check "with the delete question open, a click on a row copies nothing and Pass still asks ($(pass_state | jq -c '[.open, .mode]'))" bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = unchanged ] && timeout 0.5 dots-call pass state | jq -e '.open and .mode == \"delete\"' >/dev/null"
+wtype -k Escape
+until_ok 2000 pass_is '.mode == "list"'
+wtype -k Escape
+until_ok 3000 pass_is '.open | not'
 
 # The cheat sheet's chips: / focuses the filter, esc closes.
 sheet_state() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }

@@ -496,6 +496,8 @@ FocusScope {
                                 // A click on a word moves the cursor there and plays it, as Enter does.
                                 Click {
                                     name: "deen-read-word:" + (ayahRow.index + 1) + ":" + (wordBox.index + 1)
+                                    // The surah picker takes the keys while it is open, so the words behind it take no click.
+                                    enabled: !page.picking
                                     onTapped: {
                                         page.moveTo({ a: ayahRow.index + 1, i: wordBox.index + 1 });
                                         page.hearWord();

@@ -204,7 +204,11 @@ Item {
                         }
                         Root.Click {
                             name: "control-tab:" + Lib.SECTIONS[index]
-                            onTapped: control.current = index
+                            // The open password line takes only keys, as the rows do.
+                            onTapped: {
+                                if (!control.section.typing)
+                                    control.current = index;
+                            }
                         }
                     }
                 }

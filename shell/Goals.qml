@@ -133,6 +133,9 @@ Item {
 
     // A click selects the row under it, then a goal or done heading folds as Enter does and a task ticks as Space does.
     function clickRow(index) {
+        // While delete? or a prompt asks, the keys answer only it, so a row takes no click.
+        if (confirm || prompt !== null)
+            return;
         selected = index;
         if (row?.kind === "task")
             tick();
