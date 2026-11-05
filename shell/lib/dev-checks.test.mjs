@@ -150,6 +150,32 @@ echo "fails=$fails"`;
   assert.match(r.stdout, /^fails=3$/m);
 });
 
+// m80: an unbound $name killed picker-specimen.sh after 3 of 14 checks, and every summary counting ok and FAIL lines read it green.
+test('a check that dies before any FAIL prints one from lib.sh\'s EXIT trap, and a check that failed or passed gets none', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const fn = lib.match(/^dev_exit\(\) \{[\s\S]*?^\}/m);
+  assert.ok(fn, 'lib.sh defines dev_exit()');
+  const run = (body) =>
+    spawnSync('bash', ['-c', `set -uo pipefail
+${fn[0]}
+qml_errors() { :; }
+cleanup() { :; }
+dev_stop() { :; }
+dev_out=/nonexistent dev_log=/nonexistent
+fails=0
+trap dev_exit EXIT
+${body}`], { encoding: 'utf8', timeout: 3000 });
+  const died = run('echo "ok   one"\necho "$name"\necho "ok   two"');
+  assert.notEqual(died.status, 0);
+  assert.match(died.stdout, /^FAIL .*exit 1.* before any check failed/m);
+  const failed = run('fails=1\necho "FAIL one"\nexit $((fails > 0))');
+  assert.equal(failed.status, 1);
+  assert.deepEqual(failed.stdout.match(/^FAIL/gm), ['FAIL']);
+  const passed = run('echo "ok   one"\nexit $((fails > 0))');
+  assert.equal(passed.status, 0);
+  assert.doesNotMatch(passed.stdout, /^FAIL/m);
+});
+
 // qs writes its log and QML warnings to stdout, so a check that kept only Files' stderr read an empty log and its "no QML errors" passed blind (m34).
 test('every tests/dev script that starts Files keeps its stdout and stderr in one log', () => {
   const found = [];

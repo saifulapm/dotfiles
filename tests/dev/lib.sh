@@ -92,6 +92,8 @@ qml_errors() {
 }
 dev_exit() {
   local rc=$? errs=
+  # A script that dies part way (an unbound name, a failed command) counts no FAIL, so a summary of ok and FAIL lines would read it green.
+  [ "$rc" -ne 0 ] && [ "$fails" -eq 0 ] && echo "FAIL $(basename "$0") ended with exit $rc before any check failed"
   [ -n "${DOTS_DEV_UNIT:-}" ] && errs=$(qml_errors)
   if [ -n "$errs" ]; then
     echo "FAIL the shell's journal has no QML errors"
