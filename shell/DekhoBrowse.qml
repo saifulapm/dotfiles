@@ -348,7 +348,7 @@ FocusScope {
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: words.label
-                    color: c.accent ?? "blue"
+                    color: look.label.color ?? "blue"
                     font.family: page.bodyFont
                     font.pixelSize: 12
                     font.weight: Font.Medium
@@ -870,7 +870,7 @@ FocusScope {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: page.words.person
-                        color: page.c.accent ?? "white"
+                        color: page.look.label.color ?? "white"
                         font.family: page.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Medium

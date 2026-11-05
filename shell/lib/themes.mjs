@@ -58,7 +58,7 @@ export function pickerLook(themed) {
     legend: (n) => l.keys([['j/k', 'choose'], [n > 1 ? `1–${Math.min(n, 9)}` : '1', 'jump'], ['↵', 'apply']]),
     esc: l.keyText('esc'),
     header: (n) => ({ title: 'Themes', font: t.ui, size: 20, weight: 700, color: c.ink, sub: `${n} themes`, subFont: t.ui, subSize: 13, italic: false, right: '' }),
-    tag: (current, cursor) => (current ? { text: 'Current', color: c.accent, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
+    tag: (current, cursor) => (current ? { text: 'Current', color: l.label.color, fill: l.cursor.fill, border: 'transparent', radius: 6 } : cursor ? { text: '↵', color: l.cursor.text, fill: l.cursor.fill, border: 'transparent', radius: 6 } : null),
     tile: { fill: plainTones(themed).field, border: { width: 0, color: 'transparent' }, radius: 12, pad: 10 },
     cursor: { fill: c.surface, border: { width: 1.5, color: c.accent }, radius: 12 },
   };

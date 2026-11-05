@@ -22,7 +22,8 @@ export function youtubeLook(tokens) {
   const l = listLook(tokens);
   // The board's tint, field, tiles, thumbnail and error block, which no token carries.
   const tones = plainTones(tokens);
-  const tint = { tint: tones.tint, deep: tones.deep, tile: tones.tile, field: tones.field, thumb: tones.thumb, errFill: tones.warnChip, errInk: tones.warn, errText: tones.strong };
+  // word is the pill word, the accent moved toward the ink where it would not read on the tint.
+  const tint = { tint: tones.tint, word: l.label.color, deep: tones.deep, tile: tones.tile, field: tones.field, thumb: tones.thumb, errFill: tones.warnChip, errInk: tones.warn, errText: tones.strong };
   const fonts = (tokens && tokens.type) || { ui: '' };
   return Object.assign(l, {
     title: {

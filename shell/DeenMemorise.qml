@@ -235,7 +235,7 @@ FocusScope {
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: page.words.badge(page.revealed)
-                                color: c.accent ?? "black"
+                                color: look.label.color ?? "black"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
                                 font.weight: Font.Medium

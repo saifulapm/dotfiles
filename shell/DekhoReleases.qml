@@ -407,7 +407,7 @@ FocusScope {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: page.mode === "starting" ? page.words.starting : page.words.release
-                        color: page.c.accent ?? "black"
+                        color: page.look.label.color ?? "black"
                         font.family: page.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Medium

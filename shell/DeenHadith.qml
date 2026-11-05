@@ -448,7 +448,7 @@ FocusScope {
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: card.failed ? "2 · if it fails" : "1 · downloading"
-                                color: page.c.accent ?? "white"
+                                color: page.look.label.color ?? "white"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
                                 font.weight: Font.Medium

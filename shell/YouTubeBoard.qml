@@ -328,7 +328,7 @@ Rectangle {
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: look.title.label
-                    color: c.accent ?? "gray"
+                    color: look.tint.word ?? "gray"
                     font.family: board.bodyFont
                     font.pixelSize: 12
                     font.weight: Font.Medium

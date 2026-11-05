@@ -889,7 +889,7 @@ ShellRoot {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: app.head.label
-                        color: c.accent ?? "blue"
+                        color: look.label.color ?? "blue"
                         font.family: look.small.font
                         font.pixelSize: 12
                         font.weight: Font.Medium

@@ -111,3 +111,17 @@ test('no shell surface draws a literal white on a plain branch', () => {
   }
   assert.deepEqual(found, []);
 });
+
+test("every word drawn on the tint or a pill reads at 4.5:1 there: the launcher pill, the picker's Current tag, YouTube's tint word", async () => {
+  const { pickerLook } = await import('./themes.mjs');
+  const { youtubeLook } = await import('./youtube-look.mjs');
+  for (const n of SCHEMES) {
+    const t = schemeTokens(n);
+    const tag = pickerLook(t).tag(true, true);
+    const yt = youtubeLook(t).tint;
+    for (const [what, fg, bg] of [['pill', listLook(t).label.color, listLook(t).label.fill], ['Current', tag.color, tag.fill], ['youtube', yt.word, yt.tint]]) {
+      const ratio = contrast(solid(fg), solid(bg));
+      assert.ok(ratio >= 4.5, `${n} ${what} ${fg} on ${bg}: ${ratio.toFixed(2)}`);
+    }
+  }
+});
