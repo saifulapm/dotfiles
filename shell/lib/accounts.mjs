@@ -1,5 +1,5 @@
 // Accounts' card from bin/dots-accounts' rows and the Claude account registry: one group of accounts with their limits, then balances, then usage, in the words the boards use.
-import { line, mark, plainTones } from './voice.mjs';
+import { line, plainTones } from './voice.mjs';
 
 // Labels come from a registry file and from provider names, so each is one line with no control characters, and elided.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
@@ -160,42 +160,23 @@ export const useTarget = (item) => (item && item.kind === 'account' && !item.act
 // What the island says once the registry names the account; the label is the card's, already one line.
 export const activeNotice = (label) => `Claude · ${label} is active for new sessions`;
 
-const upper = (s) => String(s).toUpperCase();
 const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : '');
 
-// How the card's own parts read under a theme: the group labels, a limit's name, a figure, the ACTIVE mark, the bar, and the warning and stale colours.
+// How the card's own parts read under a colorscheme: a limit's name, a figure, the ACTIVE mark, the bar, and the warning and stale colours.
 export function accountsLook(tokens) {
   const c = tokens.color;
-  const voice = tokens.type.voice;
-  const plain = voice === 'plain';
-  const bracket = voice === 'bracket';
-  const counted = (g) => {
-    const n = g[1];
-    const noun = g[0] === 'Claude' ? 'ACCOUNT' : g[0] === 'Usage' && bracket ? 'WINDOW' : 'PROVIDER';
-    return `${n} ${noun}${n === 1 ? '' : 'S'}`;
-  };
-  // Paper and Artboard draw a Claude limit as its bare percent; Blueprint dims the words after a figure.
+  // A Claude limit reads as its bare percent, a balance with a limit as what is left.
   const figure = (item) => {
     let text = item.figure;
-    if (item.kind === 'limit' && !bracket) text = text.replace(/ used$/, '');
-    if (plain) return { main: item.kind === 'balance' && item.fraction !== null ? `${text} left` : text.replace(/ characters$/, ' chars'), tail: '' };
-    const cut = text.indexOf(' ');
-    if (!bracket || cut < 0) return { main: text, tail: '' };
-    return { main: text.slice(0, cut), tail: upper(text.slice(cut + 1)).replace(/ CHARACTERS$/, ' CHARS').replace(/ WINDOW$/, '') };
+    if (item.kind === 'limit') text = text.replace(/ used$/, '');
+    return item.kind === 'balance' && item.fraction !== null ? `${text} left` : text.replace(/ characters$/, ' chars');
   };
   return {
-    voice,
-    group: (g) => ({ text: plain ? g[0] : upper(g[0]), right: plain ? '' : counted(g) }),
-    words: (s) => (bracket ? upper(s) : s),
-    limitName: (s) => (bracket ? upper(s) : lowerFirst(s)),
+    limitName: lowerFirst,
     figure,
-    active: plain
-      ? { text: 'ACTIVE', color: c.surface, fill: c.ink, border: 'transparent', radius: 8, dot: plainTones(tokens).bar }
-      : bracket
-        ? { text: mark(tokens.type.engraved === true, 'ACTIVE'), color: c.accent, fill: 'transparent', border: 'transparent', radius: 0, dot: '' }
-        : { text: 'ACTIVE', color: c.ink, fill: 'transparent', border: c.ink, radius: 0, dot: '' },
-    // Paper's outlined box, Artboard's rounded 6 px bar, Blueprint's row of twenty blocks.
-    bar: plain ? { kind: 'round', track: plainTones(tokens).rule, fill: c.accent } : bracket ? { kind: 'blocks', track: c.line, fill: c.accent } : { kind: 'box', track: c.ink, fill: c.ink },
+    active: { text: 'ACTIVE', color: c.surface, fill: c.ink, border: 'transparent', radius: 8, dot: plainTones(tokens).bar },
+    // A rounded 6 px bar.
+    bar: { track: plainTones(tokens).rule, fill: c.accent },
     warn: c.danger,
     dim: c.muted,
   };

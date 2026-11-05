@@ -1,9 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
-import { checkTokens, validateTheme } from './theme.mjs';
+import { schemeTokens } from './colorscheme-file.mjs';
 import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
@@ -161,53 +159,32 @@ test('the key strip is the board\'s', () => {
   assert.deepEqual(accountsKeys(look), [['↵', 'make active'], ['r', 'refresh'], ['esc', '']]);
 });
 
-const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
-const looks = () => ['paper', 'artboard', 'blueprint'].map((n) => accountsLook(theme(n)));
+const artboard = () => accountsLook(schemeTokens('artboard'));
 
-test("each theme labels the groups as its board: Paper's caps with a count, Artboard's plain word, Blueprint's caps counting windows", () => {
-  const [paper, artboard, blueprint] = looks();
-  const groups = view().groups;
-  assert.deepEqual(groups.map(paper.group), [{ text: 'CLAUDE', right: '2 ACCOUNTS' }, { text: 'BALANCES', right: '5 PROVIDERS' }, { text: 'USAGE', right: '2 PROVIDERS' }]);
-  assert.deepEqual(groups.map(artboard.group), [{ text: 'Claude', right: '' }, { text: 'Balances', right: '' }, { text: 'Usage', right: '' }]);
-  assert.deepEqual(groups.map(blueprint.group), [{ text: 'CLAUDE', right: '2 ACCOUNTS' }, { text: 'BALANCES', right: '5 PROVIDERS' }, { text: 'USAGE', right: '2 WINDOWS' }]);
-  assert.deepEqual(paper.group(['Claude', 1]), { text: 'CLAUDE', right: '1 ACCOUNT' });
+test('the key strip reads in plain words', () => {
+  const strip = accountsKeys(listLook(schemeTokens('artboard'))).map((k) => `${k.key} ${k.word}`.trim());
+  assert.deepEqual(strip, ['↵ make active', 'r refresh', 'esc']);
 });
 
-test("each theme's key strip is its board's: Paper's caps, Artboard's plain words, Blueprint's brackets", () => {
-  const strip = (n) => accountsKeys(listLook(theme(n))).map((k) => `${k.key} ${k.word}`.trim());
-  assert.deepEqual(strip('paper'), ['↵ MAKE ACTIVE', 'R REFRESH', 'ESC']);
-  assert.deepEqual(strip('artboard'), ['↵ make active', 'r refresh', 'esc']);
-  assert.deepEqual(strip('blueprint'), ['[↵] MAKE ACTIVE', '[R] REFRESH', '[ESC]']);
-});
-
-test('each theme draws a figure as its board: a bare percent in Paper and Artboard, Blueprint\'s figure with its words after it', () => {
-  const [paper, artboard, blueprint] = looks();
+test('a figure reads as a bare percent, what is left of a balance, and chars for characters', () => {
+  const look = artboard();
   const v = view();
   const five = Object.assign({ kind: 'limit' }, v.accounts[0].limits[0]);
   const open = Object.assign({ kind: 'balance' }, v.balances[1]);
   const eleven = Object.assign({ kind: 'usage' }, v.usage[0]);
-  const codex = Object.assign({ kind: 'usage' }, v.usage[1]);
-  assert.deepEqual([five, open, eleven].map(paper.figure), [{ main: '34%', tail: '' }, { main: '$3.10 of $10', tail: '' }, { main: '11,500 of 32,000 characters', tail: '' }]);
-  assert.deepEqual([five, open, eleven].map(artboard.figure), [{ main: '34%', tail: '' }, { main: '$3.10 of $10 left', tail: '' }, { main: '11,500 of 32,000 chars', tail: '' }]);
-  assert.deepEqual([five, open, eleven, codex].map(blueprint.figure), [{ main: '34%', tail: 'USED' }, { main: '$3.10', tail: 'OF $10' }, { main: '11,500', tail: 'OF 32,000 CHARS' }, { main: '0%', tail: 'OF MONTHLY' }]);
-  assert.deepEqual([paper.limitName('Weekly Fable'), artboard.limitName('Weekly'), blueprint.limitName('Weekly Fable')], ['weekly Fable', 'weekly', 'WEEKLY FABLE']);
+  assert.deepEqual([five, open, eleven].map(look.figure), ['34%', '$3.10 of $10 left', '11,500 of 32,000 chars']);
+  assert.equal(look.limitName('Weekly'), 'weekly');
 });
 
-test("a warning draws in each theme's danger token, a stale row in its muted one, and ACTIVE in each board's mark", () => {
-  const [paper, artboard, blueprint] = looks();
-  assert.deepEqual([paper.warn, artboard.warn, blueprint.warn], ['#C8381E', '#CF222E', '#FFB547']);
-  assert.deepEqual([paper.dim, artboard.dim, blueprint.dim], ['#575653', '#57606A', '#80A4C2']);
-  assert.deepEqual(paper.active, { text: 'ACTIVE', color: '#1C1915', fill: 'transparent', border: '#1C1915', radius: 0, dot: '' });
-  assert.deepEqual(artboard.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
-  assert.deepEqual(blueprint.active, { text: '[ACTIVE]', color: '#7FE3F0', fill: 'transparent', border: 'transparent', radius: 0, dot: '' });
+test("a warning draws in the scheme's danger token, a stale row in its muted one, and ACTIVE as an ink chip with a dot", () => {
+  const look = artboard();
+  assert.deepEqual([look.warn, look.dim], ['#CF222E', '#57606A']);
+  assert.deepEqual(look.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
+  assert.deepEqual(look.bar, { track: '#E3E6EB', fill: '#3D5AFE' });
 });
 
-test("Frost's ACTIVE dot and bar track are its bar and rule colours", () => {
-  const frost = accountsLook(checkTokens(validateTheme(parseToml(readFileSync(new URL('../../themes/frost/theme.toml', import.meta.url), 'utf8')))));
-  assert.equal(frost.active.dot, '#88C0D0');
-  assert.equal(frost.bar.track, '#434C5E');
-  // The chip's text sits on the ink fill, so it is the surface: white in Artboard, Polar Night in Frost, never white on Frost's light ink.
-  assert.equal(frost.active.color, '#3B4252');
+test("ACTIVE's text is the surface it sits on in a dark scheme too, never white on light ink", () => {
+  assert.equal(accountsLook(schemeTokens('gruvbox-dark')).active.color, '#282828');
 });
 
 test('Enter makes an account that is not active the active one, and does nothing on a balance, a usage row or the active account', () => {

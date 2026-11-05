@@ -7,7 +7,7 @@ import "." as Root
 import "lib/voice.mjs" as L
 import "lib/accounts.mjs" as A
 
-// Claude accounts with their limits, then balances and usage, from dots-accounts' rows in each theme's voice; the collector runs only when the card opens or on r.
+// Claude accounts with their limits, then balances and usage, from dots-accounts' rows; the collector runs only when the card opens or on r.
 Item {
     id: panel
 
@@ -31,19 +31,14 @@ Item {
     readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || "dots-accounts"
     readonly property string registryPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/claude-accounts.json"
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the panel draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
-    readonly property var marks: A.accountsLook(theme.tokens ?? { color: {}, type: { voice: "caps" } })
+    readonly property var marks: A.accountsLook(theme.tokens ?? { color: {} })
     readonly property var view: A.accountsView(registryText, rowsText, Date.now(), fetcher.running)
     readonly property var items: A.accountsItems(view)
     readonly property var stops: items.map((it, i) => it.stop ? i : -1).filter(i => i >= 0)
     readonly property int current: stops.length ? stops[Math.min(selected, stops.length - 1)] : -1
     readonly property var activeAccount: view.accounts.find(a => a.active) ?? null
-    readonly property bool caps: look.voice === "caps"
-    readonly property bool plain: look.voice === "plain"
-    readonly property bool bracket: look.voice === "bracket"
     readonly property Root.Motion motion: Root.Motion {
         shown: panel.shown
         tokens: panel.theme.tokens
@@ -132,14 +127,13 @@ Item {
             groups: groups,
             rows: rows,
             selected: current >= 0 ? items[current].kind + ":" + items[current].label : "",
-            footer: (caps ? stripFooter : footerLine).text,
+            footer: footerLine.text,
             hint: keys.join(" · "),
             openMs: openMs,
             cardMs: cardMs,
             opens: opens,
             settled: motion.settled,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             keyboard: panel.Window.active
         });
     }
@@ -240,8 +234,7 @@ Item {
         id: card
         x: Math.round((parent.width - width) / 2)
         y: Math.max(24, Math.min(100, Math.round((parent.height - height) / 2)))
-        // Paper's board is 700 px wide, Artboard's 640 and Blueprint's 760.
-        width: plain ? 640 : bracket ? 760 : 700
+        width: 640
         height: column.implicitHeight
         tokens: panel.theme.tokens
         label: "Accounts"
@@ -252,20 +245,19 @@ Item {
             width: parent.width
             spacing: 0
 
-            // The heading in the launcher's label idiom; Paper names the account cx starts in, the others the key.
+            // The heading in the launcher's pill, and the key across from it.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 18 : bracket ? 22 : 20
+                Layout.leftMargin: 18
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: plain ? 16 : bracket ? 12 : 18
-                Layout.bottomMargin: plain ? 16 : bracket ? 10 : 14
+                Layout.topMargin: 16
+                Layout.bottomMargin: 16
                 spacing: 12
 
                 Rectangle {
-                    visible: look.label.kind !== "header"
-                    implicitWidth: heading.implicitWidth + (plain ? 18 : 14)
+                    implicitWidth: heading.implicitWidth + 18
                     implicitHeight: heading.implicitHeight + 6
-                    radius: plain ? 8 : 0
+                    radius: 8
                     color: look.label.fill
                     Text {
                         id: heading
@@ -274,20 +266,10 @@ Item {
                         text: look.heading("accounts", "")
                         color: look.label.color
                         font.family: fonts.ui
-                        font.pixelSize: plain ? 12 : 10
-                        font.weight: plain ? Font.Medium : Font.Normal
-                        font.letterSpacing: plain ? 0 : 1.4
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        font.letterSpacing: 0
                     }
-                }
-
-                Text {
-                    visible: look.label.kind === "header"
-                    textFormat: Text.PlainText
-                    text: look.heading("accounts", "usage")
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
                 }
 
                 Item {
@@ -295,20 +277,20 @@ Item {
                 }
 
                 Rectangle {
-                    implicitWidth: headRight.implicitWidth + (plain ? 18 : 0)
-                    implicitHeight: headRight.implicitHeight + (plain ? 6 : 0)
+                    implicitWidth: headRight.implicitWidth + 18
+                    implicitHeight: headRight.implicitHeight + 6
                     radius: 8
-                    color: plain ? look.tile.fill : "transparent"
+                    color: look.tile.fill
                     Text {
                         id: headRight
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
-                        text: plain ? "Mod+U" : bracket ? L.mark(look.engraved, "MOD+U") : "CX · " + (panel.activeAccount ? panel.activeAccount.label.toUpperCase() : "")
-                        color: bracket ? c.accent : c.muted
+                        text: "Mod+U"
+                        color: c.muted
                         font.family: fonts.ui
-                        font.pixelSize: plain ? 11 : 10
-                        font.weight: plain ? Font.Medium : bracket ? Font.Bold : Font.Normal
-                        font.letterSpacing: plain ? 0 : 1.4
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
+                        font.letterSpacing: 0
                     }
                 }
             }
@@ -318,7 +300,7 @@ Item {
             Column {
                 id: list
                 Layout.fillWidth: true
-                Layout.leftMargin: caps ? 0 : bracket ? 10 : 8
+                Layout.leftMargin: 8
                 Layout.rightMargin: Layout.leftMargin
                 Layout.topMargin: 4
                 Layout.bottomMargin: 8
@@ -338,8 +320,7 @@ Item {
                         readonly property bool hasNote: !isGroup && !isLimit && (it.note || "") !== ""
                         readonly property bool isAccount: it.kind === "account"
                         readonly property bool isCurrent: index === panel.current
-                        readonly property var group: isGroup ? marks.group([it.label, it.count]) : null
-                        readonly property var fig: isGroup || isAccount ? null : marks.figure(it)
+                        readonly property string fig: isGroup || isAccount ? "" : marks.figure(it)
                         readonly property bool warn: !!it.warning
                         readonly property color ink: isCurrent ? look.cursor.text : it.dim ? marks.dim : c.ink
                         readonly property color quiet: isCurrent ? look.cursor.detail : marks.dim
@@ -348,32 +329,32 @@ Item {
                             return {
                                 kind: it.kind,
                                 name: nameText.text,
-                                plan: planText.visible ? planText.text : isAccount && resetUnder.visible ? resetUnder.text : "",
+                                plan: isAccount && resetUnder.visible ? resetUnder.text : "",
                                 active: activeMark.visible ? activeText.text : "",
-                                figure: (figure.visible ? figMain.text : "") + (figure.visible && figTail.visible ? " " + figTail.text : ""),
+                                figure: figure.visible ? figMain.text : "",
                                 reset: resetText.visible ? resetText.text : !isAccount && resetUnder.visible ? resetUnder.text : "",
                                 note: noteText.visible ? noteText.text : "",
                                 warning: triangle.visible,
                                 lines: nameText.lineCount,
                                 elided: nameText.truncated,
-                                figureElided: figMain.truncated || figTail.truncated,
+                                figureElided: figMain.truncated,
                                 noteCut: noteText.visible && (noteText.x < 0 || noteText.x + noteText.width > noteBox.width + 0.5),
                                 noteElided: noteText.visible && noteText.truncated,
                                 // The farthest right any drawn text of the row reaches, in the window, to compare with cardBox.
-                                right: [nameText, noteText, figMain, figTail, resetText, activeMark].filter(t => t.visible).reduce((m, t) => Math.max(m, t.mapToItem(null, t.width, 0).x), 0)
+                                right: [nameText, noteText, figMain, resetText, activeMark].filter(t => t.visible).reduce((m, t) => Math.max(m, t.mapToItem(null, t.width, 0).x), 0)
                             };
                         }
                         function drawnGroup() {
                             const a = groupText.mapToItem(null, 0, 0);
-                            return { text: groupText.text, right: groupRight.text, x: a.x, y: a.y, w: groupText.width * card.scale, h: groupText.height * card.scale };
+                            return { text: groupText.text, x: a.x, y: a.y, w: groupText.width * card.scale, h: groupText.height * card.scale };
                         }
 
                         width: list.width
-                        implicitHeight: isGroup ? groupRow.implicitHeight + (it.label === "Claude" ? 14 : 20) : row.implicitHeight + (isLimit ? (bracket ? 10 : 12) : plain ? 10 : bracket ? 14 : 16)
+                        implicitHeight: isGroup ? groupRow.implicitHeight + (it.label === "Claude" ? 14 : 20) : row.implicitHeight + (isLimit ? 12 : 10)
                         radius: look.cursor.radius
                         color: isCurrent ? look.cursor.fill : "transparent"
 
-                        // A group label: Paper and Blueprint count the rows at the right, Artboard writes the plain word.
+                        // A group label in the plain word.
                         RowLayout {
                             id: groupRow
                             visible: rowItem.isGroup
@@ -381,29 +362,17 @@ Item {
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             anchors.bottomMargin: 4
-                            anchors.leftMargin: caps ? 20 : 12
+                            anchors.leftMargin: 12
                             anchors.rightMargin: anchors.leftMargin
 
                             Text {
                                 id: groupText
                                 textFormat: Text.PlainText
-                                text: rowItem.group ? rowItem.group.text : ""
+                                text: rowItem.isGroup ? rowItem.it.label : ""
                                 color: look.small.color
                                 font.family: look.small.font
                                 font.pixelSize: look.small.size
-                                font.letterSpacing: plain ? 0 : 1.6
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                            }
-                            Text {
-                                id: groupRight
-                                textFormat: Text.PlainText
-                                text: rowItem.group ? rowItem.group.right : ""
-                                color: look.small.color
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: 1.6
+                                font.letterSpacing: 0
                             }
                         }
 
@@ -411,25 +380,12 @@ Item {
                             id: row
                             visible: !rowItem.isGroup
                             anchors.fill: parent
-                            anchors.leftMargin: caps ? 20 : 12
+                            anchors.leftMargin: 12
                             anchors.rightMargin: anchors.leftMargin
-                            spacing: plain ? 10 : 14
+                            spacing: 10
 
-                            // Paper's cursor mark, Blueprint's row number; a limit row keeps the column empty.
-                            Text {
-                                visible: !plain
-                                Layout.preferredWidth: bracket ? 22 : 10
-                                textFormat: Text.PlainText
-                                text: bracket ? (rowItem.it.stop ? look.number(panel.stops.indexOf(rowItem.index)) : "") : "▸"
-                                color: bracket ? (rowItem.isCurrent ? look.cursor.text : c.muted) : rowItem.isCurrent ? look.cursor.marker : "transparent"
-                                font.family: bracket ? look.name.font : fonts.ui
-                                font.pixelSize: bracket ? 13 : 15
-                                font.bold: bracket && rowItem.isCurrent
-                            }
-
-                            // Artboard's 32 px tile: a person for an account, a provider's initials for the rest; its limits sit indented under it.
+                            // A 32 px tile: a person for an account, a provider's initials for the rest; its limits sit indented under it.
                             Rectangle {
-                                visible: plain
                                 implicitWidth: rowItem.isLimit ? 34 : look.tile.size
                                 implicitHeight: rowItem.isLimit ? 1 : look.tile.size
                                 radius: look.tile.radius
@@ -482,27 +438,27 @@ Item {
                             }
 
                             ColumnLayout {
-                                Layout.preferredWidth: rowItem.isLimit ? (plain ? 92 : bracket ? 118 : 102) : (plain ? -1 : 120)
-                                Layout.fillWidth: plain && !rowItem.isLimit
-                                Layout.leftMargin: rowItem.isLimit && caps ? 18 : 0
+                                Layout.preferredWidth: rowItem.isLimit ? 92 : -1
+                                Layout.fillWidth: !rowItem.isLimit
                                 spacing: 0
 
                                 Text {
                                     id: nameText
                                     Layout.fillWidth: true
                                     textFormat: Text.PlainText
-                                    text: rowItem.isLimit ? marks.limitName(rowItem.it.name) : marks.words(rowItem.it.label || "")
+                                    text: rowItem.isLimit ? marks.limitName(rowItem.it.name) : rowItem.it.label || ""
                                     maximumLineCount: 1
                                     elide: Text.ElideRight
-                                    color: rowItem.isLimit ? (plain || bracket ? rowItem.quiet : rowItem.ink) : rowItem.isCurrent && plain ? look.cursor.text : rowItem.ink
+                                    color: rowItem.isLimit ? rowItem.quiet : rowItem.isCurrent ? look.cursor.text : rowItem.ink
                                     font.family: fonts.ui
-                                    font.pixelSize: rowItem.isLimit ? (plain ? 12 : 13) : plain && !rowItem.isAccount ? 14 : 15
-                                    font.weight: rowItem.isLimit ? Font.Normal : bracket && rowItem.isAccount ? Font.Bold : bracket ? Font.Normal : Font.Medium
-                                    font.letterSpacing: bracket ? (rowItem.isLimit ? 1 : 0.6) : 0
+                                    font.pixelSize: rowItem.isLimit ? 12 : !rowItem.isAccount ? 14 : 15
+                                    font.weight: rowItem.isLimit ? Font.Normal : Font.Medium
+                                    font.letterSpacing: 0
                                 }
+                                // The plan under an account's name, the reset under a usage row's.
                                 Text {
                                     id: resetUnder
-                                    visible: plain && (rowItem.isAccount || rowItem.it.kind === "usage") && text !== ""
+                                    visible: (rowItem.isAccount || rowItem.it.kind === "usage") && text !== ""
                                     textFormat: Text.PlainText
                                     text: rowItem.isAccount ? rowItem.it.plan : rowItem.it.reset || ""
                                     color: c.muted
@@ -511,55 +467,17 @@ Item {
                                 }
                             }
 
-                            // The plan: Paper's italic serif, Blueprint's bordered caps; Artboard writes it under the name.
-                            Rectangle {
-                                visible: rowItem.isAccount && !plain && rowItem.it.plan !== ""
-                                implicitWidth: planText.implicitWidth + (bracket ? 12 : 0)
-                                implicitHeight: planText.implicitHeight + (bracket ? 2 : 0)
-                                color: "transparent"
-                                border.width: bracket ? 1 : 0
-                                border.color: rowItem.isCurrent ? look.cursor.text : c.muted
-                                Text {
-                                    id: planText
-                                    visible: rowItem.isAccount && !plain
-                                    anchors.centerIn: parent
-                                    textFormat: Text.PlainText
-                                    text: marks.words(rowItem.it.plan || "")
-                                    color: rowItem.isCurrent ? look.cursor.detail : c.muted
-                                    font.family: bracket ? fonts.ui : fonts.display
-                                    font.pixelSize: bracket ? 10 : 17
-                                    font.italic: caps
-                                    font.letterSpacing: bracket ? 1.2 : 0
-                                }
-                            }
-
-                            // Each board's bar: Paper's outlined box, Artboard's rounded line, Blueprint's twenty blocks.
+                            // A rounded 6 px bar.
                             Item {
                                 id: bar
                                 readonly property real fraction: rowItem.it.fraction ?? 0
                                 readonly property color fill: rowItem.warn ? marks.warn : rowItem.it.dim ? marks.dim : marks.bar.fill
-                                readonly property int blocks: Math.round(fraction * 20)
                                 visible: !rowItem.isGroup && !rowItem.isAccount && rowItem.it.fraction !== null && rowItem.it.fraction !== undefined
-                                Layout.fillWidth: plain && rowItem.isLimit
-                                Layout.preferredWidth: bracket ? 164 : plain ? (rowItem.isLimit ? -1 : 120) : 110
-                                implicitHeight: bracket ? blockText.implicitHeight : plain ? 6 : 8
+                                Layout.fillWidth: rowItem.isLimit
+                                Layout.preferredWidth: rowItem.isLimit ? -1 : 120
+                                implicitHeight: 6
 
                                 Rectangle {
-                                    visible: marks.bar.kind === "box"
-                                    anchors.fill: parent
-                                    color: "transparent"
-                                    border.width: 1
-                                    border.color: rowItem.it.dim ? marks.dim : marks.bar.track
-                                    Rectangle {
-                                        x: 1
-                                        y: 1
-                                        width: (parent.width - 2) * bar.fraction
-                                        height: parent.height - 2
-                                        color: bar.fill
-                                    }
-                                }
-                                Rectangle {
-                                    visible: marks.bar.kind === "round"
                                     anchors.fill: parent
                                     radius: 3
                                     color: marks.bar.track
@@ -570,76 +488,46 @@ Item {
                                         color: bar.fill
                                     }
                                 }
-                                Row {
-                                    visible: marks.bar.kind === "blocks"
-                                    Text {
-                                        id: blockText
-                                        textFormat: Text.PlainText
-                                        text: "▮".repeat(bar.blocks)
-                                        color: bar.fill
-                                        font.family: fonts.mono
-                                        font.pixelSize: 12
-                                        font.letterSpacing: 0.6
-                                    }
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        text: "▮".repeat(20 - bar.blocks)
-                                        color: marks.bar.track
-                                        font.family: fonts.mono
-                                        font.pixelSize: 12
-                                        font.letterSpacing: 0.6
-                                    }
-                                }
                             }
 
                             // A stale account's line, or a provider's stale time or failure; a failure speaks in the danger token.
-                            Rectangle {
+                            Item {
                                 id: noteBox
-                                readonly property real pad: bracket && rowItem.it.error ? 16 : 0
                                 visible: rowItem.hasNote
                                 // Fixed at its text's width up to a cap, so the figure gives way to it, never the other way; an account's line says what to do and may run longer. Past the cap it ends in an ellipsis.
-                                Layout.preferredWidth: Math.min(implicitWidth, (rowItem.isAccount ? 360 : 200) + pad)
-                                implicitWidth: noteText.implicitWidth + pad
-                                implicitHeight: noteText.implicitHeight + (bracket && rowItem.it.error ? 2 : 0)
-                                color: "transparent"
-                                border.width: bracket && rowItem.it.error ? 1 : 0
-                                border.color: marks.warn
+                                Layout.preferredWidth: Math.min(implicitWidth, rowItem.isAccount ? 360 : 200)
+                                implicitWidth: noteText.implicitWidth
+                                implicitHeight: noteText.implicitHeight
                                 Text {
                                     id: noteText
                                     anchors.left: parent.left
-                                    anchors.leftMargin: noteBox.pad / 2
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width: Math.min(implicitWidth, parent.width - noteBox.pad)
+                                    width: Math.min(implicitWidth, parent.width)
                                     elide: Text.ElideRight
                                     textFormat: Text.PlainText
-                                    text: bracket ? (rowItem.it.error ? "✕ " : "") + (rowItem.it.note || "").toUpperCase() : rowItem.it.note || ""
+                                    text: rowItem.it.note || ""
                                     color: rowItem.it.error ? marks.warn : rowItem.isCurrent ? look.cursor.detail : marks.dim
-                                    font.family: caps ? fonts.display : fonts.ui
-                                    font.pixelSize: caps ? 17 : bracket ? 11 : 12
-                                    font.italic: caps
-                                    font.weight: bracket && rowItem.it.error ? Font.Bold : Font.Normal
-                                    font.letterSpacing: bracket ? 1.2 : 0
+                                    font.family: fonts.ui
+                                    font.pixelSize: 12
                                 }
                             }
 
-                            // The figure: from 80% used it takes the danger token, a bolder weight and a small triangle. Paper writes it after the bar, the others at the right.
+                            // The figure at the right: from 80% used it takes the danger token, a bolder weight and a small triangle.
                             Item {
                                 id: figure
-                                visible: rowItem.fig !== null && rowItem.fig.main !== ""
-                                // Paper's 230 px and the others' natural width give way to a note or a long figure, so the row never runs past the card.
-                                Layout.fillWidth: !(plain && rowItem.isLimit)
-                                Layout.preferredWidth: caps ? 230 : plain && rowItem.isLimit ? 56 : figRow.implicitWidth
-                                Layout.maximumWidth: caps ? 230 : Number.POSITIVE_INFINITY
+                                visible: rowItem.fig !== ""
+                                // Its natural width gives way to a note or a long figure, so the row never runs past the card.
+                                Layout.fillWidth: !rowItem.isLimit
+                                Layout.preferredWidth: rowItem.isLimit ? 56 : figRow.implicitWidth
                                 Layout.minimumWidth: 0
                                 implicitHeight: figRow.implicitHeight
                                 clip: true
 
                                 Row {
                                     id: figRow
-                                    // What the figure's two texts share once the triangle and the gap are taken: the main part keeps at least half, the tail takes what the main leaves.
-                                    readonly property real room: Math.max(0, figure.width - (triangle.visible ? triangle.width + spacing : 0) - (figTail.visible ? spacing : 0))
-                                    anchors.left: caps ? parent.left : undefined
-                                    anchors.right: caps ? undefined : parent.right
+                                    // What the figure's text has once the triangle and the gap are taken.
+                                    readonly property real room: Math.max(0, figure.width - (triangle.visible ? triangle.width + spacing : 0))
+                                    anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
                                     spacing: 6
 
@@ -690,108 +578,89 @@ Item {
                                     Text {
                                         id: figMain
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: Math.min(implicitWidth, figTail.visible ? Math.max(figRow.room - figTail.implicitWidth, figRow.room / 2) : figRow.room)
+                                        width: Math.min(implicitWidth, figRow.room)
                                         elide: Text.ElideRight
                                         textFormat: Text.PlainText
-                                        text: rowItem.fig ? rowItem.fig.main : ""
+                                        text: rowItem.fig
                                         color: rowItem.warn ? marks.warn : rowItem.ink
                                         font.family: fonts.ui
-                                        font.pixelSize: rowItem.isLimit ? (plain ? 12 : 13) : plain ? 14 : 13
-                                        font.weight: rowItem.warn ? Font.Bold : plain ? Font.Medium : Font.Normal
-                                    }
-                                    Text {
-                                        id: figTail
-                                        visible: text !== ""
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: Math.min(implicitWidth, Math.max(0, figRow.room - figMain.width))
-                                        elide: Text.ElideRight
-                                        textFormat: Text.PlainText
-                                        text: rowItem.fig ? rowItem.fig.tail : ""
-                                        color: rowItem.isCurrent ? look.cursor.detail : c.muted
-                                        font.family: fonts.ui
-                                        font.pixelSize: rowItem.isLimit ? 12 : 13
+                                        font.pixelSize: rowItem.isLimit ? 12 : 14
+                                        font.weight: rowItem.warn ? Font.Bold : Font.Medium
                                     }
                                 }
                             }
 
                             Item {
-                                visible: caps || !figure.visible
+                                visible: !figure.visible
                                 Layout.fillWidth: true
                             }
 
-                            // ACTIVE in each board's mark: Paper's box, Artboard's ink chip with its dot, Blueprint's bracket.
+                            // ACTIVE as an ink chip with its dot.
                             Rectangle {
                                 id: activeMark
                                 visible: rowItem.isAccount && rowItem.it.active
-                                implicitWidth: activeRow.implicitWidth + (bracket ? 0 : plain ? 18 : 12)
-                                implicitHeight: activeRow.implicitHeight + (bracket ? 0 : 6)
+                                implicitWidth: activeRow.implicitWidth + 18
+                                implicitHeight: activeRow.implicitHeight + 6
                                 radius: marks.active.radius
                                 color: marks.active.fill
-                                border.width: marks.active.border === "transparent" ? 0 : 1
-                                border.color: rowItem.isCurrent && caps ? look.cursor.text : marks.active.border
                                 Row {
                                     id: activeRow
                                     anchors.centerIn: parent
                                     spacing: 6
                                     Rectangle {
-                                        visible: marks.active.dot !== ""
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 6
                                         height: 6
                                         radius: 3
-                                        color: marks.active.dot || "transparent"
+                                        color: marks.active.dot
                                     }
                                     Text {
                                         id: activeText
                                         textFormat: Text.PlainText
                                         text: marks.active.text
-                                        color: rowItem.isCurrent && !plain ? look.cursor.text : marks.active.color
+                                        color: marks.active.color
                                         font.family: fonts.ui
-                                        font.pixelSize: plain ? 11 : 10
-                                        font.weight: plain ? Font.Medium : bracket ? Font.Bold : Font.Normal
-                                        font.letterSpacing: plain ? 0 : 1.4
+                                        font.pixelSize: 11
+                                        font.weight: Font.Medium
+                                        font.letterSpacing: 0
                                     }
                                 }
                             }
 
-                            // The reset at the row's end: Paper's italic serif, Blueprint's caps; Artboard puts a usage row's under its name.
+                            // A limit's reset at the row's end; a usage row's sits under its name.
                             Text {
                                 id: resetText
-                                visible: !rowItem.isGroup && !rowItem.isAccount && !(plain && rowItem.it.kind === "usage") && (rowItem.isLimit || rowItem.it.kind === "usage")
+                                visible: rowItem.isLimit
                                 // A column when the row has room; when it has none, the column's slack goes to the figure, never the reset's own text.
-                                Layout.fillWidth: !caps
-                                Layout.preferredWidth: caps ? -1 : bracket ? 140 : 112
-                                Layout.maximumWidth: caps ? Number.POSITIVE_INFINITY : bracket ? 140 : 112
-                                Layout.minimumWidth: caps ? -1 : implicitWidth
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 112
+                                Layout.maximumWidth: 112
+                                Layout.minimumWidth: implicitWidth
                                 horizontalAlignment: Text.AlignRight
                                 textFormat: Text.PlainText
-                                text: marks.words(rowItem.it.reset || "")
-                                color: rowItem.warn && plain ? marks.warn : rowItem.quiet
-                                font.family: caps ? fonts.display : fonts.ui
-                                font.pixelSize: caps ? 17 : 11
-                                font.italic: caps
-                                font.letterSpacing: bracket ? 1.2 : 0
+                                text: rowItem.it.reset || ""
+                                color: rowItem.warn ? marks.warn : rowItem.quiet
+                                font.family: fonts.ui
+                                font.pixelSize: 11
+                                font.letterSpacing: 0
                             }
                         }
                     }
                 }
             }
 
-            Rule {
-                visible: !caps
-            }
+            Rule {}
 
-            // When the rows were fetched, or that a fetch runs; Paper writes it at the key strip's end.
+            // When the rows were fetched, or that a fetch runs.
             Text {
                 id: footerLine
-                visible: !caps
                 Layout.fillWidth: true
-                Layout.leftMargin: bracket ? 22 : 20
+                Layout.leftMargin: 20
                 Layout.topMargin: 9
                 Layout.bottomMargin: 9
                 textFormat: Text.PlainText
-                text: marks.words(view.footer)
-                color: bracket && fetcher.running ? c.accent : c.muted
+                text: view.footer
+                color: c.muted
                 font.family: look.small.font
                 font.pixelSize: look.small.size
                 font.letterSpacing: look.small.spacing
@@ -799,18 +668,18 @@ Item {
 
             Rule {}
 
-            // The key strip as Pass draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key strip as Pass draws it, each pair in a chip.
             RowLayout {
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 14 : bracket ? 22 : 20
+                Layout.leftMargin: 14
                 Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: plain ? 10 : 12
-                Layout.bottomMargin: bracket ? 14 : Layout.topMargin
+                Layout.topMargin: 10
+                Layout.bottomMargin: Layout.topMargin
                 spacing: 8
 
                 Flow {
                     Layout.fillWidth: true
-                    spacing: plain ? 8 : 14
+                    spacing: 8
 
                     Repeater {
                         id: keyRepeater
@@ -821,15 +690,15 @@ Item {
                             required property var modelData
                             readonly property string keyLabel: keyText.text
                             readonly property string wordLabel: wordText.text
-                            width: pair.implicitWidth + (plain ? 14 : 0)
-                            height: pair.implicitHeight + (plain ? 6 : 0)
+                            width: pair.implicitWidth + 14
+                            height: pair.implicitHeight + 6
                             radius: 6
                             color: look.chip.fill
 
                             Row {
                                 id: pair
                                 anchors.centerIn: parent
-                                spacing: plain ? 6 : 5
+                                spacing: 6
 
                                 Text {
                                     id: keyText
@@ -855,38 +724,14 @@ Item {
                         }
                     }
                 }
-
-                // Paper's red square marks a fetch that runs.
-                Rectangle {
-                    visible: caps && fetcher.running
-                    implicitWidth: 7
-                    implicitHeight: 7
-                    color: c.accent
-                }
-                Text {
-                    id: stripFooter
-                    visible: caps
-                    textFormat: Text.PlainText
-                    text: view.footer
-                    color: fetcher.running ? c.ink : c.muted
-                    font.family: fonts.display
-                    font.pixelSize: 17
-                    font.italic: true
-                }
             }
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }
