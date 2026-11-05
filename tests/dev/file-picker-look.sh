@@ -23,6 +23,17 @@ for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do truncate -s 2800000 "$loo
 
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 state_is() { pk_state | jq -e "$@" >/dev/null 2>&1; }
+# Exits 0 when the screen holds a pixel within $4 of $1 $2 $3.
+on_screen() {
+  grim -s 1 -t ppm - | node -e '
+    const [r, g, b, tol] = process.argv.slice(1).map(Number);
+    const buf = require("fs").readFileSync(0);
+    const head = buf.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    const px = buf.subarray(head[0].length);
+    for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) process.exit(0);
+    process.exit(1);
+  ' "$@"
+}
 request() { jq -cn --arg mode "$1" --arg folder "$2" --argjson multiple "${3-false}" --arg app "${4-chromium-browser}" '{mode: $mode, multiple: $multiple, title: "", app: $app, folder: $folder, name: (if $mode == "save" then "report.pdf" else "" end), filters: [], filter: 0, accept: ""}'; }
 ask() {
   rm -f "$out/$1"
@@ -64,6 +75,7 @@ long=$(printf 'chrome-%0193d' 0)
 ask preview "$(request open "$look/shots")"
 shown
 cursor_to Photo.jpg
+check "the cursor row's #EEF1FF tint reads on screen" on_screen 238 241 255 2
 check "a 640 x 480 JPEG draws 640 × 480 px ($(until_ok 3000 state_is '.previewDims != ""'; preview_of))" state_is '.previewDims == "640 × 480 px" and .previewName == "Photo.jpg"'
 cursor_to Report.pdf
 check "a PDF draws no dimensions line and no picture ($(until_ok 2000 state_is '.previewName == "Report.pdf"'; preview_of))" until_ok 2000 state_is '.previewName == "Report.pdf" and .preview == false and .previewDims == "" and .previewLines[0:1] == ["184 KB"] and (.previewLines | length) == 2'

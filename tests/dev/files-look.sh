@@ -19,6 +19,17 @@ json_is() { jq -e "$@" >/dev/null; }
 files_call() { timeout 0.5 qs ipc -p "$files_qml" call files "$@" 2>/dev/null; }
 files_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "files" and .is_focused)' >/dev/null; }
 files_gone() { ! niri msg -j windows | jq -e 'any(.[]; .app_id == "files")' >/dev/null; }
+# Exits 0 when the screen holds a pixel within $4 of $1 $2 $3.
+on_screen() {
+  grim -s 1 -t ppm - | node -e '
+    const [r, g, b, tol] = process.argv.slice(1).map(Number);
+    const buf = require("fs").readFileSync(0);
+    const head = buf.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
+    const px = buf.subarray(head[0].length);
+    for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) process.exit(0);
+    process.exit(1);
+  ' "$@"
+}
 
 # The board's rounded paths.
 folder='M2 4.5A1.5 1.5 0 0 1 3.5 3H6l1.5 1.8h5A1.5 1.5 0 0 1 14 6.3v5.2a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5z'
@@ -41,6 +52,7 @@ plain_row=$(files_call row invoice-0912.pdf)
 folder_row=$(files_call row screenshots)
 check "a marked row draws ● filled #3d5afe ($(jq -c '{mark, markFill}' <<<"$marked"))" \
   json_is '.mark == "●" and .markFill == "#3d5afe"' <<<"$marked"
+check "the marked row's ● reads #3D5AFE on screen" on_screen 61 90 254 12
 check "an unmarked row draws ○ ($(jq -c '{mark, markFill}' <<<"$plain_row"))" json_is '.mark == "○"' <<<"$plain_row"
 check "a folder row draws the board's folder and a file row its page ($(jq -c .icon <<<"$folder_row") $(jq -c .icon <<<"$plain_row"))" \
   bash -c 'jq -e --arg p "$1" ".icon == \$p" <<<"$2" >/dev/null && jq -e --arg p "$3" ".icon == \$p" <<<"$4" >/dev/null' _ "$folder" "$folder_row" "$file" "$plain_row"
@@ -54,6 +66,8 @@ place_here=$(files_call place Downloads)
 place_off=$(files_call place Home)
 check "the current place is filled #eef1ff, another place is not ($place_here $(jq -c .fill <<<"$place_off"))" \
   bash -c 'jq -e ".fill == \"#eef1ff\"" <<<"$1" >/dev/null && jq -e ".fill == \"#00000000\"" <<<"$2" >/dev/null' _ "$place_here" "$place_off"
+
+check "the current place's #EEF1FF fill reads on screen" on_screen 238 241 255 2
 
 check "the preview shows in the full window ($(files_state | jq -c '{width, shown: .preview.shown}'))" files_is '.preview.shown'
 # FilesMarked draws the narrow layout 850 px wide, with no preview.
