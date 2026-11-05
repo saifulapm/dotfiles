@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/notifs.mjs" as Lib
 import "lib/voice.mjs" as V
+import "lib/dekho.mjs" as D
 
 // The notification centre, drawn in the Surfaces window.
 Item {
@@ -165,6 +166,9 @@ Item {
             ruleBox: box(headRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
+            // How far the list is scrolled from its first row, and the box it draws rows in.
+            scrollY: list.contentY - list.originY,
+            listBox: box(list),
             legend: legendKeys.map(k => k.key + " " + k.word).join("  "),
             legendKeys: legendKeys.map(k => k.key),
             legendSpacing: look.small.spacing,
@@ -363,6 +367,14 @@ Item {
                     interactive: false
                     model: rows
 
+                    // Under the rows in the content, the wheel moves contentY as the keys do; a row's MouseArea takes no wheel.
+                    MouseArea {
+                        anchors.fill: parent
+                        z: -1
+                        acceptedButtons: Qt.NoButton
+                        onWheel: event => list.contentY = list.originY + D.wheeled(list.contentY - list.originY, event.angleDelta.y, list.contentHeight, list.height)
+                    }
+
                     delegate: Column {
                         id: item
                         required property var modelData
@@ -519,8 +531,15 @@ Item {
                             MouseArea {
                                 id: rowArea
                                 property bool onChip: false
+                                objectName: "click:notif-row:" + item.index
                                 anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
                                 drag.target: rowOffer
+                                // A press and release with no drag does what Enter does on this row.
+                                onClicked: {
+                                    centre.selected = item.index;
+                                    centre.act();
+                                }
                                 onPressed: mouse => {
                                     const f = item.fileChip;
                                     onChip = f !== null && f.contains(f.mapFromItem(rowArea, mouse.x, mouse.y));
