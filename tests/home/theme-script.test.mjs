@@ -17,10 +17,11 @@ test('the theme script hashes the colorschemes and renders the saved one', () =>
   assert.doesNotMatch(script, /paper|theme-render\.mjs/);
 });
 
-test('dots-dev renders DOTS_DEV_SCHEME with the colorscheme render and keeps the legacy default otherwise', () => {
+test('dots-dev renders DOTS_DEV_SCHEME with the colorscheme render, artboard by default, and no legacy theme', () => {
   const dev = read('bin/dots-dev');
+  assert.match(dev, /^: "\$\{DOTS_DEV_SCHEME:=artboard\}"$/m);
   assert.match(dev, /colorscheme-render\.mjs" "\$DOTS_DEV_SCHEME"/);
-  assert.match(dev, /theme-render\.mjs" "\$\{DOTS_DEV_THEME:-paper\}"/);
+  assert.doesNotMatch(dev, /theme-render\.mjs|DOTS_DEV_THEME/);
 });
 
 // A dark old theme saved on a machine became artboard on the next apply while GTK kept prefer-dark, since only a switch tells GTK (m79 review).

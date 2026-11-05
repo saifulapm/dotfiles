@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The island morphs by the theme's motion: Artboard's spring overshoots and settles, Paper's snappy curve never does, and nothing runs at rest.
 {
-export DOTS_DEV_THEME=artboard
+export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
