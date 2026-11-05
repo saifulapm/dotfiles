@@ -1,13 +1,14 @@
-// dots claude-account and the fish cx, with claude and its login played by a stub in a scratch home.
+// dots claude-account, the claude wrapper every launcher runs and the fish cx, with claude and its login played by a stub in a scratch home.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, existsSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const dots = new URL('../../bin/dots', import.meta.url).pathname;
 const cxFn = new URL('../../home/dot_config/fish/functions/cx.fish', import.meta.url).pathname;
+const wrapperSrc = new URL('../../home/dot_local/libexec/dots/executable_claude', import.meta.url).pathname;
 const links = ['skills', 'agents', 'settings.json', 'CLAUDE.md', 'history.jsonl', 'projects'];
 
 const stub = `#!/usr/bin/env bash
@@ -29,9 +30,13 @@ function scratch(t) {
   const home = join(root, 'home');
   const bindir = join(root, 'bin');
   for (const d of ['rec', 'state', 'config', 'cache', 'data', 'run']) mkdirSync(join(root, d));
-  for (const d of [bindir, join(home, '.claude')]) mkdirSync(d, { recursive: true });
-  writeFileSync(join(bindir, 'claude'), stub);
-  chmodSync(join(bindir, 'claude'), 0o755);
+  for (const d of [bindir, join(home, '.claude'), join(home, '.local/bin'), join(home, '.local/libexec/dots')]) mkdirSync(d, { recursive: true });
+  // The installer's claude in ~/.local/bin is the one the wrapper runs; the one on PATH is the one dots claude-account logs in with.
+  for (const p of [join(bindir, 'claude'), join(home, '.local/bin/claude')]) {
+    writeFileSync(p, stub);
+    chmodSync(p, 0o755);
+  }
+  symlinkSync(wrapperSrc, join(home, '.local/libexec/dots/claude'));
   for (const n of ['skills', 'agents', 'projects']) mkdirSync(join(home, '.claude', n));
   for (const n of ['settings.json', 'CLAUDE.md', 'history.jsonl']) writeFileSync(join(home, '.claude', n), '');
   const env = {
@@ -49,7 +54,9 @@ function scratch(t) {
   delete env.STUB_LOGIN_FAIL;
   const reg = join(root, 'state/dots/claude-accounts.json');
   const run = (args, extra = {}) => spawnSync(dots, ['claude-account', ...args], { env: { ...env, ...extra }, encoding: 'utf8' });
-  return { root, home, env, reg, run };
+  const wrapper = join(home, '.local/libexec/dots/claude');
+  const claude = (args, extra = {}) => spawnSync(wrapper, args, { env: { ...env, ...extra }, encoding: 'utf8' });
+  return { root, home, env, reg, run, wrapper, claude };
 }
 
 test('add links the shared entries, records both accounts and holds no token', (t) => {
@@ -132,4 +139,48 @@ test('use and cx refuse an account whose home is not a directory', (t) => {
     assert.equal(r.stdout.trim(), '', `cx ran claude for ${id}`);
     assert.match(r.stderr, /home/);
   }
+});
+
+test('the wrapper runs the installer\'s claude in the active account\'s home, as cx does', (t) => {
+  const s = scratch(t);
+  const work = join(s.root, 'state/dots/claude-accounts/work');
+  // No registry, or the main account active: the default home, whatever home the caller's environment held.
+  assert.equal(s.claude(['-p', 'hi'], { CLAUDE_CONFIG_DIR: '/elsewhere' }).stdout.trim(), 'dir=unset argv=-p hi');
+  assert.equal(s.run(['add', 'work']).status, 0);
+  assert.equal(s.claude(['-p', 'hi'], { CLAUDE_CONFIG_DIR: '/elsewhere' }).stdout.trim(), 'dir=unset argv=-p hi');
+  assert.equal(s.run(['use', 'work']).status, 0);
+  assert.equal(s.claude(['-p', 'hi']).stdout.trim(), `dir=${work} argv=-p hi`);
+  const reg = JSON.parse(readFileSync(s.reg, 'utf8'));
+  writeFileSync(s.reg, JSON.stringify(Object.assign({}, reg, { active: 'gone', accounts: [...reg.accounts, { id: 'gone', label: 'gone', home: join(s.root, 'gone') }] })));
+  const r = s.claude(['-p', 'hi']);
+  assert.notEqual(r.status, 0);
+  assert.equal(r.stdout, '');
+  assert.match(r.stderr, /home/);
+});
+
+// The cloud environment ids are keyed by the email each home is logged into, since a machine's default home may hold the work account.
+test('a --cloud start gets the active account\'s cloud environment through --settings, and nothing else does', (t) => {
+  const s = scratch(t);
+  const work = join(s.root, 'state/dots/claude-accounts/work');
+  const envs = join(s.root, 'state/dots/claude-environments.json');
+  const settings = (id) => `--settings {"remote":{"defaultEnvironmentId":"${id}"}}`;
+  writeFileSync(join(s.home, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'main@example.com' } }));
+  // No ids copied from pass yet: the start goes as it came.
+  assert.equal(s.claude(['--cloud', 'hi']).stdout.trim(), 'dir=unset argv=--cloud hi');
+  mkdirSync(join(s.root, 'state/dots'));
+  writeFileSync(envs, JSON.stringify({ 'main@example.com': 'env_main', 'work@example.com': 'env_work' }));
+  assert.equal(s.claude(['--cloud', 'hi']).stdout.trim(), `dir=unset argv=${settings('env_main')} --cloud hi`);
+  assert.equal(s.claude(['-p', 'hi']).stdout.trim(), 'dir=unset argv=-p hi');
+  assert.equal(s.run(['add', 'work']).status, 0);
+  assert.equal(s.run(['use', 'work']).status, 0);
+  // The second home's own login file names its email; until it does, no id.
+  assert.equal(s.claude(['--cloud', 'hi']).stdout.trim(), `dir=${work} argv=--cloud hi`);
+  writeFileSync(join(work, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'work@example.com' } }));
+  assert.equal(s.claude(['--cloud', 'hi']).stdout.trim(), `dir=${work} argv=${settings('env_work')} --cloud hi`);
+  writeFileSync(join(work, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: 'other@example.com' } }));
+  assert.equal(s.claude(['--cloud', 'hi']).stdout.trim(), `dir=${work} argv=--cloud hi`);
+});
+
+test('cx runs claude through the wrapper', () => {
+  assert.match(readFileSync(cxFn, 'utf8'), /~\/\.local\/libexec\/dots\/claude --allow-dangerously-skip-permissions \$argv/);
 });

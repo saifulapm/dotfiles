@@ -83,7 +83,7 @@ test('claude-rc@ runs in ~/Codes/<project>, skips a missing folder, and no insta
   const unit = readFileSync(join(units, 'claude-rc@.service'), 'utf8');
   assert.match(unit, /^ConditionPathIsDirectory=%h\/Codes\/%i$/m);
   assert.match(unit, /^WorkingDirectory=%h\/Codes\/%i$/m);
-  assert.match(unit, /^ExecStart=%h\/\.local\/bin\/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir$/m);
+  assert.match(unit, /^ExecStart=%h\/\.local\/libexec\/dots\/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir$/m);
   assert.match(unit, /^WantedBy=default\.target$/m);
   const linked = readdirSync(units, { recursive: true }).filter((f) => /claude-rc@/.test(f) && f !== 'claude-rc@.service');
   assert.deepEqual(linked, []);

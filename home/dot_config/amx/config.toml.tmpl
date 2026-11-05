@@ -1,4 +1,5 @@
-agent = "claude"
+# The wrapper runs claude in the active Claude account; amx takes the vendor from its name, and runs it with no shell to expand a ~.
+agent = "{{ .chezmoi.homeDir }}/.local/libexec/dots/claude"
 max_agents = 15
 subagent_depth = 3
 max_total = 6

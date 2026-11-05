@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# claude in the active Claude account, for every launcher (amx, workflow's cloud starts, the hub, claude-rc@, cx): dots claude-account's registry picks the home, and a --cloud start gets that account's cloud environment. Named claude, since amx reads the vendor off the program's name; out of PATH, since the installer owns ~/.local/bin/claude.
+set -uo pipefail
+{
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+reg=$state/claude-accounts.json
+# dots secrets copies the ids here from pass, keyed by email; nothing launched headless may call pass, whose gpg can want a pinentry.
+envs=$state/claude-environments.json
+
+dir=
+[ -f "$reg" ] && dir=$(jq -r '.active as $a | first(.accounts[] | select(.id == $a)) | .home // "-"' "$reg" 2>/dev/null)
+# An active account with no home, or one gone, would give claude a fresh, logged-out config dir.
+if [ -n "$dir" ] && [ ! -d "$dir" ]; then
+  echo "claude: the active Claude account's home is missing; dots claude-account use main goes back to the main one" >&2
+  exit 1
+fi
+login=$HOME/.claude.json
+if [ -n "$dir" ] && [ "$dir" != "$HOME/.claude" ]; then
+  export CLAUDE_CONFIG_DIR=$dir
+  login=$dir/.claude.json
+else
+  unset CLAUDE_CONFIG_DIR
+fi
+
+settings=()
+for a in "$@"; do
+  [ "$a" = --cloud ] || continue
+  # The ids are keyed by the email the home is logged into, not the account's label: a machine's default home may hold the work account. --settings outranks the user settings, which every home shares by link.
+  email=$(jq -r '.oauthAccount.emailAddress // empty' "$login" 2>/dev/null)
+  id=
+  [ -n "$email" ] && id=$(jq -r --arg e "$email" '.[$e] // empty' "$envs" 2>/dev/null)
+  [ -z "$id" ] || settings=(--settings "$(jq -cn --arg id "$id" '{remote: {defaultEnvironmentId: $id}}')")
+  break
+done
+
+exec "$HOME/.local/bin/claude" "${settings[@]}" "$@"
+}

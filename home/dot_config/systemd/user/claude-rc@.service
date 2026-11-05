@@ -7,8 +7,8 @@ StartLimitIntervalSec=0
 
 [Service]
 WorkingDirectory=%h/Codes/%i
-# bypassPermissions, as workflow go's orchestrators run; no session is pre-created in the checkout an orchestrator works in, so every session gets its own worktree.
-ExecStart=%h/.local/bin/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir
+# The account wrapper serves it from the active Claude account as the unit starts; bypassPermissions, as workflow go's orchestrators run; no session is pre-created in the checkout an orchestrator works in, so every session gets its own worktree.
+ExecStart=%h/.local/libexec/dots/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir
 # A stop or SIGTERM withdraws the server from claude.ai and the restart serves again in about 7 s; after a SIGKILL each restart is refused until the claim lapses, about 3 minutes later (measured 2026-10-15).
 Restart=always
 RestartSec=5

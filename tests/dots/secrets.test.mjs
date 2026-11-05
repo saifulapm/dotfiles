@@ -16,6 +16,8 @@ const PASS = {
   'workflow/hub-peer-token': 'peer-test',
   'workflow/slack-bot-token': 'xoxb-test',
   'dufs/saiful': 'dufs-test-password',
+  'claude/cloud-environment/main@example.com': 'env_01mainTEST',
+  'claude/cloud-environment/work@example.com': 'env_01workTEST',
 };
 
 let w;
@@ -127,8 +129,13 @@ test('a fresh machine gets the Dropbox remote, age key, ~/.ssh, GPG key, pass st
   assert.equal(readFileSync(ctx7, 'utf8'), '{\n  "access_token": "ctx7sk-test",\n  "token_type": "Bearer"\n}\n');
   assert.equal(mode(ctx7), '600');
   const env = join(m.XDG_CONFIG_HOME, 'hub/local.env');
-  assert.equal(readFileSync(env, 'utf8'), 'HUB_PEER_TOKEN=peer-test\nSLACK_BOT_TOKEN=xoxb-test\n');
+  assert.equal(readFileSync(env, 'utf8'), `HUB_PEER_TOKEN=peer-test\nSLACK_BOT_TOKEN=xoxb-test\nWORKFLOW_CLAUDE=${m.HOME}/.local/libexec/dots/claude\n`);
   assert.equal(mode(env), '600');
+
+  // The claude wrapper runs headless under the hub and the units, so it reads the ids from a plain file, never from pass.
+  const envs = join(m.XDG_STATE_HOME, 'dots/claude-environments.json');
+  assert.deepEqual(JSON.parse(readFileSync(envs, 'utf8')), { 'main@example.com': 'env_01mainTEST', 'work@example.com': 'env_01workTEST' });
+  assert.equal(mode(envs), '644');
 
   const dufs = join(m.XDG_CONFIG_HOME, 'dufs/config.yaml');
   const hash = readFileSync(dufs, 'utf8').match(/saiful:(\$6\$[^@]+)@/)[1];
