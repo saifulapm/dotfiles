@@ -123,6 +123,13 @@ Item {
         color: Qt.alpha(share.c.surface ?? "white", 0.72)
     }
 
+    // A click on the dimmed window closes the list as Esc does, and the press stops here so no row behind acts.
+    MouseArea {
+        objectName: "click:share-outside"
+        anchors.fill: parent
+        onClicked: share.close()
+    }
+
     Rectangle {
         id: card
         anchors.horizontalCenter: parent.horizontalCenter
@@ -133,6 +140,11 @@ Item {
         radius: 14
         border.width: 1.5
         border.color: share.c.accent ?? "red"
+
+        // A press on the card outside a row is the card's, not the dimmed window's.
+        MouseArea {
+            anchors.fill: parent
+        }
 
         ColumnLayout {
             id: cardColumn
@@ -226,6 +238,15 @@ Item {
                         implicitHeight: 52
                         radius: share.look.cursor.radius
                         color: isCurrent ? share.look.cursor.fill : "transparent"
+
+                        // An offline row's click sends nothing and the list stays, as Enter on it.
+                        Click {
+                            name: "share-row:" + rowItem.index
+                            onTapped: {
+                                share.selected = rowItem.index;
+                                share.send();
+                            }
+                        }
 
                         RowLayout {
                             anchors.fill: parent

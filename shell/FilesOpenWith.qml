@@ -131,6 +131,13 @@ Item {
         color: Qt.alpha(root.c.surface ?? "white", 0.72)
     }
 
+    // A click on the dimmed window closes the list as Esc does, and the press stops here so no row behind acts.
+    MouseArea {
+        objectName: "click:openwith-outside"
+        anchors.fill: parent
+        onClicked: root.close()
+    }
+
     Rectangle {
         id: card
         x: (parent.width - width) / 2
@@ -141,6 +148,11 @@ Item {
         radius: 14
         border.width: 1.5
         border.color: root.c.accent ?? "blue"
+
+        // A press on the card outside a row is the card's, not the dimmed window's.
+        MouseArea {
+            anchors.fill: parent
+        }
 
         ColumnLayout {
             id: cardColumn
@@ -230,6 +242,14 @@ Item {
                         implicitHeight: 52
                         radius: root.look.cursor.radius
                         color: isCurrent ? root.look.cursor.fill : "transparent"
+
+                        Click {
+                            name: "openwith-row:" + appRow.index
+                            onTapped: {
+                                root.at = appRow.index;
+                                root.openIn();
+                            }
+                        }
 
                         ColumnLayout {
                             anchors.verticalCenter: parent.verticalCenter
