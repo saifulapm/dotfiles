@@ -29,19 +29,16 @@ test('the heading reads the surah\'s Bangla name', () => {
 });
 
 test('the heading line counts the ayat, names Meccan Makki and Medinan Madani, and gives the juz', () => {
-  assert.equal(R.metaText('caps', { count: 8, type: 'Meccan' }, null), '8 ayat · Makki');
-  assert.equal(R.metaText('caps', { count: 83, type: 'Meccan' }, 22), '83 ayat · Makki · juz 22');
-  assert.equal(R.metaText('plain', { count: 286, type: 'Medinan' }, 1), '286 ayat · Madani · juz 1');
-  assert.equal(R.metaText('caps', { count: 7, type: 'Meccan' }, null), '7 ayat · Makki');
-  assert.equal(R.metaText('bracket', { count: 7, type: 'Meccan' }, 1), '7 AYAT · MAKKI · JUZ 1');
+  assert.equal(R.metaText({ count: 8, type: 'Meccan' }, null), '8 ayat · Makki');
+  assert.equal(R.metaText({ count: 83, type: 'Meccan' }, 22), '83 ayat · Makki · juz 22');
+  assert.equal(R.metaText({ count: 286, type: 'Medinan' }, 1), '286 ayat · Madani · juz 1');
+  assert.equal(R.metaText({ count: 7, type: 'Meccan' }, null), '7 ayat · Makki');
 });
 
 test('the bar reads the word\'s place and root, leaving out a root it has none of, and no Latin transliteration', () => {
-  assert.equal(R.wordLine('caps', { i: 3, tr: 'l-ʿus\'ri', root: 'ع س ر' }, 6), 'ayah 6, word 3 · root ع س ر');
-  assert.equal(R.wordLine('plain', { i: 1, tr: 'ya-seen', root: null }, 1), 'ayah 1, word 1');
-  assert.equal(R.wordLine('bracket', { i: 3, tr: 'rabbi', root: 'ر ب ب' }, 2), 'AYAH 2, WORD 3 · ROOT ر ب ب');
-  assert.equal(R.hearHint('caps'), '↵ hear this word');
-  assert.equal(R.hearHint('bracket'), '[↵] HEAR THIS WORD');
+  assert.equal(R.wordLine({ i: 3, tr: 'l-ʿus\'ri', root: 'ع س ر' }, 6), 'ayah 6, word 3 · root ع س ر');
+  assert.equal(R.wordLine({ i: 1, tr: 'ya-seen', root: null }, 1), 'ayah 1, word 1');
+  assert.equal(R.hearHint, '↵ hear this word');
 });
 
 const surahs = [

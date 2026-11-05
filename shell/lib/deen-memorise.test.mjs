@@ -8,23 +8,18 @@ const read = (name) => JSON.parse(readFileSync(fileURLToPath(new URL(`../../dev/
 const deck = () => read('hifz-due---limit-40');
 
 test('a next review under an hour reads in minutes, under a day in hours, then days', () => {
-  assert.equal(M.nextText('caps', 600), '10 min');
-  assert.equal(M.nextText('caps', 60), '1 min');
-  assert.equal(M.nextText('caps', 3600), '1 hour');
-  assert.equal(M.nextText('caps', 7200), '2 hours');
-  assert.equal(M.nextText('caps', 86400), '1 day');
-  assert.equal(M.nextText('caps', 259200), '3 days');
+  assert.equal(M.nextText(600), '10 min');
+  assert.equal(M.nextText(60), '1 min');
+  assert.equal(M.nextText(3600), '1 hour');
+  assert.equal(M.nextText(7200), '2 hours');
+  assert.equal(M.nextText(86400), '1 day');
+  assert.equal(M.nextText(259200), '3 days');
 });
 
 test('a next review past 60 days reads in months', () => {
-  assert.equal(M.nextText('caps', 60 * 86400), '60 days');
-  assert.equal(M.nextText('caps', 61 * 86400), '2 months');
-  assert.equal(M.nextText('caps', 90 * 86400), '3 months');
-});
-
-test('Blueprint writes the next review in capitals', () => {
-  assert.equal(M.nextText('bracket', 600), '10 MIN');
-  assert.equal(M.nextText('bracket', 259200), '3 DAYS');
+  assert.equal(M.nextText(60 * 86400), '60 days');
+  assert.equal(M.nextText(61 * 86400), '2 months');
+  assert.equal(M.nextText(90 * 86400), '3 months');
 });
 
 test('a card shows the first half of its words, at least one and at most five', () => {
@@ -84,27 +79,23 @@ test('after the last card nothing is current', () => {
   assert.equal(s.left, 0);
 });
 
-test('Paper and Artboard write the count and its line in sentence case, Blueprint in capitals', () => {
-  assert.equal(M.words('caps').due(7), '7 due today');
-  assert.equal(M.words('plain').line(2, 1, 7), '2 new · 1 of 7 · self-graded, nothing is recorded');
-  assert.equal(M.words('bracket').due(7), '7 DUE TODAY');
-  assert.equal(M.words('bracket').line(2, 1, 7), '2 NEW · 1 OF 7 · SELF-GRADED, NOTHING IS RECORDED');
+test('the count and its line read in sentence case', () => {
+  assert.equal(M.words.due(7), '7 due today');
+  assert.equal(M.words.line(2, 1, 7), '2 new · 1 of 7 · self-graded, nothing is recorded');
 });
 
-test('each theme writes the card badge and the rating head as its board does', () => {
-  assert.equal(M.words('caps').badge(false), '1 · RECALL');
-  assert.equal(M.words('plain').badge(true), '2 · revealed');
-  assert.equal(M.words('bracket').badge(false), '[1 · RECALL]');
-  assert.equal(M.words('caps').ask, 'HOW DID IT GO · NEXT REVIEW');
-  assert.equal(M.words('plain').ask, 'How did it go · next review');
-  assert.deepEqual(M.words('bracket').grades, ['AGAIN', 'HARD', 'GOOD', 'EASY']);
-  assert.deepEqual(M.words('plain').grades, ['again', 'hard', 'good', 'easy']);
+test('the card badge, the rating head and the grades read in sentence case', () => {
+  assert.equal(M.words.badge(false), '1 · recall');
+  assert.equal(M.words.badge(true), '2 · revealed');
+  assert.equal(M.words.ask, 'How did it go · next review');
+  assert.equal(M.words.hintKey, 'space');
+  assert.deepEqual(M.words.grades, ['again', 'hard', 'good', 'easy']);
 });
 
 test('the done line names the next review when one is known', () => {
-  assert.equal(M.words('plain').done(600), 'Done for today. Next review in 10 min.');
-  assert.equal(M.words('plain').done(null), 'Done for today.');
-  assert.equal(M.words('plain').nothing, 'Nothing due today. Press m in Read to add a surah to Memorise.');
+  assert.equal(M.words.done(600), 'Done for today. Next review in 10 min.');
+  assert.equal(M.words.done(null), 'Done for today.');
+  assert.equal(M.words.nothing, 'Nothing due today. Press m in Read to add a surah to Memorise.');
 });
 
 test('a surah is named by its Bangla name, else by its number in Bangla digits', () => {
@@ -114,8 +105,8 @@ test('a surah is named by its Bangla name, else by its number in Bangla digits',
 });
 
 test('a card\'s heading gives its Bangla surah name and its reference in Bangla digits', () => {
-  assert.equal(M.words('caps').heading('সূরা আশ-শারহ', 94, 6), 'সূরা আশ-শারহ ৯৪:৬');
-  assert.equal(M.words('bracket').heading('সূরা আল-ফাতিহা', 1, 2), 'সূরা আল-ফাতিহা ১:২');
+  assert.equal(M.words.heading('সূরা আশ-শারহ', 94, 6), 'সূরা আশ-শারহ ৯৪:৬');
+  assert.equal(M.words.heading('সূরা আল-ফাতিহা', 1, 2), 'সূরা আল-ফাতিহা ১:২');
 });
 
 // The test files are left out: they name the very tools this test looks for.

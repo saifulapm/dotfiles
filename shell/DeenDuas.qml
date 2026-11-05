@@ -378,7 +378,7 @@ FocusScope {
                         Text {
                             id: headText
                             textFormat: Text.PlainText
-                            text: page.openDua ? U.duaHead(page.openIndex + 1, page.openChapter.duas.length, bracket) : ""
+                            text: page.openDua ? U.duaHead(page.openIndex + 1, page.openChapter.duas.length) : ""
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12

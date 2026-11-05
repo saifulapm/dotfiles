@@ -1,10 +1,7 @@
-// Deen's Memorise page: today's due cards one at a time, what each theme says over them, and the list as it shrinks while Saiful rates himself.
-import { mark } from './voice.mjs';
-
-const upper = (s) => s.toUpperCase();
+// Deen's Memorise page: today's due cards one at a time, what the page says over them, and the list as it shrinks while Saiful rates himself.
 
 // How long until a card comes back, in the unit that reads best: minutes, hours, days, past 60 days months.
-export function nextText(voice, seconds) {
+export function nextText(seconds) {
   const plural = (n, unit) => `${n} ${unit}${n === 1 ? '' : 's'}`;
   const days = Math.floor(seconds / 86400);
   let text;
@@ -12,7 +9,7 @@ export function nextText(voice, seconds) {
   else if (seconds < 86400) text = plural(Math.floor(seconds / 3600), 'hour');
   else if (days > 60) text = plural(Math.floor(days / 30), 'month');
   else text = plural(days, 'day');
-  return voice === 'bracket' ? upper(text) : text;
+  return text;
 }
 
 // The first half of the ayah's words as a cue, one to five of them, and how many are left to recite.
@@ -67,31 +64,23 @@ export function rate(s, graded) {
 // The head card goes to the end unrated; the count stays.
 export const skip = (s) => Object.assign({}, s, { cards: s.cards.slice(1).concat(s.cards.slice(0, 1)) });
 
-// What each theme's board says: Paper keeps its caps for the labels, Artboard is all sentence case, Blueprint is all capitals.
-export function words(voice, engraved = false) {
-  const t = voice === 'bracket' ? upper : (s) => s;
-  const label = voice === 'plain' ? (s) => s : upper;
-  const badge = (revealed) => {
-    const text = label(revealed ? '2 · revealed' : '1 · recall');
-    return voice === 'bracket' ? mark(engraved, text) : text;
-  };
-  return {
-    due: (n) => t(`${n} due today`),
-    line: (fresh, at, left) => t(`${fresh} new · ${at} of ${left} · self-graded, nothing is recorded`),
-    quiet: t('self-graded, nothing is recorded'),
-    badge,
-    heading: (name, s, a) => `${name} ${bnDigits(s)}:${bnDigits(a)}`,
-    recite: t('Recite the rest aloud. No microphone: you judge yourself.'),
-    hintKey: voice === 'bracket' ? mark(engraved, 'SPACE') : 'space',
-    hintWord: t('reveal the rest'),
-    ask: label('How did it go · next review'),
-    grades: ['again', 'hard', 'good', 'easy'].map(t),
-    done: (back) => t(back === null ? 'Done for today.' : `Done for today. Next review in ${nextText('caps', back)}.`),
-    nothing: t('Nothing due today. Press m in Read to add a surah to Memorise.'),
-    failed: t('Could not read the deck.'),
-    unsaved: t('Could not save that rating. Try again.'),
-  };
-}
+// What the page says, in sentence case.
+export const words = {
+  due: (n) => `${n} due today`,
+  line: (fresh, at, left) => `${fresh} new · ${at} of ${left} · self-graded, nothing is recorded`,
+  quiet: 'self-graded, nothing is recorded',
+  badge: (revealed) => (revealed ? '2 · revealed' : '1 · recall'),
+  heading: (name, s, a) => `${name} ${bnDigits(s)}:${bnDigits(a)}`,
+  recite: 'Recite the rest aloud. No microphone: you judge yourself.',
+  hintKey: 'space',
+  hintWord: 'reveal the rest',
+  ask: 'How did it go · next review',
+  grades: ['again', 'hard', 'good', 'easy'],
+  done: (back) => (back === null ? 'Done for today.' : `Done for today. Next review in ${nextText(back)}.`),
+  nothing: 'Nothing due today. Press m in Read to add a surah to Memorise.',
+  failed: 'Could not read the deck.',
+  unsaved: 'Could not save that rating. Try again.',
+};
 
 // When the first card rated so far comes back, in ms since the epoch; a grade that did not save changes nothing.
 export function backAt(prev, now, graded) {

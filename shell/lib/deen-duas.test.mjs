@@ -123,8 +123,7 @@ test('the cursor stops at the ends, and n wraps to the first dua', () => {
 });
 
 test('the pane\'s head counts the dua within its chapter', () => {
-  assert.equal(U.duaHead(7, 13, false), 'dua 7 of 13');
-  assert.equal(U.duaHead(7, 13, true), 'DUA 7 OF 13');
+  assert.equal(U.duaHead(7, 13), 'dua 7 of 13');
 });
 
 test('a copy is the four lines drawn: Arabic, pronunciation, meaning, source', () => {

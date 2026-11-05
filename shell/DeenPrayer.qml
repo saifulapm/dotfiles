@@ -366,7 +366,7 @@ FocusScope {
                             id: dateText
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: page.day ? P.dateLine(page.day.date, page.day.times.sunrise, bracket) : ""
+                            text: page.day ? P.dateLine(page.day.date, page.day.times.sunrise) : ""
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12

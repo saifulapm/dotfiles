@@ -328,7 +328,7 @@ FocusScope {
             Text {
                 id: metaText
                 textFormat: Text.PlainText
-                text: page.surah ? R.metaText(page.voice, page.surah.surah, page.surah.ayahs[0].juz ?? null) : ""
+                text: page.surah ? R.metaText(page.surah.surah, page.surah.ayahs[0].juz ?? null) : ""
                 color: page.c.muted ?? "gray"
                 font.family: page.bodyFont
                 font.pixelSize: 12
@@ -702,7 +702,7 @@ FocusScope {
                         id: barLine
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
-                        text: page.focused ? D.oneLine(R.wordLine(page.voice, page.focused, page.cursor.a)) : ""
+                        text: page.focused ? D.oneLine(R.wordLine(page.focused, page.cursor.a)) : ""
                         elide: Text.ElideRight
                         maximumLineCount: 1
                         color: page.c.muted ?? "gray"
@@ -714,7 +714,7 @@ FocusScope {
                 Text {
                     id: barHint
                     textFormat: Text.PlainText
-                    text: page.note ? D.oneLine(page.note) : R.hearHint(page.voice, look.engraved)
+                    text: page.note ? D.oneLine(page.note) : R.hearHint
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
                     font.pixelSize: page.bracket ? 10 : 11

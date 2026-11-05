@@ -17,7 +17,7 @@ FocusScope {
     readonly property bool caps: voice === "caps"
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
-    readonly property var words: M.words(voice, look.engraved)
+    readonly property var words: M.words
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
 
     // The deck as M.openDeck shapes it, null before the first answer; failed is true when the last answer was no deck.
@@ -468,7 +468,7 @@ FocusScope {
                                             id: rateNext
                                             Layout.alignment: Qt.AlignHCenter
                                             textFormat: Text.PlainText
-                                            text: page.head ? M.nextText(page.voice, page.head.next[rateTile.gradeName]) : ""
+                                            text: page.head ? M.nextText(page.head.next[rateTile.gradeName]) : ""
                                             color: c.muted ?? "gray"
                                             font.family: (plain ? fonts.ui : fonts.mono) ?? ""
                                             font.pixelSize: bracket ? 10 : 11

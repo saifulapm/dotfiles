@@ -71,12 +71,9 @@ export function rows(times, now, today) {
   });
 }
 
-// Blueprint writes its lines in capitals and its date as an ISO date.
-export function dateLine(key, sunrise, shout) {
+export function dateLine(key, sunrise) {
   const t = new Date(utc(key));
-  const day = DAYS[t.getUTCDay()];
-  const line = shout ? `${day} ${key} · sunrise ${sunrise}` : `${day} ${t.getUTCDate()} ${MONTHS[t.getUTCMonth()]} ${t.getUTCFullYear()} · sunrise ${sunrise}`;
-  return shout ? line.toUpperCase() : line;
+  return `${DAYS[t.getUTCDay()]} ${t.getUTCDate()} ${MONTHS[t.getUTCMonth()]} ${t.getUTCFullYear()} · sunrise ${sunrise}`;
 }
 
 export const methodLine = (name, cached) => `Method: ${name} · aladhan${cached ? ', cached for the month' : ''}`;

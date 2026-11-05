@@ -60,9 +60,8 @@ test('another day has nothing dimmed or next, and only Asr keeps its tag', () =>
   assert.deepEqual(rows.map((r) => r.tag), ['', '', 'Hanafi', '', '']);
 });
 
-test('the date line gives the weekday, the date and sunrise; Blueprint writes it in capitals with an ISO date', () => {
-  assert.equal(P.dateLine('2026-10-23', '05:59', false), 'Friday 23 October 2026 · sunrise 05:59');
-  assert.equal(P.dateLine('2026-10-23', '05:59', true), 'FRIDAY 2026-10-23 · SUNRISE 05:59');
+test('the date line gives the weekday, the date and sunrise', () => {
+  assert.equal(P.dateLine('2026-10-23', '05:59'), 'Friday 23 October 2026 · sunrise 05:59');
 });
 
 test('the method line says whether the month is cached', () => {
