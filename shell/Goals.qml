@@ -340,7 +340,7 @@ Item {
                             }
                             Layout.fillWidth: true
                             implicitHeight: inner.implicitHeight + 24
-                            radius: panel.style.corner.radius ? 8 : 0
+                            radius: 0
                             color: sel && head.kind === "goal" ? c.surface : "transparent"
                             border.width: sel ? 2 : 0
                             border.color: c.accent
@@ -390,7 +390,7 @@ Item {
                                     visible: block.sel && block.head.kind === "goal" && block.parts[1] > 0
                                     Layout.fillWidth: true
                                     implicitHeight: 4
-                                    radius: panel.style.corner.radius ? 2 : 0
+                                    radius: 0
                                     color: c.line
 
                                     Rectangle {
