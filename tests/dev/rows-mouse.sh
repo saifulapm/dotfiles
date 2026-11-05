@@ -38,7 +38,8 @@ until_ok 3000 acc_is '.open and .settled and .keyboard'
 until_ok 6000 acc_is '.busy == false and (.accounts | length) == 2'
 check "Accounts opens with the cursor on main" acc_is '.selected == "account:main"'
 click_box accounts-row:account:work
-until_ok 5000 test "$(jq -r .active "$reg")" = work
+active_is() { [ "$(jq -r .active "$reg")" = "$1" ]; }
+until_ok 5000 active_is work
 check "a click on work's row makes it the active account, as Enter does ($(jq -r .active "$reg"))" test "$(jq -r .active "$reg")" = work
 niri msg action spawn -- dots-call accounts toggle
 until_ok 3000 acc_is '.drawing == false'
