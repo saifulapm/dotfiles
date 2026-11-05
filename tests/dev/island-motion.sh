@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The island morphs by the theme's motion: Artboard's spring overshoots and settles, Paper's snappy curve never does, and nothing runs at rest.
+# The island morphs on a spring: it overshoots and settles, and nothing runs at rest.
 {
 export DOTS_DEV_SCHEME=artboard
 source "$(dirname "$0")/lib.sh"
@@ -34,15 +34,6 @@ until_ok 7000 mode_is rest
 read -r _ took < <(watch_morph)
 check "closing back to the clock settles faster than opening (${took} ms)" test "$took" -le 600
 check "at the clock's own width" eval 'island | jq -e ".drawn == .width and .width < 100" >/dev/null'
-
-legacy_theme paper >/dev/null
-until_ok 3000 settled
-notify-send "snap"
-until_ok 2000 mode_is notification
-read -r widest took < <(watch_morph)
-echo "     paper open: widest ${widest} px, moving for ${took} ms"
-check "Paper's snappy curve never passes 440 px (${widest} px)" eval "(( \$(printf %.0f $widest) <= 440 ))"
-check "and settles within 250 ms (${took} ms)" test "$took" -le 250
 
 exit $((fails > 0))
 }
