@@ -84,6 +84,13 @@ Item {
         selected = Math.max(0, Math.min(stops.length - 1, selected + by));
     }
 
+    // Enter runs nothing on a device, so a click on one moves the cursor there and its pane shows; a group row takes none.
+    function clickRow(i) {
+        const s = stops.indexOf(i);
+        if (s >= 0)
+            selected = s;
+    }
+
     // State that will not parse as an object keeps the rows drawn.
     function take(text) {
         if (text.trim().charAt(0) !== "{")
@@ -461,6 +468,11 @@ Item {
                             required property int index
                             readonly property var it: modelData
                             readonly property bool isCurrent: index === panel.current
+                            // A click on the row does what Enter does on it.
+                            Root.Click {
+                                name: "dns-row:" + (rowItem.it.key ?? rowItem.index)
+                                onTapped: panel.clickRow(rowItem.index)
+                            }
                             readonly property bool hasLine: it.kind === "group" && (it.line || "") !== ""
                             readonly property var group: it.kind === "group" ? marks.group(it) : null
                             readonly property string groupLabel: groupText.text

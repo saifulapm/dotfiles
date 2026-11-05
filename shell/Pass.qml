@@ -229,6 +229,12 @@ Item {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
+    // A click on a row does what Enter does on it.
+    function clickRow(i) {
+        selected = i;
+        enter();
+    }
+
     // The card closes first, since gpg may ask for its passphrase on its own card; the island says how the copy went.
     function copy(kind) {
         if (!current || runner.running)
@@ -591,6 +597,11 @@ Item {
                             required property var modelData
                             required property int index
                             readonly property bool isCurrent: index === pass.selected
+                            // A click on the row does what Enter does on it.
+                            Root.Click {
+                                name: "pass-row:" + rowItem.index
+                                onTapped: pass.clickRow(rowItem.index)
+                            }
                             readonly property var runs: P.segments(modelData)
                             readonly property string drawnName: runs.map(r => r.text).join("")
                             function underlined() {

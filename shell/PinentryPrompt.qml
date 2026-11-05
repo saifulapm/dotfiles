@@ -240,12 +240,19 @@ Item {
                     Rectangle {
                         id: keyPair
                         required property var modelData
+                        required property int index
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
                         width: pairRow.implicitWidth + 14
                         height: pairRow.implicitHeight + 6
                         radius: 6
                         color: prompt.look.chip.fill
+
+                        // The first chip is ↵ and the second esc, so a click on one does what its key does.
+                        Root.Click {
+                            name: "pinentry-key:" + keyPair.index
+                            onTapped: keyPair.index === 0 ? prompt.submit() : prompt.close()
+                        }
 
                         Row {
                             id: pairRow

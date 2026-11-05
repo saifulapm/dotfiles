@@ -198,7 +198,16 @@ Item {
                         spacing: 8
                         Repeater {
                             model: look.keys([["/", "filter"], ["esc", "close"]])
-                            KeyPair {}
+                            KeyPair {
+                                id: headKey
+                                required property int index
+
+                                // The first chip is / and the second esc, so a click on one does what its key does.
+                                Root.Click {
+                                    name: "cheatsheet-key:" + headKey.index
+                                    onTapped: headKey.index === 0 ? input.forceActiveFocus() : sheet.close()
+                                }
+                            }
                         }
                     }
                 }

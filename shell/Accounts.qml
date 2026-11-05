@@ -93,6 +93,15 @@ Item {
         selected = Math.max(0, Math.min(stops.length - 1, selected + by));
     }
 
+    // A click on a row the cursor stops on moves it there and does what Enter does; a group or limit row takes none.
+    function clickRow(i) {
+        const s = stops.indexOf(i);
+        if (s < 0)
+            return;
+        selected = s;
+        use();
+    }
+
     // Rows that will not parse as a list keep the ones drawn.
     function take(text) {
         if (text.trim().charAt(0) === "[")
@@ -312,6 +321,11 @@ Item {
                         id: rowItem
                         required property var modelData
                         required property int index
+                        // A click on the row does what Enter does on it.
+                        Root.Click {
+                            name: "accounts-row:" + rowItem.it.kind + ":" + rowItem.it.label
+                            onTapped: panel.clickRow(rowItem.index)
+                        }
                         readonly property var it: modelData
                         readonly property bool isGroup: it.kind === "group"
                         readonly property bool isLimit: it.kind === "limit"

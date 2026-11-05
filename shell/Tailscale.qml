@@ -79,6 +79,12 @@ Item {
         selected = Math.max(0, Math.min(rows.length - 1, selected + by));
     }
 
+    // A click on a row does what Enter does on it: copies its address.
+    function clickRow(i) {
+        selected = i;
+        copy();
+    }
+
     // The card closes on a copy, as Pass's does, and the island says what went on the clipboard.
     function copy() {
         if (!current)
@@ -438,6 +444,11 @@ Item {
                             required property var modelData
                             required property int index
                             readonly property bool isCurrent: index === panel.selected
+                            // A click on the row does what Enter does on it.
+                            Root.Click {
+                                name: "tailscale-row:" + rowItem.index
+                                onTapped: panel.clickRow(rowItem.index)
+                            }
                             readonly property bool online: modelData.online
                             readonly property var mark: marks.status(modelData)
                             readonly property color textColor: isCurrent ? look.cursor.text : online ? c.ink : c.muted

@@ -9,6 +9,7 @@ Item {
 
     required property var theme
     property bool shown: false
+    property int submits: 0
     // The agent's AuthFlow while a request runs.
     property var flow: null
     // The request's text as the card draws it, copied, since the agent may delete a cancelled request while its close still plays.
@@ -64,6 +65,7 @@ Item {
             return;
         flow.submit(input.text);
         input.text = "";
+        submits += 1;
     }
 
     function swapped() {
@@ -88,6 +90,8 @@ Item {
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
             field: input.text.length,
+            // How many answers this shell has handed a request, by Enter or by a click on the ↵ chip.
+            submits: submits,
             // The password field as drawn, which Control's Wi-Fi line matches.
             fieldLook: {
                 font: input.font.family,
@@ -235,12 +239,19 @@ Item {
                     Rectangle {
                         id: keyPair
                         required property var modelData
+                        required property int index
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
                         width: pairRow.implicitWidth + 14
                         height: pairRow.implicitHeight + 6
                         radius: 6
                         color: prompt.look.chip.fill
+
+                        // The first chip is ↵ and the second esc, so a click on one does what its key does.
+                        Root.Click {
+                            name: "polkit-key:" + keyPair.index
+                            onTapped: keyPair.index === 0 ? prompt.submit() : prompt.close()
+                        }
 
                         Row {
                             id: pairRow
