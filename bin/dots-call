@@ -26,6 +26,15 @@ if [[ -S $sock && $* != *[$'\x1e\x1f\n']* ]] && command -v socat >/dev/null; the
       ;;
   esac
 fi
-qs ipc call "$@"
-exit
+out=$(qs ipc call "$@")
+rc=$?
+# qs ipc exits 0 on a target or function it cannot find, so a call to a surface that is gone would read as done.
+case $out in
+  "Target not found." | "Function not found.")
+    echo "dots-call: $1 ${2:-}: $out" >&2
+    exit 1
+    ;;
+esac
+[[ -z $out ]] || printf '%s\n' "$out"
+exit "$rc"
 }
