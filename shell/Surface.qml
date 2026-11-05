@@ -25,7 +25,7 @@ Item {
     }
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
-    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1 })
+    readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, opacity: 1 })
     default property alias content: inner.data
     // The name the surfaces host knows a card by, so a press on it never counts as a click outside.
     objectName: "card"
@@ -33,6 +33,7 @@ Item {
     readonly property alias drawnFill: fillRect.color
 
     scale: pose.scale
+    opacity: pose.opacity
 
     // The card as drawn this frame, moved and scaled by its motion, in the window's pixels.
     function drawnBox() {

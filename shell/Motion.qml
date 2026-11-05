@@ -15,7 +15,9 @@ Item {
     readonly property var curves: tokens ? M.surfaceMotion(Root.State.slowdown) : null
     // How far through its open the card is drawn: 0 draws nothing, 1 is at rest.
     property real progress: 0
-    readonly property var pose: curves ? M.surfacePose(curves, progress) : ({ lift: 0, scale: 1 })
+    // The progress a close began at; the close fades from that pose, so a close mid-open jumps nowhere.
+    property real closeFrom: 0
+    readonly property var pose: !curves ? ({ lift: 0, scale: 1, opacity: 1 }) : !shown && closeFrom > 0 ? M.closePose(curves, closeFrom, progress / closeFrom) : M.surfacePose(curves, progress)
     // A closing surface still draws, though it gave the keyboard back when its close began.
     readonly property bool drawing: shown || progress > 0
     readonly property bool settled: open && progress === 1
@@ -68,7 +70,9 @@ Item {
         clock.stop();
         armed = open && progress === 0;
         const to = open ? 1 : 0;
-        const ms = !curves ? 0 : open ? curves.openMs * (1 - progress) : curves.closeMs * progress;
+        closeFrom = open ? 0 : progress;
+        // A close takes its whole short time from wherever it starts, since it fades rather than retracing the open.
+        const ms = !curves ? 0 : open ? curves.openMs * (1 - progress) : progress > 0 ? curves.closeMs : 0;
         if (ms <= 0) {
             armed = false;
             progress = to;

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# At the live speed every surface opens on the one spring (362 ms) and settles in 340 to 400 ms, no sooner than a frame or so short of it; the launcher's close is shorter than its open.
+# At the live speed every surface opens on the one spring (362 ms) and settles in 340 to 400 ms, no sooner than a frame or so short of it; the launcher's close is far shorter than its open.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
@@ -22,9 +22,9 @@ settles() {
 
 until_ok 5000 shell_status >/dev/null
 for s in launcher notifs cheatsheet goals control; do settles "$s"; done
-# The launcher times its own close: 0.8 of the open's 362 ms, 290, less a frame or so.
-check "the launcher's close took 260 to 330 ms, shorter than its open ($(timeout 0.5 qs ipc call launcher state | jq -c '[.closeTookMs, .settleMs, .motionMs]'))" \
-  surface_is launcher '.closeTookMs >= 260 and .closeTookMs <= 330 and .closeTookMs < .settleMs and .motionMs.close < .motionMs.open'
+# The launcher times its own close: 120 ms, so it feels instant, give or take a frame or so.
+check "the launcher's close took 100 to 170 ms, far shorter than its open ($(timeout 0.5 qs ipc call launcher state | jq -c '[.closeTookMs, .settleMs, .motionMs]'))" \
+  surface_is launcher '.closeTookMs >= 100 and .closeTookMs <= 170 and .closeTookMs < .settleMs and .motionMs.close < .motionMs.open'
 
 # The recorder's picker opens and closes on its one toggle.
 niri msg action spawn -- dots-call record toggle >/dev/null

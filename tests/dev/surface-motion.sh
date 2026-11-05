@@ -41,7 +41,7 @@ check "the launcher reports a spring that settled in about 20 times 362 ms ($(la
 check "at rest the drawn card is where it rests, at full size" state_is '.cardBox.y == 168 and .cardBox.w == 640'
 check "at rest the card's top edge is white" near $((cx + 100)) $((cy + 3)) 255 255 255
 
-# Esc gives the keyboard back as the close starts, long before the 5.8 s close is drawn.
+# Esc gives the keyboard back as the close starts, long before the 2.4 s close is drawn.
 t0=$(now_ms)
 wtype -k Escape
 until_ok 1000 focus_is None
@@ -52,9 +52,9 @@ check "and the card still covers its centre" test "$(rgb $((cx + 320)) $((cy + 6
 until_ok 9000 state_is '.drawing == false'
 after=$(rgb $((cx + 320)) $((cy + 60)))
 check "once the close ends the card's centre reads the paper again ($before, then $after)" test "$after" = "$before"
-check "the close took about 20 times 290 ms, shorter than the open ($(launcher_state | jq -c '[.closeTookMs, .settleMs]'))" state_is '.closeTookMs >= 5400 and .closeTookMs <= 6400 and .closeTookMs < .settleMs'
+check "the close took about 20 times 120 ms, far shorter than the open ($(launcher_state | jq -c '[.closeTookMs, .settleMs]'))" state_is '.closeTookMs >= 2200 and .closeTookMs <= 2900 and .closeTookMs < .settleMs'
 
-# Open, then close mid-open: it sinks back from where it was and ends closed with the keyboard back.
+# Open, then close mid-open: it fades from where it was and ends closed with the keyboard back.
 press
 until_ok 3000 state_is '.keyboard'
 wait_until 800
