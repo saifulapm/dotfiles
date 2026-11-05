@@ -1113,6 +1113,8 @@ ShellRoot {
                                 "text/uri-list": F.uriList(app.dragPaths)
                             })
                         image: app.chipUrl
+                        // An undecodable name's path names no file, so its row offers no drag.
+                        offering: app.dragPaths.length > 0
                         function rowAt(mouse) {
                             return rowList.indexAt(mouse.x, mouse.y + rowList.contentY);
                         }

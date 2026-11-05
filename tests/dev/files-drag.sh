@@ -8,6 +8,8 @@ work=$(mktemp -d)
 h=$work/home
 mkdir -p "$h/Downloads"
 for n in IMG_2039.jpg IMG_2040.jpg IMG_2041.jpg "my photo #1 é.jpg"; do printf 'jpg' >"$h/Downloads/$n"; done
+# A name that is not UTF-8, as a download can bring.
+printf 'jpg' >"$h/Downloads/"$'zz\xe9.jpg'
 log=$work/files.log
 cleanup() {
   exec 7>&- 2>/dev/null
@@ -102,6 +104,27 @@ check "after the drop the status line reads the counts again ($(files_state | jq
 drag_row "my photo #1 é.jpg"
 check "dragging an unmarked row drops only it, its name encoded ($(drops -1 | jq -c .uriList))" \
   test "$(drops -1 | jq -r .uriList)" = "file://$h/Downloads/my%20photo%20%231%20%C3%A9.jpg"$'\r'
+
+# Its path names no file, so a drag from its row starts nothing and drops nothing.
+bad=$(files_state | jq -r '.rows[] | select(test("\ufffd"))')
+box=$(timeout 0.5 qs ipc -p "$files_qml" call files box "$bad")
+read -r fx fy < <(origin files)
+read -r tx ty < <(origin drop-target)
+tx=$((tx + 150)) ty=$((ty + 200))
+x=$((fx + $(jq -r '(.x + .w / 3) | floor' <<<"$box")))
+y=$((fy + $(jq -r '(.y + .h / 2) | floor' <<<"$box")))
+n=$(drop_count)
+niri msg action focus-window --id "$(win_id files)"
+point press "$x" "$y"
+point move "$((x + 30))" "$((y + 30))" 10
+point sleep 300
+seen=$(files_state | jq -c '{dragging, chip}')
+point move "$tx" "$ty" 30
+point sleep 300
+point release
+point sleep 500
+check "a drag from the undecodable name $bad starts nothing ($seen)" jq -e '.dragging == false' <<<"$seen"
+check "and drops nothing ($(drop_count) drops, $n before)" test "$(drop_count)" = "$n"
 
 errs=$(grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load|is not a type|Cannot assign|Unable to assign|Cannot read propert|unavailable' "$log")
 check "Files' log has no QML errors${errs:+: $(head -c 200 <<<"$errs")}" test -z "$errs"
