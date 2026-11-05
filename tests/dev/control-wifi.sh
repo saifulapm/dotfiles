@@ -133,42 +133,37 @@ until_ok 2000 no_line
 wtype -k Escape
 until_ok 2000 state_is '.open == false and .drawing == false'
 
-# In each theme the line is drawn as the polkit prompt's password field, and a wrong password says so in the theme's voice.
+# The line is drawn as the polkit prompt's password field, and a wrong password says so in plain words.
 look_keys='(.font | type == "string" and length > 0) and (.px | type == "number" and . > 0) and (.ink | type == "string") and (.border | type == "string") and (.placeholder | type == "string")'
 same_look() { jq -e -n --argjson a "$1" --argjson b "$2" "\$a == \$b and (\$a | $look_keys)" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
-n=0
-for t in "paper|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET" "artboard|Wrong password|↵ join · ctrl+v paste · esc cancel|↵ connect · d forget" "blueprint|WRONG PASSWORD|↵ JOIN · CTRL+V PASTE · ESC CANCEL|↵ CONNECT · D FORGET"; do
-  n=$((n + 1))
-  IFS='|' read -r theme wrong join_hint connect_hint <<<"$t"
-  in_theme "$theme"
-  polkit Begin s "w$n" >/dev/null
-  until_ok 3000 pk_is '.open and .settled'
-  pk_look=$(pk_state | jq -c .fieldLook)
-  wtype -k Escape
-  until_ok 3000 pk_is '(.open | not) and .drawing == false'
-  open_wifi
-  enter_on "Dots Secured"
-  until_ok 3000 line_open
-  check "$theme: with the line open the hint reads $join_hint ($(control_state | jq -c .hint))" state_is --arg h "$join_hint" '.hint == $h'
-  check "$theme: with the line open the legend drops tab, j/k and esc close ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "↵ join  ctrl+v paste  esc cancel"'
-  wifi_look=$(control_state | jq -c .lineLook)
-  check "$theme: the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
-  type_psk nope
-  check "$theme: four typed characters draw four dots" state_is '.lineText == "••••"'
-  check "$theme: and no state field holds the typed text" state_clean
-  wtype -k Return
-  until_ok 3000 state_is --arg m "$wrong" '.lineMessage == $m'
-  check "$theme: a wrong password keeps the line open and empty and reads $wrong ($(control_state | jq -c '{line, pskLength, lineText, lineMessage}'))" \
-    state_is --arg m "$wrong" '.line == true and .pskLength == 0 and .lineText == "" and .lineMessage == $m'
-  wtype -k Escape
-  until_ok 2000 no_line
-  check "$theme: with the line closed the legend is back ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn | ascii_downcase | gsub("[\\[\\]]"; "") == "tab section  j/k move  esc close"'
-  check "$theme: with the line closed the hint reads $connect_hint ($(control_state | jq -c .hint))" state_is --arg h "$connect_hint" '.hint == $h'
-  wtype -k Escape
-  until_ok 2000 state_is '.open == false and .drawing == false'
-done
+wrong="Wrong password"
+join_hint="↵ join · ctrl+v paste · esc cancel"
+connect_hint="↵ connect · d forget"
+polkit Begin s w1 >/dev/null
+until_ok 3000 pk_is '.open and .settled'
+pk_look=$(pk_state | jq -c .fieldLook)
+wtype -k Escape
+until_ok 3000 pk_is '(.open | not) and .drawing == false'
+open_wifi
+enter_on "Dots Secured"
+until_ok 3000 line_open
+check "with the line open the hint reads $join_hint ($(control_state | jq -c .hint))" state_is --arg h "$join_hint" '.hint == $h'
+check "with the line open the legend drops tab, j/k and esc close ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn == "↵ join  ctrl+v paste  esc cancel"'
+wifi_look=$(control_state | jq -c .lineLook)
+check "the line's field is drawn as the polkit field ($wifi_look, polkit $pk_look)" same_look "$wifi_look" "$pk_look"
+type_psk nope
+check "four typed characters draw four dots" state_is '.lineText == "••••"'
+check "and no state field holds the typed text" state_clean
+wtype -k Return
+until_ok 3000 state_is --arg m "$wrong" '.lineMessage == $m'
+check "a wrong password keeps the line open and empty and reads $wrong ($(control_state | jq -c '{line, pskLength, lineText, lineMessage}'))" \
+  state_is --arg m "$wrong" '.line == true and .pskLength == 0 and .lineText == "" and .lineMessage == $m'
+wtype -k Escape
+until_ok 2000 no_line
+check "with the line closed the legend is back ($(control_state | jq -c .legendDrawn))" state_is '.legendDrawn == "tab section  j/k move  esc close"'
+check "with the line closed the hint reads $connect_hint ($(control_state | jq -c .hint))" state_is --arg h "$connect_hint" '.hint == $h'
+wtype -k Escape
+until_ok 2000 state_is '.open == false and .drawing == false'
 
 # A join that fails for another reason keeps the line open and says why; Quickshell names a lost network (53) and a supplicant timeout (11).
 fail_next() { bus call org.freedesktop.NetworkManager "$nm" org.dots.FakeNM FailNext u "$1" >/dev/null; }
