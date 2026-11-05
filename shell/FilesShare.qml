@@ -199,10 +199,9 @@ Item {
                 }
             }
 
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
                 implicitHeight: 1
-                color: share.look.rule.color
             }
 
             ColumnLayout {
@@ -304,10 +303,9 @@ Item {
                 }
             }
 
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
                 implicitHeight: 1
-                color: share.look.rule.color
             }
 
             Flow {

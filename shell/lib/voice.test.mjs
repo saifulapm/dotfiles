@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
@@ -200,6 +201,10 @@ test("a list surface keeps the launcher's cursor row and draws no rules", () => 
     assert.deepEqual(list(n).cursor, look(n).cursor, n);
     assert.equal(list(n).rule, undefined, n);
   }
+  // The list look has no rule, so a QML that still read look.rule.color would throw and draw its slot in Qt's default colour.
+  const shell = new URL('../', import.meta.url).pathname;
+  const reads = readdirSync(shell).filter((f) => f.endsWith('.qml') && /\blook\.rule\.color/.test(readFileSync(shell + f, 'utf8')));
+  assert.deepEqual(reads, []);
 });
 
 test("a list surface writes an entry's age in whole units, floored: now under a minute, then minutes, hours and days", () => {

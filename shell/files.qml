@@ -1059,10 +1059,9 @@ ShellRoot {
                     }
                 }
 
-                Rectangle {
+                Item {
                     Layout.fillHeight: true
                     implicitWidth: 1
-                    color: look.rule.color
                 }
 
                 // The rows: folders first, each with its size or item count and when it changed.
@@ -1342,12 +1341,11 @@ ShellRoot {
                 }
 
                 // The cursor file: its picture when it is one, its size, kind and date; a narrow window has no room for it.
-                Rectangle {
+                Item {
                     id: previewPane
                     visible: win.width >= 980 && app.cursorRow !== null
                     Layout.fillHeight: true
                     implicitWidth: 1
-                    color: look.rule.color
                 }
                 // 280 px with its padding, as the board draws it; the picture sits on a grey rounded tile.
                 ColumnLayout {
@@ -1905,10 +1903,10 @@ ShellRoot {
         }
     }
 
-    component Rule: Rectangle {
+    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
+    component Rule: Item {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.color
     }
 
     component Head: Text {

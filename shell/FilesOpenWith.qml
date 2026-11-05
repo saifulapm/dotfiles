@@ -209,10 +209,9 @@ Item {
                 }
             }
 
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
                 implicitHeight: 1
-                color: root.look.rule.color
             }
 
             ColumnLayout {
@@ -313,10 +312,9 @@ Item {
                 }
             }
 
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
                 implicitHeight: 1
-                color: root.look.rule.color
             }
 
             // The list's keys, each with its word; Esc's word is left out, as every board draws it.
