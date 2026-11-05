@@ -4,7 +4,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 // A look check that reads only the shell's state passed while the text drew in its own fill (m71) and cream on cream (m73), so each theme step must also read the screen.
 const dir = new URL('../../tests/dev/', import.meta.url).pathname;
-const THEMES = 'paper|artboard|blueprint|hi-fi';
+// The old theme names stay until the last check that switches to one is gone.
+const THEMES = 'artboard|catppuccin-mocha|github-light|gruvbox-dark|rose-pine-dawn|paper|blueprint|hi-fi|frost';
 
 // The functions a script defines, each with its whole body: a one-liner, or the lines up to the closing brace at the start of a line.
 function functions(lines) {
@@ -36,8 +37,10 @@ function steps(file) {
   // A switcher renders or switches to its first argument.
   const switchers = names.filter((n) => /(bin\/dots"? colorscheme|legacy_theme|theme-render\.mjs"?|status_theme) "\$1"/.test(fns[n]) && n !== 'status_theme');
   const switchAt = new RegExp(`^\\s*(${['"\\$repo/bin/dots" colorscheme', 'legacy_theme', 'until_ok \\d+ status_theme', ...switchers].join('|')})\\s+("?)(${THEMES}|\\S+)\\2(\\s|$)`);
-  const found = [];
-  let cur = null;
+  // The scheme the nested session starts in is the first step, so a check that never switches has one too.
+  const start = lines.join('\n').match(/^export\s.*\bDOTS_DEV_SCHEME=([a-z0-9-]+)/m)?.[1] ?? 'artboard';
+  let cur = { step: `${file}:${start}`, pixels: false };
+  const found = [cur];
   lines.forEach((line) => {
     if (/^\s*#/.test(line) || /^[a-z_][a-z0-9_]*\(\)\s*\{/.test(line)) return;
     const m = line.match(switchAt);
