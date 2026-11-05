@@ -41,19 +41,36 @@ function apply({ manager = 'running', env, switchFails = false } = {}) {
     mkdirSync(join(home, '.config/hub'), { recursive: true });
     writeFileSync(join(home, '.config/hub/local.env'), env);
   }
+  // The apply has written the dotfiles' git config, with its name and email, before this step runs.
+  writeFileSync(join(home, '.gitconfig'), '[user]\n\tname = test\n\temail = test@example.invalid\n');
   const vars = { PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home };
   const rendered = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env: vars });
   assert.equal(rendered.status, 0, rendered.stderr);
   const r = spawnSync('bash', ['-c', rendered.stdout], { encoding: 'utf8', env: vars });
   const calls = existsSync(join(home, 'calls')) ? readFileSync(join(home, 'calls'), 'utf8').trim().split('\n') : [];
-  return { r, calls };
+  return { r, calls, home };
 }
 
-test('with a user manager, the apply starts pxy and the local hub', () => {
+test('with a user manager, the apply starts pxy, the local hub and Remote Control', () => {
   const { r, calls } = apply();
   assert.equal(r.status, 0, r.stderr);
   assert.ok(calls.includes('systemctl --user daemon-reload'), calls.join('\n'));
-  assert.ok(calls.some((c) => /^systemctl --user start .*\bpxy\.service\b/.test(c) && /\bhub-local\.service\b/.test(c)), calls.join('\n'));
+  assert.ok(calls.some((c) => /^systemctl --user start .*\bpxy\.service\b/.test(c) && /\bhub-local\.service\b/.test(c) && /\bclaude-rc@remote\.service\b/.test(c)), calls.join('\n'));
+});
+
+// Remote Control's worktree mode needs a git repository, and a worktree needs a commit to branch from.
+test('the apply makes ~/Codes/remote a git repo with a first commit, with or without a user manager, and leaves one there alone', () => {
+  for (const manager of ['running', 'offline']) {
+    const { r, home } = apply({ manager });
+    assert.equal(r.status, 0, r.stderr);
+    const git = (...args) => spawnSync('git', ['-C', join(home, 'Codes/remote'), ...args], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home } }).stdout.trim();
+    assert.equal(git('log', '--format=%s'), 'Start the Remote Control folder', manager);
+    const head = git('rev-parse', 'HEAD');
+    const vars = { PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home };
+    const rendered = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env: vars });
+    assert.equal(spawnSync('bash', ['-c', rendered.stdout], { encoding: 'utf8', env: vars }).status, 0);
+    assert.equal(git('rev-parse', 'HEAD'), head, manager);
+  }
 });
 
 // An install's container and a first boot's tty have no user manager to start anything in.
@@ -77,8 +94,8 @@ test('a machine already in the store, or without local.env, runs no workflow swi
   }
 });
 
-// The dotfiles ship one Remote Control template; a device enables its own projects, so no per-project file is linked here.
-test('claude-rc@ runs in ~/Codes/<project>, skips a missing folder, and no instance is enabled from the dotfiles', () => {
+// Each device serves Remote Control for one folder, ~/Codes/remote, never per project.
+test('claude-rc@ runs in ~/Codes/<folder>, skips a missing folder, and the dotfiles enable only claude-rc@remote', () => {
   const units = join(repo, 'home/dot_config/systemd/user');
   const unit = readFileSync(join(units, 'claude-rc@.service'), 'utf8');
   assert.match(unit, /^ConditionPathIsDirectory=%h\/Codes\/%i$/m);
@@ -86,7 +103,8 @@ test('claude-rc@ runs in ~/Codes/<project>, skips a missing folder, and no insta
   assert.match(unit, /^ExecStart=%h\/\.local\/libexec\/dots\/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir$/m);
   assert.match(unit, /^WantedBy=default\.target$/m);
   const linked = readdirSync(units, { recursive: true }).filter((f) => /claude-rc@/.test(f) && f !== 'claude-rc@.service');
-  assert.deepEqual(linked, []);
+  assert.deepEqual(linked, ['default.target.wants/symlink_claude-rc@remote.service']);
+  assert.equal(readFileSync(join(units, linked[0]), 'utf8').trim(), '../claude-rc@.service');
 });
 
 // run_onchange records a script that exits 0, so a join that failed has to fail the script to be tried on the next apply.

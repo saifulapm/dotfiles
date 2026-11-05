@@ -1,6 +1,6 @@
 [Unit]
 Description=Claude Code Remote Control server for %i
-# One server per project folder under ~/Codes, enabled on the device with systemctl --user enable --now claude-rc@<project>; the Claude app's Code tab lists it by the folder's name, and a folder the device lacks skips the unit instead of failing it.
+# One server per folder under ~/Codes; the dotfiles enable only claude-rc@remote, for ~/Codes/remote, so each device serves Remote Control from that one folder. The Claude app's Code tab lists it by the folder's name, and a folder the device lacks skips the unit instead of failing it.
 ConditionPathIsDirectory=%h/Codes/%i
 # Server mode exits after about 10 minutes without network; with no limit it retries every 5 s until the network is back, instead of failing for good.
 StartLimitIntervalSec=0

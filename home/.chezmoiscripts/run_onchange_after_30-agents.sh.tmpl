@@ -2,13 +2,19 @@
 # local.env: {{ $env := joinPath .chezmoi.homeDir ".config/hub/local.env" }}{{ if stat $env }}written{{ if contains "HUB_STORE_TOKEN=" (include $env) }}, in the store{{ end }}{{ else }}absent{{ end }}
 {{ template "lib.sh" . }}
 export PATH="$HOME/.local/bin:$PATH"
+# claude-rc@remote serves Remote Control from this one folder; its worktree mode needs a git repository, and a worktree a commit to branch from. No hook of workflow's runs on that commit.
+remote=$HOME/Codes/remote
+if [[ ! -d $remote/.git ]]; then
+  mkdir -p "$remote" && git -C "$remote" init -q && git -C "$remote" -c core.hooksPath=/dev/null commit -q --allow-empty -m 'Start the Remote Control folder' ||
+    die "could not make $remote a git repository for claude-rc@remote"
+fi
 # The agent services start at login; this starts them now, again once dots secrets has written local.env, and the hub skips itself by its condition until then.
 case $(systemctl --user is-system-running 2>/dev/null) in
   running | degraded) ;;
   *) exit 0 ;;
 esac
 systemctl --user daemon-reload
-systemctl --user start pxy.service hub-local.service || log "pxy or the local hub did not start: systemctl --user status pxy hub-local"
+systemctl --user start pxy.service hub-local.service claude-rc@remote.service || log "pxy, the local hub or Remote Control did not start: systemctl --user status pxy hub-local claude-rc@remote"
 # The first apply after dots secrets joins the machine to the mem store; workflow switch writes HUB_STORE_TOKEN into local.env, so it runs once.
 env=$HOME/.config/hub/local.env
 if [[ -f $env ]] && ! grep -q '^HUB_STORE_TOKEN=' "$env"; then
