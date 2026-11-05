@@ -1,0 +1,34 @@
+# UI colours, the ANSI 16 and the code colours are Primer's (@primer/primitives 11.10.0 dark.css): paper bgColor-inset, surface bgColor-default, ink fgColor-default, muted fgColor-muted, line borderColor-default, accent fgColor-accent, danger and ok fgColor-danger and fgColor-success, code its prettylights-syntax tokens; attribute and meta the tinted-theming base16 "Github Dark" base09 and 0F.
+[meta]
+name = "github-dark"
+title = "GitHub Dark"
+family = "GitHub"
+variant = "dark"
+source = "https://github.com/primer/primitives"
+licence = "MIT"
+
+[color]
+paper = "#010409"
+surface = "#0D1117"
+ink = "#F0F6FC"
+muted = "#9198A1"
+line = "#3D444D"
+accent = "#4493F8"
+danger = "#F85149"
+ok = "#3FB950"
+ansi = [
+  "#2F3742", "#FF7B72", "#3FB950", "#D29922", "#58A6FF", "#BE8FFF", "#39C5CF", "#F0F6FC",
+  "#656C76", "#FFA198", "#56D364", "#E3B341", "#79C0FF", "#D2A8FF", "#56D4DD", "#FFFFFF",
+]
+
+[syntax]
+keyword = "#FF7B72"
+function = "#D2A8FF"
+string = "#A5D6FF"
+type = "#FFA657"
+value = "#79C0FF"
+variable = "#F0F6FC"
+attribute = "#FFA657"
+meta = "#FFA198"
+builtin = "#79C0FF"
+comment = "#9198A1"
