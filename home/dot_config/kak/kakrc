@@ -6,7 +6,7 @@ set-option global indentwidth 2
 set-option global autoreload true
 set-option global startup_info_version 20250603
 set-option global matching_pairs ( ) { } [ ] < > \" \" « » ‹ ›
-set-option global ui_options terminal_set_title=yes terminal_title=Saiful terminal_synchronized=yes
+set-option global ui_options terminal_set_title=yes terminal_title=Saiful terminal_synchronized=yes terminal_assistant=none
 
 # Performance tuning
 set-option global idle_timeout 150
