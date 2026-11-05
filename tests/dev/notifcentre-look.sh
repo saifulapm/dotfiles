@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# Each theme's notification centre draws in the launcher's voice: Paper's ink row and red marker, Artboard's tinted rounded cursor, Blueprint's header line, dashed rule and cyan cursor.
+# The notification centre draws in the launcher's one design: a tint pill heading, a tinted rounded cursor row, a solid rule and lower-case key chips.
 {
 source "$(dirname "$0")/lib.sh"
 
 notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 state_is() { notifs | jq -e "$1" >/dev/null; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # A notification sent just before the centre opens, so its row's age is under a minute; the newest row comes first.
 send_fresh() { local n; n=$(notifs | jq .count); notify-send -a mail "fresh $1"; until_ok 2000 state_is ".count == $((n + 1))"; }
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }
@@ -42,72 +40,26 @@ notify-send -a mail "mail 1" "a body line"
 notify-send -a chat "chat 1"
 until_ok 2000 state_is '.count == 3'
 
-in_theme paper
-send_fresh paper
+send_fresh fresh
 open_centre
-check "paper: the fresh row's time column reads NOW and the oldest 3H ($(notifs | jq -c .ages))" state_is '.ages[0] == "NOW" and .ages[-1] == "3H"'
-check "paper: the heading is the ink chip reading NOTIFICATIONS ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "chip" and .heading == "NOTIFICATIONS"'
-check "paper: the cursor row's fill is ink ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#1c1915"'
-row_ink=$(near "$(box_geo cursorBox 60 2 200 4)" 28 25 21 6)
-check "paper: the cursor row draws ink across its width ($row_ink of 800 px)" test "$row_ink" -gt 700
-marker=$(near "$(box_geo cursorBox 0 4 50 30)" 200 56 30 40)
-check "paper: the cursor row's ▸ marker is #C8381E ($marker px)" test "$marker" -gt 3 -a "$marker" -lt 200
-check "paper: the legend is tracked caps with ⇧D for clear all ($(notifs | jq -c '[.legend, .legendSpacing]'))" state_is '.legend == "J/K MOVE  ↵ OPEN  D DISMISS  ⇧D CLEAR ALL  M MUTE  I DND  S STAY  1-3 ACTION  / SEARCH  ESC CLOSE" and .legendSpacing > 1'
-close_centre
-
-in_theme artboard
-send_fresh artboard
-open_centre
-check "artboard: the fresh row's time column reads now and the oldest 3h ($(notifs | jq -c .ages))" state_is '.ages[0] == "now" and .ages[-1] == "3h"'
-check "artboard: the heading is the pill reading Notifications ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "pill" and .heading == "Notifications"'
-check "artboard: the cursor row's fill is #EEF1FF ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
+check "the fresh row's time column reads now and the oldest 3h ($(notifs | jq -c .ages))" state_is '.ages[0] == "now" and .ages[-1] == "3h"'
+check "the heading is the pill reading Notifications ($(notifs | jq -c .heading))" state_is '.heading == "Notifications"'
+check "the cursor row's fill is #EEF1FF ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
 tint=$(near "$(box_geo cursorBox 300 2 8 4)" 238 241 255 3)
-check "artboard: inside the cursor row reads the tint ($tint of 32 px)" test "$tint" -eq 32
+check "inside the cursor row reads the tint ($tint of 32 px)" test "$tint" -eq 32
 corner=$(near "$(box_geo cursorBox 0 0 2 2)" 255 255 255 3)
-check "artboard: the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
-close_centre
-
-in_theme blueprint
-send_fresh blueprint
-open_centre
-check "blueprint: the fresh row's time column reads T+0S and the oldest T+3H ($(notifs | jq -c .ages))" state_is '.ages[0] == "T+0S" and .ages[-1] == "T+3H"'
-check "blueprint: the header line reads NOTIFICATIONS ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "header" and .heading == "NOTIFICATIONS"'
-check "blueprint: the rule sits under the header line" state_is '.ruleBox.y > .headingBox.y'
-# Dashes of 4 px leave gaps of 3 that read the card's #0A1526; a solid rule leaves none, wherever its fractional y blends it.
-gaps=$(near "$(box_geo ruleBox 20 0 280 1)" 10 21 38 6)
-check "blueprint: the rule under the header is dashed ($gaps of 280 px read the card between dashes)" test "$gaps" -gt 60 -a "$gaps" -lt 200
-check "blueprint: the cursor row's fill is #7FE3F0 ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#7fe3f0"'
-cyan=$(near "$(box_geo cursorBox 300 2 8 4)" 127 227 240 3)
-check "blueprint: inside the cursor row reads the accent ($cyan of 32 px)" test "$cyan" -eq 32
-check "blueprint: every legend key is bracketed ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["[J/K]", "[↵]", "[D]", "[⇧D]", "[M]", "[I]", "[S]", "[1-3]", "[/]", "[ESC]"]'
+check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+check "the legend keys are lower-case ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["j/k", "↵", "d", "⇧D", "m", "i", "s", "1-3", "/", "esc"]'
+check "the legend reads j/k move first ($(notifs | jq -c .legend))" state_is '.legend | startswith("j/k move  ↵ open  d dismiss  ⇧D clear all")'
+check "the rule sits under the heading" state_is '.ruleBox.y > .headingBox.y'
 # The fresh notification's 5 s in the island end first; the ages need no timer of their own.
 until_ok 7000 one_timer
-check "blueprint: with the centre open status still reports one timer ($(shell_status | jq -c .timers))" one_timer
+check "with the centre open status still reports one timer ($(shell_status | jq -c .timers))" one_timer
 # wtype -k D sends the keysym without Shift, which Qt reads as d, so the check holds Shift as a person does.
 until_ok 2000 state_is .keyboard
 wtype -M shift -k d -m shift
 until_ok 2000 state_is .hint
-check "blueprint: the empty list's hint brackets its keys ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["[/]", "[ESC]"]'
-close_centre
-
-# Hi-Fi draws Blueprint's header and keys without the brackets; the rows are notifications this check sent, none with a bracket.
-in_theme hi-fi
-send_fresh hi-fi
-open_centre
-check "hi-fi: the header line reads NOTIFICATIONS ($(notifs | jq -c '[.headingKind, .heading]'))" state_is '.headingKind == "header" and .heading == "NOTIFICATIONS"'
-check "hi-fi: every legend key is bare ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["J/K", "↵", "D", "⇧D", "M", "I", "S", "1-3", "/", "ESC"]'
-check "hi-fi: nothing the centre reports holds a bracket ($(notifs | marked | head -3 | paste -sd'|'))" eval '[ -z "$(notifs | marked)" ]'
-check "hi-fi: the cursor row is backlit #413A29 ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#413a29"'
-# The 3 px square at the centre of the cursor row's 7 px lamp.
-lamp_geo() { notifs | jq -r '.cursorLamp | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
-until_ok 2000 state_is '.cursorLamp != null'
-lit=$(near "$(lamp_geo)" 250 189 47 12)
-check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
-until_ok 2000 state_is .keyboard
-wtype -M shift -k d -m shift
-until_ok 2000 state_is .hint
-check "hi-fi: the empty list's hint is bare ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["/", "ESC"]'
-check "hi-fi: and the empty centre holds no bracket either" eval '[ -z "$(notifs | marked)" ]'
+check "the empty list's hint names search and esc ($(notifs | jq -c .hintKeys))" state_is '.hint and .hintKeys == ["/", "esc"]'
 close_centre
 
 # An app name is whatever the sender says: a long one elides inside the card, a newline stays on one line, and none at all leaves just the count.
@@ -116,15 +68,12 @@ notify_as "App $(printf 'long%.0s' {1..50})" "long"
 notify_as $'two\nlines' "newline"
 notify_as "" "no app"
 until_ok 2000 state_is '.count == 3'
-for t in blueprint artboard paper; do
-  in_theme "$t"
-  open_centre
-  echo "     $t heads: $(notifs | jq -c '[.heads[] | {text: .text[0:24], elided, lines, right}] + [{cardRight}]')"
-  check "$t: a long app name elides inside the card" state_is '[.heads[] | select(.text | startswith("APP LONG") or startswith("App long"))] | length == 1 and (.[0].elided)'
-  check "$t: no group head runs past the card or onto a second line" state_is '. as $s | all(.heads[]; .right <= $s.cardRight and .lines == 1)'
-  check "$t: an app sent without a name heads its group with the count alone" state_is 'any(.heads[]; .text == "1")'
-  close_centre
-done
+open_centre
+echo "     heads: $(notifs | jq -c '[.heads[] | {text: .text[0:24], elided, lines, right}] + [{cardRight}]')"
+check "a long app name elides inside the card" state_is '[.heads[] | select(.text | startswith("App long"))] | length == 1 and (.[0].elided)'
+check "no group head runs past the card or onto a second line" state_is '. as $s | all(.heads[]; .right <= $s.cardRight and .lines == 1)'
+check "an app sent without a name heads its group with the count alone" state_is 'any(.heads[]; .text == "1")'
+close_centre
 
 exit $((fails > 0))
 }
