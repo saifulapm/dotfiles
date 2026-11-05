@@ -151,10 +151,10 @@ sha256 = "668dd16aee983f111644925a6cccc25ab5dd5107c25d6fd77e05795ae559ef91"
 [[pin]]
 name = "libva-v4l2-request"
 version = "0e54d318004e204d2f73818c96e89c4642178351"
-repo = "sofus13/libva-v4l2_request"
+repo = "AsahiLinux/asahi-va-driver"
 track = "commit"
-install = "/usr/lib64/dri/v4l2_request_drv_video.so and its asahi_drv_video.so link on the Macs, VA-API over the decoder"
-url = "https://github.com/sofus13/libva-v4l2_request/archive/{version}.tar.gz"
+install = "/usr/lib64/dri/asahi_drv_video.so on the Macs, VA-API over the decoder"
+url = "https://github.com/AsahiLinux/asahi-va-driver/archive/{version}.tar.gz"
 sha256 = "90e38019e76760d8ad11f04878331a90b56d18257f85f620daf57b10e50c71c4"
 
 [[pin]]
