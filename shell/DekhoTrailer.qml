@@ -9,7 +9,7 @@ Item {
 
     required property var dekho
 
-    readonly property string bin: Quickshell.shellDir + "/../bin/dots-dekho-play"
+    readonly property string bin: Quickshell.shellDir + "/bin/dots-dekho-play"
     // What is played: id, kind and title.
     property var target: ({})
     property string session: ""

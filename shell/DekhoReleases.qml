@@ -18,7 +18,7 @@ FocusScope {
     readonly property var look: dekho.look
     readonly property var words: R.releasesText()
     readonly property string bodyFont: fonts.ui ?? ""
-    readonly property string bin: Quickshell.shellDir + "/../bin/dots-dekho-play"
+    readonly property string bin: Quickshell.shellDir + "/bin/dots-dekho-play"
 
     // "" when closed, else "list", "none" or "starting".
     property string mode: ""

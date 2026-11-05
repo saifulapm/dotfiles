@@ -44,7 +44,7 @@ Scope {
     property Item statusItem: null
     property Item dateItem: null
     // just dev points this at a fake, so no check messages the phone.
-    readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/../bin/dots-notify-phone"
+    readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
 
     // The marker goes down before the lock does, so a shell killed at any point after this relocks on restart.

@@ -18,7 +18,7 @@ ShellRoot {
 
     // Process start to the window's first frame, set once.
     property var firstFrameMs: null
-    readonly property string backend: Quickshell.env("DOTS_YOUTUBE") || Quickshell.shellDir + "/../bin/dots-youtube-api"
+    readonly property string backend: Quickshell.env("DOTS_YOUTUBE") || Quickshell.shellDir + "/bin/dots-youtube-api"
     // The sidebar's entry the list shows: search, saved, history, or playlist with the Playlist's id in playlistId.
     property string view: "search"
     property string playlistId: ""
@@ -72,7 +72,7 @@ ShellRoot {
     // The download index as dots-youtube-get keeps it, {files, failed}; read once its where has pruned the files gone since, and on every write after.
     property var downloads: G.index("")
     property string indexPath: ""
-    readonly property string getter: Quickshell.shellDir + "/../bin/dots-youtube-get"
+    readonly property string getter: Quickshell.shellDir + "/bin/dots-youtube-get"
 
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
@@ -319,7 +319,7 @@ ShellRoot {
     function playVideos(ids) {
         queueCommand(Q.setPauseLine(true));
         // The repo's bin is on the session PATH only through fish, so the player is found beside the shell.
-        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "video"].concat(ids), answer => {
+        run([Quickshell.shellDir + "/bin/dots-youtube-play", "video"].concat(ids), answer => {
             if (answer && typeof answer.unit === "string")
                 app.units = app.units.concat([answer.unit]);
         });
@@ -412,7 +412,7 @@ ShellRoot {
         writeQueue(r.write);
         if (!r.start)
             return;
-        run([Quickshell.shellDir + "/../bin/dots-youtube-play", "audio"], answer => {
+        run([Quickshell.shellDir + "/bin/dots-youtube-play", "audio"], answer => {
             if (answer && typeof answer.socket === "string")
                 queueSocket.connected = true;
             // A failed start, or a socket that refused the connect, drops what waited, so the next m or a starts the unit again.

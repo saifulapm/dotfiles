@@ -37,7 +37,7 @@ ShellRoot {
     // The session followed: Starting's run, or the run a reopened Dekho finds active.
     property string playSession: ""
     property var playTail: null
-    readonly property string playBin: Quickshell.shellDir + "/../bin/dots-dekho-play"
+    readonly property string playBin: Quickshell.shellDir + "/bin/dots-dekho-play"
 
     readonly property var c: theme.color
     readonly property var tones: L.plainTones(theme.tokens)

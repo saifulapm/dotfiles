@@ -26,7 +26,7 @@ Item {
     property bool stale: false
     readonly property bool busy: reader.running || toggler.running
 
-    readonly property string sendBin: Quickshell.shellDir + "/../bin/dots-taildrop-send"
+    readonly property string sendBin: Quickshell.shellDir + "/bin/dots-taildrop-send"
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)

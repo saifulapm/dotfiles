@@ -24,7 +24,7 @@ Item {
     signal closed
 
     // dots-taildrop-send beside the shell's bin/, started detached so the send outlives Files' window.
-    readonly property string sendBin: Quickshell.shellDir + "/../bin/dots-taildrop-send"
+    readonly property string sendBin: Quickshell.shellDir + "/bin/dots-taildrop-send"
     readonly property var head: F.shareHead(paths.length, bytes)
     readonly property var keyPairs: [["↵", "send with Taildrop"], ["j/k", "move"], ["esc", ""]].map(([k, w]) => ({
                 key: k,

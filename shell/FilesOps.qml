@@ -24,7 +24,7 @@ Scope {
     signal ended(var last)
 
     // Beside the shell's bin/, as Share finds dots-taildrop-send.
-    readonly property string bin: Quickshell.shellDir + "/../bin/dots-files-op"
+    readonly property string bin: Quickshell.shellDir + "/bin/dots-files-op"
 
     function start(how, list, fromDir, dest, name) {
         if (running || !list.length)

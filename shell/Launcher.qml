@@ -68,9 +68,9 @@ Item {
         case "reminder":
             return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.broken : false);
         case "commands":
-            return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin", machine);
+            return Lib.commandRows(parsed.q, Quickshell.shellDir + "/bin", machine);
         case "colorschemes":
-            return Lib.schemeRows(schemes, parsed.q, theme.name, Quickshell.shellDir + "/../bin");
+            return Lib.schemeRows(schemes, parsed.q, theme.name, Quickshell.shellDir + "/bin");
         case "apps":
             return Lib.rank(apps, parsed.q).map(a => ({
                         title: a.name,
@@ -315,7 +315,7 @@ Item {
 
     Process {
         id: zoner
-        command: [Quickshell.shellDir + "/../bin/dots-zones"]
+        command: [Quickshell.shellDir + "/bin/dots-zones"]
         stdout: StdioCollector {
             id: zoned
         }

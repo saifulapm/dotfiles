@@ -16,7 +16,7 @@ Item {
     required property Item rowKeys
 
     // Started by path, as the nested shell runs without bin/ on PATH.
-    readonly property string appsBin: Quickshell.shellDir + "/../bin/dots-files-apps"
+    readonly property string appsBin: Quickshell.shellDir + "/bin/dots-files-apps"
     property var targets: []
     property var found: null
     property int at: 0

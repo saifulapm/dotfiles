@@ -35,7 +35,7 @@ Item {
     // What the clipboard's QR says it is (issuer, account, type, digits, period), never its secret, while q picks the entry to save it to.
     property var qr: null
 
-    readonly property string bin: Quickshell.shellDir + "/../bin/dots-pass"
+    readonly property string bin: Quickshell.shellDir + "/bin/dots-pass"
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
