@@ -1,15 +1,13 @@
 #!/usr/bin/env bash
-# Each theme's launcher looks like its board: Paper's ink row, Artboard's icon tiles and tinted cursor, Blueprint's header, numbers and cyan cursor.
+# The launcher looks like its board: icon tiles, a rounded tinted cursor row, a mode pill and prefix chips.
 {
 source "$(dirname "$0")/lib.sh"
 
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 open_launcher() { niri msg action spawn -- dots-call launcher toggle; until_ok 3000 state_is '.open and .query == "" and .keyboard and .settled'; }
 close_launcher() { wtype -k Escape; until_ok 2000 state_is '.open == false'; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 2000 status_theme "$1"; }
 # Pixels of geometry $1 within $5 of r g b.
 near() {
   grim -s 1 -t ppm -g "$1" - | node -e '
@@ -25,6 +23,8 @@ cursor_geo() {
   launcher_state | jq -r --argjson dx "$1" --argjson dy "$2" --argjson w "$3" --argjson h "$4" \
     '.cursorBox | "\((if $dx < 0 then .x + .w + $dx else .x + $dx end) | floor),\((if $dy < 0 then .y + .h + $dy else .y + $dy end) | floor) \($w)x\($h)"'
 }
+# An 8 px square in the query's empty right half, where only the card's fill shows.
+fill_geo() { launcher_state | jq -r '.cardBox | "\(.x + 300 | floor),\(.y + 22 | floor) 8x8"'; }
 
 # An app whose icon no theme has, written after the shell's scan, so the scan must pick it up.
 mkdir -p "$DOTS_DEV_DIR/data/applications"
@@ -34,158 +34,81 @@ printf '[Desktop Entry]\nType=Application\nName=%s\nGenericName=Long Detail\nExe
 
 until_ok 5000 shell_status >/dev/null
 
-in_theme paper
-open_launcher
-wtype fo
-until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
-check "paper: the cursor row's fill is ink ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#1c1915"'
-check "paper: the query is Instrument Serif at 34 px and the detail italic Instrument Serif at 16 px" state_is '.queryFont == ["Instrument Serif", 34] and .detailFont == ["Instrument Serif", 16, true]'
-row_ink=$(near "$(cursor_geo 60 4 200 8)" 28 25 21 6)
-check "paper: the cursor row draws ink across its width ($row_ink of 1600 px)" test "$row_ink" -gt 1200
-marker=$(near "$(cursor_geo 0 4 50 30)" 200 56 30 40)
-check "paper: the cursor row's ▸ marker is #C8381E ($marker px)" test "$marker" -gt 6 -a "$marker" -lt 200
-close_launcher
-
-in_theme artboard
 open_launcher
 wtype fo
 until_ok 3000 state_is '.query == "fo" and .results[0] == "Foot" and .cursorBox != null'
-check "artboard: the cursor row's fill is #EEF1FF ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
+check "the cursor row's fill is #EEF1FF ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
 tint=$(near "$(cursor_geo -70 4 8 8)" 238 241 255 3)
-check "artboard: inside the cursor row reads the tint ($tint of 64 px)" test "$tint" -eq 64
+check "inside the cursor row reads the tint ($tint of 64 px)" test "$tint" -eq 64
 corner=$(near "$(cursor_geo 0 0 2 2)" 255 255 255 3)
-check "artboard: the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
-check "artboard: Foot's row draws its icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
+check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+check "Foot's row draws its icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
 # foot's icon is a dark terminal, so its tile holds dark pixels that the tint never has.
 dark=$(near "$(cursor_geo 12 12 32 32)" 30 30 30 40)
-check "artboard: Foot's 32 px icon shows in its slot ($dark dark px)" test "$dark" -gt 100
-check "artboard: the mode pill reads Apps and the footer shows five prefix chips" state_is '.label == "Apps" and .legendKeys == 5 and .legendLines == 1'
+check "Foot's 32 px icon shows in its slot ($dark dark px)" test "$dark" -gt 100
+check "the mode pill reads Apps and the footer shows five prefix chips" state_is '.label == "Apps" and .legendKeys == 5 and .legendLines == 1'
 close_launcher
 
 open_launcher
 wtype "zz iconless"
 until_ok 5000 state_is '.results[0] == "Zz Iconless" and .cursorBox != null'
-check "artboard: an entry whose icon is missing gets the fallback tile ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "tile"'
+check "an entry whose icon is missing gets the fallback tile ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "tile"'
 tile=$(near "$(cursor_geo 20 20 16 16)" 242 243 246 2)
-check "artboard: the fallback tile is #F2F3F6 ($tile of 256 px)" test "$tile" -gt 240
+check "the fallback tile is #F2F3F6 ($tile of 256 px)" test "$tile" -gt 240
 close_launcher
 
-in_theme blueprint
 open_launcher
-wtype fo
-until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
-check "blueprint: the header reads LAUNCH // APPS and <n> MATCHES for the state's count ($(launcher_state | jq -c '[.label, .countText, .count]'))" state_is '.label == "LAUNCH // APPS" and .countText == "\(.count) MATCHES"'
-check "blueprint: the cursor row's fill is #7FE3F0 and its first cell reads 01" state_is '.cursorFill == "#7fe3f0" and .slots[.selected] == "01"'
-cyan=$(near "$(cursor_geo -60 3 8 8)" 127 227 240 3)
-check "blueprint: inside the cursor row reads the accent ($cyan of 64 px)" test "$cyan" -eq 64
-check "blueprint: the legend fits one line in apps mode ($(launcher_state | jq -c .legend))" state_is '.legendLines == 1 and .legendKeys == 5'
-# The block caret is the query's: it glows while the query has focus and goes when Tab hands j/k to the list.
-caret_px() { near "$(launcher_state | jq -r '.queryBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"')" 127 227 240 10; }
-caret_on() { (($(caret_px) > 100)); }
-# It blinks, so gone means gone in four looks over 1.6 s.
-caret_off() { local i; for i in 1 2 3 4; do (($(caret_px) < 20)) || return 1; sleep 0.4; done; }
-until_ok 2000 caret_on
-check "blueprint: the query shows its block caret while it has focus ($(caret_px) px)" caret_on
-wtype -k Tab
-check "blueprint: after Tab the block caret is gone" caret_off
-# Hi-Fi draws Blueprint's board in its own tokens, its keys and labels without brackets.
-in_theme hi-fi
-no_marks() { [ -n "$(launcher_state)" ] && [ -z "$(launcher_state | marked)" ]; }
-check "hi-fi: nothing the launcher reports holds a bracket ($(launcher_state | marked | head -3 | paste -sd'|'))" no_marks
-check "hi-fi: the header reads LAUNCH · APPS ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH · APPS"'
-in_theme blueprint
-wtype /
-until_ok 2000 caret_on
-# The board restyles at once: the query and the keyboard stay while the cursor row turns Artboard's tint.
-in_theme artboard
-until_ok 2000 state_is '.cursorFill == "#eef1ff"'
-check "switching to artboard while open restyles the cursor row and keeps the query" state_is '.open and .query == "fo" and .cursorFill == "#eef1ff" and .label == "Apps" and .keyboard'
-tint=$(near "$(cursor_geo -70 4 8 8)" 238 241 255 3)
-check "after the switch the cursor row draws the tint ($tint of 64 px)" test "$tint" -eq 64
+wtype "zz long"
+until_ok 3000 state_is '(.results[0] // "") | startswith("Zz Long")'
+check "a 200-character name elides above its detail ($(launcher_state | jq -c '[.cursorElided, .cursorDetailWidth]'))" state_is '.cursorElided and .cursorDetailWidth > 40'
 close_launcher
-
-for t in paper artboard blueprint; do
-  in_theme "$t"
-  open_launcher
-  wtype "zz long"
-  until_ok 3000 state_is '(.results[0] // "") | startswith("Zz Long")'
-  check "$t: a 200-character name elides before the detail column ($(launcher_state | jq -c '[.cursorElided, .cursorDetailWidth]'))" state_is '.cursorElided and .cursorDetailWidth > 40'
-  close_launcher
-done
 
 for m in "w " "v " ": " "= " "> "; do
-  in_theme blueprint
   open_launcher
   wtype -- "$m"
   until_ok 2000 state_is ".query == \"$m\""
-  check "blueprint: the legend fits one line in mode '$m'" state_is '.legendLines == 1'
+  check "the legend fits one line in mode '$m'" state_is '.legendLines == 1'
   close_launcher
 done
 
-# Every mode draws its rows in the theme's look.
-in_theme blueprint
+# Every mode draws its rows in the same look.
 niri msg action spawn -- dots-call launcher mode clipboard
 until_ok 3000 state_is '.open and .mode == "clipboard"'
-check "blueprint: Mod+V shows a header reading LAUNCH // CLIPBOARD ($(launcher_state | jq -c .label))" state_is '.label == "LAUNCH // CLIPBOARD"'
-check "blueprint: Mod+V leaves no block caret in the query, since j/k move the list" caret_off
+check "Mod+V shows the mode pill reading Clipboard ($(launcher_state | jq -c .label))" state_is '.label == "Clipboard"'
 close_launcher
 
-in_theme artboard
 open_launcher
 wtype ": fire"
 until_ok 3000 state_is '.results[0] == "🔥 fire" and .cursorBox != null'
-check "artboard: : fire shows 🔥 in the first row's icon slot ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "🔥"'
+check ": fire shows 🔥 in the first row's icon slot ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "🔥"'
 flame=$(near "$(cursor_geo 12 12 32 32)" 245 130 40 60)
-check "artboard: the flame's colours show in the slot ($flame px)" test "$flame" -gt 20
+check "the flame's colours show in the slot ($flame px)" test "$flame" -gt 20
 close_launcher
 
-for t in paper artboard blueprint; do
-  in_theme "$t"
-  open_launcher
-  wtype "= 1440*1.25"
-  until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
-  check "$t: = 1440*1.25 shows 1800 as the first row" state_is '.results[0] == "1800" and .label != ""'
-  close_launcher
-done
+open_launcher
+wtype "= 1440*1.25"
+until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
+check "= 1440*1.25 shows 1800 as the first row" state_is '.results[0] == "1800" and .label == "Calculator"'
+close_launcher
 
-in_theme artboard
 niri msg action spawn -- foot -c /dev/null
 until_ok 5000 bash -c 'niri msg -j windows | jq -e "any(.[]; .app_id == \"foot\")" >/dev/null'
 open_launcher
 wtype "w "
 until_ok 3000 state_is '.mode == "windows" and (.results | length) >= 1'
-check "artboard: a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
+check "a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
 close_launcher
 
-# Hi-Fi lights its cursor row like a lamp: the name amber on the backlit #413A29, and the lamp moves with j.
-name_geo() { launcher_state | jq -r '.cursorNameBox | "\(.x | floor),\(.y | floor) \(.w | floor)x\(.h | floor)"'; }
-# The 3 px square at the centre of row $1's 7 px lamp.
-lamp_geo() { launcher_state | jq -r --argjson i "$1" '.lampBoxes[$i] | "\(.x + 2 | floor),\(.y + 2 | floor) 3x3"'; }
-in_theme hi-fi
+# The card restyles at once: a switch while open keeps the query and the keyboard and fills the card in the new surface.
 open_launcher
 wtype fo
-until_ok 3000 state_is '.query == "fo" and .cursorName != null'
-# The nested session's app list has four apps matching fo, so the count reads 4, not the board's 3.
-check "hi-fi: the header reads LAUNCH · APPS, 4 MATCHES and the cursor row FOOT ($(launcher_state | jq -c '[.header, .countText, .cursorName]'))" state_is '.header == "LAUNCH · APPS" and .countText == "4 MATCHES" and .cursorName == "FOOT"'
-check "hi-fi: the legend reads the five prefixes and J K · ↵ · ESC ($(launcher_state | jq -c .legend))" state_is '.legend == "W WINDOWS  V CLIPBOARD  : EMOJI  = CALC  > COMMANDS  J K · ↵ · ESC"'
-name_amber=$(near "$(name_geo)" 250 189 47 12)
-name_fill=$(near "$(name_geo)" 65 58 41 3)
-check "hi-fi: the cursor row's name draws #FABD2F ($name_amber px) on #413A29 ($name_fill px)" test "$name_amber" -gt 20 -a "$name_fill" -gt 500
-# The lit name glows like its lamp: a warm halo of amber over the row's fill rings each letter.
-halo=$(near "$(name_geo)" 95 80 46 22)
-check "hi-fi: the cursor row's name glows ($halo px of amber halo)" test "$halo" -gt 25
-lit=$(near "$(lamp_geo 0)" 250 189 47 12)
-check "hi-fi: the cursor row's lamp reads amber at its centre ($lit of 9 px)" test "$lit" -eq 9
-check "hi-fi: the state lights the first row's lamp ($(launcher_state | jq -c .lampLit))" state_is '.lampLit == 0'
-wtype -k Tab
-wtype j
-until_ok 2000 state_is '.selected == 1 and .lampLit == 1'
-check "hi-fi: j moves the lit lamp to the second row ($(launcher_state | jq -c '[.selected, .lampLit]'))" state_is '.selected == 1 and .lampLit == 1'
-second=$(near "$(lamp_geo 1)" 250 189 47 12)
-first=$(near "$(lamp_geo 0)" 60 56 54 6)
-check "hi-fi: the second row's lamp reads amber ($second of 9 px) and the first goes back to #3C3836 ($first of 9 px)" test "$second" -eq 9 -a "$first" -eq 9
+until_ok 3000 state_is '.query == "fo"'
+"$repo/bin/dots" colorscheme catppuccin-mocha >/dev/null
+until_ok 3000 eval 'shell_status | jq -e ".theme == \"catppuccin-mocha\" and .transition == \"\"" >/dev/null'
+check "a switch while open keeps the query and the keyboard" state_is '.open and .query == "fo" and .keyboard'
+fill=$(near "$(fill_geo)" 30 30 46 3)
+check "the card is filled with Mocha's surface #1E1E2E ($fill of 64 px)" test "$fill" -eq 64
 close_launcher
 
-in_theme paper
 exit $((fails > 0))
 }

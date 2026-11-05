@@ -2,9 +2,7 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Effects
 import "." as Root
-import "lib/hifi.mjs" as H
 import "lib/launcher.mjs" as Lib
 import "lib/clips.mjs" as Clips
 import "lib/emoji.mjs" as Emoji
@@ -173,13 +171,7 @@ Item {
         const q = input.mapToItem(null, 0, 0);
         const nameBox = cur ? cur.nameText : null;
         const n = nameBox ? nameBox.mapToItem(null, 0, 0) : null;
-        const lampAt = i => {
-            const l = rowRepeater.itemAt(i)?.lampItem;
-            const m = l ? l.mapToItem(null, 0, 0) : null;
-            return m ? { x: m.x, y: m.y, w: l.width, h: l.height } : null;
-        };
         return JSON.stringify({
-            header: header.text,
             open: shown,
             mode: mode,
             query: query,
@@ -201,25 +193,16 @@ Item {
             cardBox: card.drawnBox(),
             glassFill: String(card.drawnFill),
             nameFont: nameBox ? nameBox.fontInfo.family : null,
-            fieldFill: look.field ? String(well.color) : null,
-            fieldBorder: look.field ? String(well.border.color) : null,
-            fieldBox: look.field ? { x: well.mapToItem(null, 0, 0).x, y: well.mapToItem(null, 0, 0).y, w: well.width, h: well.height } : null,
             prompt: { text: look.prompt.text, color: look.prompt.color },
-            caretColor: look.field ? String(look.field.caret) : null,
-            highlight: look.highlight ? String(paneHighlight.color) : null,
             keyColor: footerKeys.count > 0 ? String(footerKeys.itemAt(0).keyGlyph.color) : null,
             keyFont: footerKeys.count > 0 ? footerKeys.itemAt(0).keyGlyph.fontInfo.family : null,
             keyBox: footerKeys.count > 0 ? { x: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).x, y: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).y, w: footerKeys.itemAt(0).keyGlyph.width, h: footerKeys.itemAt(0).keyGlyph.height } : null,
             cursorBadge: cur ? cur.badgeText : null,
-            look: look.voice,
-            label: (look.label.kind === "header" ? header : look.label.kind === "pill" ? pill : chip).text,
+            label: pill.text,
             count: found.length,
-            countText: (look.label.kind === "header" ? headerCount : chipCount).text,
-            slots: rows.map((r, i) => look.slot === "number" ? look.number(i) : look.slot === "marker" ? "▸" : look.slot === "lamp" ? "lamp" : r.icon || r.glyph || "tile"),
+            slots: rows.map(r => r.icon || r.glyph || "tile"),
             cursorName: nameBox ? nameBox.text : null,
             cursorNameBox: n ? { x: n.x, y: n.y, w: nameBox.width, h: nameBox.height } : null,
-            lampLit: rows.findIndex((r, i) => rowRepeater.itemAt(i)?.lampLit),
-            lampBoxes: rows.map((r, i) => lampAt(i)),
             cursorFill: box ? String(box.color) : null,
             cursorBox: box ? { x: p.x, y: p.y, w: box.width, h: box.height } : null,
             cursorElided: cur ? cur.elided : null,
@@ -334,114 +317,22 @@ Item {
             label: "Launcher"
             motion: launcher.motion
 
-            // Hi-Fi's surface has a 1 px top highlight of ink under its frame.
-            Rectangle {
-                visible: look.slot === "lamp"
-                x: 1
-                y: 1
-                width: column.width - 2
-                height: 1
-                color: look.slot === "lamp" ? H.glass(launcher.theme.tokens).highlight : "transparent"
-            }
-
-            // A blurring theme's pane has a 1 px inner highlight under its frame.
-            Rectangle {
-                id: paneHighlight
-                visible: !!look.highlight
-                x: 1
-                y: 1
-                width: column.width - 2
-                height: 1
-                color: look.highlight ?? "transparent"
-            }
-
-            // A blurring theme's field is a well with an edge around the prompt and the query.
-            Rectangle {
-                id: well
-                visible: !!look.field
-                x: field.x - 10
-                y: field.y - 6
-                width: field.width + 20
-                height: field.height + 12
-                radius: 8
-                color: look.field ? look.field.fill : "transparent"
-                border.width: 1
-                border.color: look.field ? look.field.border : "transparent"
-            }
-
-            // Hi-Fi's field is a glass well around the prompt and the query.
-            Root.Glass {
-                visible: launcher.look.slot === "lamp"
-                tokens: launcher.look.slot === "lamp" ? launcher.theme.tokens : null
-                x: field.x - 10
-                y: field.y - 6
-                width: field.width + 20
-                height: field.height + 12
-            }
-
             ColumnLayout {
                 id: column
                 width: parent.width
                 spacing: 0
 
-                // Blueprint names the mode and counts its matches on a line of their own above the prompt.
-                RowLayout {
-                    visible: look.label.kind === "header"
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.topMargin: 12
-
-                    Text {
-                        id: header
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        text: look.label.text(launcher.mode)
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
-                    Text {
-                        id: headerCount
-                        textFormat: Text.PlainText
-                        text: launcher.mode === "reminder" ? look.pendingCount(pending.length) : look.count(found.length)
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
-                }
-
                 RowLayout {
                     id: field
                     Layout.fillWidth: true
-                    Layout.leftMargin: look.voice === "plain" ? 18 : look.voice === "bracket" ? 22 : 20
+                    Layout.leftMargin: 18
                     Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: look.voice === "plain" ? 16 : look.voice === "bracket" ? 8 : 18
-                    Layout.bottomMargin: look.voice === "plain" ? 16 : 14
-                    spacing: look.voice === "caps" ? 14 : look.voice === "bracket" ? 10 : 12
+                    Layout.topMargin: 16
+                    Layout.bottomMargin: 16
+                    spacing: 12
 
-                    Rectangle {
-                        visible: look.label.kind === "chip"
-                        implicitWidth: chip.implicitWidth + 14
-                        implicitHeight: chip.implicitHeight + 6
-                        color: look.label.fill
-                        Text {
-                            id: chip
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: look.label.text(launcher.mode)
-                            color: look.label.color
-                            font.family: fonts.ui
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.4
-                        }
-                    }
-
-                    // Artboard's magnifier: a ring and a handle at 45 degrees.
+                    // The magnifier: a ring and a handle at 45 degrees.
                     Item {
-                        visible: look.prompt.search
                         implicitWidth: 18
                         implicitHeight: 18
                         Rectangle {
@@ -465,15 +356,6 @@ Item {
                         }
                     }
 
-                    Text {
-                        visible: look.prompt.text !== ""
-                        textFormat: Text.PlainText
-                        text: look.prompt.text
-                        color: look.prompt.color
-                        font.family: look.query.font
-                        font.pixelSize: look.query.size
-                    }
-
                     TextInput {
                         id: input
                         Layout.fillWidth: true
@@ -482,7 +364,6 @@ Item {
                         font.pixelSize: look.query.size
                         clip: true
                         focus: true
-                        cursorDelegate: look.caret === "block" ? blockCaret : look.field ? lineCaret : null
                         Keys.onPressed: event => {
                             const ctrl = event.modifiers & Qt.ControlModifier;
                             if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
@@ -501,19 +382,7 @@ Item {
                         }
                     }
 
-                    Text {
-                        id: chipCount
-                        visible: look.label.kind === "chip"
-                        textFormat: Text.PlainText
-                        text: launcher.mode === "reminder" ? look.pendingCount(pending.length) : look.count(found.length)
-                        color: look.small.color
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
-
                     Rectangle {
-                        visible: look.label.kind === "pill"
                         implicitWidth: pill.implicitWidth + 18
                         implicitHeight: pill.implicitHeight + 6
                         radius: 8
@@ -559,8 +428,7 @@ Item {
                     Column {
                         id: list
                         y: 8
-                        // Paper's rows run edge to edge; the others sit inset as tiles.
-                        x: look.voice === "plain" ? 8 : look.voice === "bracket" ? 10 : 0
+                        x: 8
                         width: parent.width - 2 * x
 
                         Text {
@@ -592,8 +460,6 @@ Item {
                                 readonly property string headText: modelData.head ? headLabel.text : ""
                                 readonly property Item box: rowBox
                                 readonly property Item nameText: title
-                                readonly property Item lampItem: rowLamp
-                                readonly property bool lampLit: rowLamp.visible && rowLamp.light === "lit"
                                 width: list.width
 
                                 RowLayout {
@@ -602,7 +468,7 @@ Item {
                                     Text {
                                         id: headLabel
                                         Layout.fillWidth: true
-                                        leftPadding: look.voice === "caps" ? 20 : 12
+                                        leftPadding: 12
                                         topPadding: 10
                                         bottomPadding: 4
                                         textFormat: Text.PlainText
@@ -613,7 +479,7 @@ Item {
                                         font.letterSpacing: look.small.spacing
                                     }
                                     Text {
-                                        rightPadding: look.voice === "caps" ? 20 : 12
+                                        rightPadding: 12
                                         topPadding: 10
                                         bottomPadding: 4
                                         textFormat: Text.PlainText
@@ -628,42 +494,19 @@ Item {
                             Rectangle {
                                 id: rowBox
                                 width: list.width
-                                implicitHeight: row.implicitHeight + (look.voice === "caps" ? 22 : 20)
+                                implicitHeight: row.implicitHeight + 20
                                 radius: look.cursor.radius
                                 color: current ? look.cursor.fill : "transparent"
 
                                 RowLayout {
                                     id: row
                                     anchors.fill: parent
-                                    anchors.leftMargin: look.voice === "caps" ? 20 : 12
+                                    anchors.leftMargin: 12
                                     anchors.rightMargin: anchors.leftMargin
-                                    spacing: look.voice === "plain" ? 12 : 14
-
-                                    // Hi-Fi's row lamp, lit on the cursor row.
-                                    Root.Lamp {
-                                        id: rowLamp
-                                        visible: launcher.look.slot === "lamp"
-                                        tokens: launcher.theme.tokens
-                                        light: current ? "lit" : "unlit"
-                                        size: 7
-                                        Layout.alignment: Qt.AlignVCenter
-                                        Layout.preferredWidth: size
-                                        Layout.preferredHeight: size
-                                    }
-
-                                    Text {
-                                        visible: look.slot === "number" || look.slot === "marker"
-                                        textFormat: Text.PlainText
-                                        text: look.slot === "number" ? look.number(index) : "▸"
-                                        color: look.slot === "number" ? (current ? look.cursor.text : c.muted) : current ? look.cursor.marker : "transparent"
-                                        font.family: look.slot === "number" ? look.name.font : fonts.ui
-                                        font.pixelSize: look.slot === "number" ? 13 : 15
-                                        font.bold: look.slot === "number" && current
-                                    }
+                                    spacing: 12
 
                                     // An app's own icon at 32 px, else a tile holding the row's glyph, or a plain tile when it has neither.
                                     Rectangle {
-                                        visible: look.slot === "icon"
                                         implicitWidth: look.tile.size
                                         implicitHeight: look.tile.size
                                         radius: look.tile.radius
@@ -671,7 +514,7 @@ Item {
                                         Image {
                                             anchors.fill: parent
                                             visible: !!modelData.icon
-                                            source: look.slot === "icon" && modelData.icon ? modelData.icon : ""
+                                            source: modelData.icon || ""
                                             sourceSize.width: look.tile.size
                                             sourceSize.height: look.tile.size
                                             asynchronous: true
@@ -687,32 +530,20 @@ Item {
                                         }
                                     }
 
+                                    // The detail sits under the name.
                                     GridLayout {
                                         Layout.fillWidth: true
-                                        // Artboard sets the detail under the name; the others put it at the right.
-                                        columns: look.voice === "plain" ? 1 : 2
+                                        columns: 1
                                         rowSpacing: 0
-                                        columnSpacing: 14
 
                                         Text {
                                             id: title
                                             textFormat: Text.PlainText
                                             Layout.fillWidth: true
-                                            // Where the slot shows the row's glyph, the title drops it.
-                                            text: look.title(look.slot === "icon" && modelData.bare ? modelData.bare : modelData.title)
+                                            // The slot shows the row's glyph, so the title drops it.
+                                            text: look.title(modelData.bare ? modelData.bare : modelData.title)
                                             elide: Text.ElideRight
                                             color: current ? look.cursor.text : look.name.color
-                                            // Hi-Fi's lit name glows like its lamp; the layer is made only on that row.
-                                            layer.enabled: current && !!look.cursor.glow
-                                            layer.effect: MultiEffect {
-                                                shadowEnabled: true
-                                                shadowColor: look.cursor.glow || "transparent"
-                                                shadowOpacity: 0.35
-                                                shadowBlur: 0.6
-                                                blurMax: 16
-                                                shadowHorizontalOffset: 0
-                                                shadowVerticalOffset: 0
-                                            }
                                             font.family: look.name.font
                                             font.pixelSize: look.name.size
                                             font.weight: current ? look.cursor.weight : look.name.weight
@@ -721,8 +552,7 @@ Item {
                                         Text {
                                             id: detail
                                             textFormat: Text.PlainText
-                                            Layout.fillWidth: look.voice === "plain"
-                                            Layout.maximumWidth: look.voice === "plain" ? -1 : 260
+                                            Layout.fillWidth: true
                                             text: look.rowDetail(modelData)
                                             elide: Text.ElideRight
                                             color: current ? look.cursor.detail : look.detail.color
@@ -733,16 +563,16 @@ Item {
                                         }
                                     }
 
-                                    // A row with a global key names it; Paper keeps a column for the keys, so the tools line up.
+                                    // A row with a global key names it.
                                     Item {
-                                        visible: !!modelData.key || look.keyChip.column > 0
-                                        implicitWidth: Math.max(look.keyChip.column, keyChip.implicitWidth)
+                                        visible: !!modelData.key
+                                        implicitWidth: keyChip.implicitWidth
                                         implicitHeight: keyChip.implicitHeight
                                         Rectangle {
                                             id: keyChip
                                             anchors.right: parent.right
                                             visible: !!modelData.key
-                                            implicitWidth: keyLabel.implicitWidth + (look.keyChip.fill === "transparent" && look.keyChip.border === 0 ? 0 : 14)
+                                            implicitWidth: keyLabel.implicitWidth + 14
                                             implicitHeight: keyLabel.implicitHeight + 4
                                             radius: look.keyChip.radius
                                             color: current ? look.keyChip.cursorFill : look.keyChip.fill
@@ -787,19 +617,19 @@ Item {
 
                 Rule {}
 
-                // The prefixes start at the left, as chips in Artboard, and the moving keys end the line at the right.
+                // The prefixes start at the left as chips, and the moving keys end the line at the right.
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.leftMargin: look.voice === "plain" ? 14 : look.voice === "bracket" ? 22 : 20
+                    Layout.leftMargin: 14
                     Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: look.voice === "plain" ? 10 : 12
-                    Layout.bottomMargin: look.voice === "bracket" ? 14 : Layout.topMargin
+                    Layout.topMargin: 10
+                    Layout.bottomMargin: Layout.topMargin
                     spacing: 14
 
                     Flow {
                         id: footer
                         Layout.fillWidth: true
-                        spacing: look.legend(launcher.mode).chips ? 8 : 14
+                        spacing: 8
 
                         Repeater {
                             id: footerKeys
@@ -807,8 +637,8 @@ Item {
 
                             Rectangle {
                                 required property var modelData
-                                width: pair.implicitWidth + (look.legend(launcher.mode).chips ? 14 : 0)
-                                height: pair.implicitHeight + (look.legend(launcher.mode).chips ? 6 : 0)
+                                width: pair.implicitWidth + 14
+                                height: pair.implicitHeight + 6
                                 radius: 6
                                 color: look.chip.fill
 
@@ -817,14 +647,14 @@ Item {
                                 Row {
                                     id: pair
                                     anchors.centerIn: parent
-                                    spacing: look.legend(launcher.mode).chips ? 6 : 5
+                                    spacing: 6
 
                                     Text {
                                         id: pairKey
                                         textFormat: Text.PlainText
                                         text: modelData.key
                                         color: look.chip.key
-                                        font.family: look.chip.font ?? fonts.mono
+                                        font.family: fonts.mono
                                         font.pixelSize: look.small.size
                                         font.letterSpacing: look.small.spacing
                                         font.bold: true
@@ -846,7 +676,7 @@ Item {
                         id: tail
                         textFormat: Text.PlainText
                         Layout.alignment: Qt.AlignRight | Qt.AlignTop
-                        topPadding: look.legend(launcher.mode).chips ? 3 : 0
+                        topPadding: 3
                         text: look.legend(launcher.mode).tail
                         color: c.muted
                         font.family: look.small.font
@@ -858,47 +688,10 @@ Item {
         }
     }
 
-    // A blurring theme's caret: a 2 px line of its field's caret colour.
-    Component {
-        id: lineCaret
-
-        Rectangle {
-            width: 2
-            color: look.field.caret
-            visible: input.cursorVisible
-        }
-    }
-
-    // Blueprint's caret: a glowing accent block the height of the query.
-    Component {
-        id: blockCaret
-
-        Rectangle {
-            width: 11
-            height: input.font.pixelSize
-            color: look.prompt.color
-            // Qt hides only its own caret when the query loses focus, so a delegate follows cursorVisible itself.
-            visible: input.cursorVisible
-
-            RectangularShadow {
-                anchors.fill: parent
-                z: -1
-                blur: 9.6
-                color: Qt.alpha(look.prompt.color, 0.8)
-            }
-        }
-    }
-
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A 1 px rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 }
