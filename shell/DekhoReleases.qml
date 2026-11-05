@@ -2,7 +2,6 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Shapes
 import "lib/dekho.mjs" as D
 import "lib/dekho-releases.mjs" as R
 import "lib/dekho-starting.mjs" as S
@@ -17,12 +16,8 @@ FocusScope {
     readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
-    readonly property string voice: dekho.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
     readonly property var words: R.releasesText()
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
     readonly property string bin: Quickshell.shellDir + "/../bin/dots-dekho-play"
 
     // "" when closed, else "list", "none" or "starting".
@@ -257,8 +252,6 @@ FocusScope {
                 session: session,
                 look: {
                     cardRadius: cardFill.radius,
-                    chamfer: chamfer.visible,
-                    shadow: hardShadow.visible,
                     tagFill: String(tagBox.color),
                     ink: String(c.ink),
                     accent: String(c.accent),
@@ -359,11 +352,11 @@ FocusScope {
         }
     }
 
-    // The page beneath, dimmed in each board's paper.
+    // The page beneath, dimmed in the paper colour.
     Rectangle {
         anchors.fill: parent
-        color: Qt.alpha(page.c.paper ?? "white", plain ? 0.62 : 0.72)
-        radius: plain ? 14 : 0
+        color: Qt.alpha(page.c.paper ?? "white", 0.62)
+        radius: 14
     }
 
     // The overlay takes every click and wheel, so none reaches the page beneath; the rows' own click areas and the list's wheel sit above it.
@@ -380,39 +373,14 @@ FocusScope {
         width: page.mode === "starting" ? 560 : page.mode === "none" ? 600 : 900
         height: body.implicitHeight
 
-        // Paper's hard shadow, Artboard's rounded card ringed in its accent, Blueprint's cut corners.
-        Rectangle {
-            id: hardShadow
-            x: 6
-            y: 6
-            width: parent.width
-            height: parent.height
-            visible: page.caps
-            color: page.c.ink ?? "black"
-        }
+        // A rounded card ringed in the accent.
         Rectangle {
             id: cardFill
             anchors.fill: parent
-            visible: !page.bracket
-            radius: page.plain ? 14 : 0
+            radius: 14
             color: page.c.surface ?? "white"
             border.width: 1.5
-            border.color: (page.plain ? page.c.accent : page.c.ink) ?? "black"
-        }
-        Shape {
-            id: chamfer
-            anchors.fill: parent
-            visible: page.bracket
-            preferredRendererType: Shape.GeometryRenderer
-
-            ShapePath {
-                strokeColor: page.c.accent ?? "cyan"
-                strokeWidth: 1
-                fillColor: page.c.surface ?? "black"
-                PathPolyline {
-                    path: [Qt.point(16.5, 0.5), Qt.point(card.width - 0.5, 0.5), Qt.point(card.width - 0.5, card.height - 16.5), Qt.point(card.width - 16.5, card.height - 0.5), Qt.point(0.5, card.height - 0.5), Qt.point(0.5, 16.5), Qt.point(16.5, 0.5)]
-                }
-            }
+            border.color: page.c.accent ?? "black"
         }
 
         ColumnLayout {
@@ -422,39 +390,28 @@ FocusScope {
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: plain ? 56 : -1
-                Layout.leftMargin: bracket ? 22 : plain ? 18 : 16
-                Layout.rightMargin: bracket ? 22 : plain ? 18 : 16
-                Layout.topMargin: plain ? 0 : bracket ? 12 : 14
-                Layout.bottomMargin: plain ? 0 : bracket ? 10 : 14
-                spacing: bracket ? 6 : 12
+                Layout.preferredHeight: 56
+                Layout.leftMargin: 18
+                Layout.rightMargin: 18
+                spacing: 12
 
                 Rectangle {
                     id: tagBox
-                    implicitWidth: tagText.implicitWidth + (bracket ? 0 : plain ? 18 : 14)
-                    implicitHeight: tagText.implicitHeight + (bracket ? 0 : 4)
-                    radius: plain ? 8 : 0
-                    color: page.caps ? page.c.ink ?? "black" : page.plain ? page.look.label.fill : "transparent"
+                    implicitWidth: tagText.implicitWidth + 18
+                    implicitHeight: tagText.implicitHeight + 4
+                    radius: 8
+                    color: page.look.label.fill
 
                     Text {
                         id: tagText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: page.mode === "starting" ? page.words.starting : page.words.release
-                        color: (page.caps ? page.c.surface : page.c.accent) ?? "black"
+                        color: page.c.accent ?? "black"
                         font.family: page.bodyFont
-                        font.pixelSize: page.plain ? 12 : 10
-                        font.weight: page.plain ? Font.Medium : page.bracket ? Font.Bold : Font.Normal
-                        font.letterSpacing: page.plain ? 0 : 1.4
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
                     }
-                }
-                Text {
-                    visible: page.bracket
-                    textFormat: Text.PlainText
-                    text: "//"
-                    color: page.c.muted ?? "gray"
-                    font.family: page.bodyFont
-                    font.pixelSize: 10
                 }
                 Text {
                     id: headText
@@ -463,8 +420,8 @@ FocusScope {
                     text: [D.title(page.target.title), page.episodeTag, page.mode === "starting" ? "" : D.title(page.target.name)].filter(p => p).join(" · ")
                     color: page.c.ink ?? "black"
                     font.family: page.bodyFont
-                    font.pixelSize: page.plain ? 16 : page.bracket ? 12 : 15
-                    font.weight: page.plain ? Font.Medium : Font.Normal
+                    font.pixelSize: 16
+                    font.weight: Font.Medium
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -483,7 +440,7 @@ FocusScope {
                         selectionColor: page.c.accent ?? "red"
                         selectedTextColor: page.c.surface ?? "white"
                         font.family: page.bodyFont
-                        font.pixelSize: page.bracket ? 12 : 13
+                        font.pixelSize: 13
                         onTextChanged: page.row = 0
                         Keys.onPressed: event => {
                             const k = event.key;
@@ -513,10 +470,10 @@ FocusScope {
                 }
                 Rectangle {
                     visible: page.mode === "list"
-                    implicitWidth: countText.implicitWidth + (plain ? 18 : 0)
-                    implicitHeight: countText.implicitHeight + (plain ? 6 : 0)
+                    implicitWidth: countText.implicitWidth + 18
+                    implicitHeight: countText.implicitHeight + 6
                     radius: 8
-                    color: plain ? page.look.tile.fill : "transparent"
+                    color: page.look.tile.fill
 
                     Text {
                         id: countText
@@ -525,17 +482,14 @@ FocusScope {
                         text: page.asking ? "" : page.words.count(Math.max(0, page.rows.length - 1))
                         color: page.c.muted ?? "gray"
                         font.family: page.bodyFont
-                        font.pixelSize: page.bracket ? 10 : 11
-                        font.weight: page.plain ? Font.Medium : Font.Normal
-                        font.letterSpacing: page.bracket ? 1.6 : 0
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
                     }
                 }
             }
 
             Rule {
                 Layout.fillWidth: true
-                dashed: bracket
-                color: page.c.line ?? "gray"
             }
 
             // The list: a column per thing asked for, the cursor on the best.
@@ -650,9 +604,9 @@ FocusScope {
                     textFormat: Text.PlainText
                     text: page.words.none
                     color: page.c.ink ?? "black"
-                    font.family: (page.caps ? page.fonts.display : page.bodyFont) ?? ""
-                    font.pixelSize: page.caps ? 25 : page.plain ? 18 : 16
-                    font.weight: page.caps ? Font.Normal : Font.Bold
+                    font.family: page.bodyFont
+                    font.pixelSize: 18
+                    font.weight: Font.Bold
                 }
                 Text {
                     id: noneWhy
@@ -668,16 +622,13 @@ FocusScope {
                 Rule {
                     Layout.fillWidth: true
                     Layout.topMargin: 6
-                    dashed: page.bracket
-                    color: page.c.line ?? "gray"
                 }
                 Text {
                     textFormat: Text.PlainText
                     text: page.words.tryHead
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
-                    font.pixelSize: page.plain ? 11 : 10
-                    font.letterSpacing: page.plain ? 0 : 1.4
+                    font.pixelSize: 11
                 }
                 Repeater {
                     model: page.words.tries(page.target.kind)
@@ -689,7 +640,7 @@ FocusScope {
                         Text {
                             textFormat: Text.PlainText
                             text: page.look.keyText(modelData[0])
-                            color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                            color: page.c.ink ?? "black"
                             font.family: page.bodyFont
                             font.pixelSize: 12
                             font.weight: Font.Bold
@@ -744,7 +695,6 @@ FocusScope {
                     color: page.c.muted ?? "gray"
                     font.family: page.bodyFont
                     font.pixelSize: 12
-                    font.letterSpacing: page.bracket ? 0.7 : 0
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -756,7 +706,7 @@ FocusScope {
                         id: track
                         Layout.fillWidth: true
                         implicitHeight: 8
-                        radius: page.plain ? 4 : 0
+                        radius: 4
                         color: page.c.line ?? "gray"
 
                         Rectangle {
@@ -778,7 +728,6 @@ FocusScope {
                             color: page.c.ink ?? "black"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: page.bracket ? 0.7 : 0
                         }
                         Text {
                             id: amountText
@@ -787,7 +736,6 @@ FocusScope {
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
-                            font.letterSpacing: page.bracket ? 0.7 : 0
                         }
                     }
                 }
@@ -804,8 +752,6 @@ FocusScope {
                 }
                 Rule {
                     Layout.fillWidth: true
-                    dashed: page.bracket
-                    color: page.c.line ?? "gray"
                 }
                 Row {
                     Layout.fillWidth: true
@@ -828,17 +774,15 @@ FocusScope {
 
             Rule {
                 Layout.fillWidth: true
-                dashed: page.bracket
-                color: (page.caps ? page.c.ink : page.c.line) ?? "gray"
             }
 
             Flow {
                 Layout.fillWidth: true
-                Layout.leftMargin: plain ? 14 : 16
-                Layout.rightMargin: plain ? 14 : 16
-                Layout.topMargin: plain ? 10 : 11
-                Layout.bottomMargin: plain ? 10 : 11
-                spacing: plain ? 8 : 16
+                Layout.leftMargin: 14
+                Layout.rightMargin: 14
+                Layout.topMargin: 10
+                Layout.bottomMargin: 10
+                spacing: 8
 
                 Repeater {
                     id: keyRepeater
@@ -851,25 +795,24 @@ FocusScope {
                             return [keyName.text, keyWord.text];
                         }
 
-                        implicitWidth: keyPair.implicitWidth + (page.plain ? 14 : 0)
-                        implicitHeight: keyPair.implicitHeight + (page.plain ? 6 : 0)
+                        implicitWidth: keyPair.implicitWidth + 14
+                        implicitHeight: keyPair.implicitHeight + 6
                         radius: 6
-                        color: page.plain ? page.look.tile.fill : "transparent"
+                        color: page.look.tile.fill
 
                         Row {
                             id: keyPair
                             anchors.centerIn: parent
-                            spacing: page.bracket ? 8 : 6
+                            spacing: 6
 
                             Text {
                                 id: keyName
                                 textFormat: Text.PlainText
                                 text: modelData.key
-                                color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                                color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.caps ? 10 : 11
-                                font.weight: page.plain ? Font.Medium : Font.Bold
-                                font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                                font.pixelSize: 11
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: keyWord
@@ -877,8 +820,7 @@ FocusScope {
                                 text: modelData.word
                                 color: page.c.muted ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.caps ? 10 : 11
-                                font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                                font.pixelSize: 11
                             }
                         }
                     }
@@ -887,31 +829,16 @@ FocusScope {
         }
     }
 
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
+        color: page.c.line ?? "gray"
     }
 
     component Head: Text {
         textFormat: Text.PlainText
-        style: page.dekho.engraving.on ? Text.Raised : Text.Normal
-        styleColor: page.dekho.engraving.color
         color: page.c.muted ?? "gray"
         font.family: page.bodyFont
-        font.pixelSize: page.caps ? 10 : 11
-        font.letterSpacing: page.plain ? 0 : 1.4
+        font.pixelSize: 11
     }
 
     component Stat: Text {
@@ -919,10 +846,9 @@ FocusScope {
         color: page.c.ink ?? "black"
         font.family: page.bodyFont
         font.pixelSize: 12
-        font.letterSpacing: page.bracket ? 0.7 : 0
     }
 
-    // One release: quality and its name, size, seeders and audio; the cursor's row inverts in Paper and Blueprint, Artboard tints and rings it.
+    // One release: quality and its name, size, seeders and audio; the cursor's row is tinted and ringed in the accent.
     component ReleaseRow: Rectangle {
         id: rel
 
@@ -930,9 +856,7 @@ FocusScope {
         required property int index
         readonly property bool auto: modelData.auto === true
         readonly property bool cursor: page.row === index
-        readonly property bool inverse: cursor && !page.plain
-        readonly property color fore: inverse ? page.c.surface ?? "white" : page.c.ink ?? "black"
-        readonly property color soft: inverse ? (page.caps ? page.c.line : page.c.surface) ?? "white" : page.c.muted ?? "gray"
+        readonly property color soft: page.c.muted ?? "gray"
 
         function drawn() {
             return {
@@ -951,9 +875,9 @@ FocusScope {
         }
 
         height: 40
-        radius: page.plain ? 10 : 0
-        color: cursor ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
-        border.width: cursor && page.plain ? 1.5 : 0
+        radius: 10
+        color: cursor ? page.look.label.fill : "transparent"
+        border.width: cursor ? 1.5 : 0
         border.color: page.c.accent ?? "blue"
 
         RowLayout {
@@ -970,30 +894,29 @@ FocusScope {
                     id: qualityText
                     textFormat: Text.PlainText
                     text: rel.auto ? page.words.auto : D.title(rel.modelData.quality)
-                    color: rel.cursor && page.plain ? page.tones.deep : rel.fore
+                    color: rel.cursor ? page.tones.deep : page.c.ink ?? "black"
                     font.family: page.bodyFont
-                    font.pixelSize: page.plain ? 14 : 13
-                    font.weight: rel.inverse && page.bracket ? Font.Bold : Font.Medium
+                    font.pixelSize: 14
+                    font.weight: Font.Medium
                 }
                 Rectangle {
                     id: bestBox
                     // The best release is the first after Auto, which a filter may have removed.
                     visible: !rel.auto && rel.modelData.hash === page.items[0].hash
-                    implicitWidth: bestText.implicitWidth + (page.bracket ? 0 : page.plain ? 16 : 12)
-                    implicitHeight: bestText.implicitHeight + (page.bracket ? 0 : page.plain ? 4 : 2)
-                    radius: page.plain ? 8 : 0
-                    color: page.bracket ? "transparent" : (page.plain ? page.c.ink : rel.inverse ? page.c.surface : page.c.ink) ?? "black"
+                    implicitWidth: bestText.implicitWidth + 16
+                    implicitHeight: bestText.implicitHeight + 4
+                    radius: 8
+                    color: page.c.ink ?? "black"
 
                     Text {
                         id: bestText
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: page.words.best
-                        color: (page.bracket ? rel.fore : page.plain ? page.tones.card : rel.inverse ? page.c.ink : page.c.surface) ?? "white"
+                        color: page.tones.card
                         font.family: page.bodyFont
-                        font.pixelSize: page.plain ? 11 : 10
-                        font.weight: page.caps ? Font.Normal : page.plain ? Font.Medium : Font.Bold
-                        font.letterSpacing: page.plain ? 0 : 1.4
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
                     }
                 }
                 Text {
@@ -1017,7 +940,6 @@ FocusScope {
                 color: rel.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
             }
             Text {
                 id: seedersText
@@ -1028,7 +950,6 @@ FocusScope {
                 color: rel.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
             }
             Text {
                 id: audioText
@@ -1038,7 +959,6 @@ FocusScope {
                 color: rel.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
@@ -1072,19 +992,19 @@ FocusScope {
             id: mark
             implicitWidth: 16
             implicitHeight: 16
-            radius: page.plain ? 8 : 0
-            color: step.done ? (page.caps ? page.c.ink : page.c.accent) ?? "black" : "transparent"
-            border.width: step.done ? 0 : step.current ? (page.bracket ? 1 : 2) : page.bracket ? 1 : 1.5
-            border.color: (step.current ? page.c.accent : page.plain ? page.c.line : page.c.muted) ?? "gray"
+            radius: 8
+            color: step.done ? page.c.accent ?? "black" : "transparent"
+            border.width: step.done ? 0 : step.current ? 2 : 1.5
+            border.color: (step.current ? page.c.accent : page.c.line) ?? "gray"
 
             FilesIcon {
                 anchors.centerIn: parent
                 visible: step.done
                 size: 9
-                box: page.plain ? 9 : 16
-                stroke: page.plain ? 1.5 : 2.6
-                path: page.plain ? "M1.5 4.6L3.5 6.6L7.5 2.4" : "M3.5 8.5L6.5 11.5L12.5 4.5"
-                color: (page.plain ? page.tones.card : page.c.surface) ?? "white"
+                box: 9
+                stroke: 1.5
+                path: "M1.5 4.6L3.5 6.6L7.5 2.4"
+                color: page.tones.card
             }
         }
         Text {
@@ -1093,7 +1013,7 @@ FocusScope {
             text: step.modelData.text
             color: (step.done || step.current ? page.c.ink : page.c.muted) ?? "black"
             font.family: page.bodyFont
-            font.pixelSize: page.plain ? 14 : 13
+            font.pixelSize: 14
             font.weight: step.current ? Font.Medium : Font.Normal
         }
     }

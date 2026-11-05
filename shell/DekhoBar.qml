@@ -11,12 +11,8 @@ Item {
     readonly property var c: dekho.c
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
-    readonly property string voice: dekho.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
     readonly property var words: P.barText()
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
     readonly property var now: dekho.nowPlaying
 
     function drawn() {
@@ -38,33 +34,32 @@ Item {
     }
 
     visible: now !== null
-    implicitHeight: visible ? row.implicitHeight + (plain ? 20 : 22) : 0
+    implicitHeight: visible ? row.implicitHeight + 20 : 0
 
     RowLayout {
         id: row
         anchors.fill: parent
-        anchors.leftMargin: bar.plain ? 14 : 16
-        anchors.rightMargin: bar.plain ? 14 : 16
-        spacing: bar.plain ? 10 : 12
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
+        spacing: 10
 
-        // Artboard pills the tag in its accent's tint, Paper inks it, Blueprint brackets it in its accent.
+        // The tag sits in a pill of the accent's tint.
         Rectangle {
             id: tagBox
-            implicitWidth: tagText.implicitWidth + (bar.bracket ? 0 : bar.plain ? 18 : 12)
-            implicitHeight: tagText.implicitHeight + (bar.bracket ? 0 : bar.plain ? 6 : 4)
-            radius: bar.plain ? 8 : 0
-            color: bar.plain ? bar.look.label.fill : bar.caps ? bar.c.ink ?? "black" : "transparent"
+            implicitWidth: tagText.implicitWidth + 18
+            implicitHeight: tagText.implicitHeight + 6
+            radius: 8
+            color: bar.look.label.fill
 
             Text {
                 id: tagText
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
                 text: bar.words.tag
-                color: (bar.plain || bar.bracket ? bar.c.accent : bar.c.surface) ?? "black"
+                color: bar.c.accent ?? "black"
                 font.family: bar.bodyFont
-                font.pixelSize: bar.plain ? 12 : 10
-                font.weight: bar.plain ? Font.Medium : Font.Bold
-                font.letterSpacing: bar.plain ? 0 : 1.4
+                font.pixelSize: 12
+                font.weight: Font.Medium
             }
         }
         Text {
@@ -75,7 +70,7 @@ Item {
             text: bar.now ? bar.now.title : ""
             color: bar.c.ink ?? "black"
             font.family: bar.bodyFont
-            font.pixelSize: bar.plain ? 13 : 12
+            font.pixelSize: 13
             font.weight: Font.Medium
             elide: Text.ElideRight
             maximumLineCount: 1
@@ -87,8 +82,7 @@ Item {
             text: bar.now ? bar.now.episode : ""
             color: bar.c.muted ?? "gray"
             font.family: bar.bodyFont
-            font.pixelSize: bar.plain ? 12 : 11
-            font.letterSpacing: bar.bracket ? 0.7 : 0
+            font.pixelSize: 12
         }
         Item {
             Layout.fillWidth: true
@@ -104,10 +98,10 @@ Item {
                 function drawn() {
                     return [keyName.text, keyWord.text];
                 }
-                implicitWidth: keyPair.implicitWidth + (bar.plain ? 14 : 0)
-                implicitHeight: keyPair.implicitHeight + (bar.plain ? 6 : 0)
+                implicitWidth: keyPair.implicitWidth + 14
+                implicitHeight: keyPair.implicitHeight + 6
                 radius: 6
-                color: bar.plain ? bar.look.tile.fill : "transparent"
+                color: bar.look.tile.fill
 
                 // A click on the key stops the film as the key does.
                 DekhoClick {
@@ -117,17 +111,16 @@ Item {
                 Row {
                     id: keyPair
                     anchors.centerIn: parent
-                    spacing: bar.bracket ? 8 : 6
+                    spacing: 6
 
                     Text {
                         id: keyName
                         textFormat: Text.PlainText
                         text: modelData.key
-                        color: (bar.bracket ? bar.c.accent : bar.c.ink) ?? "black"
+                        color: bar.c.ink ?? "black"
                         font.family: bar.bodyFont
-                        font.pixelSize: bar.caps ? 10 : 11
-                        font.weight: bar.plain ? Font.Medium : Font.Bold
-                        font.letterSpacing: bar.caps ? 1 : bar.bracket ? 1.5 : 0
+                        font.pixelSize: 11
+                        font.weight: Font.Medium
                     }
                     Text {
                         id: keyWord
@@ -135,8 +128,7 @@ Item {
                         text: modelData.word
                         color: bar.c.muted ?? "gray"
                         font.family: bar.bodyFont
-                        font.pixelSize: bar.caps ? 10 : 11
-                        font.letterSpacing: bar.caps ? 1 : bar.bracket ? 1.5 : 0
+                        font.pixelSize: 11
                     }
                 }
             }

@@ -15,11 +15,8 @@ FocusScope {
     readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
-    readonly property string voice: dekho.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
     readonly property var words: H.homeText()
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
 
     property var continued: []
     property var series: []
@@ -232,8 +229,7 @@ FocusScope {
             look: {
                 homeFont: pageName.font.family,
                 rowHead: continueStrip.headText,
-                cardRadius: continueStrip.cardRadius,
-                ruleDashed: headRule.dashed
+                cardRadius: continueStrip.cardRadius
             }
         };
     }
@@ -293,32 +289,29 @@ FocusScope {
         anchors.fill: parent
         spacing: 0
 
-        // The header: Dekho's label, the page's name, and how it opened; Artboard pills the label in its accent and the note in grey.
+        // The header: Dekho's label pilled in its accent, the page's name, and how it opened in a grey pill.
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: plain ? 52 : -1
-            Layout.leftMargin: plain ? 18 : 14
-            Layout.rightMargin: plain ? 18 : 14
-            Layout.topMargin: plain ? 0 : 12
-            Layout.bottomMargin: plain ? 0 : 12
-            spacing: plain ? 12 : 10
+            Layout.preferredHeight: 52
+            Layout.leftMargin: 18
+            Layout.rightMargin: 18
+            spacing: 12
 
             Rectangle {
-                implicitWidth: labelText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: labelText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: labelText.implicitWidth + 18
+                implicitHeight: labelText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.label.fill : "transparent"
+                color: look.label.fill
 
                 Text {
                     id: labelText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: words.label
-                    color: plain ? c.accent ?? "blue" : c.muted ?? "gray"
+                    color: c.accent ?? "blue"
                     font.family: home.bodyFont
-                    font.pixelSize: plain ? 12 : 10
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: plain ? 0 : 1.4
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
                 }
             }
             Text {
@@ -326,18 +319,18 @@ FocusScope {
                 textFormat: Text.PlainText
                 text: words.page
                 color: c.ink ?? "black"
-                font.family: (voice === "caps" ? fonts.display : home.bodyFont) ?? ""
-                font.pixelSize: voice === "caps" ? 18 : plain ? 14 : 12
-                font.weight: voice === "caps" ? Font.Normal : Font.Bold
+                font.family: home.bodyFont
+                font.pixelSize: 14
+                font.weight: Font.Bold
             }
             Item {
                 Layout.fillWidth: true
             }
             Rectangle {
-                implicitWidth: fromText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: fromText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: fromText.implicitWidth + 18
+                implicitHeight: fromText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.tile.fill : "transparent"
+                color: look.tile.fill
 
                 Text {
                     id: fromText
@@ -346,21 +339,17 @@ FocusScope {
                     text: words.from
                     color: c.muted ?? "gray"
                     font.family: home.bodyFont
-                    font.pixelSize: bracket ? 10 : 11
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: bracket ? 1.4 : 0
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
                 }
             }
         }
 
         Rule {
-            id: headRule
             Layout.fillWidth: true
-            dashed: bracket
-            color: voice === "caps" ? c.ink ?? "black" : c.line ?? "gray"
         }
 
-        // With TMDB unreachable: Paper's ruled box with an ink mark, Artboard's peach block, Blueprint's accent-ruled box with an amber mark.
+        // With TMDB unreachable: a peach block with a round warning mark.
         Rectangle {
             id: notice
             Layout.fillWidth: true
@@ -369,10 +358,8 @@ FocusScope {
             Layout.rightMargin: 18
             visible: home.offline
             implicitHeight: noticeRow.implicitHeight + 20
-            radius: plain ? 12 : 0
-            color: plain ? tones.warnChip : "transparent"
-            border.width: plain ? 0 : 1
-            border.color: (bracket ? c.accent : c.ink) ?? "black"
+            radius: 12
+            color: tones.warnChip
 
             RowLayout {
                 id: noticeRow
@@ -385,16 +372,16 @@ FocusScope {
                     id: noticeMark
                     implicitWidth: 18
                     implicitHeight: 18
-                    radius: plain ? 9 : 0
-                    color: (plain ? tones.warn : bracket ? c.danger : c.ink) ?? "black"
+                    radius: 9
+                    color: tones.warn
 
                     Text {
                         anchors.centerIn: parent
                         textFormat: Text.PlainText
                         text: "!"
-                        color: (plain ? tones.card : c.surface) ?? "white"
+                        color: tones.card
                         font.family: home.bodyFont
-                        font.pixelSize: bracket ? 10 : 11
+                        font.pixelSize: 11
                         font.weight: Font.Bold
                     }
                 }
@@ -402,9 +389,9 @@ FocusScope {
                     id: noticeLead
                     textFormat: Text.PlainText
                     text: words.unreachable
-                    color: (plain ? tones.warn : c.ink) ?? "black"
+                    color: tones.warn
                     font.family: home.bodyFont
-                    font.pixelSize: plain ? 13 : 12
+                    font.pixelSize: 13
                     font.weight: Font.Bold
                 }
                 Text {
@@ -412,9 +399,9 @@ FocusScope {
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
                     text: words.showing(home.savedFrom)
-                    color: (plain ? tones.warn : c.ink) ?? "black"
+                    color: tones.warn
                     font.family: home.bodyFont
-                    font.pixelSize: plain ? 13 : 12
+                    font.pixelSize: 13
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -425,37 +412,33 @@ FocusScope {
                         id: retryKey
                         textFormat: Text.PlainText
                         text: words.retry[0]
-                        color: (bracket ? c.accent : plain ? tones.warn : c.ink) ?? "black"
+                        color: tones.warn
                         font.family: home.bodyFont
                         font.pixelSize: 12
                         font.weight: Font.Bold
-                        font.letterSpacing: bracket ? 0.72 : 0
                     }
                     Text {
                         id: retryWord
                         textFormat: Text.PlainText
                         text: words.retry[1]
-                        color: (plain ? tones.warn : c.ink) ?? "black"
+                        color: tones.warn
                         font.family: home.bodyFont
                         font.pixelSize: 12
-                        font.letterSpacing: bracket ? 0.72 : 0
                     }
                 }
             }
         }
 
-        // The search field: Paper's and Blueprint's ruled box, Artboard's filled pill.
+        // The search field, a filled pill.
         Rectangle {
             Layout.fillWidth: true
             Layout.topMargin: 16
             Layout.leftMargin: 18
             Layout.rightMargin: 18
             Layout.bottomMargin: 6
-            implicitHeight: plain ? 48 : 46
-            radius: plain ? 14 : 0
-            color: plain ? tones.field : "transparent"
-            border.width: plain ? 0 : 1
-            border.color: (bracket ? c.line : home.offline && voice === "caps" ? c.ink : c.muted) ?? "gray"
+            implicitHeight: 48
+            radius: 14
+            color: tones.field
 
             // Search is off while TMDB is unreachable: the box says so in the field's place.
             Text {
@@ -468,7 +451,7 @@ FocusScope {
                 text: words.searchOff
                 color: c.muted ?? "gray"
                 font.family: home.bodyFont
-                font.pixelSize: plain ? 14 : 13
+                font.pixelSize: 14
             }
             FilesIcon {
                 id: searchIcon
@@ -477,9 +460,9 @@ FocusScope {
                 anchors.leftMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
                 path: "M11.5 7A4.5 4.5 0 1 1 2.5 7A4.5 4.5 0 1 1 11.5 7M10.5 10.5L14 14"
-                size: plain ? 18 : 16
-                stroke: plain ? 1.6 : 1.4
-                color: (plain ? c.muted : bracket ? c.accent : c.ink) ?? "black"
+                size: 18
+                stroke: 1.6
+                color: c.muted ?? "black"
             }
             TextInput {
                 id: field
@@ -496,7 +479,7 @@ FocusScope {
                 selectionColor: c.accent ?? "red"
                 selectedTextColor: c.surface ?? "white"
                 font.family: home.bodyFont
-                font.pixelSize: bracket ? 14 : 15
+                font.pixelSize: 15
                 onTextChanged: home.edited()
                 Keys.onPressed: event => {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
@@ -523,10 +506,10 @@ FocusScope {
                 anchors.right: parent.right
                 anchors.rightMargin: 16
                 anchors.verticalCenter: parent.verticalCenter
-                implicitWidth: hintText.implicitWidth + (plain ? 14 : 0)
-                implicitHeight: hintText.implicitHeight + (plain ? 4 : 0)
+                implicitWidth: hintText.implicitWidth + 14
+                implicitHeight: hintText.implicitHeight + 4
                 radius: 6
-                color: plain ? c.surface ?? "white" : "transparent"
+                color: c.surface ?? "white"
 
                 Text {
                     id: hintText
@@ -535,9 +518,8 @@ FocusScope {
                     text: words.hint
                     color: c.muted ?? "gray"
                     font.family: home.bodyFont
-                    font.pixelSize: bracket ? 10 : 11
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: bracket ? 1.4 : 0
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
                 }
             }
         }
@@ -607,8 +589,6 @@ FocusScope {
 
         Rule {
             Layout.fillWidth: true
-            dashed: bracket
-            color: voice === "caps" ? c.ink ?? "black" : c.line ?? "gray"
         }
 
         // While a film plays, the now-playing bar takes the keys' place.
@@ -618,15 +598,15 @@ FocusScope {
             dekho: home.dekho
         }
 
-        // The keys, as each board strips them: Paper's tracked caps, Artboard's grey chips, Blueprint's bracketed accent keys.
+        // The keys, in grey chips.
         Flow {
             Layout.fillWidth: true
             visible: home.dekho.nowPlaying === null
-            Layout.leftMargin: plain ? 14 : 16
-            Layout.rightMargin: plain ? 14 : 16
-            Layout.topMargin: plain ? 10 : 11
-            Layout.bottomMargin: plain ? 10 : 11
-            spacing: plain ? 8 : 16
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            Layout.topMargin: 10
+            Layout.bottomMargin: 10
+            spacing: 8
 
             Repeater {
                 id: keyList
@@ -638,25 +618,24 @@ FocusScope {
                     function drawn() {
                         return [keyName.text, keyWord.text];
                     }
-                    implicitWidth: keyPair.implicitWidth + (home.plain ? 14 : 0)
-                    implicitHeight: keyPair.implicitHeight + (home.plain ? 6 : 0)
+                    implicitWidth: keyPair.implicitWidth + 14
+                    implicitHeight: keyPair.implicitHeight + 6
                     radius: 6
-                    color: home.plain ? home.look.tile.fill : "transparent"
+                    color: home.look.tile.fill
 
                     Row {
                         id: keyPair
                         anchors.centerIn: parent
-                        spacing: home.bracket ? 8 : 6
+                        spacing: 6
 
                         Text {
                             id: keyName
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: (home.bracket ? home.c.accent : home.c.ink) ?? "black"
+                            color: home.c.ink ?? "black"
                             font.family: home.bodyFont
-                            font.pixelSize: home.voice === "caps" ? 10 : 11
-                            font.weight: home.plain ? Font.Medium : Font.Bold
-                            font.letterSpacing: home.voice === "caps" ? 1 : home.bracket ? 1.5 : 0
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
                         }
                         Text {
                             id: keyWord
@@ -664,8 +643,7 @@ FocusScope {
                             text: modelData.word
                             color: home.c.muted ?? "gray"
                             font.family: home.bodyFont
-                            font.pixelSize: home.voice === "caps" ? 10 : 11
-                            font.letterSpacing: home.voice === "caps" ? 1 : home.bracket ? 1.5 : 0
+                            font.pixelSize: 11
                         }
                     }
                 }
@@ -673,22 +651,10 @@ FocusScope {
         }
     }
 
-    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    // A one-pixel rule in the line colour.
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
+        color: home.c.line ?? "gray"
     }
 
 }

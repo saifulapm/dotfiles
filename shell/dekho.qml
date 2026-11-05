@@ -42,8 +42,6 @@ ShellRoot {
     readonly property var tones: L.plainTones(theme.tokens)
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
-    readonly property var engraving: L.engraving(theme.tokens)
-    readonly property string voice: look.voice
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
@@ -369,7 +367,6 @@ ShellRoot {
                 page: app.page,
                 firstFrameMs: app.firstFrameMs,
                 rssKiB: Status.rssKiB(procStatus.text()),
-                voice: app.voice,
                 opened: app.opened,
                 toast: toastItem.state(),
                 playing: app.nowPlaying,

@@ -17,12 +17,8 @@ FocusScope {
     readonly property var tones: dekho.tones
     readonly property var fonts: dekho.fonts
     readonly property var look: dekho.look
-    readonly property string voice: dekho.voice
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool caps: voice === "caps"
     readonly property var words: T.titleText()
-    readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
+    readonly property string bodyFont: fonts.ui ?? ""
 
     // What Home opened, drawn at once; the backend's answer fills the rest in.
     property var entry: ({})
@@ -429,8 +425,6 @@ FocusScope {
                     datedFont: aired ? aired.font : "",
                     datedItalic: aired ? aired.italic : false,
                     tabRadius: tabRow.count ? tabRow.itemAt(0).radius : -1,
-                    hatch: hatch.visible,
-                    cross: cross.visible,
                     icon: frameIcon.visible
                 }
             }
@@ -505,29 +499,26 @@ FocusScope {
         // The header as Home draws it, with the title's name where Home writes its own.
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: plain ? 52 : -1
-            Layout.leftMargin: plain ? 18 : 14
-            Layout.rightMargin: plain ? 18 : 14
-            Layout.topMargin: plain ? 0 : 12
-            Layout.bottomMargin: plain ? 0 : 12
-            spacing: plain ? 12 : 10
+            Layout.preferredHeight: 52
+            Layout.leftMargin: 18
+            Layout.rightMargin: 18
+            spacing: 12
 
             Rectangle {
-                implicitWidth: labelText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: labelText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: labelText.implicitWidth + 18
+                implicitHeight: labelText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.label.fill : "transparent"
+                color: look.label.fill
 
                 Text {
                     id: labelText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: words.label
-                    color: plain ? c.accent ?? "blue" : c.muted ?? "gray"
+                    color: c.accent ?? "blue"
                     font.family: page.bodyFont
-                    font.pixelSize: plain ? 12 : 10
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: plain ? 0 : 1.4
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
                 }
             }
             Text {
@@ -535,17 +526,17 @@ FocusScope {
                 textFormat: Text.PlainText
                 text: D.title(page.shown.title)
                 color: c.ink ?? "black"
-                font.family: (caps ? fonts.display : page.bodyFont) ?? ""
-                font.pixelSize: caps ? 18 : plain ? 14 : 12
-                font.weight: caps ? Font.Normal : Font.Bold
+                font.family: page.bodyFont
+                font.pixelSize: 14
+                font.weight: Font.Bold
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
             Rectangle {
-                implicitWidth: pageText.implicitWidth + (plain ? 18 : 0)
-                implicitHeight: pageText.implicitHeight + (plain ? 6 : 0)
+                implicitWidth: pageText.implicitWidth + 18
+                implicitHeight: pageText.implicitHeight + 6
                 radius: 8
-                color: plain ? look.tile.fill : "transparent"
+                color: look.tile.fill
 
                 Text {
                     id: pageText
@@ -554,9 +545,8 @@ FocusScope {
                     text: words.page
                     color: c.muted ?? "gray"
                     font.family: page.bodyFont
-                    font.pixelSize: bracket ? 10 : 11
-                    font.weight: plain ? Font.Medium : Font.Normal
-                    font.letterSpacing: bracket ? 1.4 : 0
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
                 }
             }
         }
@@ -564,8 +554,6 @@ FocusScope {
         Rule {
             id: headRule
             Layout.fillWidth: true
-            dashed: bracket
-            color: caps ? c.ink ?? "black" : c.line ?? "gray"
         }
 
         RowLayout {
@@ -585,56 +573,18 @@ FocusScope {
                 Layout.alignment: Qt.AlignTop
                 spacing: 12
 
-                // The picture's place: the poster once it is on disk, else the backdrop, else each board's empty image, Paper's hatch, Artboard's grey tile and picture icon, Blueprint's crossed box.
+                // The picture's place: the poster once it is on disk, else the backdrop, else a grey tile with a picture icon.
                 Rectangle {
                     id: placeholder
                     Layout.fillWidth: true
                     Layout.preferredHeight: 300
-                    radius: plain ? 14 : 0
-                    color: plain ? tones.thumb : "transparent"
-                    border.width: plain ? 0 : 1
-                    border.color: (bracket ? c.accent : c.muted) ?? "gray"
+                    radius: 14
+                    color: tones.thumb
                     clip: true
 
-                    Shape {
-                        id: hatch
-                        anchors.fill: parent
-                        visible: caps
-                        preferredRendererType: Shape.GeometryRenderer
-
-                        ShapePath {
-                            strokeColor: page.c.line ?? "gray"
-                            strokeWidth: 1
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: {
-                                    let p = "";
-                                    for (let x = 6; x < 520; x += 6)
-                                        p += "M" + x + " 0L" + (x - 300) + " 300";
-                                    return p;
-                                }
-                            }
-                        }
-                    }
-                    Shape {
-                        id: cross
-                        anchors.fill: parent
-                        visible: bracket
-                        preferredRendererType: Shape.GeometryRenderer
-
-                        ShapePath {
-                            strokeColor: page.c.line ?? "gray"
-                            strokeWidth: 1
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: "M0 0L220 300M220 0L0 300"
-                            }
-                        }
-                    }
                     FilesIcon {
                         id: frameIcon
                         anchors.centerIn: parent
-                        visible: plain
                         box: 40
                         size: 40
                         stroke: 1.5
@@ -666,8 +616,7 @@ FocusScope {
                     text: D.title(T.sideText(page.shown))
                     color: c.muted ?? "gray"
                     font.family: page.bodyFont
-                    font.pixelSize: bracket ? 10 : 11
-                    font.letterSpacing: bracket ? 1.4 : 0
+                    font.pixelSize: 11
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -676,7 +625,7 @@ FocusScope {
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                spacing: plain ? 8 : 10
+                spacing: 8
 
                 ColumnLayout {
                     Layout.fillWidth: true
@@ -688,9 +637,9 @@ FocusScope {
                         textFormat: Text.PlainText
                         text: D.title(page.shown.title)
                         color: c.ink ?? "black"
-                        font.family: (caps ? fonts.display : page.bodyFont) ?? ""
-                        font.pixelSize: caps ? 38 : plain ? 28 : 27
-                        font.weight: caps ? Font.Normal : Font.Bold
+                        font.family: page.bodyFont
+                        font.pixelSize: 28
+                        font.weight: Font.Bold
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
@@ -702,7 +651,6 @@ FocusScope {
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: 12
-                        font.letterSpacing: bracket ? 0.7 : 0
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
@@ -716,8 +664,7 @@ FocusScope {
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: 12
-                        font.italic: !bracket
-                        font.letterSpacing: bracket ? 0.7 : 0
+                        font.italic: true
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
@@ -736,7 +683,6 @@ FocusScope {
                             required property var modelData
                             required property int index
                             readonly property bool focused: page.zone === "buttons" && page.button === index
-                            readonly property bool inverse: focused && !page.plain
                             function drawn() {
                                 return {
                                     kind: modelData.id,
@@ -748,22 +694,21 @@ FocusScope {
                                 };
                             }
                             implicitWidth: buttonText.implicitWidth + 24
-                            implicitHeight: buttonText.implicitHeight + (page.plain ? 10 : 8)
-                            radius: page.plain ? 8 : 0
-                            color: focused ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? page.look.tile.fill : "transparent"
-                            border.width: focused && page.plain ? 1.5 : page.plain ? 0 : 1
-                            border.color: (page.plain ? page.c.accent : page.bracket ? page.c.line : page.c.ink) ?? "gray"
+                            implicitHeight: buttonText.implicitHeight + 10
+                            radius: 8
+                            color: focused ? page.look.label.fill : page.look.tile.fill
+                            border.width: focused ? 1.5 : 0
+                            border.color: page.c.accent ?? "gray"
 
                             Text {
                                 id: buttonText
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: D.title(modelData.text)
-                                color: (parent.inverse ? page.c.surface : page.c.ink) ?? "black"
+                                color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 13 : 12
+                                font.pixelSize: 13
                                 font.weight: Font.Medium
-                                font.letterSpacing: page.bracket ? 0.7 : 0
                                 maximumLineCount: 1
                             }
                             DekhoClick {
@@ -790,7 +735,6 @@ FocusScope {
                             required property var modelData
                             required property int index
                             readonly property bool focused: page.zone === "links" && page.linkCol === index
-                            readonly property bool inverse: focused && !page.plain
                             function drawn() {
                                 return {
                                     kind: modelData.id,
@@ -801,21 +745,20 @@ FocusScope {
                                 };
                             }
                             implicitWidth: linkText.implicitWidth + 20
-                            implicitHeight: linkText.implicitHeight + (page.plain ? 6 : 4)
-                            radius: page.plain ? 8 : 0
-                            color: focused ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : page.plain ? page.look.tile.fill : "transparent"
-                            border.width: focused && page.plain ? 1.5 : page.plain ? 0 : 1
-                            border.color: (page.plain ? page.c.accent : page.bracket ? page.c.line : page.c.ink) ?? "gray"
+                            implicitHeight: linkText.implicitHeight + 6
+                            radius: 8
+                            color: focused ? page.look.label.fill : page.look.tile.fill
+                            border.width: focused ? 1.5 : 0
+                            border.color: page.c.accent ?? "gray"
 
                             Text {
                                 id: linkText
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: D.title(modelData.text)
-                                color: (parent.inverse ? page.c.surface : page.c.ink) ?? "black"
+                                color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 12 : 11
-                                font.letterSpacing: page.bracket ? 0.7 : 0
+                                font.pixelSize: 12
                                 maximumLineCount: 1
                             }
                             DekhoClick {
@@ -849,11 +792,9 @@ FocusScope {
                                 };
                             }
                             implicitWidth: chipText.implicitWidth + 20
-                            implicitHeight: chipText.implicitHeight + (page.plain ? 6 : 4)
-                            radius: page.plain ? 8 : 0
-                            color: page.plain ? page.look.tile.fill : "transparent"
-                            border.width: page.plain ? 0 : 1
-                            border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
+                            implicitHeight: chipText.implicitHeight + 6
+                            radius: 8
+                            color: page.look.tile.fill
 
                             Text {
                                 id: chipText
@@ -862,7 +803,7 @@ FocusScope {
                                 text: D.title(modelData)
                                 color: page.c.ink ?? "black"
                                 font.family: page.bodyFont
-                                font.pixelSize: page.plain ? 12 : 11
+                                font.pixelSize: 12
                                 maximumLineCount: 1
                             }
                             DekhoClick {
@@ -878,8 +819,7 @@ FocusScope {
                         text: words.filters
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
-                        font.pixelSize: bracket ? 10 : 11
-                        font.letterSpacing: bracket ? 1.4 : 0
+                        font.pixelSize: 11
                     }
                     Item {
                         Layout.fillWidth: true
@@ -895,7 +835,7 @@ FocusScope {
                     text: D.title(page.shown.overview)
                     color: c.ink ?? "black"
                     font.family: page.bodyFont
-                    font.pixelSize: plain ? 14 : 13
+                    font.pixelSize: 14
                     lineHeight: 1.55
                     wrapMode: Text.Wrap
                     maximumLineCount: 3
@@ -904,7 +844,7 @@ FocusScope {
 
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: plain ? 6 : 8
+                    spacing: 6
 
                     RowLayout {
                         Layout.fillWidth: true
@@ -917,8 +857,7 @@ FocusScope {
                             text: words.crew
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: plain ? 11 : 10
-                            font.letterSpacing: plain ? 0 : 1.4
+                            font.pixelSize: 11
                         }
                         Repeater {
                             id: crewRow
@@ -950,8 +889,7 @@ FocusScope {
                             text: words.cast
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: plain ? 11 : 10
-                            font.letterSpacing: plain ? 0 : 1.4
+                            font.pixelSize: 11
                         }
                         Repeater {
                             id: castRow
@@ -975,8 +913,7 @@ FocusScope {
                             text: words.more(page.cast.length - 3)
                             color: c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: bracket ? 10 : 11
-                            font.letterSpacing: bracket ? 1.4 : 0
+                            font.pixelSize: 11
                             elide: Text.ElideRight
                             maximumLineCount: 1
                         }
@@ -986,7 +923,7 @@ FocusScope {
                 // The seasons as tabs and the season's watched count.
                 RowLayout {
                     Layout.fillWidth: true
-                    Layout.topMargin: plain ? 2 : 4
+                    Layout.topMargin: 2
                     visible: page.tv
                     spacing: 8
 
@@ -1005,12 +942,10 @@ FocusScope {
                                     current: current
                                 };
                             }
-                            implicitWidth: tabText.implicitWidth + (current && page.bracket ? 28 : 24)
-                            implicitHeight: tabText.implicitHeight + (current && page.bracket ? 12 : 10)
-                            radius: page.plain ? 10 : 0
-                            color: page.plain ? (current ? page.look.label.fill : page.look.tile.fill) : current ? (page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
-                            border.width: page.plain || current ? 0 : 1
-                            border.color: (page.bracket ? page.c.line : page.c.ink) ?? "black"
+                            implicitWidth: tabText.implicitWidth + 24
+                            implicitHeight: tabText.implicitHeight + 10
+                            radius: 10
+                            color: current ? page.look.label.fill : page.look.tile.fill
 
                             // The seasons' zone rings the current tab in the accent.
                             Rectangle {
@@ -1027,11 +962,10 @@ FocusScope {
                                 anchors.centerIn: parent
                                 textFormat: Text.PlainText
                                 text: "S" + tab.modelData
-                                color: (tab.current ? (page.plain ? page.tones.deep : page.c.surface) : page.c.muted) ?? "gray"
+                                color: (tab.current ? page.tones.deep : page.c.muted) ?? "gray"
                                 font.family: page.bodyFont
-                                font.pixelSize: tab.current && page.caps ? 10 : tab.current && page.bracket ? 11 : 12
-                                font.weight: tab.current && !page.caps ? (page.plain ? Font.Medium : Font.Bold) : Font.Normal
-                                font.letterSpacing: tab.current && !page.plain ? 1.4 : page.bracket ? 0.7 : 0
+                                font.pixelSize: 12
+                                font.weight: tab.current ? Font.Medium : Font.Normal
                             }
                             DekhoClick {
                                 name: "title-season:" + tab.index
@@ -1048,8 +982,7 @@ FocusScope {
                         text: page.items.length ? T.watchedText(page.items) : ""
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
-                        font.pixelSize: bracket ? 10 : 11
-                        font.letterSpacing: bracket ? 1.4 : 0
+                        font.pixelSize: 11
                     }
                 }
 
@@ -1099,7 +1032,7 @@ FocusScope {
                 DekhoStrip {
                     id: similarStrip
                     Layout.fillWidth: true
-                    Layout.topMargin: page.plain ? 6 : 8
+                    Layout.topMargin: 6
                     visible: page.similar.length > 0
                     page: page
                     name: "title-similar"
@@ -1119,8 +1052,6 @@ FocusScope {
 
         Rule {
             Layout.fillWidth: true
-            dashed: bracket
-            color: caps ? c.ink ?? "black" : c.line ?? "gray"
         }
 
         // While a film plays, the now-playing bar takes the keys' place.
@@ -1134,11 +1065,11 @@ FocusScope {
         Flow {
             Layout.fillWidth: true
             visible: page.dekho.nowPlaying === null
-            Layout.leftMargin: plain ? 14 : 16
-            Layout.rightMargin: plain ? 14 : 16
-            Layout.topMargin: plain ? 10 : 11
-            Layout.bottomMargin: plain ? 10 : 11
-            spacing: plain ? 8 : 16
+            Layout.leftMargin: 14
+            Layout.rightMargin: 14
+            Layout.topMargin: 10
+            Layout.bottomMargin: 10
+            spacing: 8
 
             Repeater {
                 id: keyRow
@@ -1149,32 +1080,30 @@ FocusScope {
                     function drawn() {
                         return [modelData.key, modelData.word];
                     }
-                    implicitWidth: keyPair.implicitWidth + (page.plain ? 14 : 0)
-                    implicitHeight: keyPair.implicitHeight + (page.plain ? 6 : 0)
+                    implicitWidth: keyPair.implicitWidth + 14
+                    implicitHeight: keyPair.implicitHeight + 6
                     radius: 6
-                    color: page.plain ? page.look.tile.fill : "transparent"
+                    color: page.look.tile.fill
 
                     Row {
                         id: keyPair
                         anchors.centerIn: parent
-                        spacing: page.bracket ? 8 : 6
+                        spacing: 6
 
                         Text {
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: (page.bracket ? page.c.accent : page.c.ink) ?? "black"
+                            color: page.c.ink ?? "black"
                             font.family: page.bodyFont
-                            font.pixelSize: page.caps ? 10 : 11
-                            font.weight: page.plain ? Font.Medium : Font.Bold
-                            font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
                         }
                         Text {
                             textFormat: Text.PlainText
                             text: modelData.word
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
-                            font.pixelSize: page.caps ? 10 : 11
-                            font.letterSpacing: page.caps ? 1 : page.bracket ? 1.5 : 0
+                            font.pixelSize: 11
                         }
                     }
                 }
@@ -1182,22 +1111,10 @@ FocusScope {
         }
     }
 
-    // A one-pixel rule, solid, or dashed as Blueprint draws its rules.
-    component Rule: Item {
-        property bool dashed: false
-        property color color: "black"
+    // A one-pixel rule in the line colour.
+    component Rule: Rectangle {
         implicitHeight: 1
-
-        Rectangle {
-            anchors.fill: parent
-            visible: !parent.dashed
-            color: parent.color
-        }
-        Dashed {
-            anchors.fill: parent
-            visible: parent.dashed
-            color: parent.color
-        }
+        color: page.c.line ?? "gray"
     }
 
     // A person as a button: a face's place, the name underlined, the job or part beside it.
@@ -1222,10 +1139,10 @@ FocusScope {
 
         implicitWidth: chipBody.implicitWidth + 14
         implicitHeight: 26
-        radius: page.plain ? 13 : 0
-        color: page.plain ? page.tones.field : "transparent"
-        border.width: focused ? 1.5 : page.plain ? 0 : 1
-        border.color: (focused ? page.c.accent : page.bracket ? page.c.line : "#B9AE99") ?? "gray"
+        radius: 13
+        color: page.tones.field
+        border.width: focused ? 1.5 : 0
+        border.color: page.c.accent ?? "gray"
 
         Row {
             id: chipBody
@@ -1237,26 +1154,10 @@ FocusScope {
             Rectangle {
                 width: 20
                 height: 20
-                radius: page.plain ? 10 : 0
-                color: page.plain ? page.tones.thumb : page.bracket ? page.c.surface ?? "black" : "transparent"
-                border.width: page.plain ? 0 : 1
-                border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
+                radius: 10
+                color: page.tones.thumb
                 clip: true
 
-                Shape {
-                    anchors.fill: parent
-                    visible: page.caps
-                    preferredRendererType: Shape.GeometryRenderer
-
-                    ShapePath {
-                        strokeColor: page.c.line ?? "gray"
-                        strokeWidth: 1
-                        fillColor: "transparent"
-                        PathSvg {
-                            path: "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L4 20M30 0L10 20M36 0L16 20"
-                        }
-                    }
-                }
                 DekhoPicture {
                     id: face
                     anchors.fill: parent
@@ -1284,11 +1185,10 @@ FocusScope {
                 id: roleText
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.PlainText
-                text: page.bracket ? D.title(chip.role).toUpperCase() : D.title(chip.role)
+                text: D.title(chip.role)
                 color: page.c.muted ?? "gray"
                 font.family: page.bodyFont
-                font.pixelSize: page.bracket ? 10 : 11
-                font.letterSpacing: page.bracket ? 1.4 : 0
+                font.pixelSize: 11
                 elide: Text.ElideRight
                 maximumLineCount: 1
                 width: Math.min(implicitWidth, 140)
@@ -1306,10 +1206,8 @@ FocusScope {
         readonly property bool due: T.aired(modelData, page.today)
         readonly property bool up: page.next === index
         readonly property bool done: !!modelData.watched
-        // The cursor's row inverts in Paper and Blueprint; Artboard tints it and rings it in its accent.
-        readonly property bool inverse: cursor && !page.plain
-        readonly property color fore: inverse ? page.c.surface ?? "white" : page.c.ink ?? "black"
-        readonly property color soft: inverse ? (page.caps ? page.c.line : page.c.surface) ?? "white" : page.c.muted ?? "gray"
+        // The cursor's row is tinted and ringed in the accent.
+        readonly property color soft: page.c.muted ?? "gray"
 
         function drawn() {
             const at = ep.mapToItem(episodeView, 0, 0);
@@ -1331,9 +1229,9 @@ FocusScope {
         }
 
         height: 30
-        radius: page.plain ? 10 : 0
-        color: cursor ? (page.plain ? page.look.label.fill : page.bracket ? page.c.accent : page.c.ink) ?? "black" : "transparent"
-        border.width: cursor && page.plain ? 1.5 : 0
+        radius: 10
+        color: cursor ? page.look.label.fill : "transparent"
+        border.width: cursor ? 1.5 : 0
         border.color: page.c.accent ?? "blue"
 
         RowLayout {
@@ -1352,39 +1250,32 @@ FocusScope {
                     width: 18
                     height: 18
                     visible: ep.done
-                    radius: page.plain ? 9 : 0
-                    color: (page.plain ? page.c.accent : page.bracket ? (ep.inverse ? page.c.surface : page.c.accent) : ep.inverse ? page.c.surface : page.c.ink) ?? "black"
+                    radius: 9
+                    color: page.c.accent ?? "black"
 
                     FilesIcon {
                         anchors.centerIn: parent
-                        size: page.plain ? 9 : 10
-                        box: page.plain ? 9 : 16
-                        stroke: page.plain ? 1.5 : 2.4
-                        path: page.plain ? "M1.5 4.6L3.5 6.6L7.5 2.4" : "M3.5 8.5L6.5 11.5L12.5 4.5"
-                        color: (page.plain ? page.tones.card : ep.inverse ? (page.bracket ? page.c.accent : page.c.ink) : page.c.surface) ?? "white"
+                        size: 9
+                        box: 9
+                        stroke: 1.5
+                        path: "M1.5 4.6L3.5 6.6L7.5 2.4"
+                        color: page.tones.card
                     }
                 }
                 Rectangle {
                     width: 18
                     height: 18
                     visible: !ep.done && ep.due
-                    radius: page.plain ? 9 : 0
+                    radius: 9
                     color: "transparent"
-                    border.width: page.bracket ? 1 : 1.5
-                    border.color: (page.plain ? page.c.line : ep.fore) ?? "gray"
+                    border.width: 1.5
+                    border.color: page.c.line ?? "gray"
                 }
-                Dashed {
-                    width: 18
-                    height: 18
-                    visible: !ep.done && !ep.due && !page.plain
-                    frame: true
-                    color: ep.soft
-                }
-                // Artboard's mark is a circle, so its dashed one is too.
+                // The mark is a circle, so its dashed one is too.
                 Shape {
                     width: 18
                     height: 18
-                    visible: !ep.done && !ep.due && page.plain
+                    visible: !ep.done && !ep.due
                     preferredRendererType: Shape.GeometryRenderer
 
                     ShapePath {
@@ -1403,31 +1294,15 @@ FocusScope {
                     }
                 }
             }
-            // The still's place, marked as each board marks an empty picture: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
+            // The still's place, a grey tile until the still is on disk.
             Rectangle {
                 id: stillPlace
                 Layout.preferredWidth: 40
                 Layout.preferredHeight: 22
-                radius: page.plain ? 4 : 0
-                color: page.plain ? page.tones.thumb : "transparent"
-                border.width: page.plain ? 0 : 1
-                border.color: (page.bracket ? page.c.line : page.c.muted) ?? "gray"
+                radius: 4
+                color: page.tones.thumb
                 clip: true
 
-                Shape {
-                    anchors.fill: parent
-                    visible: !page.plain
-                    preferredRendererType: Shape.GeometryRenderer
-
-                    ShapePath {
-                        strokeColor: page.c.line ?? "gray"
-                        strokeWidth: 1
-                        fillColor: "transparent"
-                        PathSvg {
-                            path: page.bracket ? "M0 0L40 22M40 0L0 22" : "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L2 22M30 0L8 22M36 0L14 22M42 0L20 22M48 0L26 22M54 0L32 22M60 0L38 22"
-                        }
-                    }
-                }
                 DekhoPicture {
                     id: still
                     anchors.fill: parent
@@ -1441,41 +1316,39 @@ FocusScope {
                 Layout.preferredWidth: 28
                 textFormat: Text.PlainText
                 text: "E" + ep.modelData.episode
-                color: ep.inverse && page.bracket ? ep.fore : ep.soft
+                color: ep.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
             }
             Text {
                 id: nameText
                 Layout.fillWidth: true
                 textFormat: Text.PlainText
                 text: D.title(ep.modelData.name)
-                color: !ep.due ? page.c.muted ?? "gray" : ep.cursor && page.plain ? page.tones.deep : ep.fore
+                color: !ep.due ? page.c.muted ?? "gray" : ep.cursor ? page.tones.deep : page.c.ink ?? "black"
                 font.family: page.bodyFont
-                font.pixelSize: page.plain ? 14 : 13
-                font.weight: ep.cursor ? (page.bracket ? Font.Bold : Font.Medium) : Font.Normal
+                font.pixelSize: 14
+                font.weight: ep.cursor ? Font.Medium : Font.Normal
                 elide: Text.ElideRight
                 maximumLineCount: 1
             }
             Rectangle {
                 id: tag
                 visible: ep.up
-                implicitWidth: tagText.implicitWidth + (page.bracket ? 0 : page.plain ? 16 : 12)
-                implicitHeight: tagText.implicitHeight + (page.bracket ? 0 : page.plain ? 4 : 2)
-                radius: page.plain ? 8 : 0
-                color: page.bracket ? "transparent" : (page.plain ? page.c.ink : ep.inverse ? page.c.surface : page.c.ink) ?? "black"
+                implicitWidth: tagText.implicitWidth + 16
+                implicitHeight: tagText.implicitHeight + 4
+                radius: 8
+                color: page.c.ink ?? "black"
 
                 Text {
                     id: tagText
                     anchors.centerIn: parent
                     textFormat: Text.PlainText
                     text: words.nextUp
-                    color: (page.bracket ? ep.fore : page.plain ? page.tones.card : ep.inverse ? page.c.ink : page.c.surface) ?? "white"
+                    color: page.tones.card
                     font.family: page.bodyFont
-                    font.pixelSize: page.plain ? 11 : 10
-                    font.weight: page.caps ? Font.Normal : page.plain ? Font.Medium : Font.Bold
-                    font.letterSpacing: page.plain ? 0 : 1.4
+                    font.pixelSize: 11
+                    font.weight: Font.Medium
                 }
             }
             Text {
@@ -1483,23 +1356,19 @@ FocusScope {
                 horizontalAlignment: Text.AlignRight
                 textFormat: Text.PlainText
                 text: T.episodeLength(ep.modelData.runtime)
-                color: ep.inverse && page.bracket ? ep.fore : ep.soft
+                color: ep.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
             }
-            // Paper sets an aired date in its italic serif; a date to come stays in the body face.
             Text {
                 id: dateText
                 Layout.preferredWidth: 96
                 horizontalAlignment: Text.AlignRight
                 textFormat: Text.PlainText
                 text: T.dateText(ep.modelData.air_date, page.today)
-                color: ep.inverse && page.bracket ? ep.fore : ep.soft
-                font.family: (page.caps && ep.due ? page.fonts.display : page.bodyFont) ?? ""
-                font.italic: page.caps && ep.due
-                font.pixelSize: page.caps && ep.due ? 17 : 12
-                font.letterSpacing: page.bracket ? 0.7 : 0
+                color: ep.soft
+                font.family: page.bodyFont
+                font.pixelSize: 12
             }
         }
         DekhoClick {

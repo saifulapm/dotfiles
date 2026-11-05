@@ -18,8 +18,6 @@ dekho_pids() { session_qs_pids "-p $dekho_qml"; }
 no_dekho_process() { [ -z "$(dekho_pids)" ]; }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
 
 # The nested shell scans the temp data dir's entries, so the repo's entry goes there for the launcher to list.
 cp "$entry" "$DOTS_DEV_DIR/data/applications/dekho.desktop"
@@ -109,32 +107,16 @@ wtype -k Escape
 until_ok 1000 dekho_is '.rows.shown and (.search.results | length) == 0'
 check "Esc leaves the results for the home rows, with the window open" dekho_is '.rows.shown and .search.text == "" and (.search.results | length) == 0'
 
-# Each board's own detail, read back from the drawn items while the window stays open.
-check "paper: the page heading Home is Instrument Serif, as the Paper board sets it ($(dekho_state | jq -c .look))" \
-  dekho_is '.look.homeFont == "Instrument Serif" and .look.rowHead == "CONTINUE WATCHING" and .look.ruleDashed == false'
-check "paper: the poster fills its hatched place square ($(dekho_state | jq -c '.rows.continue[0].poster'))" \
-  dekho_is '.rows.continue[0].poster | .shown and .radius == 0 and .width == 38 and .height == 56'
-in_theme artboard
-until_ok 3000 dekho_is '.voice == "plain"'
-check "artboard: cards are rounded 12 px and headings sentence case, as the Artboard board draws them ($(dekho_state | jq -c .look))" \
+# The board's own detail, read back from the drawn items while the window stays open.
+check "cards are rounded 12 px and headings sentence case ($(dekho_state | jq -c .look))" \
   dekho_is '.look.cardRadius == 12 and .look.rowHead == "Continue watching" and .look.homeFont == "Maple Mono"'
-check "artboard: the poster is masked to its grey tile's 8 px corners ($(dekho_state | jq -c '.rows.continue[0].poster'))" \
+check "the poster is masked to its grey tile's 8 px corners ($(dekho_state | jq -c '.rows.continue[0].poster'))" \
   dekho_is '.rows.continue[0].poster | .shown and .radius == 8 and .width == 36 and .height == 54'
-in_theme blueprint
-until_ok 3000 dekho_is '.voice == "bracket"'
-check "blueprint: the header rule is dashed and the time left reads MIN LEFT, as the Blueprint board writes it ($(dekho_state | jq -c '[.look, .rows.continue[1].line]'))" \
-  dekho_is '.look.ruleDashed and .look.cardRadius == 0 and .rows.continue[1].line == "RESUME · 40 MIN LEFT"'
-check "blueprint: the poster fills its crossed box square, and a null one keeps the cross ($(dekho_state | jq -c '[.rows.continue[0].poster, .rows.continue[2].poster.shown]'))" \
-  dekho_is '(.rows.continue[0].poster | .shown and .radius == 0) and .rows.continue[2].poster.shown == false'
 
-# Blueprint's home draws its marks; Hi-Fi draws the same words bare. The only brackets left are the fixture titles that carried an ANSI colour code, whose ESC the window drops and whose [31m stays.
+# The home draws its words bare. The only brackets left are the fixture titles that carried an ANSI colour code, whose ESC the window drops and whose [31m stays.
 words_marked() { dekho_state | marked | grep -v '\[31m'; }
 no_marks() { [ -z "$(words_marked)" ]; }
-blueprint_marks=$(words_marked)
-check "blueprint: the home still draws its marks ($(head -3 <<<"$blueprint_marks" | paste -sd'|'))" test -n "$blueprint_marks"
-in_theme hi-fi
-until_ok 3000 no_marks
-check "hi-fi: nothing in the state holds a bracket but the [31m fixture titles ($(words_marked | head -3 | paste -sd'|'))" no_marks
+check "nothing in the state holds a bracket but the [31m fixture titles ($(words_marked | head -3 | paste -sd'|'))" no_marks
 
 wtype -k Escape
 until_ok 3000 dekho_gone

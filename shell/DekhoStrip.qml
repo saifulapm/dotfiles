@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Shapes
 import "lib/dekho.mjs" as D
 import "lib/dekho-home.mjs" as H
 
@@ -19,7 +18,7 @@ ColumnLayout {
     // A row of titles being watched: each card draws its episode or RESUME and a progress bar.
     property bool progressed: false
     readonly property real cardWidth: Math.max(0, (width - 4 * 14) / 5)
-    readonly property real cardRadius: page.plain ? 12 : 0
+    readonly property real cardRadius: 12
     readonly property string tailDrawn: tailLabel.text
 
     // A click on a card; the page moves its cursor there and does what Enter does.
@@ -56,8 +55,7 @@ ColumnLayout {
             text: strip.headText
             color: strip.page.c.muted ?? "gray"
             font.family: strip.page.bodyFont
-            font.pixelSize: strip.page.voice === "caps" ? 10 : 11
-            font.letterSpacing: strip.page.plain ? 0 : strip.page.bracket ? 1.54 : 1.4
+            font.pixelSize: 11
         }
         Text {
             id: tailLabel
@@ -65,8 +63,7 @@ ColumnLayout {
             text: strip.tailText
             color: strip.page.c.muted ?? "gray"
             font.family: strip.page.bodyFont
-            font.pixelSize: strip.page.voice === "caps" ? 10 : 11
-            font.letterSpacing: strip.page.plain ? 0 : strip.page.bracket ? 1.54 : 1.4
+            font.pixelSize: 11
         }
     }
 
@@ -121,7 +118,7 @@ ColumnLayout {
 
         signal tapped
 
-        readonly property var voiceText: progressed ? H.continueLine(modelData) : H.hitLine(modelData)
+        readonly property var lineWords: progressed ? H.continueLine(modelData) : H.hitLine(modelData)
         readonly property real played: Math.max(0, Math.min(1, Number(modelData.progress) || 0))
 
         function drawn() {
@@ -140,22 +137,13 @@ ColumnLayout {
         }
 
         implicitHeight: body.implicitHeight + 20
-        color: page.plain ? (focused ? page.c.surface ?? "white" : page.tones.field) : page.bracket && focused ? Qt.alpha(page.c.accent ?? "cyan", 0.1) : "transparent"
-        border.width: page.plain ? (focused ? 1.5 : 0) : 1
-        border.color: (page.plain ? page.c.accent : page.bracket ? (focused ? page.c.accent : page.c.line) : page.c.ink) ?? "black"
+        color: focused ? page.c.surface ?? "white" : page.tones.field
+        border.width: focused ? 1.5 : 0
+        border.color: page.c.accent ?? "black"
 
         DekhoClick {
             name: card.row + ":" + card.index
             onTapped: card.tapped()
-        }
-
-        // Paper rings the cursor's card in its accent, two pixels inside its ink border.
-        Rectangle {
-            anchors.fill: parent
-            visible: card.focused && card.page.voice === "caps"
-            color: "transparent"
-            border.width: 2
-            border.color: card.page.c.accent ?? "red"
         }
 
         ColumnLayout {
@@ -168,31 +156,15 @@ ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 12
 
-                // The poster's place, as each board marks it until the poster is on disk: Paper's hatch, Artboard's grey tile, Blueprint's crossed box.
+                // The poster's place, a grey tile until the poster is on disk.
                 Rectangle {
                     id: place
-                    implicitWidth: card.page.plain ? 36 : 38
-                    implicitHeight: card.page.plain ? 54 : 56
-                    radius: card.page.plain ? 8 : 0
-                    color: card.page.plain ? card.page.tones.thumb : "transparent"
-                    border.width: card.page.plain ? 0 : 1
-                    border.color: (card.page.bracket ? card.page.c.line : card.page.c.muted) ?? "gray"
+                    implicitWidth: 36
+                    implicitHeight: 54
+                    radius: 8
+                    color: card.page.tones.thumb
                     clip: true
 
-                    Shape {
-                        anchors.fill: parent
-                        visible: !card.page.plain
-                        preferredRendererType: Shape.GeometryRenderer
-
-                        ShapePath {
-                            strokeColor: card.page.c.line ?? "gray"
-                            strokeWidth: 1
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: card.page.bracket ? "M0 0L38 56M38 0L0 56" : "M6 0L0 6M12 0L0 12M18 0L0 18M24 0L0 24M30 0L0 30M36 0L0 36M42 0L0 42M48 0L0 48M54 0L0 54M60 0L4 56M66 0L10 56M72 0L16 56M78 0L22 56M84 0L28 56M90 0L34 56M96 0L40 56"
-                            }
-                        }
-                    }
                     DekhoPicture {
                         id: poster
                         anchors.fill: parent
@@ -222,11 +194,10 @@ ColumnLayout {
                         id: lineText
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
-                        text: card.voiceText
+                        text: card.lineWords
                         color: card.page.c.muted ?? "gray"
                         font.family: card.page.bodyFont
-                        font.pixelSize: card.page.bracket ? 10 : 11
-                        font.letterSpacing: card.page.bracket ? 1.4 : 0
+                        font.pixelSize: 11
                         elide: Text.ElideRight
                         maximumLineCount: 1
                     }
@@ -237,7 +208,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 visible: card.progressed
                 implicitHeight: 4
-                radius: card.page.plain ? 2 : 0
+                radius: 2
                 color: card.page.c.line ?? "gray"
 
                 Rectangle {
