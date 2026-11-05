@@ -124,6 +124,17 @@ managed=$(
         ]
       }
     ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if workflow guard --help 2>/dev/null | grep -q 'possible values:.*bash'; then workflow guard bash; fi"
+          }
+        ]
+      }
+    ],
     "PostToolBatch": [
       {
         "hooks": [
@@ -143,13 +154,29 @@ managed=$(
           }
         ]
       }
+    ],
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if workflow worktree --help 2>/dev/null | grep -q 'possible values: create, remove'; then workflow worktree create; else n=$(sed -n 's/.*\"name\" *: *\"\\([^\"]*\\)\".*/\\1/p'); d=\"$(git rev-parse --path-format=absolute --git-common-dir)/../.claude/worktrees/$n\"; git worktree add -q -b \"worktree-$n\" \"$d\" HEAD >&2 && cd \"$d\" && pwd -P; fi"
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if workflow worktree --help 2>/dev/null | grep -q 'possible values: create, remove'; then workflow worktree remove; else git worktree remove \"$(sed -n 's/.*\"worktree_path\" *: *\"\\([^\"]*\\)\".*/\\1/p')\"; fi"
+          }
+        ]
+      }
     ]
   },
   "worktree": {
-    "symlinkDirectories": [
-      "node_modules",
-      "vendor"
-    ],
     "baseRef": "head",
     "bgIsolation": "none"
   },
@@ -236,9 +263,17 @@ current=$(cat)
 #
 # The Stop hook (`mem session-check`) went on 2026-10-09: of 240 nudges, 7 were
 # followed by a mem write, and every one woke the model for another turn.
+#
+# PreToolUse, WorktreeCreate and WorktreeRemove came from workflow's guards
+# roadmap (2026-11-05), copied from its cloud/settings-hooks.json. `workflow
+# guard bash` refuses a Bash call that repeats a lesson's mistake; the worktree
+# hooks give an Agent worktree its installs and generated types, which
+# symlinkDirectories did only in part, so that key is deleted. An old or
+# missing workflow falls back: every call runs, and worktrees are plain git.
 printf '%s' "$current" | jq --argjson managed "$managed" '
   del(.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)
   | del(.modelSettings["claude-opus-5"])
   | del(.subagentPromptCacheTtl)
   | del(.hooks.Stop)
+  | del(.worktree.symlinkDirectories)
   | . * $managed'
