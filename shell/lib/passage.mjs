@@ -48,14 +48,16 @@ export const dateOf = (day) => new Date(day * DAY).toISOString().slice(0, 10);
 
 export const today = (now) => `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())}`;
 
-export function pick(day, entries) {
-  const kind = KINDS[day % 4];
+// Walked back, as the lock walks it, the kinds turn the other way and each kind counts from its end, so the lock never draws the paper's kind.
+export function pick(day, entries, back = false) {
+  const kind = KINDS[back ? 3 - (day % 4) : day % 4];
   const of = entries.filter((e) => e.kind === kind);
-  const entry = Math.floor(day / 4) % of.length;
+  const n = Math.floor(day / 4) % of.length;
+  const entry = back ? of.length - 1 - n : n;
   return { day, date: dateOf(day), kind, entry, item: of[entry] };
 }
 
-// The quote a day shows when deen cannot answer it: one the next blocks hold, never this block's own.
+// The quote a day shows when deen cannot answer it: one the next blocks hold, never this block's own. The lock shares it, so on a day deen answers neither walk the two can draw the same quote.
 export function fallback(day, entries) {
   const quotes = entries.filter((e) => e.kind === 'quote');
   const entry = (Math.floor(day / 4) + 1 + (day % 4)) % quotes.length;

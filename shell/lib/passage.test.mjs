@@ -77,6 +77,19 @@ test('the kind turns ayah, hadith, dua, quote, and the entry is the day over 4 w
   assert.equal(P.pick(P.dayOf('2026-11-03'), entries).item.ref, 'a0');
 });
 
+test('walked back, the kind turns quote, dua, hadith, ayah, and the entry counts from the end of its kind', () => {
+  const at = (iso) => (({ kind, entry }) => [kind, entry])(P.pick(P.dayOf(iso), entries, true));
+  assert.deepEqual(at('2026-11-03'), ['quote', 11]);
+  assert.deepEqual(at('2026-11-04'), ['dua', 29]);
+  assert.deepEqual(at('2026-11-01'), ['hadith', 0]);
+  assert.deepEqual(at('2026-11-02'), ['ayah', 0]);
+  assert.equal(P.pick(P.dayOf('2026-11-02'), entries, true).item.ref, 'a0');
+});
+
+test('walked back, no day picks the kind the forward walk picks', () => {
+  for (let day = 20756; day < 20756 + 4 * 102; day++) assert.notEqual(P.pick(day, entries, true).kind, P.pick(day, entries).kind, `day ${day}`);
+});
+
 test("a day deen cannot answer falls back to a later block's quote, never its own block's", () => {
   // 2026-11-04 is a hadith day in block 5190: (5190 + 1 + 1) mod 102.
   assert.deepEqual(P.fallback(P.dayOf('2026-11-04'), entries), { entry: 92, item: { kind: 'quote', text: 'q92', author: 'x' } });

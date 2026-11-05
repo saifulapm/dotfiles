@@ -16,10 +16,12 @@ Scope {
     readonly property string backend: Quickshell.env("DOTS_DEEN") || "deen"
     // The date the IPC set; "" is today.
     property string pinned: ""
+    // The lock's passage walks the list back, so it never draws the paper's; it answers no IPC of its own.
+    property bool back: false
     readonly property var entries: P.parse(list.text()).entries
     // A string, so a tick on the same date, or a pinned date at midnight, leaves the pick and its read alone.
     readonly property string date: pinned || P.today(clock.now)
-    readonly property var pick: entries.length ? P.pick(P.dayOf(date), entries) : null
+    readonly property var pick: entries.length ? P.pick(P.dayOf(date), entries, back) : null
     // `deen api surahs`, read once, the first time an ayah needs its surah's name; a day it failed for asks no more, and a later day asks again.
     property string surahs: ""
     property var surahsFor: null
@@ -135,6 +137,7 @@ Scope {
 
     Root.Ipc {
         target: "passage"
+        enabled: !passage.back
 
         function state(): string {
             const p = passage.pick;

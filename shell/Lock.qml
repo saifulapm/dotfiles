@@ -30,6 +30,8 @@ Scope {
     readonly property bool secure: session.secure
     // How often an agent unlock asked niri to turn the monitors off, so a check can see the request.
     property int monitorsOff: 0
+    // The day's other passage, walked back from the paper's; shell.qml sets it after the paper's first frame, so a lock before then draws none.
+    property var passage: null
 
     // Every surface's field clears on this, so no screen keeps a typed password.
     signal cleared
@@ -41,8 +43,8 @@ Scope {
     // The clock a lock surface drew last, so state() reports what is on screen rather than the lookup.
     property Item clockItem: null
     property Item fieldItem: null
-    property Item statusItem: null
     property Item dateItem: null
+    property Item passageItem: null
     // just dev points this at a fake, so no check messages the phone.
     readonly property string notifyPhone: Quickshell.env("DOTS_NOTIFY_PHONE") || Quickshell.shellDir + "/bin/dots-notify-phone"
     readonly property string marker: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/locked"
@@ -156,10 +158,9 @@ Scope {
             clockStroke: t && t.style === Text.Outline ? String(t.styleColor) : "transparent",
             clockBox: t ? { x: p.x, y: p.y, w: t.width, h: t.height } : null,
             fieldBox: f ? { x: r.x, y: r.y, w: f.width, h: f.height } : null,
-            statusText: statusItem ? statusItem.text : "",
-            statusBox: box(statusItem),
             dateText: dateItem ? dateItem.text : "",
-            dateBox: box(dateItem)
+            dateBox: box(dateItem),
+            passage: passage && passage.pick ? { kind: passage.pick.kind, entry: passage.pick.entry, box: box(passageItem) } : null
         });
     }
 
@@ -259,7 +260,7 @@ Scope {
 
         WlSessionLockSurface {
             id: surface
-            color: screenLock.c.paper
+            color: surface.look.ground
 
             readonly property var look: screenLock.look
             readonly property string date: Qt.formatDate(clock.now, look.date.format)
@@ -268,34 +269,12 @@ Scope {
                 id: clock
             }
 
-            Text {
-                id: statusText
-                textFormat: Text.PlainText
-                x: 32
-                y: 16
-                text: surface.look.status.text
-                color: surface.look.status.color
-                font.family: screenLock.fonts.ui
-                font.pixelSize: 12
-                font.weight: Font.DemiBold
-                Component.onCompleted: screenLock.statusItem = statusText
-            }
-
-            // Artboard's selected card, its frame from Surface; the date sits under the clock, since the one design draws no frame labels.
-            Root.Surface {
-                id: card
-                x: Math.round((surface.width - width) / 2)
-                y: Math.round(surface.height * 0.3)
-                width: 460
-                height: 36 + face.height + 22 + entry.height + 32
-                tokens: screenLock.theme.tokens
-            }
-
+            // No card: the clock and date high on the bare ground.
             Column {
                 id: face
                 anchors.horizontalCenter: parent.horizontalCenter
-                y: card.y + 36
-                spacing: 4
+                y: Math.round(surface.height * 0.2)
+                spacing: 6
 
                 Text {
                     id: clockText
@@ -323,25 +302,46 @@ Scope {
                 }
             }
 
+            // Centred between the date and the field, and smaller as a whole where it would crowd them.
+            Loader {
+                id: words
+                readonly property real start: face.y + face.height + 48
+                readonly property real room: entry.y - 48 - start
+                anchors.horizontalCenter: parent.horizontalCenter
+                y: Math.round(start + (room - height) / 2)
+                scale: item ? Math.min(1, room / height) : 1
+                active: screenLock.passage !== null && screenLock.passage.text !== null
+                opacity: status === Loader.Ready ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 400 }
+                }
+                Component.onCompleted: screenLock.passageItem = words
+
+                sourceComponent: Root.LockPassage {
+                    look: surface.look.passage
+                    text: screenLock.passage.text
+                }
+            }
+
             Column {
                 id: entry
                 x: Math.round((surface.width - width) / 2) + screenLock.shakeX
-                y: face.y + face.height + 22
-                width: 380
-                spacing: 10
+                y: surface.height - height - 72
+                width: 320
+                spacing: 12
 
                 Item {
                     width: parent.width
-                    height: 46
+                    height: 44
 
-                    // Artboard's field: a tinted rounded well with a 2 px accent ring.
+                    // A quiet pill, framed in line, that takes the accent once something is typed.
                     Rectangle {
                         id: well
                         anchors.fill: parent
-                        radius: 12
-                        color: Qt.tint(screenLock.c.surface ?? "white", Qt.alpha(screenLock.c.ink, 0.05))
-                        border.width: 2
-                        border.color: screenLock.c.accent
+                        radius: height / 2
+                        color: Qt.tint(surface.look.ground, Qt.alpha(screenLock.c.ink, 0.05))
+                        border.width: 1
+                        border.color: screenLock.field > 0 ? screenLock.c.accent : screenLock.c.line ?? screenLock.c.muted
                         Component.onCompleted: screenLock.fieldItem = well
                     }
 

@@ -39,6 +39,7 @@ ShellRoot {
         pinentry = compiled("Pinentry.qml").createObject(root, { surfaces: surfacesLoader });
         portal = compiled("Portal.qml").createObject(root, { surfaces: surfacesLoader });
         passage = compiled("Passage.qml").createObject(root, { theme: themeService, papers: papers, clock: desk.clock });
+        lockScope.passage = compiled("Passage.qml").createObject(root, { theme: themeService, papers: papers, clock: desk.clock, back: true });
         warmStart.start();
         apps = Qt.binding(() => DesktopEntries.applications.values.map(e => ({
                         id: e.id,
