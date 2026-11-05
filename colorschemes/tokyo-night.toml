@@ -1,0 +1,34 @@
+# UI and code colours are folke/tokyonight.nvim's night palette (extras/lua/tokyonight_night.lua), the code ones as its highlight groups use them (lua/tokyonight/groups/base.lua, treesitter.lua); the ANSI 16 are its foot extra (extras/foot/tokyonight_night.ini).
+[meta]
+name = "tokyo-night"
+title = "Tokyo Night"
+family = "Tokyo Night"
+variant = "dark"
+source = "https://github.com/folke/tokyonight.nvim"
+licence = "Apache-2.0"
+
+[color]
+paper = "#16161E"
+surface = "#1A1B26"
+ink = "#C0CAF5"
+muted = "#A9B1D6"
+line = "#292E42"
+accent = "#7AA2F7"
+danger = "#F7768E"
+ok = "#9ECE6A"
+ansi = [
+  "#15161E", "#F7768E", "#9ECE6A", "#E0AF68", "#7AA2F7", "#BB9AF7", "#7DCFFF", "#A9B1D6",
+  "#414868", "#F7768E", "#9ECE6A", "#E0AF68", "#7AA2F7", "#BB9AF7", "#7DCFFF", "#C0CAF5",
+]
+
+[syntax]
+keyword = "#9D7CD8"
+function = "#7AA2F7"
+string = "#9ECE6A"
+type = "#2AC3DE"
+value = "#FF9E64"
+variable = "#C0CAF5"
+attribute = "#73DACA"
+meta = "#7DCFFF"
+builtin = "#F7768E"
+comment = "#565F89"
