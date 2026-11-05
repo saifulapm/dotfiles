@@ -391,8 +391,9 @@ Item {
             choose();
     }
 
+    // A click on a place opens it as Enter does, a folder still listing too, so a stuck listing can be left.
     function openPlace(i) {
-        if (asking || typingPath || !listed)
+        if (asking || typingPath)
             return;
         side = "places";
         placeAt = i;

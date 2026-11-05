@@ -57,7 +57,9 @@ until_ok 2000 app_placed files
 wtype -k Shift_L
 drop_count() { jq length "$DROP_OUT" 2>/dev/null || echo 0; }
 drops_more() { test "$(drop_count)" -gt "$1"; }
-read -r tx ty < <(app_origin drop-target)
+# The drop target is a qs window found by its title, not an app id.
+read -r tx ty < <(niri msg -j windows | jq -r '.[] | select(.title == "drop-target") | .layout | "\((.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]) | floor) \((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor)"')
+check "the drop target is placed ($tx $ty)" test -n "$tx" -a -n "$ty"
 tx=$((tx + 150)) ty=$((ty + 200))
 # Carries a pressed row's drag over the drop target and lets go, then waits for the drop.
 drop_it() {
@@ -79,9 +81,13 @@ point dclick $p
 check "a double click on Downloads enters it and the path names it ($(files_state | jq -c '[.folder, .path]'))" \
   until_ok 2000 files_is '.listed and (.folder | endswith("/Downloads")) and (.path | endswith("Downloads"))'
 
-# Behaviour 1: click, Shift-click, Ctrl-click; the keys then act on that selection.
+# Behaviour 1: before any click the cursor is on the first file, so a Shift-click selects from there; then click, Shift-click, Ctrl-click, and the keys act on that selection.
+# shellcheck disable=SC2046
+mod_click shift $(spot f03.txt)
+check "a Shift-click with no earlier click selects from the first file ($(files_state | jq -c '[.cursor, .marked]'))" \
+  until_ok 1000 files_is '.cursor == "f03.txt" and .marked == ["f01.txt", "f02.txt", "f03.txt"]'
 at f03.txt
-check "a click on the third file selects only it ($(files_state | jq -c '[.cursor, .marked]'))" until_ok 1000 files_is '.cursor == "f03.txt" and .marked == []'
+check "then a click on the third file selects only it ($(files_state | jq -c '[.cursor, .marked]'))" until_ok 1000 files_is '.cursor == "f03.txt" and .marked == []'
 # shellcheck disable=SC2046
 mod_click shift $(spot f06.txt)
 check "a Shift-click on the sixth selects files 3 to 6 ($(files_state | jq -c '[.cursor, .marked]'))" \
