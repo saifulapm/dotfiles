@@ -175,6 +175,11 @@ export function markedPaths(entries, marked, folder) {
   return sortRows(entries.filter((e) => !e.dir && marked.indexOf(e.name) >= 0)).map((e) => base + '/' + e.name);
 }
 
+// Enter on a marked file of a multi-file picker answers all the marked files; on an unmarked one, only it.
+export function answersMarked(multiple, marked, row) {
+  return multiple && !!row && !row.dir && marked.indexOf(row.name) >= 0;
+}
+
 // The line above the key strip: how many files ctrl+Enter opens, or the folder it chooses, which is a path and keeps its case.
 export function footText(mode, n, here) {
   if (mode === 'folder') return `ctrl+↵ chooses ${here}, the folder you are in`;

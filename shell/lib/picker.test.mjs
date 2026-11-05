@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { answerLine, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
+import { answerLine, answersMarked, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -323,6 +323,15 @@ test('the marked files answer in list order, a file the query hides too', () => 
   const entries = [{ name: 'c.png', dir: false }, { name: 'shots', dir: true }, { name: 'A.png', dir: false }, { name: 'b.png', dir: false }];
   assert.deepEqual(markedPaths(entries, ['c.png', 'A.png', 'b.png'], '/home/s/Downloads'), ['/home/s/Downloads/A.png', '/home/s/Downloads/b.png', '/home/s/Downloads/c.png']);
   assert.deepEqual(markedPaths(entries, ['b.png'], '/'), ['/b.png']);
+});
+
+test('Enter on a marked file in a multi-file picker answers every marked file', () => {
+  const file = { name: 'a.png', dir: false };
+  assert.equal(answersMarked(true, ['a.png', 'b.png'], file), true);
+  assert.equal(answersMarked(true, ['b.png'], file), false);
+  assert.equal(answersMarked(false, ['a.png'], file), false);
+  assert.equal(answersMarked(true, ['shots'], { name: 'shots', dir: true }), false);
+  assert.equal(answersMarked(true, ['a.png'], null), false);
 });
 
 test('the footer line: how many are marked, or the folder ctrl+Enter chooses', () => {
