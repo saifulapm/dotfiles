@@ -57,24 +57,14 @@ mode nobn
 on_day 2026-11-02
 on_day 2026-11-03
 check "with deen answering 94:6 with no Bangla, 2026-11-03 draws its fallback quote in English ($(passage | jq -c '[.fallback, .kind, .label, .en, .ref]'))" \
-  passage_is '.fallback == true and .kind == "ayah" and .label == "QUOTE" and .ar == "" and .bn == "" and .bn_pron == "" and .en != "" and .drawn[0][0].bn == ""'
+  passage_is '.fallback == true and .kind == "ayah" and .label == "Quote" and .ar == "" and .bn == "" and .bn_pron == "" and .en != "" and .drawn[0][0].bn == ""'
 
 mode fail
 on_day 2026-11-04
 check "with deen exiting 1, hadith day 2026-11-04 draws quote 92, Emerson's ($(passage | jq -c '[.kind, .entry, .fallback, .en, .ref]'))" \
   passage_is "$emerson and .fallback == true and .kind == \"hadith\" and .date == \"2026-11-04\""
 check "it leaves no Arabic from the ayah day before ($(passage | jq -c '[.ar, .drawn[0][0].ar]'))" passage_is '.ar == "" and .drawn[0][0].ar == ""'
-check "Paper labels it QUOTE, not HADITH ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "QUOTE" and .drawn[0][0].label == "QUOTE"'
-
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 3000 status_theme "$1"; }
-in_theme blueprint
-until_ok 3000 passage_is '.drawn[0][0].label == "[QUOTE]"'
-check "Blueprint labels it [QUOTE] ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "[QUOTE]" and .drawn[0][0].label == "[QUOTE]"'
-in_theme artboard
-until_ok 3000 passage_is '.drawn[0][0].label == "Quote"'
-check "Artboard labels it Quote ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "Quote" and .drawn[0][0].label == "Quote"'
-in_theme paper
+check "it is labelled Quote, not Hadith ($(passage | jq -c '[.label, .drawn[0][0].label]'))" passage_is '.label == "Quote" and .drawn[0][0].label == "Quote"'
 
 on_day 2026-11-02
 check "with deen exiting 1, quote day 2026-11-02 draws its own quote 89 ($(passage | jq -c '[.kind, .entry, .fallback, .en]'))" \
