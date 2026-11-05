@@ -4,6 +4,7 @@ import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
 import "services" as Services
+import "lib/click.mjs" as C
 import "lib/files.mjs" as F
 import "lib/picker.mjs" as P
 import "lib/status.mjs" as Status
@@ -701,12 +702,12 @@ ShellRoot {
             });
         }
 
-        // A row's box in the window, for a check that drags it.
+        // A row's box in the window, for a check that drags it; any other name is a click area's, as `shell box` finds one.
         function box(name: string): string {
             const i = app.rows.findIndex(r => r.name === name);
             const item = i >= 0 ? rowList.itemAtIndex(i) : null;
             if (!item)
-                return "null";
+                return C.boxJson(win.contentItem, name);
             const p = item.mapToItem(null, 0, 0);
             return JSON.stringify({ x: p.x, y: p.y, w: item.width, h: item.height });
         }
