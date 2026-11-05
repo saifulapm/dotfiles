@@ -1,6 +1,8 @@
 // Pure pieces of the launcher, kept here so node can test them.
 import { calc, format } from './calc.mjs';
 import { convert } from './worldclock.mjs';
+import { checkTokens } from './theme.mjs';
+import { line } from './voice.mjs';
 
 // Lower is better: exact name, name prefix, word prefix, substring, then a keyword match.
 function tier(entry, q) {
@@ -120,3 +122,25 @@ export function schemeRows(schemes, q, current, bin) {
 
 // A stamped row's command runs under the key press time, which dots colorscheme times its switch from.
 export const stampedExec = (row, now) => (row.stamp ? ['env', `DOTS_SWITCH_T0=${now}`].concat(row.exec) : row.exec);
+
+// themes.json is a file any process can write: each entry passes the check shell.json passes, and its title and family draw as one line of text.
+export function schemeList(list) {
+  if (!Array.isArray(list)) return [];
+  const out = [];
+  for (const t of list) {
+    try {
+      const s = checkTokens(t);
+      out.push(Object.assign(s, { title: typeof t.title === 'string' ? line(t.title) : s.name, family: typeof t.family === 'string' ? line(t.family) : '' }));
+    } catch (e) {
+      continue;
+    }
+  }
+  return out;
+}
+
+// The selection moves over every row found, and the window of size rows follows it; selected counts from the window's top.
+export function scroll(top, selected, by, total, size) {
+  const at = Math.max(0, Math.min(total - 1, top + selected + by));
+  const next = at < top ? at : at >= top + size ? at - size + 1 : top;
+  return { top: next, selected: at - next };
+}

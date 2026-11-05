@@ -3,7 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "services" as Services
-import "lib/themes.mjs" as ThemesLib
+import "lib/launcher.mjs" as LauncherLib
 import "lib/status.mjs" as Status
 
 ShellRoot {
@@ -253,7 +253,7 @@ ShellRoot {
         }
     }
 
-    // The theme list is read with the shell, so the switcher's first open does not wait on it.
+    // The colorscheme list is read with the shell, so the launcher's c mode does not wait on it.
     property var themeList: []
 
     FileView {
@@ -262,7 +262,7 @@ ShellRoot {
         onFileChanged: reload()
         onLoaded: {
             try {
-                root.themeList = ThemesLib.cards(JSON.parse(text()));
+                root.themeList = LauncherLib.schemeList(JSON.parse(text()));
             } catch (e) {
                 console.warn("themes: keeping the last good list: " + e.message);
             }

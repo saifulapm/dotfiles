@@ -17,7 +17,9 @@ Item {
     required property var theme
     property bool shown: false
     readonly property string query: input.text
+    // selected counts from scrollTop, the first of the eight rows drawn out of every row found.
     property int selected: 0
+    property int scrollTop: 0
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -29,6 +31,8 @@ Item {
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
     required property var apps
+    // themes.json's colorschemes, as the shell read them.
+    property var schemes: []
     // The Desk's reminders service, null until the Desk loads.
     property var reminders: null
     readonly property var pending: reminders ? reminders.list : []
@@ -64,6 +68,8 @@ Item {
             return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.broken : false);
         case "commands":
             return Lib.commandRows(parsed.q, Quickshell.shellDir + "/../bin", machine);
+        case "colorschemes":
+            return Lib.schemeRows(schemes, parsed.q, theme.name, Quickshell.shellDir + "/../bin");
         case "apps":
             return Lib.rank(apps, parsed.q).map(a => ({
                         title: a.name,
@@ -74,7 +80,7 @@ Item {
         }
         return [];
     }
-    readonly property var rows: found.slice(0, 8)
+    readonly property var rows: found.slice(scrollTop, scrollTop + 8)
     readonly property var look: L.launcherLook(theme.tokens)
     readonly property Root.Motion motion: Root.Motion {
         shown: launcher.shown
@@ -88,6 +94,7 @@ Item {
         opens += 1;
         input.text = typed || ({ clipboard: "v ", emoji: ": " })[mode] || "";
         selected = 0;
+        scrollTop = 0;
         shown = true;
         // Mod+V lands on the results so plain j/k move; a second Mod+V keeps the mode, so it lists again here.
         if (launcher.mode === "clipboard") {
@@ -131,7 +138,9 @@ Item {
     }
 
     function move(by) {
-        selected = Math.max(0, Math.min(rows.length - 1, selected + by));
+        const s = Lib.scroll(scrollTop, selected, by, found.length, 8);
+        scrollTop = s.top;
+        selected = s.selected;
     }
 
     // An app is spawned through niri, so it is niri's child and outlives a shell restart; copyOnly (Shift+Enter) runs a row's copyExec instead, when it has one.
@@ -154,7 +163,7 @@ Item {
         if (copyOnly && row.copyExec)
             Quickshell.execDetached(row.copyExec);
         else if (row.exec)
-            Quickshell.execDetached(row.exec);
+            Quickshell.execDetached(Lib.stampedExec(row, Date.now()));
         else if (row.copy)
             Quickshell.execDetached(["wl-copy", "--", row.copy]);
     }
@@ -179,6 +188,9 @@ Item {
             ids: rows.map(r => r.id ?? null),
             icons: rows.map(r => r.icon ?? null),
             selected: selected,
+            top: scrollTop,
+            marks: rows.map(r => !!r.current),
+            strips: rows.map((r, i) => rowRepeater.itemAt(i)?.stripColors ?? null),
             openMs: openMs,
             opens: opens,
             motion: motion.curves?.kind ?? null,
@@ -221,7 +233,10 @@ Item {
         });
     }
 
-    onQueryChanged: selected = 0
+    onQueryChanged: {
+        selected = 0;
+        scrollTop = 0;
+    }
     onModeChanged: {
         if (mode === "windows" && !lister.running)
             lister.running = true;
@@ -456,6 +471,8 @@ Item {
                                 readonly property string keyText: keyChip.visible ? keyLabel.text : ""
                                 readonly property string badgeText: badgeBox.visible ? badge.text : ""
                                 readonly property string headText: modelData.head ? headLabel.text : ""
+                                // A colorscheme row's strip as drawn, for the state.
+                                readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
                                 readonly property Item box: rowBox
                                 readonly property Item nameText: title
                                 width: list.width
@@ -503,8 +520,20 @@ Item {
                                     anchors.rightMargin: anchors.leftMargin
                                     spacing: 12
 
+                                    // A colorscheme row's slot holds the current scheme's dot instead of a tile.
+                                    Text {
+                                        visible: !!modelData.swatches
+                                        Layout.preferredWidth: 10
+                                        textFormat: Text.PlainText
+                                        text: modelData.current ? "●" : ""
+                                        color: c.accent
+                                        font.family: fonts.mono
+                                        font.pixelSize: 12
+                                    }
+
                                     // An app's own icon at 32 px, else a tile holding the row's glyph, or a plain tile when it has neither.
                                     Rectangle {
+                                        visible: !modelData.swatches
                                         implicitWidth: look.tile.size
                                         implicitHeight: look.tile.size
                                         radius: look.tile.radius
@@ -558,6 +587,21 @@ Item {
                                             font.italic: look.detail.italic
                                             font.pixelSize: look.detail.size
                                             font.letterSpacing: look.detail.spacing ?? 0
+                                        }
+                                    }
+
+                                    // A colorscheme's paper, surface, accent and four ANSI colours.
+                                    Row {
+                                        id: strip
+                                        visible: !!modelData.swatches
+                                        Repeater {
+                                            model: modelData.swatches ?? []
+                                            Rectangle {
+                                                required property string modelData
+                                                width: 14
+                                                height: 14
+                                                color: modelData
+                                            }
                                         }
                                     }
 

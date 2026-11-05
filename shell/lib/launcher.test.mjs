@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec } from './launcher.mjs';
+import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll } from './launcher.mjs';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const app = (name, keywords = []) => ({ id: name.toLowerCase(), name, genericName: '', keywords });
 const names = (entries) => entries.map((e) => e.name);
@@ -210,4 +214,36 @@ test('Enter on a row runs dots colorscheme from the bin beside the shell', () =>
 test('a stamped row runs under env with the key press time; any other row runs as it is', () => {
   assert.deepEqual(stampedExec({ exec: ['/b/dots', 'colorscheme', 'nord'], stamp: true }, 1234), ['env', 'DOTS_SWITCH_T0=1234', '/b/dots', 'colorscheme', 'nord']);
   assert.deepEqual(stampedExec({ exec: ['dots', 'sync'] }, 1234), ['dots', 'sync']);
+});
+
+// themes.json is a file any process can write, so an entry the shell would refuse gets no row, and a forged title draws on one line.
+test('schemeList keeps every rendered scheme with its title and family, and drops what the shell would refuse', (t) => {
+  const state = mkdtempSync(join(tmpdir(), 'dots-launcher-'));
+  t.after(() => rmSync(state, { recursive: true, force: true }));
+  execFileSync('node', [new URL('./colorscheme-render.mjs', import.meta.url).pathname, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  const rendered = JSON.parse(readFileSync(join(state, 'dots/theme-out/themes.json'), 'utf8'));
+  const list = schemeList(rendered);
+  assert.equal(list.length, rendered.length);
+  const mocha = list.find((s) => s.name === 'catppuccin-mocha');
+  assert.equal(mocha.title, 'Catppuccin Mocha');
+  assert.equal(mocha.family, 'Catppuccin');
+  assert.equal(mocha.color.ansi.length, 16);
+  const noAnsi = { ...mocha, name: 'noansi', color: { ...mocha.color } };
+  delete noAnsi.color.ansi;
+  const forged = { ...rendered[0], name: 'forged', title: 'Ev\nil\u202E', family: 7 };
+  const out = schemeList([noAnsi, null, 'x', forged]);
+  assert.deepEqual(out.map((s) => s.name), ['forged']);
+  assert.equal(out[0].title, 'Ev il');
+  assert.equal(out[0].family, '');
+  assert.deepEqual(schemeList({ not: 'a list' }), []);
+});
+
+test('the selection scrolls the eight visible rows: down past the last row moves the window, up past the first moves it back', () => {
+  assert.deepEqual(scroll(0, 0, 1, 40, 8), { top: 0, selected: 1 });
+  assert.deepEqual(scroll(0, 7, 1, 40, 8), { top: 1, selected: 7 });
+  assert.deepEqual(scroll(32, 7, 1, 40, 8), { top: 32, selected: 7 });
+  assert.deepEqual(scroll(5, 0, -1, 40, 8), { top: 4, selected: 0 });
+  assert.deepEqual(scroll(0, 0, -1, 40, 8), { top: 0, selected: 0 });
+  assert.deepEqual(scroll(0, 2, 1, 3, 8), { top: 0, selected: 2 });
+  assert.deepEqual(scroll(0, 0, 1, 0, 8), { top: 0, selected: 0 });
 });

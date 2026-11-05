@@ -228,6 +228,7 @@ PanelWindow {
         sourceComponent: Root.Launcher {
             theme: host.theme
             apps: host.apps
+            schemes: host.themeList
             reminders: host.reminders
             // A launch or a picked window from the overview closes it too; Esc returns to it.
             onLaunched: {
