@@ -4,7 +4,7 @@ import "." as Root
 import "lib/control.mjs" as Lib
 import "lib/voice.mjs" as V
 
-// A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object; its implicitHeight sizes its band above the rows.
+// A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); optional readonly property bool levels (true when every row has a volume or brightness that h/l steps, so the wheel steps it); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object; its implicitHeight sizes its band above the rows.
 Item {
     id: control
 
@@ -62,6 +62,22 @@ Item {
 
     function move(by) {
         section.selected = Math.max(0, Math.min(rows.length - 1, section.selected + by));
+    }
+
+    // A click on a row selects it and hands its section the Enter its key() handles; the open password line takes only keys.
+    function runRow(index) {
+        if (section.typing)
+            return;
+        section.selected = index;
+        section.key({ key: Qt.Key_Return, modifiers: 0, text: "" });
+    }
+
+    // A wheel turn over a level row selects it and takes the h or l step its key() handles.
+    function turnRow(index, angle) {
+        const dir = Lib.wheelDir(angle);        if (!section.levels || section.typing || dir === 0)
+            return;
+        section.selected = index;
+        section.key({ key: dir > 0 ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
     }
 
     // An item's box in window coordinates.
@@ -182,6 +198,10 @@ Item {
                             font.pixelSize: 13
                             font.weight: on ? Font.Medium : Font.Normal
                         }
+                        Root.Click {
+                            name: "control-tab:" + Lib.SECTIONS[index]
+                            onTapped: control.current = index
+                        }
                     }
                 }
             }
@@ -264,6 +284,19 @@ Item {
                         implicitHeight: row.implicitHeight + 22
                         radius: look.cursor.radius
                         color: on ? look.cursor.fill : "transparent"
+
+                        // Under the click area, which takes no wheel; off for a section with no level rows, so the turn passes through.
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.NoButton
+                            enabled: control.section.levels === true
+                            onWheel: event => control.turnRow(index, event.angleDelta.y)
+                        }
+
+                        Root.Click {
+                            name: "control-row:" + index
+                            onTapped: control.runRow(index)
+                        }
 
                         RowLayout {
                             id: row

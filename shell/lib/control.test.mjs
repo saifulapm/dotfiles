@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SECTIONS, cycle, stepVolume, audioRow } from './control.mjs';
+import { SECTIONS, cycle, stepVolume, wheelDir, audioRow } from './control.mjs';
 
 test('the six sections, in Tab order', () => {
   assert.deepEqual(SECTIONS, ['audio', 'wifi', 'bluetooth', 'power', 'display', 'route']);
@@ -26,6 +26,13 @@ test('volume clamps to 0 and 100 %, with no boost', () => {
   assert.equal(stepVolume(0.98, 1), 1);
   assert.equal(stepVolume(1.2, 1), 1);
   assert.equal(stepVolume(0.03, -1), 0);
+});
+
+test('a wheel notch up is one l step, a notch down one h step, and a zero angle none', () => {
+  assert.equal(wheelDir(120), 1);
+  assert.equal(wheelDir(-120), -1);
+  assert.equal(wheelDir(15), 1);
+  assert.equal(wheelDir(0), 0);
 });
 
 test('a row names the device and reads its kind, volume and default', () => {

@@ -10,6 +10,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property bool levels: true
     readonly property var look: V.listLook(theme.tokens)
     property var panels: []
     // Read once, when Control first opens, not when the warm-up makes it.

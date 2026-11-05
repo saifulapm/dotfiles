@@ -12,6 +12,7 @@ Item {
 
     required property var theme
     property int selected: 0
+    readonly property bool levels: true
     readonly property var look: V.listLook(theme.tokens)
 
     readonly property var all: Pipewire.nodes.values.filter(n => n.audio && !n.isStream)

@@ -13,6 +13,11 @@ export function stepVolume(volume, dir) {
   return Math.max(0, Math.min(100, pct)) / 100;
 }
 
+// A wheel event's step on a level row: a notch up (positive angle) is the l key, a notch down the h key.
+export function wheelDir(angle) {
+  return Math.sign(angle);
+}
+
 export function audioRow(node) {
   const parts = [node.isSink ? 'Output' : 'Input', node.muted ? 'muted' : Math.round(node.volume * 100) + '%'];
   if (node.isDefault) parts.push('default');
