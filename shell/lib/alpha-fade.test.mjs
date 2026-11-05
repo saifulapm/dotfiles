@@ -7,7 +7,7 @@ import { join } from 'node:path';
 const shell = new URL('..', import.meta.url).pathname;
 const FADING = /\b(pose|progress|fade)/i;
 
-// The second argument of each Qt.alpha( call in a line, read to its own closing bracket, so a first argument holding commas or calls is skipped whole.
+// The second argument of each Qt.alpha( call in a line, read to its own closing parenthesis, so a first argument holding commas or calls is skipped whole.
 function alphaArgs(line) {
   const found = [];
   for (let at = line.indexOf('Qt.alpha('); at !== -1; at = line.indexOf('Qt.alpha(', at + 1)) {

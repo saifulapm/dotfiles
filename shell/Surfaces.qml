@@ -201,10 +201,6 @@ PanelWindow {
         id: noInput
     }
 
-    // niri blurs only the region the drawing surface asks for, so the rest of this full-output layer stays clear; closeOthers keeps one drawing.
-    readonly property var blurRegion: all.find(s => s?.blurRegion)?.blurRegion ?? null
-    BackgroundEffect.blurRegion: blurRegion
-
     // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed, and Esc or Enter closes the overview on the window it shows focused.
     Item {
         id: overviewKeys

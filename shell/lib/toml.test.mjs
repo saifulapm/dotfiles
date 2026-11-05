@@ -11,7 +11,7 @@ name = "paper"   # trailing comment
 [niri]
 gaps = 24
 scale = 1.25
-blur = false
+shadow = false
 [color]
 ansi = [
   "#000000", "#ffffff",
@@ -20,7 +20,7 @@ ansi = [
   assert.deepEqual(doc, {
     top: 'x',
     meta: { name: 'paper' },
-    niri: { gaps: 24, scale: 1.25, blur: false },
+    niri: { gaps: 24, scale: 1.25, shadow: false },
     color: { ansi: ['#000000', '#ffffff'] },
   });
 });

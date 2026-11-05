@@ -150,11 +150,6 @@ ShellRoot {
     Root.Ipc {
         target: "shell"
 
-        // How many regions each shell window asks niri to blur behind it.
-        function blur(): string {
-            return JSON.stringify({ surfaces: surfacesLoader.item?.blurRegion ? 1 : 0 });
-        }
-
         function status(): string {
             procStatus.reload();
             return Status.statusJson({

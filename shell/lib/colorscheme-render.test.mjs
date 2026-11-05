@@ -52,7 +52,7 @@ test('themes.json lists every valid scheme, artboard first, and skips a broken o
 
 test('an unknown name exits 1 with no such colorscheme and writes nothing', (t) => {
   const state = scratch(t);
-  for (const name of ['nope', 'frost', '../themes/paper']) {
+  for (const name of ['nope', 'blueprint', '../colorschemes/artboard']) {
     const r = spawnSync('node', [cli, name], { env: { ...process.env, XDG_STATE_HOME: state }, encoding: 'utf8' });
     assert.equal(r.status, 1, name);
     assert.equal(r.stderr, `colorscheme ${name}: no such colorscheme\n`);
@@ -90,7 +90,7 @@ const saved = (t, content) => {
 };
 
 test('--saved turns an old theme name into artboard and saves it', (t) => {
-  const { r, shell, file } = saved(t, 'frost\n');
+  const { r, shell, file } = saved(t, 'blueprint\n');
   assert.equal(r.status, 0, r.stderr);
   assert.equal(file, 'artboard\n');
   assert.equal(shell.name, 'artboard');
