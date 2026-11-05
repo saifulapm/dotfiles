@@ -6,7 +6,7 @@ import "." as Root
 import "lib/voice.mjs" as L
 import "lib/picker.mjs" as P
 
-// The file picker any app's open dialog gets, drawn by the shell for bin/dots-portal: places, the folder's rows and a key strip in each theme's voice; it loads on a request and unloads 30 s after it closes.
+// The file picker any app's open dialog gets, drawn by the shell for bin/dots-portal: places, the folder's rows and a key strip; it loads on a request and unloads 30 s after it closes.
 Item {
     id: picker
 
@@ -92,22 +92,14 @@ Item {
             height: 0
         })
     property bool sizeStale: false
-    readonly property var meta: previewing ? P.previewText(voice, cursorRow, dims.path === cursorPath ? dims.width : 0, dims.height) : null
+    readonly property var meta: previewing ? P.previewText(cursorRow, dims.path === cursorPath ? dims.width : 0, dims.height) : null
     onCursorPathChanged: measure()
     readonly property bool busy: request !== null || lister.running
 
     readonly property string home: Quickshell.env("HOME")
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the picker draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
-    readonly property var engraving: L.engraving(theme.tokens)
-    readonly property string voice: look.voice
-    readonly property bool caps: voice === "caps"
-    readonly property bool plain: voice === "plain"
-    readonly property bool bracket: voice === "bracket"
-    readonly property bool engraved: look.engraved === true
     readonly property string appText: P.oneLine(P.appName(apps, seen?.app ?? ""))
     readonly property var places: [
         { path: home, label: "Home" },
@@ -442,7 +434,6 @@ Item {
             match: matchLabel.text,
             chip: chipLabel.visible ? chipLabel.text : "",
             heads: [nameHead.text, sizeHead.text, dateHead.text],
-            pathLead: pathLeadLabel.visible ? pathLeadLabel.text : "",
             cardSize: [card.width, card.height],
             boxes: {
                 heading: box(headingLabel),
@@ -461,11 +452,10 @@ Item {
             previewShown: previewName.visible,
             preview: preview,
             previewName: previewName.text,
-            previewHead: previewHeadRow.visible ? headLabel.text + " " + kindLabel.text : "",
             previewBadge: badgeBox.visible ? badgeLabel.text : "",
             previewNameFont: [previewName.font.family, previewName.font.pixelSize],
             previewLines: lines,
-            previewDims: lines.length > 0 && lines[0].value.indexOf(" × ") > 0 ? lines[0].value : "",
+            previewDims: lines.length > 0 && lines[0].indexOf(" × ") > 0 ? lines[0] : "",
             foot: footLabel.visible ? footLabel.text : "",
             hint: (noticeLabel.visible ? [noticeLabel.text] : []).concat(keys).join(" · "),
             busy: busy,            openMs: openMs,
@@ -473,7 +463,6 @@ Item {
             settled: motion.settled,
             drawing: picker.visible,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             frameLabel: card.frameLabel(),
             keyboard: picker.Window.active
         });
@@ -680,7 +669,7 @@ Item {
             anchors.fill: parent
             spacing: 0
 
-            // The heading in the launcher's label idiom: Paper's ink chip, Artboard's pill, Blueprint's header line.
+            // The heading on the label's pill.
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: 18
@@ -690,11 +679,10 @@ Item {
                 spacing: 12
 
                 Rectangle {
-                    readonly property bool boxed: look.label.kind !== "header"
-                    implicitWidth: headingLabel.width + (boxed ? 16 : 0)
-                    implicitHeight: headingLabel.implicitHeight + (boxed ? 6 : 0)
-                    radius: look.label.kind === "pill" ? 8 : 0
-                    color: boxed ? look.label.fill : "transparent"
+                    implicitWidth: headingLabel.width + 16
+                    implicitHeight: headingLabel.implicitHeight + 6
+                    radius: 8
+                    color: look.label.fill
 
                     Text {
                         id: headingLabel
@@ -702,24 +690,23 @@ Item {
                         // Under half the card, so a 200-character app name elides and the query and its chips stay inside.
                         width: Math.min(implicitWidth, Math.round(card.width * 0.45) - 16)
                         textFormat: Text.PlainText
-                        text: P.headingText(picker.voice, picker.appText, picker.mode, picker.multiple, picker.look.engraved)
+                        text: P.headingText(picker.appText, picker.mode, picker.multiple)
                         maximumLineCount: 1
                         elide: Text.ElideRight
-                        color: look.label.kind === "header" ? look.small.color : look.label.color
-                        font.family: look.label.kind === "header" ? look.small.font : fonts.ui
-                        font.pixelSize: look.label.kind === "pill" ? 12 : 11
-                        font.weight: look.label.kind === "pill" ? Font.Medium : Font.Normal
-                        font.letterSpacing: plain ? 0 : 1.4
+                        color: look.label.color
+                        font.family: fonts.ui
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
                     }
                 }
 
-                // ctrl+l turns the query into the path, with a focus ring, as every theme board draws it.
+                // ctrl+l turns the query into the path, with a focus ring.
                 Text {
                     id: promptLabel
                     visible: text !== ""
                     textFormat: Text.PlainText
-                    text: picker.typingPath ? (bracket ? "> PATH" : plain ? "path" : "PATH") : picker.saving ? (bracket ? "> NAME" : plain ? "Name" : "NAME") : bracket ? ">" : ""
-                    color: bracket ? c.accent : look.small.color
+                    text: picker.typingPath ? "path" : picker.saving ? "Name" : ""
+                    color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
                     font.letterSpacing: look.small.spacing
@@ -727,7 +714,7 @@ Item {
                 Rectangle {
                     Layout.fillWidth: true
                     implicitHeight: typedLabel.implicitHeight + 8
-                    radius: plain ? 6 : 0
+                    radius: 6
                     color: "transparent"
                     border.width: picker.typingPath || picker.saving ? 2 : 0
                     border.color: c.accent
@@ -743,7 +730,7 @@ Item {
                         maximumLineCount: 1
                         elide: Text.ElideLeft
                         color: c.ink
-                        font.family: picker.typingPath || bracket ? fonts.mono : fonts.ui
+                        font.family: picker.typingPath ? fonts.mono : fonts.ui
                         font.pixelSize: picker.typingPath || picker.saving ? 15 : 20
                     }
                 }
@@ -751,7 +738,7 @@ Item {
                     id: matchLabel
                     visible: text !== ""
                     textFormat: Text.PlainText
-                    text: picker.typingPath ? P.matchText(picker.voice, "path", picker.choices.length, "") : picker.matches.length > 0 ? P.matchText(picker.voice, "places", picker.matches.length, P.oneLine(picker.allPlaces[picker.matches[0].index].label)) : ""
+                    text: picker.typingPath ? P.matchText("path", picker.choices.length, "") : picker.matches.length > 0 ? P.matchText("places", picker.matches.length, P.oneLine(picker.allPlaces[picker.matches[0].index].label)) : ""
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -761,7 +748,7 @@ Item {
                     id: chipLabel
                     visible: text !== ""
                     textFormat: Text.PlainText
-                    text: P.chipText(picker.voice, picker.mode, picker.marked.length)
+                    text: P.chipText(picker.mode, picker.marked.length)
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -780,17 +767,6 @@ Item {
                 Layout.bottomMargin: 10
                 spacing: 10
 
-                // Blueprint names the folder; Paper's save card says it saves in it.
-                Text {
-                    id: pathLeadLabel
-                    visible: text !== ""
-                    textFormat: Text.PlainText
-                    text: bracket ? "> FOLDER" : caps && picker.saving ? "SAVE IN" : ""
-                    color: bracket ? c.accent : look.small.color
-                    font.family: bracket ? fonts.mono : look.small.font
-                    font.pixelSize: bracket ? 12 : look.small.size + 1
-                    font.letterSpacing: bracket ? 1.4 : look.small.spacing
-                }
                 Text {
                     id: pathLabel
                     Layout.fillWidth: true
@@ -805,7 +781,7 @@ Item {
                 Text {
                     id: countLabel
                     textFormat: Text.PlainText
-                    text: picker.typingPath && plain ? "typing a path" : P.countText(picker.voice, picker.rows.length, picker.filterName, picker.hidden, picker.mode)
+                    text: picker.typingPath ? "typing a path" : P.countText(picker.rows.length, picker.filterName, picker.hidden, picker.mode)
                     color: look.small.color
                     font.family: look.small.font
                     font.pixelSize: look.small.size + 1
@@ -842,10 +818,9 @@ Item {
                             readonly property bool atCursor: picker.side === "places" && picker.placeAt === index
                             readonly property bool lit: hit !== null || (here && picker.matches.length === 0)
                             function drawn() {
-                                return (numberText.visible ? numberText.text + " " : "") + labelText.drawn();
+                                return labelText.drawn();
                             }
-                            // Blueprint's caps are for its own places; a pin is a folder name and keeps its case.
-                            readonly property string label: bracket && index < picker.places.length ? P.oneLine(modelData.label).toUpperCase() : P.oneLine(modelData.label)
+                            readonly property string label: P.oneLine(modelData.label)
                             readonly property int marks: hit ? hit.length : 0
                             width: 184
 
@@ -855,7 +830,7 @@ Item {
                                 bottomPadding: 6
                                 leftPadding: 10
                                 textFormat: Text.PlainText
-                                text: placeItem.index === 0 ? (plain ? "Places" : "PLACES") : (plain ? "Pins" : "PINS  " + picker.pins.length)
+                                text: placeItem.index === 0 ? "Places" : "Pins"
                                 color: look.small.color
                                 font.family: look.small.font
                                 font.pixelSize: look.small.size
@@ -865,8 +840,8 @@ Item {
                             Rectangle {
                                 width: parent.width
                                 height: 32
-                                radius: plain ? 8 : look.cursor.radius
-                                color: placeItem.atCursor ? look.cursor.fill : placeItem.here && plain ? look.tile.fill : "transparent"
+                                radius: 8
+                                color: placeItem.atCursor ? look.cursor.fill : placeItem.here ? look.tile.fill : "transparent"
 
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter
@@ -874,22 +849,13 @@ Item {
                                     width: parent.width - 20
                                     spacing: 10
 
-                                    Text {
-                                        id: numberText
-                                        visible: bracket
-                                        textFormat: Text.PlainText
-                                        text: placeItem.here ? "▸" : look.number(placeItem.index)
-                                        color: placeItem.here ? c.accent : c.muted
-                                        font.family: fonts.mono
-                                        font.pixelSize: 13
-                                    }
                                     Marked {
                                         id: labelText
-                                        width: parent.width - (numberText.visible ? numberText.width + 10 : 0)
+                                        width: parent.width
                                         mark: placeItem.label.slice(0, placeItem.marks)
                                         rest: placeItem.label.slice(placeItem.marks)
-                                        tint: placeItem.atCursor ? look.cursor.text : placeItem.lit ? (bracket ? c.accent : c.ink) : c.muted
-                                        family: bracket ? fonts.mono : fonts.ui
+                                        tint: placeItem.atCursor ? look.cursor.text : placeItem.lit ? c.ink : c.muted
+                                        family: fonts.ui
                                         weight: placeItem.here ? Font.Medium : Font.Normal
                                     }
                                 }
@@ -919,26 +885,26 @@ Item {
                         spacing: 12
 
                         Item {
-                            implicitWidth: bracket && picker.multiple ? 28 : 16
+                            implicitWidth: 16
                         }
-                        // Artboard arrows the column the rows sort by: names A to Z, the largest and the newest first.
+                        // The column the rows sort by is arrowed: names A to Z, the largest and the newest first.
                         Head {
                             id: nameHead
                             Layout.fillWidth: true
-                            text: plain ? (picker.sort === "name" ? "Name ↑" : "Name") : "NAME"
+                            text: picker.sort === "name" ? "Name ↑" : "Name"
                         }
                         // A folder request lists folders, so the column counts their items.
                         Head {
                             id: sizeHead
                             Layout.preferredWidth: 90
                             horizontalAlignment: Text.AlignRight
-                            text: picker.choosingFolder ? (plain ? "Items" : "ITEMS") : plain ? (picker.sort === "size" ? "Size ↓" : "Size") : "SIZE"
+                            text: picker.choosingFolder ? "Items" : picker.sort === "size" ? "Size ↓" : "Size"
                         }
                         Head {
                             id: dateHead
                             Layout.preferredWidth: 130
                             horizontalAlignment: Text.AlignRight
-                            text: plain ? (picker.sort === "modified" ? "Modified ↓" : "Modified") : "MODIFIED"
+                            text: picker.sort === "modified" ? "Modified ↓" : "Modified"
                         }
                     }
 
@@ -961,8 +927,6 @@ Item {
                             required property int index
                             readonly property bool isCurrent: index === picker.selected
                             readonly property bool isMarked: !modelData.dir && picker.marked.indexOf(modelData.name) >= 0
-                            // Blueprint's several-files list draws an empty [ ] on each file not marked.
-                            readonly property bool boxed: bracket && !engraved && picker.multiple && !modelData.dir && !isMarked
                             readonly property color ink: isCurrent ? look.cursor.text : c.ink
                             readonly property color dim: isCurrent ? look.cursor.detail : c.muted
                             // The row as drawn, for the state function.
@@ -973,7 +937,7 @@ Item {
                                     size: sizeLabel.text,
                                     tag: tagLabel.visible ? tagLabel.text : "",
                                     marked: markLabel.visible,
-                                    mark: markLabel.visible ? markLabel.text : boxLabel.visible ? boxLabel.text : "",
+                                    mark: markLabel.visible ? markLabel.text : "",
                                     // The name's colour and the one under it: the row's fill, or the card's where the row draws none.
                                     ink: String(nameText.color),
                                     behind: rowItem.color.a > 0 ? String(rowItem.color) : String(card.style.fill),
@@ -994,9 +958,9 @@ Item {
                                 anchors.rightMargin: 12
                                 spacing: 12
 
-                                // Paper and Blueprint mark the cursor row; Artboard draws a folder or a page; a marked file shows a tick instead, Blueprint an [x].
+                                // A folder or a page; a marked file shows a tick instead.
                                 Item {
-                                    implicitWidth: bracket && picker.multiple ? 28 : 16
+                                    implicitWidth: 16
                                     implicitHeight: 16
 
                                     Text {
@@ -1004,34 +968,14 @@ Item {
                                         visible: rowItem.isMarked
                                         anchors.centerIn: parent
                                         textFormat: Text.PlainText
-                                        text: bracket && !engraved ? "[x]" : "✓"
-                                        color: rowItem.isCurrent ? look.cursor.text : bracket ? c.muted : c.ink
-                                        font.family: bracket ? fonts.mono : fonts.ui
-                                        font.pixelSize: 14
-                                        font.bold: !bracket || rowItem.isCurrent
-                                    }
-                                    Text {
-                                        id: boxLabel
-                                        visible: rowItem.boxed
-                                        anchors.centerIn: parent
-                                        textFormat: Text.PlainText
-                                        text: "[ ]"
-                                        color: rowItem.isCurrent ? look.cursor.text : c.muted
-                                        font.family: fonts.mono
-                                        font.pixelSize: 14
-                                        font.bold: rowItem.isCurrent
-                                    }
-                                    Text {
-                                        visible: !plain && !rowItem.isMarked && !rowItem.boxed
-                                        anchors.centerIn: parent
-                                        textFormat: Text.PlainText
-                                        text: "▸"
-                                        color: rowItem.isCurrent ? look.cursor.marker === "transparent" ? look.cursor.text : look.cursor.marker : "transparent"
+                                        text: "✓"
+                                        color: rowItem.isCurrent ? look.cursor.text : c.ink
                                         font.family: fonts.ui
                                         font.pixelSize: 14
+                                        font.bold: true
                                     }
                                     Rectangle {
-                                        visible: plain && !rowItem.isMarked
+                                        visible: !rowItem.isMarked
                                         anchors.centerIn: parent
                                         width: rowItem.modelData.dir ? 14 : 11
                                         height: rowItem.modelData.dir ? 10 : 13
@@ -1049,7 +993,7 @@ Item {
                                     maximumLineCount: 1
                                     elide: Text.ElideRight
                                     color: rowItem.ink
-                                    font.family: bracket ? fonts.mono : fonts.ui
+                                    font.family: fonts.ui
                                     font.pixelSize: 14
                                     font.weight: rowItem.modelData.dir || rowItem.isCurrent ? Font.Medium : Font.Normal
                                 }
@@ -1058,7 +1002,7 @@ Item {
                                     id: tagLabel
                                     visible: picker.saving && !rowItem.modelData.dir && rowItem.modelData.name === picker.saveName
                                     textFormat: Text.PlainText
-                                    text: plain ? "· exists" : "EXISTS"
+                                    text: "· exists"
                                     color: rowItem.isCurrent ? look.cursor.text : c.danger
                                     font.family: look.small.font
                                     font.pixelSize: look.small.size
@@ -1079,7 +1023,7 @@ Item {
                                     Layout.preferredWidth: 130
                                     horizontalAlignment: Text.AlignRight
                                     textFormat: Text.PlainText
-                                    text: P.dateText(picker.voice, rowItem.modelData.mtime, Date.now())
+                                    text: P.dateText(rowItem.modelData.mtime, Date.now())
                                     color: rowItem.dim
                                     font.family: fonts.mono
                                     font.pixelSize: 12
@@ -1113,7 +1057,7 @@ Item {
                                 topPadding: 4
                                 bottomPadding: 6
                                 textFormat: Text.PlainText
-                                text: P.completionHead(picker.voice, picker.choices.length, P.oneLine(picker.tilde(picker.split.parent)), P.oneLine(picker.split.tail))
+                                text: P.completionHead(picker.choices.length, P.oneLine(picker.tilde(picker.split.parent)), P.oneLine(picker.split.tail))
                                 maximumLineCount: 1
                                 elide: Text.ElideMiddle
                                 color: look.small.color
@@ -1131,8 +1075,7 @@ Item {
                                     required property var modelData
                                     required property int index
                                     readonly property bool isCurrent: index === picker.choice
-                                    // Paper lists the whole path with its date, Artboard the name with the path, Blueprint the name with DIR.
-                                    readonly property string lead: picker.caps ? P.oneLine(picker.tilde(picker.split.parent === "/" ? "/" : picker.split.parent + "/")) : ""
+                                    // The name, with the folder's path beside it.
                                     readonly property string name: P.oneLine(modelData.name)
                                     function drawn() {
                                         return {
@@ -1154,9 +1097,8 @@ Item {
                                         Marked {
                                             id: completionName
                                             Layout.fillWidth: true
-                                            lead: completionItem.lead
                                             mark: completionItem.name.slice(0, picker.split.tail.length)
-                                            rest: completionItem.name.slice(picker.split.tail.length) + (picker.plain ? "" : "/")
+                                            rest: completionItem.name.slice(picker.split.tail.length)
                                             tint: completionItem.isCurrent ? look.cursor.text : c.ink
                                             family: fonts.mono
                                             size: 13
@@ -1164,7 +1106,7 @@ Item {
                                         Text {
                                             id: completionDetail
                                             textFormat: Text.PlainText
-                                            text: picker.plain ? P.oneLine(picker.tilde((picker.split.parent === "/" ? "" : picker.split.parent) + "/" + completionItem.modelData.name)) : picker.bracket ? "DIR" : P.dateText(picker.voice, completionItem.modelData.mtime, Date.now())
+                                            text: P.oneLine(picker.tilde((picker.split.parent === "/" ? "" : picker.split.parent) + "/" + completionItem.modelData.name))
                                             Layout.maximumWidth: 280
                                             maximumLineCount: 1
                                             elide: Text.ElideMiddle
@@ -1187,7 +1129,7 @@ Item {
                     color: look.rule.color
                 }
 
-                // The cursor file: its picture when Qt decodes it, its name, then its meta lines in the theme's idiom; hidden while a path is typed, and gone in save mode.
+                // The cursor file: its picture when Qt decodes it, its name, then its meta lines; hidden while a path is typed, and gone in save mode.
                 Item {
                     visible: !picker.saving && !picker.choosingFolder
                     Layout.preferredWidth: 280
@@ -1200,35 +1142,7 @@ Item {
                         width: parent.width - 36
                         spacing: 8
 
-                        // Blueprint heads the pane with PREVIEW and the file's kind.
-                        Item {
-                            id: previewHeadRow
-                            visible: headLabel.text !== ""
-                            width: parent.width
-                            height: headLabel.implicitHeight
-
-                            Text {
-                                id: headLabel
-                                textFormat: Text.PlainText
-                                text: picker.meta?.head ?? ""
-                                color: look.small.color
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                            }
-                            Text {
-                                id: kindLabel
-                                anchors.right: parent.right
-                                textFormat: Text.PlainText
-                                text: picker.meta?.kind ?? ""
-                                color: look.small.color
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                            }
-                        }
-
-                        // Artboard's badge sits on the picture's corner, or alone when Qt draws no picture.
+                        // The badge sits on the picture's corner, or alone when Qt draws no picture.
                         Item {
                             width: parent.width
                             height: picker.preview ? previewImage.height : badgeBox.visible ? badgeBox.height : 0
@@ -1268,7 +1182,7 @@ Item {
                                 }
                             }
                         }
-                        // Paper sets the name in its serif at 24 px, Blueprint in bold mono; the name keeps its case in every theme.
+                        // The name keeps its case.
                         Text {
                             id: previewName
                             width: parent.width
@@ -1277,52 +1191,29 @@ Item {
                             maximumLineCount: 1
                             elide: Text.ElideMiddle
                             color: c.ink
-                            font.family: caps ? fonts.display : bracket ? fonts.mono : fonts.ui
-                            font.pixelSize: caps ? 24 : bracket ? 15 : 14
-                            font.weight: caps ? Font.Normal : bracket ? Font.Bold : Font.Medium
+                            font.family: fonts.ui
+                            font.pixelSize: 14
+                            font.weight: Font.Medium
                         }
-                        // Paper stacks each label over its value, Blueprint sets them on one row, Artboard draws the values alone.
+                        // The values alone, one a line.
                         Repeater {
                             id: metaRepeater
                             model: picker.meta?.lines ?? []
 
-                            Item {
-                                id: metaLine
-                                required property var modelData
+                            Text {
+                                id: metaValue
+                                required property string modelData
                                 function drawn() {
-                                    return {
-                                        label: metaLabel.visible ? metaLabel.text : "",
-                                        value: metaValue.text
-                                    };
+                                    return metaValue.text;
                                 }
-                                width: parent.width
-                                height: caps ? metaLabel.implicitHeight + 3 + metaValue.implicitHeight : Math.max(metaLabel.implicitHeight, metaValue.implicitHeight)
-
-                                Text {
-                                    id: metaLabel
-                                    visible: text !== ""
-                                    anchors.verticalCenter: bracket ? parent.verticalCenter : undefined
-                                    textFormat: Text.PlainText
-                                    text: metaLine.modelData.label
-                                    color: look.small.color
-                                    font.family: look.small.font
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                }
-                                Text {
-                                    id: metaValue
-                                    x: bracket ? parent.width - width : 0
-                                    y: caps ? metaLabel.implicitHeight + 3 : 0
-                                    anchors.verticalCenter: bracket ? parent.verticalCenter : undefined
-                                    width: Math.min(implicitWidth, parent.width)
-                                    textFormat: Text.PlainText
-                                    text: metaLine.modelData.value
-                                    maximumLineCount: 1
-                                    elide: Text.ElideRight
-                                    color: plain ? c.muted : c.ink
-                                    font.family: fonts.mono
-                                    font.pixelSize: caps ? 13 : 12
-                                }
+                                width: Math.min(implicitWidth, parent.width)
+                                textFormat: Text.PlainText
+                                text: modelData
+                                maximumLineCount: 1
+                                elide: Text.ElideRight
+                                color: c.muted
+                                font.family: fonts.mono
+                                font.pixelSize: 12
                             }
                         }
                     }
@@ -1340,7 +1231,7 @@ Item {
                 Layout.rightMargin: 18
                 Layout.topMargin: 12
                 textFormat: Text.PlainText
-                text: P.oneLine(P.footText(picker.voice, picker.mode, picker.marked.length, picker.tilde(picker.folder), picker.engraved))
+                text: P.oneLine(P.footText(picker.mode, picker.marked.length, picker.tilde(picker.folder)))
                 maximumLineCount: 1
                 elide: Text.ElideMiddle
                 color: c.ink
@@ -1356,14 +1247,14 @@ Item {
                 Layout.rightMargin: 18
                 Layout.topMargin: 12
                 Layout.bottomMargin: 12
-                spacing: plain ? 8 : 16
+                spacing: 8
 
                 // The replace question or a refusal, in the error colour, in place of the strip.
                 Text {
                     id: noticeLabel
                     visible: picker.notice !== ""
                     textFormat: Text.PlainText
-                    text: P.oneLine(P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).say)
+                    text: P.oneLine(P.saveNotice(picker.notice, picker.saveName).say)
                     color: c.danger
                     font.family: look.small.font
                     font.pixelSize: look.small.size
@@ -1373,22 +1264,22 @@ Item {
 
                 Repeater {
                     id: keyRepeater
-                    model: picker.notice !== "" ? P.saveNotice(picker.voice, picker.notice, picker.saveName, picker.engraved).keys : picker.typingPath ? P.pathKeys(picker.voice, picker.engraved) : P.pickerKeys(picker.voice, picker.mode, picker.multiple, picker.engraved, picker.sort)
+                    model: picker.notice !== "" ? P.saveNotice(picker.notice, picker.saveName).keys : picker.typingPath ? P.pathKeys() : P.pickerKeys(picker.mode, picker.multiple, picker.sort)
 
                     Rectangle {
                         id: keyPair
                         required property var modelData
                         readonly property string keyLabel: keyText.text
                         readonly property string wordLabel: wordText.text
-                        width: pair.implicitWidth + (plain ? 14 : 0)
-                        height: pair.implicitHeight + (plain ? 6 : 0)
+                        width: pair.implicitWidth + 14
+                        height: pair.implicitHeight + 6
                         radius: 6
                         color: look.chip.fill
 
                         Row {
                             id: pair
                             anchors.centerIn: parent
-                            spacing: plain ? 6 : 5
+                            spacing: 6
 
                             Text {
                                 id: keyText
@@ -1417,23 +1308,16 @@ Item {
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 
     // A name with its matched letters underlined, in three plain texts so a file's name never reads as markup; the end elides.
     component Marked: RowLayout {
         id: markedRow
-        property string lead: ""
         property string mark: ""
         property string rest: ""
         property color tint: c.ink
@@ -1442,20 +1326,10 @@ Item {
         property int weight: Font.Normal
         // As drawn, the underlined letters between <u> and </u>.
         function drawn() {
-            return leadText.text + (markText.text !== "" && markText.font.underline ? "<u>" + markText.text + "</u>" : markText.text) + restText.text;
+            return (markText.text !== "" && markText.font.underline ? "<u>" + markText.text + "</u>" : markText.text) + restText.text;
         }
         spacing: 0
 
-        Text {
-            id: leadText
-            visible: text !== ""
-            textFormat: Text.PlainText
-            text: markedRow.lead
-            color: markedRow.tint
-            font.family: markedRow.family
-            font.pixelSize: markedRow.size
-            font.weight: markedRow.weight
-        }
         Text {
             id: markText
             visible: text !== ""
@@ -1483,8 +1357,6 @@ Item {
 
     component Head: Text {
         textFormat: Text.PlainText
-        style: engraving.on ? Text.Raised : Text.Normal
-        styleColor: engraving.color
         color: look.small.color
         font.family: look.small.font
         font.pixelSize: look.small.size

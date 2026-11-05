@@ -1,5 +1,5 @@
-// What bin/dots-portal and the shell's file picker say to each other, one JSON line each way, and how the picker writes its rows in each theme's voice.
-import { line, mark } from './voice.mjs';
+// What bin/dots-portal and the shell's file picker say to each other, one JSON line each way, and how the picker writes its rows.
+import { line } from './voice.mjs';
 import { pad2 } from './margins.mjs';
 
 const MODES = ['open', 'save', 'folder'];
@@ -71,33 +71,23 @@ export function sizeText(row) {
   return v < 10 ? `${v.toFixed(1)} ${unit}` : `${Math.round(v)} ${unit}`;
 }
 
-// Paper gives today's rows their time, Artboard pads the day, Blueprint writes ISO; another year is named.
-export function dateText(voice, ms, now) {
+// The day is padded; another year is named.
+export function dateText(ms, now) {
   const d = new Date(ms);
-  const n = new Date(now);
-  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  if (voice === 'bracket') return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${time}`;
-  const day = `${voice === 'plain' ? pad2(d.getDate()) : d.getDate()} ${MONTHS[d.getMonth()]}`;
-  if (d.getFullYear() !== n.getFullYear()) return `${day} ${d.getFullYear()}`;
-  const today = d.getMonth() === n.getMonth() && d.getDate() === n.getDate();
-  return voice === 'caps' && today ? `${day} ${time}` : day;
+  const day = `${pad2(d.getDate())} ${MONTHS[d.getMonth()]}`;
+  return d.getFullYear() !== new Date(now).getFullYear() ? `${day} ${d.getFullYear()}` : day;
 }
 
-export function headingText(voice, app, mode, multiple, engraved = false) {
-  const word = mode === 'save' ? 'Save as' : mode === 'folder' ? 'Choose folder' : multiple ? 'Open files' : 'Open file';
-  const head = voice === 'plain' ? word : word.toUpperCase();
-  if (!app) return head;
-  return voice === 'plain' ? `${head} · ${app}` : `${head}${voice === 'bracket' && !engraved ? ' // ' : ' · '}${app.toUpperCase()}`;
+export function headingText(app, mode, multiple) {
+  const head = mode === 'save' ? 'Save as' : mode === 'folder' ? 'Choose folder' : multiple ? 'Open files' : 'Open file';
+  return app ? `${head} · ${app}` : head;
 }
 
-// Artboard spells the keys out; Paper and Blueprint draw ctrl as ⌃ and space as ␣. Paper's several-files strip calls ctrl+space MARK.
-export function pickerKeys(voice, mode, multiple, engraved = false, sort = SORT_FIRST) {
-  const space = multiple && voice === 'caps' ? 'mark' : 'select';
+// The keys spelt out as typed.
+export function pickerKeys(mode, multiple, sort = SORT_FIRST) {
   const sorted = ['ctrl+,', `sort: ${SORT_WORDS[sort]}`];
-  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], sorted, ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], sorted, ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', space], sorted, ['esc', '']];
-  if (voice === 'plain') return pairs.map(([k, w]) => ({ key: k, word: w }));
-  const key = (k) => k.replace('ctrl+space', '⌃␣').replace('ctrl+', '⌃').toUpperCase();
-  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, key(k)) : key(k), word: w.toUpperCase() }));
+  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], sorted, ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], sorted, ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], sorted, ['esc', '']];
+  return pairs.map(([k, w]) => ({ key: k, word: w }));
 }
 
 // Why a name cannot be saved as it is, or "exists" when saving it replaces a file; checked against every entry, as a hidden file is replaced all the same.
@@ -110,15 +100,10 @@ export function saveProblem(name, entries) {
 }
 
 // The line that takes the key strip's place: the replace question with its two keys, or why the name was refused.
-export function saveNotice(voice, tag, name, engraved = false) {
+export function saveNotice(tag, name) {
   const SAY = { exists: `${name} exists`, empty: 'type a name to save as', slash: 'a name cannot hold /', dots: `${name} is not a file name`, folder: `${name} is a folder` };
-  const say = SAY[tag] || '';
   const keys = tag === 'exists' ? [['↵', 'replace'], ['esc', 'keep']] : [];
-  if (voice === 'plain') return { say: say, keys: keys.map(([k, w]) => ({ key: k, word: w })) };
-  // Blueprint's error line is caps after a bang, but the name is the file's own and keeps its case.
-  const lead = tag === 'exists' || tag === 'dots' || tag === 'folder' ? name : '';
-  const text = voice === 'bracket' ? '! ' + lead + say.slice(lead.length).toUpperCase() : say;
-  return { say: text, keys: keys.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, k.toUpperCase()) : k.toUpperCase(), word: w.toUpperCase() })) };
+  return { say: SAY[tag] || '', keys: keys.map(([k, w]) => ({ key: k, word: w })) };
 }
 
 // A name as typed into the save field: controls and bidi marks dropped, spaces kept, so "notes " can grow into "notes 2".
@@ -191,11 +176,9 @@ export function markedPaths(entries, marked, folder) {
 }
 
 // The line above the key strip: how many files ctrl+Enter opens, or the folder it chooses, which is a path and keeps its case.
-export function footText(voice, mode, n, here, engraved = false) {
-  if (mode === 'folder') return voice === 'plain' ? `ctrl+↵ chooses ${here}, the folder you are in` : `THIS FOLDER ${here}`;
-  if (n === 0) return '';
-  if (voice === 'plain') return `${n} selected · ctrl+↵ open all`;
-  return `${n} SELECTED · ${voice === 'bracket' ? mark(engraved, '⌃↵') : '⌃↵'} OPEN ALL`;
+export function footText(mode, n, here) {
+  if (mode === 'folder') return `ctrl+↵ chooses ${here}, the folder you are in`;
+  return n === 0 ? '' : `${n} selected · ctrl+↵ open all`;
 }
 
 // "~/Codes/la" is the folder ~/Codes to list and "la" begun in it; a path without / or ~ starts at the folder shown.
@@ -217,37 +200,25 @@ export function completions(entries, tail) {
 const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 // Beside the query: how many places it matched, or how many folders the typed path completes to.
-export function matchText(voice, kind, n, label) {
-  if (kind === 'path') return voice === 'plain' ? '' : counted(n, 'MATCH', 'MATCHES');
-  if (voice === 'plain') return n === 1 ? `→ ${label}` : counted(n, 'place', 'places');
-  return counted(n, 'PLACE', 'PLACES');
+export function matchText(kind, n, label) {
+  if (kind === 'path') return '';
+  return n === 1 ? `→ ${label}` : counted(n, 'place', 'places');
 }
 
 // A folder request counts the folders and says files are hidden; a save counts what the folder holds, as the save boards draw it.
-export function countText(voice, n, filterName, hidden, mode) {
+export function countText(n, filterName, hidden, mode) {
   const parts = mode === 'folder' ? [counted(n, 'folder', 'folders'), 'files hidden'] : mode === 'save' ? [counted(n, 'item', 'items')] : [counted(n, 'item', 'items')].concat(filterName ? [filterName] : [], [hidden ? 'hidden on' : 'hidden off']);
-  const text = parts.join(' · ');
-  return voice === 'plain' ? text : text.toUpperCase();
+  return parts.join(' · ');
 }
 
 // Beside the query: how many files are marked, or that a folder request lists folders only.
-export function chipText(voice, mode, marked) {
-  const text = mode === 'folder' ? 'folders only' : marked > 0 ? `${marked} marked` : '';
-  return voice === 'plain' ? text : text.toUpperCase();
-}
+export const chipText = (mode, marked) => (mode === 'folder' ? 'folders only' : marked > 0 ? `${marked} marked` : '');
 
 // Above the completions; the folder is a path, so it keeps its case.
-export function completionHead(voice, n, parent, tail) {
-  if (voice === 'plain') return `${counted(n, 'folder', 'folders')} in ${parent} ${n === 1 ? 'starts' : 'start'} with ${tail}`;
-  return voice === 'bracket' ? `COMPLETING IN ${parent}` : 'FOLDERS';
-}
+export const completionHead = (n, parent, tail) => `${counted(n, 'folder', 'folders')} in ${parent} ${n === 1 ? 'starts' : 'start'} with ${tail}`;
 
-// Artboard's strip leads with tab and calls the way back the filter; Paper and Blueprint lead with ↵.
-export function pathKeys(voice, engraved = false) {
-  if (voice === 'plain') return [['tab', 'complete'], ['↵', 'go'], ['ctrl+l', 'filter'], ['esc', '']].map(([k, w]) => ({ key: k, word: w }));
-  const pairs = [['↵', 'GO'], ['TAB', 'COMPLETE'], ['⌃L', 'BACK TO LIST'], ['ESC', '']];
-  return pairs.map(([k, w]) => ({ key: voice === 'bracket' ? mark(engraved, k) : k, word: w }));
-}
+// The path strip leads with tab and calls the way back the filter.
+export const pathKeys = () => [['tab', 'complete'], ['↵', 'go'], ['ctrl+l', 'filter'], ['esc', '']].map(([k, w]) => ({ key: k, word: w }));
 
 // Prints one JSON array of a folder's entries: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters. A name that is not UTF-8 would stop the print, so it shows with U+FFFD and is marked undecodable; a dangling link lists as itself, so a save over it still asks.
 export const LIST_SCRIPT = [
@@ -312,23 +283,14 @@ export const SIZE_SCRIPT = [
   '',
 ].join('\n');
 
-// The cursor file's meta lines: the size read from its header when there is one, the file's size, its date. Paper and Blueprint label each line, Blueprint heads the pane with the file's kind, Artboard badges the extension.
-export function previewText(voice, row, width, height) {
+// The cursor file's meta lines: the size read from its header when there is one, the file's size, its date; the extension is a badge.
+export function previewText(row, width, height) {
   const ext = row.name.indexOf('.') > 0 ? row.name.slice(row.name.lastIndexOf('.') + 1).toUpperCase() : '';
-  const image = String(row.mime || '').indexOf('image/') === 0;
-  const lines = (width > 0 ? [['DIMENSIONS', `${width} × ${height}${voice === 'plain' ? ' px' : ''}`]] : []).concat([['SIZE', sizeText(row)], ['MODIFIED', stampText(voice, row.mtime)]]);
-  return {
-    head: voice === 'bracket' ? 'PREVIEW' : '',
-    kind: voice === 'bracket' ? (image ? 'IMAGE' : 'FILE') : '',
-    badge: voice === 'plain' ? ext : '',
-    lines: lines.map(([label, value]) => ({ label: voice === 'plain' ? '' : label, value: value })),
-  };
+  return { badge: ext, lines: (width > 0 ? [`${width} × ${height} px`] : []).concat([sizeText(row), stampText(row.mtime)]) };
 }
 
-// The preview's full date: Paper's dot, Artboard's comma, Blueprint's ISO.
-export function stampText(voice, ms) {
+// The preview's full date, a comma before the time.
+export function stampText(ms) {
   const d = new Date(ms);
-  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  if (voice === 'bracket') return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${time}`;
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}${voice === 'plain' ? ',' : ' ·'} ${time}`;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }

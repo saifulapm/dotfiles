@@ -61,67 +61,45 @@ test('sizes read as the boards write them, and a folder counts its items', () =>
   assert.equal(sizeText({ dir: true, count: 1 }), '1 item');
 });
 
-test('a modified date in each voice: Paper times today only, Artboard pads the day, Blueprint is ISO', () => {
+test('a modified date pads the day, and names the year only when it is another', () => {
   const now = new Date(2026, 9, 18, 15, 12).getTime();
   const today = new Date(2026, 9, 18, 14, 7).getTime();
   const earlier = new Date(2026, 9, 9, 11, 20).getTime();
   const lastYear = new Date(2025, 1, 2, 8, 5).getTime();
-  assert.equal(dateText('caps', today, now), '18 Oct 14:07');
-  assert.equal(dateText('caps', earlier, now), '9 Oct');
-  assert.equal(dateText('caps', lastYear, now), '2 Feb 2025');
-  assert.equal(dateText('plain', earlier, now), '09 Oct');
-  assert.equal(dateText('plain', today, now), '18 Oct');
-  assert.equal(dateText('plain', lastYear, now), '02 Feb 2025');
-  assert.equal(dateText('bracket', earlier, now), '2026-10-09 11:20');
+  assert.equal(dateText(earlier, now), '09 Oct');
+  assert.equal(dateText(today, now), '18 Oct');
+  assert.equal(dateText(lastYear, now), '02 Feb 2025');
 });
 
-test('the heading names the app in each voice, and stands alone without one', () => {
-  assert.equal(headingText('caps', 'Chromium'), 'OPEN FILE · CHROMIUM');
-  assert.equal(headingText('plain', 'Chromium'), 'Open file · Chromium');
-  assert.equal(headingText('bracket', 'Chromium'), 'OPEN FILE // CHROMIUM');
-  // Hi-Fi's engraved voice parts the words with its dot.
-  assert.equal(headingText('bracket', 'Chromium', 'open', false, true), 'OPEN FILE · CHROMIUM');
-  assert.equal(headingText('caps', ''), 'OPEN FILE');
-  assert.equal(headingText('plain', ''), 'Open file');
-  assert.equal(headingText('bracket', ''), 'OPEN FILE');
+test('the heading names the app, and stands alone without one', () => {
+  assert.equal(headingText('Chromium'), 'Open file · Chromium');
+  assert.equal(headingText(''), 'Open file');
 });
 
-test('a save request heads the card Save as, in each voice', () => {
-  assert.equal(headingText('caps', 'kak', 'save'), 'SAVE AS · KAK');
-  assert.equal(headingText('plain', 'kak', 'save'), 'Save as · kak');
-  assert.equal(headingText('bracket', 'kak', 'save'), 'SAVE AS // KAK');
-  assert.equal(headingText('plain', '', 'save'), 'Save as');
+test('a save request heads the card Save as', () => {
+  assert.equal(headingText('kak', 'save'), 'Save as · kak');
+  assert.equal(headingText('', 'save'), 'Save as');
 });
 
-test('the key strip in each voice', () => {
-  const strip = (v) => pickerKeys(v).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
-  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ SELECT · ⌃, SORT: DATE · ESC');
-  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: DATE · [ESC]');
+const strip = (keys) => keys.map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
+
+test('the key strip spells each key out', () => {
+  assert.equal(strip(pickerKeys()), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
 });
 
-test("a several-files strip marks in Paper's words, and selects in Artboard's and Blueprint's", () => {
-  const strip = (v) => pickerKeys(v, 'open', true).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('caps'), '↵ OPEN · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃␣ MARK · ⌃, SORT: DATE · ESC');
-  assert.equal(strip('plain'), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
-  assert.equal(strip('bracket'), '[↵] OPEN · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃␣] SELECT · [⌃,] SORT: DATE · [ESC]');
+test('a several-files strip selects with ctrl+space', () => {
+  assert.equal(strip(pickerKeys('open', true)), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
 });
 
 test('the heading chip counts the marked files, or says a folder request lists folders only', () => {
-  assert.equal(chipText('plain', 'open', 3), '3 marked');
-  assert.equal(chipText('caps', 'open', 1), '1 MARKED');
-  assert.equal(chipText('bracket', 'open', 2), '2 MARKED');
-  assert.equal(chipText('caps', 'open', 0), '');
-  assert.equal(chipText('plain', 'folder', 0), 'folders only');
-  assert.equal(chipText('bracket', 'folder', 0), 'FOLDERS ONLY');
-  assert.equal(chipText('caps', 'save', 0), '');
+  assert.equal(chipText('open', 3), '3 marked');
+  assert.equal(chipText('open', 0), '');
+  assert.equal(chipText('folder', 0), 'folders only');
+  assert.equal(chipText('save', 0), '');
 });
 
 test('the save strip saves and selects nothing', () => {
-  const strip = (v) => pickerKeys(v, 'save').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ save · tab places · ctrl+l path · ctrl+h hidden · ctrl+, sort: date · esc');
-  assert.equal(strip('caps'), '↵ SAVE · TAB PLACES · ⌃L PATH · ⌃H HIDDEN · ⌃, SORT: DATE · ESC');
-  assert.equal(strip('bracket'), '[↵] SAVE · [TAB] PLACES · [⌃L] PATH · [⌃H] HIDDEN · [⌃,] SORT: DATE · [ESC]');
+  assert.equal(strip(pickerKeys('save')), '↵ save · tab places · ctrl+l path · ctrl+h hidden · ctrl+, sort: date · esc');
 });
 
 test('a name to save is refused when empty, a path, a dot name or a folder, and asked about when it exists', () => {
@@ -136,18 +114,16 @@ test('a name to save is refused when empty, a path, a dot name or a folder, and 
   assert.equal(saveProblem('drafts', entries), 'folder');
 });
 
-test('the save notice replaces the strip in the error voice; the name keeps its case', () => {
-  const said = (v, tag, name) => {
-    const n = saveNotice(v, tag, name);
+test('the save notice replaces the strip; the name keeps its case', () => {
+  const said = (tag, name) => {
+    const n = saveNotice(tag, name);
     return [n.say].concat(n.keys.map((k) => (k.key + ' ' + k.word).trim())).join(' · ');
   };
-  assert.equal(said('plain', 'exists', 'report.pdf'), 'report.pdf exists · ↵ replace · esc keep');
-  assert.equal(said('caps', 'exists', 'report.pdf'), 'report.pdf exists · ↵ REPLACE · ESC KEEP');
-  assert.equal(said('bracket', 'exists', 'Report.pdf'), '! Report.pdf EXISTS · [↵] REPLACE · [ESC] KEEP');
-  assert.equal(said('plain', 'empty', ''), 'type a name to save as');
-  assert.equal(said('plain', 'slash', 'a/b'), 'a name cannot hold /');
-  assert.equal(said('caps', 'dots', '..'), '.. is not a file name');
-  assert.equal(said('bracket', 'folder', 'drafts'), '! drafts IS A FOLDER');
+  assert.equal(said('exists', 'Report.pdf'), 'Report.pdf exists · ↵ replace · esc keep');
+  assert.equal(said('empty', ''), 'type a name to save as');
+  assert.equal(said('slash', 'a/b'), 'a name cannot hold /');
+  assert.equal(said('dots', '..'), '.. is not a file name');
+  assert.equal(said('folder', 'drafts'), 'drafts is a folder');
 });
 
 test('a typed name loses controls and bidi marks and keeps its spaces', () => {
@@ -224,8 +200,8 @@ test('ctrl+, cycles date, name and size, a folders-only list skipping size, and 
   assert.equal(nextSort('size'), 'modified');
   assert.equal(nextSort('name', true), 'modified');
   const word = (k) => k.find((p) => p.key.indexOf(',') >= 0).word;
-  assert.equal(word(pickerKeys('plain', 'open', false, false, 'size')), 'sort: size');
-  assert.equal(word(pickerKeys('bracket', 'save', false, false, 'name')), 'SORT: NAME');
+  assert.equal(word(pickerKeys('open', false, 'size')), 'sort: size');
+  assert.equal(word(pickerKeys('save', false, 'name')), 'sort: name');
 });
 
 test('the rows shown follow the sort asked for', () => {
@@ -277,116 +253,53 @@ test('completions are folders that start with the tail, most recently changed fi
   assert.deepEqual(names(completions(list, '.l')), ['.lab']);
 });
 
-test('the typed match in each voice: Paper and Blueprint count, Artboard names the place', () => {
-  assert.equal(matchText('caps', 'places', 1, 'Downloads'), '1 PLACE');
-  assert.equal(matchText('caps', 'places', 3, ''), '3 PLACES');
-  assert.equal(matchText('bracket', 'places', 1, 'Downloads'), '1 PLACE');
-  assert.equal(matchText('plain', 'places', 1, 'Downloads'), '→ Downloads');
-  assert.equal(matchText('plain', 'places', 2, ''), '2 places');
-  assert.equal(matchText('caps', 'path', 4, ''), '4 MATCHES');
-  assert.equal(matchText('bracket', 'path', 1, ''), '1 MATCH');
-  assert.equal(matchText('plain', 'path', 4, ''), '');
+test('the typed match names the one place it matches, or counts them; a typed path counts nothing', () => {
+  assert.equal(matchText('places', 1, 'Downloads'), '→ Downloads');
+  assert.equal(matchText('places', 2, ''), '2 places');
+  assert.equal(matchText('path', 4, ''), '');
 });
 
 test('the folder row counts its items, names the filter and says whether dotfiles show', () => {
-  assert.equal(countText('plain', 11, '', false), '11 items · hidden off');
-  assert.equal(countText('plain', 1, 'Images', true), '1 item · Images · hidden on');
-  assert.equal(countText('caps', 9, 'Images', false), '9 ITEMS · IMAGES · HIDDEN OFF');
-  assert.equal(countText('bracket', 9, '', true), '9 ITEMS · HIDDEN ON');
+  assert.equal(countText(11, '', false), '11 items · hidden off');
+  assert.equal(countText(1, 'Images', true), '1 item · Images · hidden on');
 });
 
 test('a folder request counts folders with files hidden, and a save counts what the folder holds', () => {
-  assert.equal(countText('plain', 6, '', false, 'folder'), '6 folders · files hidden');
-  assert.equal(countText('caps', 1, '', true, 'folder'), '1 FOLDER · FILES HIDDEN');
-  assert.equal(countText('bracket', 6, '', false, 'folder'), '6 FOLDERS · FILES HIDDEN');
-  assert.equal(countText('plain', 7, '', false, 'save'), '7 items');
-  assert.equal(countText('caps', 7, '', true, 'save'), '7 ITEMS');
-  assert.equal(countText('bracket', 1, '', false, 'save'), '1 ITEM');
+  assert.equal(countText(6, '', false, 'folder'), '6 folders · files hidden');
+  assert.equal(countText(1, '', true, 'folder'), '1 folder · files hidden');
+  assert.equal(countText(7, '', false, 'save'), '7 items');
 });
 
-test('the completions heading in each voice', () => {
-  assert.equal(completionHead('plain', 3, '~/Codes', 'la'), '3 folders in ~/Codes start with la');
-  assert.equal(completionHead('plain', 1, '~/Codes', 'la'), '1 folder in ~/Codes starts with la');
-  assert.equal(completionHead('caps', 3, '~/Codes', 'la'), 'FOLDERS');
-  assert.equal(completionHead('bracket', 3, '~/Codes', 'la'), 'COMPLETING IN ~/Codes');
+test('the completions heading says how many folders start with the tail', () => {
+  assert.equal(completionHead(3, '~/Codes', 'la'), '3 folders in ~/Codes start with la');
+  assert.equal(completionHead(1, '~/Codes', 'la'), '1 folder in ~/Codes starts with la');
 });
 
-test('the path mode key strip in each voice', () => {
-  const strip = (v) => pathKeys(v).map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), 'tab complete · ↵ go · ctrl+l filter · esc');
-  assert.equal(strip('caps'), '↵ GO · TAB COMPLETE · ⌃L BACK TO LIST · ESC');
-  assert.equal(strip('bracket'), '[↵] GO · [TAB] COMPLETE · [⌃L] BACK TO LIST · [ESC]');
+test('the path mode key strip leads with tab', () => {
+  assert.equal(strip(pathKeys()), 'tab complete · ↵ go · ctrl+l filter · esc');
 });
 
-test("the preview's meta lines in each theme's idiom: Paper's and Blueprint's labels, Blueprint's header, Artboard's badge and plain lines", () => {
+test("the preview's meta lines are bare values, and the extension is a badge", () => {
   const heic = { name: 'IMG_2041.HEIC', dir: false, size: 2800000, mime: 'image/heic', mtime: new Date(2026, 9, 18, 14, 7).getTime() };
-  assert.deepEqual(previewText('caps', heic, 4032, 3024), {
-    head: '',
-    kind: '',
-    badge: '',
-    lines: [
-      { label: 'DIMENSIONS', value: '4032 × 3024' },
-      { label: 'SIZE', value: '2.8 MB' },
-      { label: 'MODIFIED', value: '18 Oct 2026 · 14:07' },
-    ],
-  });
-  assert.deepEqual(previewText('plain', heic, 4032, 3024), {
-    head: '',
-    kind: '',
-    badge: 'HEIC',
-    lines: [
-      { label: '', value: '4032 × 3024 px' },
-      { label: '', value: '2.8 MB' },
-      { label: '', value: '18 Oct 2026, 14:07' },
-    ],
-  });
-  assert.deepEqual(previewText('bracket', heic, 4032, 3024), {
-    head: 'PREVIEW',
-    kind: 'IMAGE',
-    badge: '',
-    lines: [
-      { label: 'DIMENSIONS', value: '4032 × 3024' },
-      { label: 'SIZE', value: '2.8 MB' },
-      { label: 'MODIFIED', value: '2026-10-18 14:07' },
-    ],
-  });
+  assert.deepEqual(previewText(heic, 4032, 3024), { badge: 'HEIC', lines: ['4032 × 3024 px', '2.8 MB', '18 Oct 2026, 14:07'] });
   // A file without a size read from its header has no dimensions line at all.
   const pdf = { name: 'report.pdf', dir: false, size: 184000, mime: 'application/pdf', mtime: new Date(2026, 9, 14, 16, 41).getTime() };
-  assert.deepEqual(previewText('bracket', pdf, 0, 0), {
-    head: 'PREVIEW',
-    kind: 'FILE',
-    badge: '',
-    lines: [
-      { label: 'SIZE', value: '184 KB' },
-      { label: 'MODIFIED', value: '2026-10-14 16:41' },
-    ],
-  });
-  assert.equal(previewText('plain', pdf, 0, 0).badge, 'PDF');
-  assert.equal(previewText('plain', { name: 'Makefile', dir: false, size: 10, mime: '', mtime: 0 }, 0, 0).badge, '');
+  assert.deepEqual(previewText(pdf, 0, 0), { badge: 'PDF', lines: ['184 KB', '14 Oct 2026, 16:41'] });
+  assert.equal(previewText({ name: 'Makefile', dir: false, size: 10, mime: '', mtime: 0 }, 0, 0).badge, '');
 });
 
-test('the full date in each voice', () => {
-  const at = new Date(2026, 9, 14, 16, 41).getTime();
-  assert.equal(stampText('caps', at), '14 Oct 2026 · 16:41');
-  assert.equal(stampText('plain', at), '14 Oct 2026, 16:41');
-  assert.equal(stampText('bracket', at), '2026-10-14 16:41');
+test('the full date has a comma before the time', () => {
+  assert.equal(stampText(new Date(2026, 9, 14, 16, 41).getTime()), '14 Oct 2026, 16:41');
 });
 
 test('an app that allows several files heads the card Open files, and a folder request Choose folder', () => {
-  assert.equal(headingText('caps', 'Chromium', 'open', true), 'OPEN FILES · CHROMIUM');
-  assert.equal(headingText('plain', 'Chromium', 'open', true), 'Open files · Chromium');
-  assert.equal(headingText('bracket', 'Chromium', 'open', true), 'OPEN FILES // CHROMIUM');
-  assert.equal(headingText('caps', 'Chromium', 'folder'), 'CHOOSE FOLDER · CHROMIUM');
-  assert.equal(headingText('plain', 'Chromium', 'folder'), 'Choose folder · Chromium');
-  assert.equal(headingText('bracket', 'Chromium', 'folder'), 'CHOOSE FOLDER // CHROMIUM');
-  assert.equal(headingText('plain', '', 'folder'), 'Choose folder');
+  assert.equal(headingText('Chromium', 'open', true), 'Open files · Chromium');
+  assert.equal(headingText('Chromium', 'folder'), 'Choose folder · Chromium');
+  assert.equal(headingText('', 'folder'), 'Choose folder');
 });
 
 test('the folder strip enters with Enter and chooses with ctrl+Enter', () => {
-  const strip = (v) => pickerKeys(v, 'folder').map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-  assert.equal(strip('plain'), '↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: date · esc');
-  assert.equal(strip('caps'), '↵ ENTER FOLDER · ⌃↵ CHOOSE THIS FOLDER · ⌃, SORT: DATE · ESC');
-  assert.equal(strip('bracket'), '[↵] ENTER FOLDER · [⌃↵] CHOOSE THIS FOLDER · [⌃,] SORT: DATE · [ESC]');
+  assert.equal(strip(pickerKeys('folder')), '↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: date · esc');
 });
 
 test('a folder request lists only folders, dot folders when shown', () => {
@@ -413,13 +326,9 @@ test('the marked files answer in list order, a file the query hides too', () => 
 });
 
 test('the footer line: how many are marked, or the folder ctrl+Enter chooses', () => {
-  assert.equal(footText('plain', 'open', 3, '~/Downloads'), '3 selected · ctrl+↵ open all');
-  assert.equal(footText('caps', 'open', 3, '~/Downloads'), '3 SELECTED · ⌃↵ OPEN ALL');
-  assert.equal(footText('bracket', 'open', 1, '~/Downloads'), '1 SELECTED · [⌃↵] OPEN ALL');
-  assert.equal(footText('plain', 'open', 0, '~/Downloads'), '');
-  assert.equal(footText('plain', 'folder', 0, '~/Codes'), 'ctrl+↵ chooses ~/Codes, the folder you are in');
-  assert.equal(footText('caps', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
-  assert.equal(footText('bracket', 'folder', 0, '~/Codes'), 'THIS FOLDER ~/Codes');
+  assert.equal(footText('open', 3, '~/Downloads'), '3 selected · ctrl+↵ open all');
+  assert.equal(footText('open', 0, '~/Downloads'), '');
+  assert.equal(footText('folder', 0, '~/Codes'), 'ctrl+↵ chooses ~/Codes, the folder you are in');
 });
 
 // Only the header bytes each format keeps its size in; the rest of a fixture is filler.
@@ -484,17 +393,3 @@ test('the lister keeps every entry when one name is not UTF-8 or a link is dangl
   ]);
 });
 
-test('Hi-Fi draws the picker keys and count without square marks', () => {
-  const keys = [...pickerKeys('bracket', 'open', true, true), ...pathKeys('bracket', true), ...saveNotice('bracket', 'exists', '[draft].md', true).keys].map((k) => k.key);
-  assert.deepEqual(keys.filter((s) => /[[\]]/.test(s)), []);
-  assert.equal(pickerKeys('bracket', 'open', false, true)[0].key, '↵');
-  assert.equal(footText('bracket', 'open', 2, '/h', true), '2 SELECTED · ⌃↵ OPEN ALL');
-  assert.equal(saveNotice('bracket', 'exists', '[draft].md', true).say, '! [draft].md EXISTS');
-});
-
-test('Blueprint keeps its square marks in the picker', () => {
-  assert.equal(pickerKeys('bracket', 'open', false)[0].key, '[↵]');
-  assert.equal(footText('bracket', 'open', 2, '/h'), '2 SELECTED · [⌃↵] OPEN ALL');
-  assert.equal(pathKeys('bracket')[0].key, '[↵]');
-  assert.equal(saveNotice('bracket', 'exists', 'a', false).keys[0].key, '[↵]');
-});
