@@ -144,8 +144,9 @@ name = "avd-fw"
 version = "0.2"
 repo = "AsahiLinux/avd-fw"
 install = "/usr/lib/firmware/updates/apple/avd-fw-*.bin on the Macs, the video decoder's firmware"
-url = "https://github.com/AsahiLinux/avd-fw/archive/v{version}/avd-fw-{version}.tar.gz"
-sha256 = "b83813636b2e52771a629aa46e0a9d86831965ad49c5acaf74eab91ba7c7203d"
+# The release's meson dist tarball: the version comes from git describe, so a plain archive has none and fails meson setup.
+url = "https://github.com/AsahiLinux/avd-fw/releases/download/v{version}/avd-fw-v{version}.tar.xz"
+sha256 = "668dd16aee983f111644925a6cccc25ab5dd5107c25d6fd77e05795ae559ef91"
 
 [[pin]]
 name = "libva-v4l2-request"

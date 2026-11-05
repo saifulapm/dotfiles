@@ -7,8 +7,8 @@ if ! grep -Faqs 'apple,' /proc/device-tree/compatible || systemd-detect-virt -q 
   exit 0
 fi
 tarball=$(pin_fetch)
-tar -xzf "$tarball" -C "$pin_tmp"
-src=$pin_tmp/avd-fw-$pin_version
+tar -xJf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/avd-fw-v$pin_version
 meson setup "$src/build" "$src" --prefix=/usr --libdir=lib -Dfirmwaredir=firmware/updates --cross-file="$src/arm-none-eabi-gcc.ini" >/dev/null || die "avd-fw: meson setup failed"
 meson compile -C "$src/build" >/dev/null || die "avd-fw: build failed"
 root meson install -C "$src/build" --no-rebuild >/dev/null || die "avd-fw: install failed"
