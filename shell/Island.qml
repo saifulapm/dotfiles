@@ -730,6 +730,7 @@ PanelWindow {
         return {
             expanded: focused,
             replying,
+            where: where.text,
             lines: askText.lineCount,
             truncated: askText.truncated,
             summary: askSummary.visible ? askSummary.text : null,
@@ -2429,7 +2430,7 @@ PanelWindow {
                                 textFormat: Text.PlainText
                                 width: parent.width - hint.implicitWidth - 12
                                 elide: Text.ElideRight
-                                text: [island.heldQuestion?.project, island.heldQuestion?.machine].filter(p => p).join(" · ")
+                                text: [island.heldQuestion?.project, island.heldQuestion?.machine].filter(p => p).map(Q.unbidi).join(" · ")
                                 color: Qt.alpha(box.style.text, 0.65)
                                 font.family: island.theme.tokens?.type.mono ?? ""
                                 font.pixelSize: 11
