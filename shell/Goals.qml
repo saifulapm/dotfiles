@@ -262,7 +262,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            color: Qt.alpha(c.paper, panel.style.wash)
+            color: panel.wash
         }
 
         Root.Surface {

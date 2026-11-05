@@ -329,8 +329,7 @@ Item {
 
         Rectangle {
             anchors.fill: parent
-            // Hi-Fi dims the desktop under its glass colour at 74 %.
-            color: look.slot === "lamp" ? Qt.alpha(launcher.theme.tokens.color.glass, 0.74) : Qt.alpha(c.paper, card.style.wash)
+            color: card.wash
         }
 
         Root.Surface {

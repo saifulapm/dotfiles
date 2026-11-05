@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# just dev: its own bus, the Paper paper, and a shell systemd brings back within 1 s of a kill.
+# just dev: its own bus, the artboard paper, and a shell systemd brings back within 1 s of a kill.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -13,8 +13,8 @@ pid=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT")
 real_rss=$(awk '/^VmRSS/ { print $2 }' "/proc/$pid/status")
 echo "     status: $status (VmRSS $real_rss)"
 check "the shell process has the nested bus" grep -qzxF "DBUS_SESSION_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS" "/proc/$pid/environ"
-status_is_m1() { jq -e '.theme == "paper" and (.outputs | length) == 1 and .timers == 1' <<<"$status" >/dev/null; }
-check "status names theme paper, one output, only the clock tick" status_is_m1
+status_is_m1() { jq -e '.theme == "artboard" and (.outputs | length) == 1 and .timers == 1' <<<"$status" >/dev/null; }
+check "status names theme artboard, one output, only the clock tick" status_is_m1
 # The shell is still growing here, so an RSS read one call late is far off.
 rss_now() { local said; said=$(jq .rssKiB <<<"$status"); ((said - real_rss < 2048 && real_rss - said < 2048)); }
 check "status rssKiB is the RSS of that call" rss_now
@@ -28,8 +28,8 @@ geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + 20),\(.y + (.hei
 read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
 echo "     paper $geo: $r $g $b"
 near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
-centre_is_paper() { near "${r:-0}" 241 && near "${g:-0}" 233 && near "${b:-0}" 216; }
-check "the output's paper is #F1E9D8" centre_is_paper
+centre_is_paper() { near "${r:-0}" 228 && near "${g:-0}" 230 && near "${b:-0}" 234; }
+check "the output's paper is #E4E6EA" centre_is_paper
 
 # A colour the theme check refuses leaves the last good paper on screen, never black.
 tokens=$XDG_STATE_HOME/dots/theme-out/shell.json
@@ -38,7 +38,7 @@ jq '.color.paper = "notacolor"' <<<"$good" >"$tokens"
 sleep 1
 read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
 printf '%s\n' "$good" >"$tokens"
-check "a bad colour in shell.json keeps the paper ($r $g $b)" eval 'near "$r" 241 && near "$g" 233 && near "$b" 216'
+check "a bad colour in shell.json keeps the paper ($r $g $b)" eval 'near "$r" 228 && near "$g" 230 && near "$b" 234'
 
 # qs ipc calls made while a shell starts slow it by up to 1.5 s, so qs is asked only once the paper is back.
 new_pid() { local p; p=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"); [ "$p" != 0 ] && [ "$p" != "$pid" ]; }

@@ -403,7 +403,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: Qt.alpha(c.paper, card.style.wash)
+        color: card.wash
     }
 
     Root.Surface {

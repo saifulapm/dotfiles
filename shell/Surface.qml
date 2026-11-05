@@ -2,7 +2,9 @@ import Quickshell
 import QtQuick
 import QtQuick.Effects
 import QtQuick.Shapes
+import "." as Root
 import "lib/surface.mjs" as S
+import "lib/switch.mjs" as W
 
 // The one frame every shell surface draws: fill, frame, shadow, corner and the theme's signature parts.
 Item {
@@ -19,6 +21,14 @@ Item {
     readonly property real chamfer: style.corner.chamfer
     readonly property var shadow: style.shadow
     readonly property color accent: tokens ? tokens.color.accent : "transparent"
+    // The paper at the style's wash, as a panel lays it over the desktop; it crossfades on a colorscheme switch like the fill.
+    property color wash: tokens ? Qt.alpha(tokens.color.paper, style.wash) : "transparent"
+    Behavior on wash {
+        ColorAnimation {
+            duration: W.SWITCH.ms * Root.State.slowdown
+            easing.type: Easing.InOutSine
+        }
+    }
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
     readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, outline: 1, fill: 1, text: 1, rise: 0 })
@@ -97,6 +107,20 @@ Item {
         border.width: surface.style.frame.width
         // A warm or fade open lights the frame with its glass, so the hairline never shows before it.
         border.color: ["warm", "fade"].includes(surface.motion?.curves?.kind) ? surface.faded(surface.style.frame.color) : surface.style.frame.color
+
+        // A colorscheme switch crossfades the fill and frame with the paper, on Qt's nearest curve to the paper's.
+        Behavior on color {
+            ColorAnimation {
+                duration: W.SWITCH.ms * Root.State.slowdown
+                easing.type: Easing.InOutSine
+            }
+        }
+        Behavior on border.color {
+            ColorAnimation {
+                duration: W.SWITCH.ms * Root.State.slowdown
+                easing.type: Easing.InOutSine
+            }
+        }
     }
 
     // Hi-Fi's glass catches light in a 1 px line of ink under the top border, whatever the island shows.

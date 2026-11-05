@@ -2,10 +2,8 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import QtQuick
-import QtQuick.Effects
 import "." as Root
-import "lib/hifi.mjs" as H
-import "lib/frost-switch.mjs" as F
+import "lib/switch.mjs" as W
 
 // The shader has no time uniform, so the paper never redraws unless the theme or the output changes.
 PanelWindow {
@@ -19,32 +17,18 @@ PanelWindow {
     // The back sheet takes each new theme, so the sheet on screen never rebuilds its shader.
     property Item front: sheetA
     readonly property Item back: front === sheetA ? sheetB : sheetA
-    // The transition H.switchKind picks for the pair; "" while none runs.
+    // The transition W.switchKind picks for the pair, always the crossfade; "" while none runs.
     property string kind: ""
     property bool waiting: false
     // When the last transition began to play and when it ended, in ms since the epoch, so a check can time a switch without polling.
     property real startedAt: 0
     property real endedAt: 0
-    // How far through its 220 ms the sweep is, 0 to 1; the pointer and the lamps' warmth follow from it.
-    property real sweepTime: 0
-    readonly property var swept: H.sweepAt(sweepTime)
-    // The sweep pointer's x as a fraction of the width; null while no sweep runs.
-    readonly property var pointer: kind === "sweep" ? swept.pointer : null
-    // How far through its 280 ms the frost switch is, 0 to 1; the frost's reach and the swap follow from it.
-    property real frostTime: 0
-    readonly property var frosted: F.frostAt(frostTime)
-    // The theme the frost is drawn from: Frost, whichever side of the switch it is on.
-    readonly property var frostTokens: [front.tokens, back.tokens].find(t => t?.primitive.motion === "ease") ?? null
+    // How far through its time the crossfade is, 0 to 1; the old sheet's opacity follows W.fadeAt of it.
+    property real fadeTime: 0
 
-    onSweptChanged: {
-        if (kind === "sweep")
-            Root.State.warmth = Math.max(Root.State.warmth, swept.warmth);
-    }
-
-    // Under full frost the outgoing sheet goes, so the melt shows the new theme.
-    onFrostedChanged: {
-        if (kind === "frost" && frosted.swapped)
-            front.visible = false;
+    onFadeTimeChanged: {
+        if (kind)
+            front.opacity = 1 - W.fadeAt(fadeTime);
     }
 
     // Emitted once, when this window's first frame reaches the compositor.
@@ -79,11 +63,7 @@ PanelWindow {
             return;
         // A switch during a transition ends it first, so the comparison below is with what is now on screen.
         if (kind) {
-            slide.stop();
-            zoom.stop();
-            scan.stop();
-            sweep.stop();
-            frost.stop();
+            fade.stop();
             finish();
         }
         // The first tokens, or the same theme again, replace the paper with no transition.
@@ -91,17 +71,10 @@ PanelWindow {
             front.tokens = t;
             return;
         }
-        kind = H.switchKind(front.tokens, t);
-        // The bar takes the new tokens in this same event, so its lamps draw unlit before the first frame of the sweep.
-        if (kind === "sweep") {
-            sweepTime = 0;
-            Root.State.warmth = 0;
-        }
-        frostTime = 0;
-        // The back sheet waits off screen or under the front one, so its shader rebuild never shows.
-        back.offset = kind === "slide" ? height : 0;
-        back.z = kind === "slide" ? 1 : 0;
-        front.z = kind === "slide" ? 0 : 1;
+        kind = W.switchKind(front.tokens, t);
+        // The back sheet waits under the front one, so its shader rebuild never shows.
+        back.z = 0;
+        front.z = 1;
         // ready can flicker true while the new tokens bind, so play() ignores it until they have.
         waiting = false;
         back.tokens = t;
@@ -114,13 +87,8 @@ PanelWindow {
         if (!waiting || !back.ready)
             return;
         waiting = false;
-        // A kind with no animation here, cut among them, swaps at once.
-        const animation = ({ slide: slide, zoom: zoom, scan: scan, sweep: sweep, frost: frost })[kind];
         startedAt = Date.now();
-        if (animation)
-            animation.start();
-        else
-            finish();
+        fade.start();
     }
 
     // What each sheet that shows a passage draws, the one on screen first.
@@ -131,17 +99,12 @@ PanelWindow {
     function finish() {
         const outgoing = front;
         front = back;
-        front.offset = 0;
         outgoing.visible = false;
         outgoing.opacity = 1;
-        outgoing.offset = 0;
-        outgoing.cut = 0;
         // The hidden sheet drops its ShaderEffect with its tokens, so idle holds one; the next switch rebuilds it unseen.
         outgoing.tokens = null;
-        canvas.scale = 1;
         kind = "";
         endedAt = Date.now();
-        Root.State.warmth = 1;
     }
 
     WlrLayershell.layer: WlrLayer.Background
@@ -156,19 +119,6 @@ PanelWindow {
     }
     color: "transparent"
 
-    // Fills the edges the zoom pulls the canvas away from, blended like the sheets so the edge never runs ahead.
-    Rectangle {
-        anchors.fill: parent
-        visible: paper.kind === "zoom"
-        color: paper.back.tokens?.color.paper ?? "transparent"
-
-        Rectangle {
-            anchors.fill: parent
-            opacity: paper.front.opacity
-            color: paper.front.tokens?.color.paper ?? "transparent"
-        }
-    }
-
     Item {
         id: canvas
         anchors.fill: parent
@@ -181,186 +131,43 @@ PanelWindow {
             id: sheetB
             visible: false
         }
-
-        Rectangle {
-            visible: paper.kind === "scan"
-            z: 2
-            y: paper.front.cut - 1
-            width: paper.width
-            height: 2
-            color: paper.front.tokens?.color.accent ?? "transparent"
-        }
-
-        // Frost's switch frost, loaded only while it plays, so a resting paper holds no extra shader.
-        Loader {
-            z: 2
-            anchors.fill: parent
-            active: paper.kind === "frost" && frostShader.url !== ""
-
-            sourceComponent: ShaderEffect {
-                blending: true
-                fragmentShader: frostShader.url
-                property size outputSize: Qt.size(width, height)
-                property color ink: paper.frostTokens?.color.ink ?? "transparent"
-                property real reach: paper.frosted.reach
-            }
-        }
-
-        // A missing .qsb crashes qs, so the frost gets its shader only once this read of it succeeds; without it the switch still swaps at 180 ms.
-        FileView {
-            id: frostShader
-            property string url: ""
-            path: paper.theme.dir ? paper.theme.dir + "/shaders/frost-switch.frag.qsb" : ""
-            onPathChanged: url = ""
-            onLoaded: url = "file://" + path
-        }
-
-        // Hi-Fi's tuning pointer, in Hi-Fi's danger red whichever side of the switch Hi-Fi is on.
-        Item {
-            readonly property color red: [paper.front.tokens, paper.back.tokens].find(t => t?.primitive.motion === "dial")?.color.danger ?? "transparent"
-
-            visible: paper.kind === "sweep"
-            z: 2
-            x: paper.front.cutLeft - 1
-            width: 2
-            height: paper.height
-
-            RectangularShadow {
-                anchors.fill: parent
-                blur: 8
-                color: Qt.alpha(parent.red, 0.7)
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                color: parent.red
-            }
-        }
     }
 
-    // Paper: the new sheet slides up from the bottom edge and the old one is pulled away beneath it.
-    ParallelAnimation {
-        id: slide
-        onFinished: paper.finish()
-
-        NumberAnimation {
-            target: paper.back
-            property: "offset"
-            to: 0
-            duration: 220 * Root.State.slowdown
-            easing.type: Easing.OutExpo
-        }
-        NumberAnimation {
-            target: paper.front
-            property: "offset"
-            from: 0
-            to: -paper.height / 4
-            duration: 220 * Root.State.slowdown
-            easing.type: Easing.OutExpo
-        }
-    }
-
-    // Artboard: the canvas zooms out 3% while the sheets cross-fade, then springs back, in a fixed 220 ms.
-    ParallelAnimation {
-        id: zoom
-        onFinished: paper.finish()
-
-        SequentialAnimation {
-            NumberAnimation {
-                target: canvas
-                property: "scale"
-                to: 0.97
-                duration: 85 * Root.State.slowdown
-                easing.type: Easing.OutCubic
-            }
-            NumberAnimation {
-                target: canvas
-                property: "scale"
-                to: 1
-                duration: 135 * Root.State.slowdown
-                easing.type: Easing.OutBack
-                easing.overshoot: 2.5
-            }
-        }
-        // The old sheet fades out over the new one, so the new one loads its shader unseen.
-        NumberAnimation {
-            target: paper.front
-            property: "opacity"
-            from: 1
-            to: 0
-            duration: 220 * Root.State.slowdown
-        }
-    }
-
-    // Blueprint: a scan line sweeps down and the new sheet shows above it.
+    // The old sheet fades out over the new one on the spring's ease, so the new one loads its shader unseen.
     NumberAnimation {
-        id: scan
-        target: paper.front
-        property: "cut"
-        from: 0
-        to: paper.height
-        duration: 220 * Root.State.slowdown
-        onFinished: paper.finish()
-    }
-
-    // Hi-Fi: a red tuning pointer crosses left to right, easing in and out, and the new sheet shows left of it.
-    NumberAnimation {
-        id: sweep
+        id: fade
         target: paper
-        property: "sweepTime"
+        property: "fadeTime"
         from: 0
         to: 1
-        duration: 220 * Root.State.slowdown
+        duration: W.SWITCH.ms * Root.State.slowdown
         onFinished: paper.finish()
     }
 
-    // Frost: the frost grows in from the edges, the theme swaps under it, and it melts back.
-    NumberAnimation {
-        id: frost
-        target: paper
-        property: "frostTime"
-        from: 0
-        to: 1
-        duration: F.FROST_SWITCH.ms * Root.State.slowdown
-        onFinished: paper.finish()
-    }
-
-    // One theme's paper. cut hides its top rows, for the scan line; cutLeft hides its left columns, for the sweep.
+    // One theme's paper.
     component Sheet: Item {
         id: sheet
 
         property var tokens: null
-        property real offset: 0
-        property real cut: 0
-        readonly property real cutLeft: paper.kind === "sweep" && sheet === paper.front ? paper.swept.pointer * paper.width : 0
         readonly property bool ready: fill.ready
         readonly property Item words: passageLoader.item
 
-        x: cutLeft
-        y: offset + cut
-        width: paper.width - cutLeft
-        height: paper.height - cut
-        clip: cut > 0 || cutLeft > 0
+        width: paper.width
+        height: paper.height
 
         PaperFill {
             id: fill
-            x: -sheet.cutLeft
-            y: -sheet.cut
-            width: paper.width
-            height: paper.height
+            anchors.fill: parent
             tokens: sheet.tokens
             dir: paper.theme.dir
-            // The zoom fades the sheet, not the fill, so the fill blends by the sheet's opacity.
+            // The crossfade fades the sheet, not the fill, so the fill blends by the sheet's opacity.
             blending: sheet.opacity < 1
         }
 
-        // Inside the sheet, so a theme switch carries the passage with the slide, zoom, scan or sweep; a sheet with no tokens draws none.
+        // Inside the sheet, so a switch fades the passage with its paper; a sheet with no tokens draws none.
         Loader {
             id: passageLoader
-            x: -sheet.cutLeft
-            y: -sheet.cut
-            width: paper.width
-            height: paper.height
+            anchors.fill: parent
             active: sheet.tokens !== null && paper.passage !== null && paper.passage.text !== null
 
             sourceComponent: PaperPassage {

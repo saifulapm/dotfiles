@@ -169,9 +169,7 @@ ShellRoot {
                 transition: papers.instances.map(p => p.kind).find(k => k) ?? "",
                 // When the last output's transition began to play and when it ended, in ms since the epoch, so a check times the motion itself.
                 transitionStartedAt: Math.max(0, ...papers.instances.map(p => p.startedAt)),
-                transitionEndedAt: Math.max(0, ...papers.instances.map(p => p.endedAt)),
-                // The first running sweep's pointer, as a fraction of its output's width; null when none runs.
-                pointer: papers.instances.map(p => p.pointer).find(x => x !== null) ?? null
+                transitionEndedAt: Math.max(0, ...papers.instances.map(p => p.endedAt))
             });
         }
     }
