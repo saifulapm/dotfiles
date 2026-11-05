@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/voice.mjs" as L
 import "lib/picker.mjs" as P
+import "lib/files.mjs" as F
 
 // The file picker any app's open dialog gets, drawn by the shell for bin/dots-portal: places, the folder's rows and a key strip; it loads on a request and unloads 30 s after it closes.
 Item {
@@ -350,6 +351,8 @@ Item {
             return save();
         if (!row)
             return;
+        if (P.answersMarked(multiple, marked, row))
+            return chooseAll();
         if (row.dir)
             enter(pathOf(row));
         else
@@ -365,6 +368,35 @@ Item {
         else
             return false;
         return true;
+    }
+
+    // A click on a row does what the keys do there: the cursor moves to it, Shift and Ctrl mark, a save names the file. Behind the replace question, the path field or an unlisted folder it changes nothing, as the keys.
+    function clickRow(i, mods) {
+        if (asking || typingPath || !listed || !rows[i])
+            return false;
+        side = "list";
+        const r = F.clicked(rows, marked, selected, i, mods, (m, row) => multiple ? P.toggleMark(m, row) : m);
+        marked = r.marked;
+        selected = r.selected;
+        if (saving && !cursorRow.dir) {
+            saveName = P.nameText(cursorRow.name);
+            notice = "";
+        }
+        return true;
+    }
+
+    // A double click is Enter on the row the first click selected.
+    function openRow(i) {
+        if (clickRow(i, {}))
+            choose();
+    }
+
+    function openPlace(i) {
+        if (asking || typingPath || !listed)
+            return;
+        side = "places";
+        placeAt = i;
+        choose();
     }
 
     function tilde(path) {
@@ -857,6 +889,12 @@ Item {
                                         weight: placeItem.here ? Font.Medium : Font.Normal
                                     }
                                 }
+
+                                // A click on a place opens it, as Enter does.
+                                Root.Click {
+                                    name: "picker-place:" + placeItem.index
+                                    onTapped: picker.openPlace(placeItem.index)
+                                }
                             }
                         }
                     }
@@ -1026,6 +1064,18 @@ Item {
                                     font.family: fonts.mono
                                     font.pixelSize: 12
                                 }
+                            }
+
+                            // A click selects the row, Shift and Ctrl mark; a double click does Enter on it. Qt's own double-click interval tells the two apart.
+                            MouseArea {
+                                objectName: "click:picker-row:" + rowItem.index
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: mouse => picker.clickRow(rowItem.index, {
+                                    ctrl: (mouse.modifiers & Qt.ControlModifier) !== 0,
+                                    shift: (mouse.modifiers & Qt.ShiftModifier) !== 0
+                                })
+                                onDoubleClicked: picker.openRow(rowItem.index)
                             }
                         }
                     }
