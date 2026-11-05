@@ -122,16 +122,18 @@ test('both kinds interleave by the sort: popular alternates, top rated by rating
   assert.deepEqual(ids('oldest'), [5, 4, 2, 1, 3]);
 });
 
-// The board's last two columns: the hit's language and its genres, capitals in Blueprint only, one line each.
-test('a result row names its language and genres as each board writes them', () => {
+// The board's last two columns: the hit's language and its genres, one line each.
+test('a result row names its language and genres as the board writes them', () => {
   const hit = { language: 'English', genres: ['Drama', 'Mystery'] };
-  assert.deepEqual(B.browseText('caps').columns, ['TITLE', 'YEAR', 'RATING', 'LANGUAGE', 'GENRES']);
-  assert.deepEqual(B.browseText('plain').columns, ['Title', 'Year', 'Rating', 'Language', 'Genres']);
-  assert.deepEqual(B.browseText('caps').hitCells(hit), ['English', 'Drama · Mystery']);
-  assert.deepEqual(B.browseText('plain').hitCells(hit), ['English', 'Drama · Mystery']);
-  assert.deepEqual(B.browseText('bracket').hitCells(hit), ['ENGLISH', 'DRAMA · MYSTERY']);
-  assert.deepEqual(B.browseText('plain').hitCells({}), ['', '']);
-  assert.deepEqual(B.browseText('plain').hitCells({ language: 'Sw\nedish‮', genres: ['Dra\u001bma'] }), ['Sw edish', 'Dra ma']);
+  assert.deepEqual(B.browseText().columns, ['Title', 'Year', 'Rating', 'Language', 'Genres']);
+  assert.deepEqual(B.browseText().hitCells(hit), ['English', 'Drama · Mystery']);
+  assert.deepEqual(B.browseText().hitCells({}), ['', '']);
+  assert.deepEqual(B.browseText().hitCells({ language: 'Sw\nedish‮', genres: ['Dra\u001bma'] }), ['Sw edish', 'Dra ma']);
+});
+
+test("Browse's header words read in sentence case", () => {
+  const w = B.browseText();
+  assert.deepEqual([w.label, w.active, w.person, w.prefilled('Harbour Lights'), w.from('Harbour Lights'), w.count(1)], ['Dekho', 'Active', 'Person', 'prefilled from Harbour Lights', 'from Harbour Lights', '1 title']);
 });
 
 // The next page: each kind keeps its own page and total_pages, and asks page N+1 only while it has more.

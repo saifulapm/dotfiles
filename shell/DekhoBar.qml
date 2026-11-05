@@ -15,7 +15,7 @@ Item {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: P.barText(voice, look.engraved)
+    readonly property var words: P.barText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
     readonly property var now: dekho.nowPlaying
 

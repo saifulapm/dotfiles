@@ -2,7 +2,6 @@
 import { stars } from './dekho.mjs';
 import { oneLine } from './picker.mjs';
 
-const upper = (voice, s) => (voice === 'plain' ? s : s.toUpperCase());
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // The backend's group order, which is also the board's.
@@ -38,14 +37,10 @@ export function lines(gs) {
   return out;
 }
 
-// Only the bracket voice shouts a kind.
-export const kindText = (voice, kind) => {
-  const word = kind === 'tv' ? 'series' : 'film';
-  return voice === 'bracket' ? word.toUpperCase() : word;
-};
+export const kindText = (kind) => (kind === 'tv' ? 'series' : 'film');
 
-export function subline(voice, birthday, deathday, gs) {
-  return [years(birthday, deathday)].concat(gs.map((g) => upper(voice, cap(g.key)))).filter((p) => p).join(' · ');
+export function subline(birthday, deathday, gs) {
+  return [years(birthday, deathday)].concat(gs.map((g) => cap(g.key))).filter((p) => p).join(' · ');
 }
 
 export function initials(name) {
@@ -55,14 +50,14 @@ export function initials(name) {
 
 export const firstName = (name) => oneLine(name).split(' ')[0];
 
-// The words each board writes on the Person page.
-export function personText(voice) {
+// The words the board writes on the Person page.
+export function personText() {
   return {
-    label: voice === 'caps' ? 'DEKHO' : 'Dekho',
-    page: voice === 'bracket' ? 'PERSON' : 'person',
-    heading: (key) => upper(voice, cap(key)),
-    filmography: (n) => upper(voice, `Filmography · ${n} ${n === 1 ? 'credit' : 'credits'}`),
-    next: voice === 'bracket' ? 'TAB NEXT ROLE' : 'tab next role',
+    label: 'Dekho',
+    page: 'person',
+    heading: (key) => cap(key),
+    filmography: (n) => `Filmography · ${n} ${n === 1 ? 'credit' : 'credits'}`,
+    next: 'tab next role',
     keys: (gs, name) => [['j/k', 'move'], ['↵', 'open title'], ['tab', `next role: ${gs.map((g) => g.key).join(', ')}`], ['f', `filter the library by ${firstName(name)}`], ['/', 'search'], ['esc', 'back']],
   };
 }

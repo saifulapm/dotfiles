@@ -6,25 +6,22 @@ const episode = { kind: 'tv', season: 3, episode: 4, position: 1260, duration: 3
 const film = { kind: 'movie', season: null, episode: null, position: 4320, duration: 6720 };
 
 test('a series in progress reads its season and episode, then the minutes left', () => {
-  assert.equal(H.continueLine('caps', episode), 'S3 · E4 · 31 min left');
-  assert.equal(H.continueLine('plain', episode), 'S3 · E4 · 31 min left');
+  assert.equal(H.continueLine(episode), 'S3 · E4 · 31 min left');
 });
 
-test('a film reads RESUME in every voice, then the time left in hours past the hour', () => {
-  assert.equal(H.continueLine('caps', film), 'RESUME · 40 min left');
-  assert.equal(H.continueLine('plain', film), 'RESUME · 40 min left');
-  assert.equal(H.continueLine('caps', { kind: 'movie', position: 1980, duration: 7440 }), 'RESUME · 1h 31 left');
-});
-
-test('Blueprint writes the words left in capitals and keeps the h of an hour', () => {
-  assert.equal(H.continueLine('bracket', episode), 'S3 · E4 · 31 MIN LEFT');
-  assert.equal(H.continueLine('bracket', film), 'RESUME · 40 MIN LEFT');
-  assert.equal(H.continueLine('bracket', { kind: 'movie', position: 1980, duration: 7440 }), 'RESUME · 1h 31 LEFT');
+test('a film reads RESUME, then the time left in hours past the hour', () => {
+  assert.equal(H.continueLine(film), 'RESUME · 40 min left');
+  assert.equal(H.continueLine({ kind: 'movie', position: 1980, duration: 7440 }), 'RESUME · 1h 31 left');
 });
 
 test('a title mpv never reported a length for says no time left', () => {
-  assert.equal(H.continueLine('caps', { kind: 'tv', season: 1, episode: 7, position: 300, duration: 0 }), 'S1 · E7');
-  assert.equal(H.continueLine('caps', { kind: 'movie', position: 300, duration: 0 }), 'RESUME');
+  assert.equal(H.continueLine({ kind: 'tv', season: 1, episode: 7, position: 300, duration: 0 }), 'S1 · E7');
+  assert.equal(H.continueLine({ kind: 'movie', position: 300, duration: 0 }), 'RESUME');
+});
+
+test('a resume line is the episode and time left for a series, the time left for a film', () => {
+  assert.equal(H.resumeLine(episode), 'S3 · E4 · 31 min left');
+  assert.equal(H.resumeLine(film), '40 min left');
 });
 
 test('a trending title reads its year and its rating to one decimal', () => {
@@ -55,17 +52,19 @@ test('an answer is fresh, a saved copy marked stale, or no answer: null or an er
   assert.equal(H.kindOfAnswer(null), 'error');
 });
 
-test('the offline words follow each board: the date in the row mark, the retry key, search off', () => {
+test('the offline words: the date in the row mark, the retry key, search off', () => {
   const day = new Date(2026, 9, 21, 18, 40);
-  assert.equal(H.homeText('caps').saved(day), 'saved 21 Oct');
-  assert.equal(H.homeText('plain').saved(day), 'saved 21 Oct');
-  assert.equal(H.homeText('bracket').saved(day), 'SAVED 21 OCT');
-  assert.deepEqual(H.homeText('caps').retry, ['r', 'retry']);
-  assert.deepEqual(H.homeText('bracket').retry, ['[R]', 'RETRY']);
-  assert.equal(H.homeText('plain').searchOff, 'Search needs TMDB');
-  assert.equal(H.homeText('plain').unreachable, 'TMDB is unreachable.');
-  assert.equal(H.homeText('plain').showing(day), 'Showing saved rows from 21 Oct 18:40.');
-  assert.equal(H.homeText('plain').showing(null), '');
+  assert.equal(H.homeText().saved(day), 'saved 21 Oct');
+  assert.deepEqual(H.homeText().retry, ['r', 'retry']);
+  assert.equal(H.homeText().searchOff, 'Search needs TMDB');
+  assert.equal(H.homeText().unreachable, 'TMDB is unreachable.');
+  assert.equal(H.homeText().showing(day), 'Showing saved rows from 21 Oct 18:40.');
+  assert.equal(H.homeText().showing(null), '');
+});
+
+test("Home's headings read in sentence case", () => {
+  const w = H.homeText();
+  assert.deepEqual([w.label, w.from, w.continue, w.series, w.movies, w.results, w.week, w.hint, w.machine], ['Dekho', 'from the launcher', 'Continue watching', 'Trending series', 'Trending movies', 'Results', 'this week', '/', 'from this machine']);
 });
 
 // Trending series and movies are asked at once and land in either order (#VQDTEX0S).

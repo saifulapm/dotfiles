@@ -28,16 +28,14 @@ test('the page opens on the season holding next up, else the last season', () =>
 });
 
 test('an aired episode reads its day and month, one to come reads airs and its day', () => {
-  assert.equal(T.dateText('caps', '2026-10-02', today), '2 Oct');
-  assert.equal(T.dateText('plain', '2026-10-30', today), 'airs 30 Oct');
-  assert.equal(T.dateText('bracket', '2026-11-06', today), 'AIRS 6 NOV');
-  assert.equal(T.dateText('bracket', '2026-10-23', today), '23 OCT');
-  assert.equal(T.dateText('caps', '', today), '');
+  assert.equal(T.dateText('2026-10-02', today), '2 Oct');
+  assert.equal(T.dateText('2026-10-30', today), 'airs 30 Oct');
+  assert.equal(T.dateText('2026-10-23', today), '23 Oct');
+  assert.equal(T.dateText('', today), '');
 });
 
 test('the count reads how many of the season are watched', () => {
-  assert.equal(T.watchedText('caps', s3), '3 of 8 watched');
-  assert.equal(T.watchedText('bracket', s3), '3 OF 8 WATCHED');
+  assert.equal(T.watchedText(s3), '3 of 8 watched');
 });
 
 test('the crew keeps the director, the writers and the composer, in that order', () => {
@@ -64,21 +62,16 @@ test('the chips are the genres then the original language', () => {
 
 test('the lines under the title read its years, rating and episode length, and its genres and seasons', () => {
   const show = { kind: 'tv', year: '2024', vote: 8.14, runtime: 3000, genres: ['Drama', 'Mystery'], season_count: 4, in_production: true };
-  assert.equal(T.metaText('caps', show), '2024 – · ★ 8.1 · 50 min episodes');
-  assert.equal(T.metaText('bracket', show), '2024 – · ★ 8.1 · 50 MIN EPISODES');
-  assert.equal(T.sideText('caps', show), 'Drama · Mystery · 4 seasons');
-  assert.equal(T.sideText('bracket', show), 'DRAMA · MYSTERY · 4 SEASONS');
-  assert.equal(T.metaText('caps', { kind: 'tv', year: '2019', vote: 7, runtime: 2700, in_production: false, last_air: '2021-05-02' }), '2019 – 2021 · ★ 7.0 · 45 min episodes');
-  assert.equal(T.metaText('plain', { kind: 'movie', year: '2026', vote: 7.8, runtime: 6720 }), '2026 · ★ 7.8 · 1h 52');
-  assert.equal(T.metaText('plain', { kind: 'movie', year: '2026', vote: 0, runtime: 6720 }), '2026 · 1h 52');
+  assert.equal(T.metaText(show), '2024 – · ★ 8.1 · 50 min episodes');
+  assert.equal(T.sideText(show), 'Drama · Mystery · 4 seasons');
+  assert.equal(T.metaText({ kind: 'tv', year: '2019', vote: 7, runtime: 2700, in_production: false, last_air: '2021-05-02' }), '2019 – 2021 · ★ 7.0 · 45 min episodes');
+  assert.equal(T.metaText({ kind: 'movie', year: '2026', vote: 7.8, runtime: 6720 }), '2026 · ★ 7.8 · 1h 52');
+  assert.equal(T.metaText({ kind: 'movie', year: '2026', vote: 0, runtime: 6720 }), '2026 · 1h 52');
 });
 
-test('each board writes the next-up tag its own way', () => {
-  assert.equal(T.titleText('caps').nextUp, 'NEXT UP');
-  assert.equal(T.titleText('plain').nextUp, 'next up');
-  assert.equal(T.titleText('bracket').nextUp, '[NEXT UP]');
-  assert.equal(T.titleText('plain').crew, 'Crew');
-  assert.equal(T.titleText('caps').crew, 'CREW');
+test("the page's tag and headings read in sentence case", () => {
+  const w = T.titleText();
+  assert.deepEqual([w.label, w.page, w.nextUp, w.crew, w.cast, w.filters, w.more(2), w.more(0)], ['Dekho', 'title', 'next up', 'Crew', 'Cast', 'f filters by these', '+ 2 · tab to reach, ↵ opens a person', 'tab to reach, ↵ opens a person']);
 });
 
 // Only a date after today holds an episode back; TMDB leaves some specials and older episodes undated.
@@ -89,7 +82,7 @@ test('an episode with no air date can be opened and be next up, and draws no dat
   ];
   assert.equal(T.aired(items[0], '2026-10-24'), true);
   assert.equal(T.nextUp(items, '2026-10-24'), 0);
-  assert.equal(T.dateText('caps', null, '2026-10-24'), '');
+  assert.equal(T.dateText(null, '2026-10-24'), '');
 });
 
 const seen = [
@@ -106,23 +99,21 @@ test("a title is being watched when history holds it by id and kind and it is no
 });
 
 test('Play always shows; Resume joins it with a series\' episode and the time left, never RESUME twice', () => {
-  assert.deepEqual(T.buttons('plain', null), [{ id: 'play', text: '▶ Play' }]);
-  assert.deepEqual(T.buttons('caps', seen[1]), [{ id: 'play', text: '▶ Play' }, { id: 'resume', text: '▶ Resume · 40 min left' }]);
-  assert.deepEqual(T.buttons('plain', seen[0]).map((b) => b.text), ['▶ Play', '▶ Resume · S3 · E4 · 31 min left']);
-  assert.deepEqual(T.buttons('bracket', seen[0]).map((b) => b.text), ['▶ PLAY', '▶ RESUME · S3 · E4 · 31 MIN LEFT']);
+  assert.deepEqual(T.buttons(null), [{ id: 'play', text: '▶ Play' }]);
+  assert.deepEqual(T.buttons(seen[1]), [{ id: 'play', text: '▶ Play' }, { id: 'resume', text: '▶ Resume · 40 min left' }]);
+  assert.deepEqual(T.buttons(seen[0]).map((b) => b.text), ['▶ Play', '▶ Resume · S3 · E4 · 31 min left']);
 });
 
 test('a title with a trailer adds Trailer after Play and Resume; a null or empty one adds none', () => {
   const url = 'https://www.youtube.com/watch?v=abc';
-  assert.deepEqual(T.buttons('plain', null, url), [{ id: 'play', text: '▶ Play' }, { id: 'trailer', text: '▶ Trailer' }]);
-  assert.deepEqual(T.buttons('caps', seen[1], url).map((b) => b.id), ['play', 'resume', 'trailer']);
-  assert.deepEqual(T.buttons('bracket', null, url).map((b) => b.text), ['▶ PLAY', '▶ TRAILER']);
-  assert.deepEqual(T.buttons('plain', null, null), [{ id: 'play', text: '▶ Play' }]);
-  assert.deepEqual(T.buttons('plain', null, ''), [{ id: 'play', text: '▶ Play' }]);
+  assert.deepEqual(T.buttons(null, url), [{ id: 'play', text: '▶ Play' }, { id: 'trailer', text: '▶ Trailer' }]);
+  assert.deepEqual(T.buttons(seen[1], url).map((b) => b.id), ['play', 'resume', 'trailer']);
+  assert.deepEqual(T.buttons(null, null), [{ id: 'play', text: '▶ Play' }]);
+  assert.deepEqual(T.buttons(null, ''), [{ id: 'play', text: '▶ Play' }]);
 });
 
 test('the footer names r for resume, t for trailer, and tab reaches the buttons', () => {
-  const keys = T.titleText('plain').keys;
+  const keys = T.titleText().keys;
   assert.ok(keys.some(([k, w]) => k === 'r' && w === 'resume'));
   assert.deepEqual(keys[keys.findIndex(([k]) => k === 'r') + 1], ['t', 'trailer']);
   assert.ok(keys.some(([k, w]) => k === 'tab' && w.startsWith('buttons')));
@@ -137,29 +128,27 @@ test('the tagline is the title\'s own text, trimmed, and empty when it has none'
   assert.equal(T.tagline({ tagline: 7 }), '');
 });
 
-test('a series links TMDB under /tv/ and IMDb, in the voice\'s words', () => {
+test('a series links TMDB under /tv/ and IMDb', () => {
   const tide = { id: 101, kind: 'tv', imdb_id: 'tt0000101', homepage: '' };
-  assert.deepEqual(T.links('plain', tide), [
+  assert.deepEqual(T.links(tide), [
     { id: 'tmdb', text: 'TMDB', url: 'https://www.themoviedb.org/tv/101' },
     { id: 'imdb', text: 'IMDb', url: 'https://www.imdb.com/title/tt0000101' },
   ]);
-  assert.deepEqual(T.links('bracket', tide).map((l) => l.text), ['TMDB', 'IMDB']);
 });
 
 test('a film links TMDB under /movie/ and its http(s) homepage last', () => {
   const film = { id: 400, kind: 'movie', imdb_id: 'tt0000400', homepage: 'https://example.org/a-quiet-verdict' };
-  assert.deepEqual(T.links('caps', film).map((l) => [l.id, l.text, l.url]), [
+  assert.deepEqual(T.links(film).map((l) => [l.id, l.text, l.url]), [
     ['tmdb', 'TMDB', 'https://www.themoviedb.org/movie/400'],
     ['imdb', 'IMDb', 'https://www.imdb.com/title/tt0000400'],
     ['homepage', 'Homepage', 'https://example.org/a-quiet-verdict'],
   ]);
-  assert.equal(T.links('bracket', film)[2].text, 'HOMEPAGE');
-  assert.equal(T.links('plain', { ...film, homepage: 'http://example.org/' })[2].url, 'http://example.org/');
+  assert.equal(T.links({ ...film, homepage: 'http://example.org/' })[2].url, 'http://example.org/');
 });
 
 test('a missing or malformed imdb id hides IMDb, and a homepage that is not http(s) shows no link', () => {
   const base = { id: 300, kind: 'tv' };
-  const ids = (t) => T.links('plain', { ...base, ...t }).map((l) => l.id);
+  const ids = (t) => T.links({ ...base, ...t }).map((l) => l.id);
   assert.deepEqual(ids({}), ['tmdb']);
   assert.deepEqual(ids({ imdb_id: '', homepage: '' }), ['tmdb']);
   assert.deepEqual(ids({ imdb_id: 'tt12/../x' }), ['tmdb']);
@@ -180,7 +169,5 @@ test('More like this draws the first 10 similar titles, and none when the title 
 });
 
 test('the More like this heading reads as Home writes its row heads', () => {
-  assert.equal(T.titleText('caps').similar, 'MORE LIKE THIS');
-  assert.equal(T.titleText('bracket').similar, 'MORE LIKE THIS');
-  assert.equal(T.titleText('plain').similar, 'More like this');
+  assert.equal(T.titleText().similar, 'More like this');
 });

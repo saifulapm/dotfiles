@@ -21,7 +21,7 @@ FocusScope {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: T.titleText(voice, look.engraved)
+    readonly property var words: T.titleText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
 
     // What Home opened, drawn at once; the backend's answer fills the rest in.
@@ -47,7 +47,7 @@ FocusScope {
     property var filter: null
     // History's entry for this title while it is still being watched, else null; it adds Resume.
     property var seen: null
-    readonly property var buttons: T.buttons(voice, seen, detail ? detail.trailer : null)
+    readonly property var buttons: T.buttons(seen, detail ? detail.trailer : null)
     // The focused button by what it does, so Resume or Trailer arriving, or Resume going once a title is finished, never moves the focus onto another button or off the row.
     property string buttonKind: "play"
     readonly property int button: Math.max(0, buttons.findIndex(b => b.id === buttonKind))
@@ -68,7 +68,7 @@ FocusScope {
     // The board shows three cast names; the cursor slides that window along the rest.
     readonly property int castStart: Math.max(0, Math.min(cast.length - 3, castCol - 2))
     // TMDB, IMDb and the homepage, each only while the title has it; they open in the browser.
-    readonly property var links: detail ? T.links(voice, detail) : []
+    readonly property var links: detail ? T.links(detail) : []
     readonly property var similar: detail ? T.similar(detail) : []
     readonly property var zones: ["buttons"].concat(links.length ? ["links"] : [], tv ? ["seasons", "episodes"] : [], crew.length ? ["crew"] : [], cast.length ? ["cast"] : [], similar.length ? ["similar"] : [])
 
@@ -663,7 +663,7 @@ FocusScope {
                     id: sideText
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: D.title(T.sideText(voice, page.shown))
+                    text: D.title(T.sideText(page.shown))
                     color: c.muted ?? "gray"
                     font.family: page.bodyFont
                     font.pixelSize: bracket ? 10 : 11
@@ -698,7 +698,7 @@ FocusScope {
                         id: metaText
                         Layout.fillWidth: true
                         textFormat: Text.PlainText
-                        text: page.detail ? D.title(T.metaText(voice, page.detail)) : ""
+                        text: page.detail ? D.title(T.metaText(page.detail)) : ""
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: 12
@@ -1045,7 +1045,7 @@ FocusScope {
                     Text {
                         id: countText
                         textFormat: Text.PlainText
-                        text: page.items.length ? T.watchedText(voice, page.items) : ""
+                        text: page.items.length ? T.watchedText(page.items) : ""
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: bracket ? 10 : 11
@@ -1482,7 +1482,7 @@ FocusScope {
                 Layout.preferredWidth: 70
                 horizontalAlignment: Text.AlignRight
                 textFormat: Text.PlainText
-                text: T.episodeLength(voice, ep.modelData.runtime)
+                text: T.episodeLength(ep.modelData.runtime)
                 color: ep.inverse && page.bracket ? ep.fore : ep.soft
                 font.family: page.bodyFont
                 font.pixelSize: 12
@@ -1494,7 +1494,7 @@ FocusScope {
                 Layout.preferredWidth: 96
                 horizontalAlignment: Text.AlignRight
                 textFormat: Text.PlainText
-                text: T.dateText(voice, ep.modelData.air_date, page.today)
+                text: T.dateText(ep.modelData.air_date, page.today)
                 color: ep.inverse && page.bracket ? ep.fore : ep.soft
                 font.family: (page.caps && ep.due ? page.fonts.display : page.bodyFont) ?? ""
                 font.italic: page.caps && ep.due

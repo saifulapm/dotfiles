@@ -92,7 +92,7 @@ test('Starting counts the bytes buffered from the start, not every piece on disk
 
 // A film has no episodes to point at (#J0ZGNW4N).
 test('the no-releases words name an episode for a series and the film for a film', () => {
-  const w = R.releasesText('plain');
+  const w = R.releasesText();
   assert.match(w.noneWhy('tv'), /this episode/);
   assert.doesNotMatch(w.noneWhy('movie'), /episode/);
   assert.match(w.noneWhy('movie'), /this film/);
@@ -103,7 +103,7 @@ test('the no-releases words name an episode for a series and the film for a film
 test('the list opens on Auto, then the releases best first', () => {
   const items = [rel('b', 530, 1), rel('c', 412, 2)];
   assert.deepEqual(R.rows(items), [{ auto: true }, items[0], items[1]]);
-  assert.equal(R.releasesText('plain').auto, 'Auto: let dekho decide');
+  assert.equal(R.releasesText().auto, 'Auto: let dekho decide');
 });
 
 const named = (hash, title) => ({ hash, title });
@@ -138,10 +138,14 @@ test('a filter that matches nothing leaves Auto alone', () => {
   assert.deepEqual(hashes(R.rows(listed, 'xyz')), ['auto']);
 });
 
-test('a no-match line and the filter key are worded in each voice', () => {
-  assert.equal(R.releasesText('plain').noMatch('xyz'), 'No release matches xyz');
-  assert.equal(R.releasesText('bracket').noMatch('xyz'), 'NO RELEASE MATCHES XYZ');
-  assert.deepEqual(R.releasesText('plain').keys[3], ['ctrl+f', 'filter']);
+test('a no-match line and the filter key are worded as the board writes them', () => {
+  assert.equal(R.releasesText().noMatch('xyz'), 'No release matches xyz');
+  assert.deepEqual(R.releasesText().keys[3], ['ctrl+f', 'filter']);
+});
+
+test("the list's headings read in sentence case", () => {
+  const w = R.releasesText();
+  assert.deepEqual([w.release, w.starting, w.columns, w.best, w.count(2), w.tryHead], ['Release', 'Starting', ['Quality', 'Size', 'Seeders', 'Audio'], 'best', '2 releases', 'What to try']);
 });
 
 test('Auto plays with no release, so dekho decides; a release plays by its hash', () => {

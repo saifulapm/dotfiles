@@ -1,26 +1,19 @@
-// Home's words: a continued title's episode or length and the time left, a trending title's year and rating, in each theme's voice.
+// Home's words: a continued title's episode or length and the time left, a trending title's year and rating.
 import { stars } from './dekho.mjs';
 import { pad2 } from './margins.mjs';
-import { mark } from './voice.mjs';
 
 const clock = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${pad2(min % 60)}`);
 
-// Blueprint's board capitals the words left, MIN LEFT, and keeps an hour's h small.
-const leftText = (voice, min) => {
-  const t = `${clock(min)} left`;
-  return voice === 'bracket' ? t.replace(/min left$/, 'MIN LEFT').replace(/left$/, 'LEFT') : t;
-};
-
-const left = (voice, item) => (item.duration ? leftText(voice, Math.round(Math.max(0, item.duration - item.position) / 60)) : '');
+const left = (item) => (item.duration ? `${clock(Math.round(Math.max(0, item.duration - item.position) / 60))} left` : '');
 
 // A card says where Saiful is: a series' season and episode as the now-playing bar writes them, a film RESUME, then the time left.
-export function continueLine(voice, item) {
+export function continueLine(item) {
   const head = item.kind === 'tv' ? `S${item.season} · E${item.episode}` : 'RESUME';
-  return [head, left(voice, item)].filter((p) => p).join(' · ');
+  return [head, left(item)].filter((p) => p).join(' · ');
 }
 
 // What Resume's button adds after its own word: a series' episode and the time left, a film's time left alone.
-export const resumeLine = (voice, item) => (item.kind === 'tv' ? continueLine(voice, item) : left(voice, item));
+export const resumeLine = (item) => (item.kind === 'tv' ? continueLine(item) : left(item));
 
 export function hitLine(hit) {
   return [hit.year, stars(hit.vote)].filter((p) => p).join(' · ');
@@ -44,26 +37,24 @@ export function kindOfAnswer(answer) {
   return answer.stale === true ? 'stale' : 'fresh';
 }
 
-// The words each board writes on Home: Paper's caps with a lower-case week, Artboard's sentence case, Blueprint's capitals and bracketed slash.
-export function homeText(voice, engraved = false) {
-  const caps = voice !== 'plain';
-  const say = (s) => (caps ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1));
+// The words the board writes on Home, in sentence case.
+export function homeText() {
   return {
-    label: voice === 'caps' ? 'DEKHO' : 'Dekho',
+    label: 'Dekho',
     page: 'Home',
-    from: voice === 'bracket' ? 'FROM THE LAUNCHER' : 'from the launcher',
-    continue: say('continue watching'),
-    series: say('trending series'),
-    movies: say('trending movies'),
-    results: say('results'),
-    week: voice === 'bracket' ? 'THIS WEEK' : 'this week',
+    from: 'from the launcher',
+    continue: 'Continue watching',
+    series: 'Trending series',
+    movies: 'Trending movies',
+    results: 'Results',
+    week: 'this week',
     search: 'Search films and series',
-    hint: voice === 'bracket' ? mark(engraved, '/') : '/',
-    machine: voice === 'bracket' ? 'FROM THIS MACHINE' : 'from this machine',
-    saved: (d) => (voice === 'bracket' ? `SAVED ${savedDay(d).toUpperCase()}` : `saved ${savedDay(d)}`),
+    hint: '/',
+    machine: 'from this machine',
+    saved: (d) => `saved ${savedDay(d)}`,
     unreachable: 'TMDB is unreachable.',
     showing: (d) => (d ? `Showing saved rows from ${savedStamp(d)}.` : ''),
-    retry: voice === 'bracket' ? [mark(engraved, 'R'), 'RETRY'] : ['r', 'retry'],
+    retry: ['r', 'retry'],
     searchOff: 'Search needs TMDB',
     offlineKeys: [['r', 'retry'], ['h/j/k/l', 'move'], ['↵', 'open'], ['esc', 'close']],
     keys: [['h/j/k/l', 'move'], ['↵', 'open'], ['/', 'search'], ['f', 'filters: genre, language, person…'], ['tab', 'next row'], ['esc', 'close']],

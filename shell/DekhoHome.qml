@@ -18,7 +18,7 @@ FocusScope {
     readonly property string voice: dekho.voice
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
-    readonly property var words: H.homeText(voice, look.engraved)
+    readonly property var words: H.homeText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
 
     property var continued: []

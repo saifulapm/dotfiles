@@ -121,7 +121,7 @@ ColumnLayout {
 
         signal tapped
 
-        readonly property var voiceText: progressed ? H.continueLine(page.voice, modelData) : H.hitLine(modelData)
+        readonly property var voiceText: progressed ? H.continueLine(modelData) : H.hitLine(modelData)
         readonly property real played: Math.max(0, Math.min(1, Number(modelData.progress) || 0))
 
         function drawn() {

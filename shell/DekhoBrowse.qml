@@ -21,7 +21,7 @@ FocusScope {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: B.browseText(voice, look.engraved)
+    readonly property var words: B.browseText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
     // Paper's chip fill and the light text on its ink cursor, which no token carries.
     readonly property color chipFill: caps ? "#F3E6CF" : plain ? look.label.fill : Qt.alpha(c.accent ?? "cyan", 0.1)

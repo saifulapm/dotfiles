@@ -17,10 +17,8 @@ test('a label anyone at TMDB could have typed draws as one plain line', () => {
   assert.doesNotMatch(p.title, /[\n‮\u001b]/);
 });
 
-test("the bar's words in each board's voice", () => {
-  assert.deepEqual(P.barText('plain'), { tag: 'Now playing', keys: [['⇧S', 'stop']] });
-  assert.equal(P.barText('caps').tag, 'NOW PLAYING');
-  assert.equal(P.barText('bracket').tag, '[NOW PLAYING]');
+test("the bar's words: its tag in sentence case and its stop key", () => {
+  assert.deepEqual(P.barText(), { tag: 'Now playing', keys: [['⇧S', 'stop']] });
 });
 
 const win = (pid, title, app_id = 'mpv') => ({ id: pid * 10, pid, app_id, title });

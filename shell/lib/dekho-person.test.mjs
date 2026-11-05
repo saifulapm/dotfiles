@@ -58,18 +58,16 @@ test('the rows run on in one list with a heading before each group', () => {
   );
 });
 
-test('a film reads film and a series reads series, shouted only in the bracket voice', () => {
-  assert.equal(P.kindText('plain', 'tv'), 'series');
-  assert.equal(P.kindText('caps', 'movie'), 'film');
-  assert.equal(P.kindText('bracket', 'tv'), 'SERIES');
+test('a film reads film and a series reads series', () => {
+  assert.equal(P.kindText('tv'), 'series');
+  assert.equal(P.kindText('movie'), 'film');
 });
 
-test('the sub-line is the years then the groups the person has credits in, in the voice', () => {
+test('the sub-line is the years then the groups the person has credits in', () => {
   const g = P.groups({ directing: credits.directing, acting: credits.acting, writing: [] });
-  assert.equal(P.subline('plain', '1978-01-01', null, g), '1978 – · Directing · Acting');
-  assert.equal(P.subline('caps', '1978-01-01', null, g), '1978 – · DIRECTING · ACTING');
-  assert.equal(P.subline('bracket', '1931-01-01', '2004-01-01', g), '1931 – 2004 · DIRECTING · ACTING');
-  assert.equal(P.subline('plain', null, null, g), 'Directing · Acting');
+  assert.equal(P.subline('1978-01-01', null, g), '1978 – · Directing · Acting');
+  assert.equal(P.subline('1931-01-01', '2004-01-01', g), '1931 – 2004 · Directing · Acting');
+  assert.equal(P.subline(null, null, g), 'Directing · Acting');
 });
 
 test('the portrait placeholder carries the first and last initials, and one for a single name', () => {
@@ -84,13 +82,7 @@ test('the filter button names the first word of the name', () => {
   assert.equal(P.firstName(''), '');
 });
 
-test('each board words the page its own way', () => {
-  assert.deepEqual(
-    ['plain', 'caps', 'bracket'].map((v) => [P.personText(v).page, P.personText(v).heading('directing'), P.personText(v).filmography(8), P.personText(v).next]),
-    [
-      ['person', 'Directing', 'Filmography · 8 credits', 'tab next role'],
-      ['person', 'DIRECTING', 'FILMOGRAPHY · 8 CREDITS', 'tab next role'],
-      ['PERSON', 'DIRECTING', 'FILMOGRAPHY · 8 CREDITS', 'TAB NEXT ROLE'],
-    ],
-  );
+test('the page words its label, headings and keys in sentence case', () => {
+  const w = P.personText();
+  assert.deepEqual([w.label, w.page, w.heading('directing'), w.filmography(8), w.filmography(1), w.next], ['Dekho', 'person', 'Directing', 'Filmography · 8 credits', 'Filmography · 1 credit', 'tab next role']);
 });

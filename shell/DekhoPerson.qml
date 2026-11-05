@@ -21,7 +21,7 @@ FocusScope {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: P.personText(voice)
+    readonly property var words: P.personText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
 
     // The id and name Enter opened, drawn at once; the backend's answer fills the rest in.
@@ -388,7 +388,7 @@ FocusScope {
                         Layout.fillWidth: true
                         visible: text !== ""
                         textFormat: Text.PlainText
-                        text: page.detail ? P.subline(voice, info.birthday, info.deathday, sets) : ""
+                        text: page.detail ? P.subline(info.birthday, info.deathday, sets) : ""
                         color: c.muted ?? "gray"
                         font.family: page.bodyFont
                         font.pixelSize: 12
@@ -737,7 +737,7 @@ FocusScope {
                                             id: kindText
                                             Layout.preferredWidth: 70
                                             textFormat: Text.PlainText
-                                            text: ln.head ? "" : P.kindText(page.voice, ln.modelData.row.kind)
+                                            text: ln.head ? "" : P.kindText(ln.modelData.row.kind)
                                             color: ln.soft
                                             font.family: page.bodyFont
                                             font.pixelSize: page.bracket ? 10 : 11

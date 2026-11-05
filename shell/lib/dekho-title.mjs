@@ -1,10 +1,7 @@
-// The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name, in each theme's voice.
+// The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name.
 import { stars } from './dekho.mjs';
 import { resumeLine } from './dekho-home.mjs';
-import { mark } from './voice.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-const upper = (voice, s) => (voice === 'bracket' ? s.toUpperCase() : s);
 
 // Dates stay YYYY-MM-DD strings, compared as text: a Date parsed from one is UTC midnight, a day off west of Greenwich. Only a date after today holds an episode back, so an undated one opens.
 export const aired = (ep, today) => !ep.air_date || ep.air_date <= today;
@@ -21,15 +18,15 @@ export function startSeason(bySeason, today) {
   return held ?? numbers[numbers.length - 1];
 }
 
-export function dateText(voice, airDate, today) {
+export function dateText(airDate, today) {
   if (!airDate) return '';
   const [, m, d] = airDate.split('-').map(Number);
   const day = `${d} ${MONTHS[m - 1]}`;
-  return upper(voice, airDate <= today ? day : `airs ${day}`);
+  return airDate <= today ? day : `airs ${day}`;
 }
 
-export function watchedText(voice, items) {
-  return upper(voice, `${items.filter((ep) => ep.watched).length} of ${items.length} watched`);
+export function watchedText(items) {
+  return `${items.filter((ep) => ep.watched).length} of ${items.length} watched`;
 }
 
 // The backend already names a composer Composer; a screenplay is a writer's credit.
@@ -50,21 +47,21 @@ export function chips(title) {
 
 const clock = (min) => (min < 60 ? `${min} min` : `${Math.floor(min / 60)}h ${String(min % 60).padStart(2, '0')}`);
 
-export function metaText(voice, title) {
+export function metaText(title) {
   const min = Math.round((title.runtime || 0) / 60);
   const tv = title.kind === 'tv';
   const ended = tv && title.in_production === false && title.last_air;
   const years = tv ? `${title.year} –${ended ? ` ${title.last_air.slice(0, 4)}` : ''}` : title.year;
   const length = !min ? '' : tv ? `${min} min episodes` : clock(min);
-  return [years, stars(title.vote), upper(voice, length)].filter((p) => p).join(' · ');
+  return [years, stars(title.vote), length].filter((p) => p).join(' · ');
 }
 
-export const episodeLength = (voice, secs) => (secs ? upper(voice, `${Math.round(secs / 60)} min`) : '');
+export const episodeLength = (secs) => (secs ? `${Math.round(secs / 60)} min` : '');
 
-export function sideText(voice, title) {
+export function sideText(title) {
   const n = title.season_count;
   const seasons = title.kind === 'tv' && n ? `${n} season${n === 1 ? '' : 's'}` : '';
-  return upper(voice, (title.genres || []).concat(seasons ? [seasons] : []).join(' · '));
+  return (title.genres || []).concat(seasons ? [seasons] : []).join(' · ');
 }
 
 // History's entry for a title still being watched: the same id and kind, not finished; else null.
@@ -74,10 +71,10 @@ export function watching(history, title) {
 }
 
 // The title's buttons: Play always, Resume with what is left while history holds it, and Trailer when the title has one.
-export function buttons(voice, seen, trailer) {
-  const out = [{ id: 'play', text: upper(voice, '▶ Play') }];
-  if (seen) out.push({ id: 'resume', text: upper(voice, ['▶ Resume', resumeLine(voice, seen)].filter((p) => p).join(' · ')) });
-  if (trailer) out.push({ id: 'trailer', text: upper(voice, '▶ Trailer') });
+export function buttons(seen, trailer) {
+  const out = [{ id: 'play', text: '▶ Play' }];
+  if (seen) out.push({ id: 'resume', text: ['▶ Resume', resumeLine(seen)].filter((p) => p).join(' · ') });
+  if (trailer) out.push({ id: 'trailer', text: '▶ Trailer' });
   return out;
 }
 
@@ -85,29 +82,27 @@ export function buttons(voice, seen, trailer) {
 export const tagline = (title) => (typeof title.tagline === 'string' ? title.tagline.trim() : '');
 
 // The title's links in the order drawn. The imdb id lands in a URL and the homepage is opened as given, so each is checked: an id as tt and digits, a homepage as http(s) with no space, control or bidi character.
-export function links(voice, title) {
+export function links(title) {
   const out = [{ id: 'tmdb', text: 'TMDB', url: `https://www.themoviedb.org/${title.kind === 'tv' ? 'tv' : 'movie'}/${title.id}` }];
   if (typeof title.imdb_id === 'string' && /^tt[0-9]+$/.test(title.imdb_id)) out.push({ id: 'imdb', text: 'IMDb', url: `https://www.imdb.com/title/${title.imdb_id}` });
   if (typeof title.homepage === 'string' && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+$/.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
-  return out.map((l) => Object.assign({}, l, { text: upper(voice, l.text) }));
+  return out;
 }
 
 // More like this draws the first 10 of the title's similar titles.
 export const similar = (title) => (Array.isArray(title.similar) ? title.similar.slice(0, 10) : []);
 
-// The words each board writes on the Title page.
-export function titleText(voice, engraved = false) {
-  const caps = voice !== 'plain';
-  const head = (s) => (caps ? s.toUpperCase() : s.charAt(0).toUpperCase() + s.slice(1));
+// The words the board writes on the Title page.
+export function titleText() {
   return {
-    label: voice === 'caps' ? 'DEKHO' : 'Dekho',
-    page: voice === 'bracket' ? 'TITLE' : 'title',
-    crew: head('crew'),
-    cast: head('cast'),
-    similar: head('more like this'),
-    nextUp: voice === 'bracket' ? mark(engraved, 'NEXT UP') : caps ? 'NEXT UP' : 'next up',
-    filters: upper(voice, 'f filters by these'),
-    more: (n) => upper(voice, `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`),
+    label: 'Dekho',
+    page: 'title',
+    crew: 'Crew',
+    cast: 'Cast',
+    similar: 'More like this',
+    nextUp: 'next up',
+    filters: 'f filters by these',
+    more: (n) => `${n > 0 ? `+ ${n} · ` : ''}tab to reach, ↵ opens a person`,
     keys: [['j/k', 'episode'], ['h/l', 'season'], ['↵', 'choose a release'], ['r', 'resume'], ['t', 'trailer'], ['w', 'mark watched'], ['tab', 'buttons, links, seasons, episodes, crew, cast, more like this'], ['f', "filter by this title's genre, language, people"], ['/', 'search'], ['esc', 'back']],
   };
 }

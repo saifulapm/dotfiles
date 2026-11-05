@@ -21,7 +21,7 @@ FocusScope {
     readonly property bool plain: voice === "plain"
     readonly property bool bracket: voice === "bracket"
     readonly property bool caps: voice === "caps"
-    readonly property var words: R.releasesText(voice, look.engraved)
+    readonly property var words: R.releasesText()
     readonly property string bodyFont: (bracket ? fonts.mono : fonts.ui) ?? ""
     readonly property string bin: Quickshell.shellDir + "/../bin/dots-dekho-play"
 
@@ -716,7 +716,7 @@ FocusScope {
                     id: failText
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
-                    text: page.words.up(page.failure)
+                    text: page.failure
                     color: page.c.ink ?? "black"
                     font.family: page.bodyFont
                     font.pixelSize: 13
@@ -774,7 +774,7 @@ FocusScope {
                             id: percentText
                             Layout.fillWidth: true
                             textFormat: Text.PlainText
-                            text: page.words.up(page.st.percent)
+                            text: page.st.percent
                             color: page.c.ink ?? "black"
                             font.family: page.bodyFont
                             font.pixelSize: 12
@@ -783,7 +783,7 @@ FocusScope {
                         Text {
                             id: amountText
                             textFormat: Text.PlainText
-                            text: page.words.up(page.st.amount)
+                            text: page.st.amount
                             color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 12
@@ -813,15 +813,15 @@ FocusScope {
 
                     Stat {
                         id: peersText
-                        text: page.words.up(page.st.peers)
+                        text: page.st.peers
                     }
                     Stat {
                         id: downText
-                        text: page.words.up(page.st.down)
+                        text: page.st.down
                     }
                     Stat {
                         id: upText
-                        text: page.words.up(page.st.up)
+                        text: page.st.up
                     }
                 }
             }
