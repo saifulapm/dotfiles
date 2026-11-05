@@ -762,11 +762,13 @@ PanelWindow {
         keys.forceActiveFocus();
     }
 
-    // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, the recording app's window, or the calendar when nothing is live.
-    readonly property bool clickable: ["rest", "playing", "lease", "sharing", "mic"].indexOf(mode) >= 0 || (mode === "question" && !focused)
+    // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, the recording app's window, the YouTube App during its download (0WP8K4M3), or the calendar when nothing is live.
+    readonly property bool clickable: ["rest", "playing", "lease", "sharing", "mic", "downloading"].indexOf(mode) >= 0 || (mode === "question" && !focused)
     function openActivity() {
         if (mode === "mic") {
             focusRecorder();
+        } else if (mode === "downloading") {
+            Quickshell.execDetached(["dots-youtube"]);
         } else if (mode === "playing") {
             mediaOpen = true;
             focused = true;

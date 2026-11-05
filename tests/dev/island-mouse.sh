@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
-# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD; a click on the resting island opens its activity, the calendar when nothing is live, and a notification keeps its own click; the media card's controls run on click and on h, Space and l.
+# The island by mouse: the wheel over it, a notification included, turns the volume one key step and shows the OSD; a click on the resting island opens its activity, the calendar when nothing is live, and a notification keeps its own click; the media card's controls run on click and on h, Space and l; a click during a download opens the YouTube App.
 {
 export DOTS_DEV_FAKE_CASTS=1
+# bin/dots-dev hands this PATH to the shell, so a click runs this dots-youtube, which only says it ran.
+fake=$(mktemp -d)
+printf '#!/usr/bin/env bash\necho ran >>"%s/youtube"\n' "$fake" >"$fake/dots-youtube"
+chmod +x "$fake/dots-youtube"
+export PATH=$fake:$PATH
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
 
@@ -49,6 +54,7 @@ out=$DOTS_DEV_DIR/printed
 sender=
 player=
 cleanup() {
+  rm -rf "$fake"
   pointer_stop
   [ -z "$sender" ] || kill "$sender" 2>/dev/null
   [ -z "$player" ] || kill "$player" 2>/dev/null
@@ -179,6 +185,16 @@ check "and gives the keyboard back" island_focus None
 
 kill "$player"
 player=
+until_ok 3000 mode_is rest
+
+# A download's slot opens the YouTube App, as dots-youtube opens it or brings its window forward.
+timeout 0.5 qs ipc call downloading start 1 1 "" "Low Tide" audio >/dev/null
+until_ok 2000 mode_is downloading
+click_island
+until_ok 2000 test -s "$fake/youtube"
+check "a click during a download runs dots-youtube ($(cat "$fake/youtube" 2>/dev/null | wc -l) runs)" test "$(cat "$fake/youtube" 2>/dev/null)" = ran
+check "and opens no calendar ($(island | jq -r .mode))" mode_is downloading
+timeout 0.5 qs ipc call downloading done >/dev/null
 until_ok 3000 mode_is rest
 
 # An agent's lease opens the lease card.
