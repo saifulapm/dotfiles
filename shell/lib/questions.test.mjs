@@ -64,7 +64,7 @@ test('markup, other schemes, file names, paths and mail addresses are never link
   assert.equal(l.html, '&lt;b&gt;hi&lt;/b&gt; javascript:alert(1) file:///etc/passwd deploy.yml corde-desktop.jpg ~/.cache/tambour-m19/release saiful@example.com 0058-0061 &amp; &quot;q&quot;');
 });
 
-test('a link in brackets leaves the bracket out, and new lines stay lines', () => {
+test('a link in parentheses leaves the closing parenthesis out, and new lines stay lines', () => {
   const l = linkify('URL (https://eventsmith.lareys.dev) and api.ebdfy.com.\nNext');
   assert.deepEqual(l.urls, ['https://eventsmith.lareys.dev', 'https://api.ebdfy.com']);
   assert.equal(l.html, 'URL (<a href="0">https://eventsmith.lareys.dev</a>) and <a href="1">api.ebdfy.com</a>.<br>Next');

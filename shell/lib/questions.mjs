@@ -60,7 +60,7 @@ export function linkify(text) {
   WEB.lastIndex = 0;
   for (let m = WEB.exec(text); m; m = WEB.exec(text)) {
     let link = m[2];
-    // Sentence punctuation after an address, and a closing bracket it never opened, are not part of it.
+    // Sentence punctuation after an address, and a closing parenthesis it never opened, are not part of it.
     for (;;) {
       const trimmed = link.replace(/[.,;:!?'"]+$/, '');
       const closes = trimmed.endsWith(')') && trimmed.split('(').length < trimmed.split(')').length;
