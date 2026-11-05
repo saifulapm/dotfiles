@@ -36,8 +36,6 @@ Item {
 
     readonly property string command: Quickshell.env("DOTS_DNS") || "dots-dns"
     readonly property var c: theme.color
-    // In a theme that blurs, the card's box is the one region the Surfaces window asks niri to blur while the panel draws.
-    readonly property var blurRegion: card.glass && visible ? card.region : null
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var marks: D.dnsLook(theme.tokens)
@@ -52,9 +50,6 @@ Item {
     readonly property var leases: D.leasesView(leasesText)
     readonly property var lease: leases.length ? leases[Math.min(leaseSelected, leases.length - 1)] : null
     readonly property bool anyTimed: items.some(it => it.kind === "device" && it.openUntil !== null)
-    readonly property bool caps: look.voice === "caps"
-    readonly property bool plain: look.voice === "plain"
-    readonly property bool bracket: look.voice === "bracket"
     readonly property Root.Motion motion: Root.Motion {
         shown: panel.shown
         tokens: panel.theme.tokens
@@ -235,7 +230,7 @@ Item {
             keyboard: panel.Window.active,
             busy: busy,
             opens: opens,
-            heading: look.label.kind === "header" ? headerHeading.text : heading.text,
+            heading: heading.text,
             cursor: device ? device.key : "",
             carried: rows.filter(r => r.key.startsWith("carried:")).length,
             router: rows.filter(r => r.key.startsWith("router:")).length,
@@ -243,7 +238,6 @@ Item {
             rows: rows,
             cursorBox: box,
             cardBox: card.drawnBox(),
-            blurRegion: blurRegion ? [card.regionBox()] : [],
             pane: {
                 name: paneName.text,
                 path: panePath.text,
@@ -423,10 +417,9 @@ Item {
                 Layout.bottomMargin: 16
 
                 Rectangle {
-                    visible: look.label.kind !== "header"
                     implicitWidth: heading.implicitWidth + 14
                     implicitHeight: heading.implicitHeight + 6
-                    radius: plain ? 8 : 0
+                    radius: 8
                     color: look.label.fill
                     Text {
                         id: heading
@@ -435,20 +428,10 @@ Item {
                         text: marks.heading(panel.adding)
                         color: look.label.color
                         font.family: fonts.ui
-                        font.pixelSize: plain ? 12 : 10
-                        font.weight: plain ? Font.Medium : Font.Normal
-                        font.letterSpacing: plain ? 0 : 1.4
+                        font.pixelSize: 12
+                        font.weight: Font.Medium
+                        font.letterSpacing: 0
                     }
-                }
-                Text {
-                    id: headerHeading
-                    visible: look.label.kind === "header"
-                    textFormat: Text.PlainText
-                    text: marks.heading(panel.adding)
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
                 }
                 Item {
                     Layout.fillWidth: true
@@ -517,7 +500,7 @@ Item {
                                         color: look.small.color
                                         font.family: look.small.font
                                         font.pixelSize: look.small.size
-                                        font.letterSpacing: plain ? 0 : 1.6
+                                        font.letterSpacing: 0
                                     }
                                     Item {
                                         Layout.fillWidth: true
@@ -529,23 +512,22 @@ Item {
                                         color: look.small.color
                                         font.family: look.small.font
                                         font.pixelSize: look.small.size
-                                        font.letterSpacing: plain ? 0 : 1.6
+                                        font.letterSpacing: 0
                                     }
                                 }
-                                // Why the router's rows are dim and since when, in the theme's error voice.
+                                // Why the router's rows are dim and since when.
                                 Text {
                                     id: groupLineText
                                     visible: rowItem.hasLine
                                     Layout.fillWidth: true
                                     textFormat: Text.PlainText
-                                    text: marks.errorText(rowItem.it.line || "")
+                                    text: rowItem.it.line || ""
                                     elide: Text.ElideRight
                                     color: c.danger
-                                    font.family: caps ? fonts.display : look.small.font
-                                    font.pixelSize: caps ? 15 : 11
-                                    font.italic: caps
-                                    font.weight: bracket ? Font.Bold : Font.Normal
-                                    font.letterSpacing: bracket ? 1.2 : 0
+                                    font.family: look.small.font
+                                    font.pixelSize: 11
+                                    font.weight: Font.Normal
+                                    font.letterSpacing: 0
                                 }
                             }
 
@@ -655,7 +637,7 @@ Item {
                             color: look.small.color
                             font.family: look.small.font
                             font.pixelSize: look.small.size
-                            font.letterSpacing: plain ? 0 : 1.6
+                            font.letterSpacing: 0
                         }
                         Item {
                             Layout.fillWidth: true
@@ -666,7 +648,7 @@ Item {
                             color: look.small.color
                             font.family: look.small.font
                             font.pixelSize: look.small.size
-                            font.letterSpacing: plain ? 0 : 1.6
+                            font.letterSpacing: 0
                         }
                     }
 
@@ -797,7 +779,7 @@ Item {
                                 color: look.small.color
                                 font.family: look.small.font
                                 font.pixelSize: look.small.size
-                                font.letterSpacing: plain ? 0 : 1.4
+                                font.letterSpacing: 0
                             }
                             Item {
                                 Layout.fillWidth: true
@@ -905,7 +887,7 @@ Item {
                             color: look.small.color
                             font.family: look.small.font
                             font.pixelSize: look.small.size
-                            font.letterSpacing: plain ? 0 : 1.4
+                            font.letterSpacing: 0
                         }
                         RowLayout {
                             id: untilRow
@@ -934,7 +916,7 @@ Item {
                             visible: panel.timedOpen
                             Layout.fillWidth: true
                             implicitHeight: 4
-                            radius: plain ? 2 : 0
+                            radius: 2
                             color: c.line
                             Rectangle {
                                 width: parent.width * (panel.timedOpen ? D.openFraction(panel.device, panel.clock) : 0)
@@ -952,7 +934,7 @@ Item {
                                     required property var modelData
                                     implicitWidth: openRow.implicitWidth + 20
                                     implicitHeight: openRow.implicitHeight + 10
-                                    radius: plain ? 6 : 0
+                                    radius: 6
                                     color: "transparent"
                                     border.width: 1
                                     border.color: c.line
@@ -1023,7 +1005,7 @@ Item {
                             Layout.fillWidth: true
                             Layout.topMargin: 4
                             implicitHeight: fieldInput.implicitHeight + 10
-                            radius: plain ? 6 : 0
+                            radius: 6
                             color: "transparent"
                             border.width: 1
                             border.color: c.accent
@@ -1101,7 +1083,7 @@ Item {
                         }
                     }
 
-                    // Why the last write was refused, for 5 s, in the theme's error voice.
+                    // Why the last write was refused, for 5 s.
                     Text {
                         id: writeErrorText
                         visible: panel.writeError !== ""
@@ -1109,14 +1091,13 @@ Item {
                         // The reason can quote a name anyone on the network set, so it elides in the pane's room and never widens the pane into the list.
                         Layout.preferredWidth: 0
                         textFormat: Text.PlainText
-                        text: marks.errorText(panel.writeError)
+                        text: panel.writeError
                         elide: Text.ElideRight
                         color: c.danger
-                        font.family: caps ? fonts.display : look.small.font
-                        font.pixelSize: caps ? 15 : 11
-                        font.italic: caps
-                        font.weight: bracket ? Font.Bold : Font.Normal
-                        font.letterSpacing: bracket ? 1.2 : 0
+                        font.family: look.small.font
+                        font.pixelSize: 11
+                        font.weight: Font.Normal
+                        font.letterSpacing: 0
                     }
                 }
 
@@ -1140,7 +1121,7 @@ Item {
                         Rectangle {
                             Layout.fillWidth: true
                             implicitHeight: nameInput.implicitHeight + 12
-                            radius: plain ? 6 : 0
+                            radius: 6
                             color: "transparent"
                             border.width: panel.naming ? 2 : 1
                             border.color: panel.naming ? c.accent : c.line
@@ -1281,14 +1262,14 @@ Item {
 
             Rule {}
 
-            // The key strip as Accounts draws it: chips in Artboard, tracked caps in Paper, brackets in Blueprint.
+            // The key strip as Accounts draws it, each pair in a chip.
             Flow {
                 Layout.fillWidth: true
                 Layout.leftMargin: 18
                 Layout.rightMargin: 18
                 Layout.topMargin: 12
                 Layout.bottomMargin: 12
-                spacing: plain ? 8 : 14
+                spacing: 8
 
                 Repeater {
                     id: keyRepeater
@@ -1297,14 +1278,14 @@ Item {
                         id: keyPair
                         required property var modelData
                         readonly property string drawnKey: chipKey.text
-                        width: pair.implicitWidth + (plain ? 14 : 0)
-                        height: pair.implicitHeight + (plain ? 6 : 0)
+                        width: pair.implicitWidth + 14
+                        height: pair.implicitHeight + 6
                         radius: 6
                         color: look.chip.fill
                         Row {
                             id: pair
                             anchors.centerIn: parent
-                            spacing: plain ? 6 : 5
+                            spacing: 6
                             Text {
                                 id: chipKey
                                 textFormat: Text.PlainText
@@ -1331,17 +1312,11 @@ Item {
         }
     }
 
-    // A rule across the card: solid, or dashed in Blueprint.
+    // A rule across the card.
     component Rule: Rectangle {
         Layout.fillWidth: true
         implicitHeight: 1
-        color: look.rule.dashed ? "transparent" : look.rule.color
-
-        Root.Dashed {
-            visible: look.rule.dashed
-            anchors.fill: parent
-            color: look.rule.color
-        }
+        color: look.rule.color
     }
 
     // A section's head in the pane, with an optional word at the right.
@@ -1356,7 +1331,7 @@ Item {
             color: look.small.color
             font.family: look.small.font
             font.pixelSize: look.small.size
-            font.letterSpacing: plain ? 0 : 1.4
+            font.letterSpacing: 0
         }
         Item {
             Layout.fillWidth: true
@@ -1368,7 +1343,7 @@ Item {
             color: look.small.color
             font.family: look.small.font
             font.pixelSize: look.small.size
-            font.letterSpacing: plain ? 0 : 1.4
+            font.letterSpacing: 0
         }
     }
 
@@ -1384,7 +1359,7 @@ Item {
         readonly property string drawnText: badgeText.text
         implicitWidth: badgeRow.implicitWidth + 17
         implicitHeight: badgeRow.implicitHeight + 4
-        radius: plain ? height / 2 : 0
+        radius: height / 2
         color: "transparent"
         border.width: badgeRoot.timed ? 0 : 1
         border.color: kid || cursorRow ? tone : c.line

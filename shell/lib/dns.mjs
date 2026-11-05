@@ -1,5 +1,5 @@
 // DNS Shield's card from `dots-dns state`: carried and router devices in two groups, KID, OPEN or open for a while, the pane for the cursor device, and the router's leases to add one from.
-import { line, listLook, mark } from './voice.mjs';
+import { line, listLook } from './voice.mjs';
 
 // Names come from the uBlockDNS API, the router's reservations and its DHCP leases, which anyone on the network can set, so each is one line with no control characters; the card elides it.
 const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
@@ -129,8 +129,8 @@ export function allowArgs(d, text) {
 // o and O open a KID device, and restart or lengthen a timed open.
 export const openArgs = (d, length) => ((d.kid || timed(d)) && !d.dim ? ['open', d.key, length] : null);
 
-// A key chip draws its key as typed, since o and O are two keys; the words take the theme's voice and Blueprint keeps its brackets.
-const keys = (look, pairs) => pairs.map(([k, w]) => ({ key: look.voice === 'bracket' ? mark(look.engraved, k) : k, word: look.tabText(w) }));
+// A key chip draws its key as typed, since o and O are two keys.
+const keys = (look, pairs) => pairs.map(([k, w]) => ({ key: k, word: look.tabText(w) }));
 
 export const dnsKeys = (look) => keys(look, [['space', 'kid mode'], ['1-5', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
 
@@ -155,14 +155,12 @@ export const writeError = (stderr) => clean(String(stderr).split('\n')[0].replac
 
 export const addKeys = (look) => keys(look, [['↵', 'add in kid mode'], ['tab', 'name'], ['j/k', 'lease'], ['esc', 'back']]);
 
-// A group label in the theme's voice, its count after it, a column word at the right; the heading, and a failure in the theme's error voice.
+// A group label with its count after it, a column word at the right, and the heading.
 export function dnsLook(tokens) {
   const look = listLook(tokens);
-  const bracket = look.voice === 'bracket';
   return {
     group: (g) => ({ text: look.groupHead(g.label, g.count), right: look.tabText('Last block') }),
     leasesHead: (n) => ({ text: look.groupHead('On the network now', n), right: look.tabText('IP') }),
-    heading: (adding) => (look.label.kind === 'header' ? look.heading('DNS Shield', adding ? 'add device' : 'devices') : look.heading(adding ? 'DNS Shield › Add device' : 'DNS Shield', '')),
-    errorText: (s) => (bracket ? `✕ ${s.toUpperCase()}` : s),
+    heading: (adding) => look.heading(adding ? 'DNS Shield › Add device' : 'DNS Shield', ''),
   };
 }

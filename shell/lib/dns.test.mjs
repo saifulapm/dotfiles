@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parseToml } from './toml.mjs';
 import { listLook } from './voice.mjs';
+import { schemeTokens } from './colorscheme-file.mjs';
 import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, addKeys, writeError } from './dns.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
@@ -62,21 +61,16 @@ test('the cursor stops on every device across both groups, never on a group labe
   assert.deepEqual(items.filter((i) => i.kind === 'group').map((i) => [i.label, i.count]), [['Carried profile', 3], ['Home router', 5]]);
 });
 
-const theme = (name) => parseToml(readFileSync(new URL(`../../themes/${name}/theme.toml`, import.meta.url), 'utf8'));
+const artboard = () => schemeTokens('artboard');
 
-test("each theme labels the groups in its voice: Paper's and Blueprint's caps, Artboard's plain words", () => {
+test('the groups read in plain words with their count', () => {
   const groups = dnsItems(view()).filter((i) => i.kind === 'group');
-  const label = (name) => groups.map((g) => dnsLook(theme(name)).group(g));
-  assert.deepEqual(label('paper'), [{ text: 'CARRIED PROFILE · 3', right: 'LAST BLOCK' }, { text: 'HOME ROUTER · 5', right: 'LAST BLOCK' }]);
-  assert.deepEqual(label('artboard'), [{ text: 'Carried profile · 3', right: 'Last block' }, { text: 'Home router · 5', right: 'Last block' }]);
-  assert.deepEqual(label('blueprint'), [{ text: 'CARRIED PROFILE · 3', right: 'LAST BLOCK' }, { text: 'HOME ROUTER · 5', right: 'LAST BLOCK' }]);
+  assert.deepEqual(groups.map((g) => dnsLook(artboard()).group(g)), [{ text: 'Carried profile · 3', right: 'Last block' }, { text: 'Home router · 5', right: 'Last block' }]);
 });
 
-test("each theme's key strip is the board's, each key as typed so o and O read apart", () => {
-  const strip = (n) => dnsKeys(listLook(theme(n))).map((k) => `${k.key} ${k.word}`.trim());
-  assert.deepEqual(strip('artboard'), ['space kid mode', '1-5 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
-  assert.deepEqual(strip('paper'), ['space KID MODE', '1-5 CATEGORIES', 'o OPEN 30M', 'O 2H', 'a ALLOW', 'n ADD DEVICE', 'esc']);
-  assert.deepEqual(strip('blueprint'), ['[space] KID MODE', '[1-5] CATEGORIES', '[o] OPEN 30M', '[O] 2H', '[a] ALLOW', '[n] ADD DEVICE', '[esc]']);
+test("the key strip is the board's, each key as typed so o and O read apart", () => {
+  const strip = dnsKeys(listLook(artboard())).map((k) => `${k.key} ${k.word}`.trim());
+  assert.deepEqual(strip, ['space kid mode', '1-5 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
 });
 
 test("a carried KID device's pane: its path, KID, the five categories with YouTube Kids and Gambling off, its allow list and recent blocks", () => {
@@ -241,12 +235,9 @@ test('while the router is unreachable a router row takes no write, and a carried
   assert.deepEqual(kidArgs(at(v, 'carried:dev00ipad')), ['kid', 'carried:dev00ipad', 'off']);
 });
 
-test('each theme draws the unreachable line in its error voice, and the heading in its own', () => {
-  const line = 'router unreachable · as of 14:58';
-  const looks = ['paper', 'artboard', 'blueprint'].map((n) => dnsLook(theme(n)));
-  assert.deepEqual(looks.map((l) => l.errorText(line)), [line, line, '✕ ROUTER UNREACHABLE · AS OF 14:58']);
-  assert.deepEqual(looks.map((l) => l.heading(true)), ['DNS SHIELD › ADD DEVICE', 'DNS Shield › Add device', 'DNS SHIELD // ADD DEVICE']);
-  assert.deepEqual(looks.map((l) => l.heading(false)), ['DNS SHIELD', 'DNS Shield', 'DNS SHIELD // DEVICES']);
+test('the heading names the add list after DNS Shield', () => {
+  const look = dnsLook(artboard());
+  assert.deepEqual([look.heading(true), look.heading(false)], ['DNS Shield › Add device', 'DNS Shield']);
 });
 
 const leases = [
@@ -255,7 +246,7 @@ const leases = [
   { mac: '02:00:00:00:00:43', ip: '192.168.0.160', hostname: 'Chrome\ncast‮\u001b' },
 ];
 
-test('the leases read as hostname or unnamed with their address, one-lined, and their count in each voice', () => {
+test('the leases read as hostname or unnamed with their address, one-lined, and their count', () => {
   const l = leasesView(JSON.stringify(leases));
   assert.deepEqual(l.map((x) => [x.mac, x.name, x.ip, x.field]), [
     ['02:00:00:00:00:41', 'Galaxy-A54', '192.168.0.143', 'Galaxy-A54'],
@@ -263,7 +254,7 @@ test('the leases read as hostname or unnamed with their address, one-lined, and 
     ['02:00:00:00:00:43', 'Chrome cast', '192.168.0.160', 'Chrome cast'],
   ]);
   assert.deepEqual(leasesView('nope'), []);
-  assert.deepEqual(['paper', 'artboard'].map((n) => dnsLook(theme(n)).leasesHead(3)), [{ text: 'ON THE NETWORK NOW · 3', right: 'IP' }, { text: 'On the network now · 3', right: 'IP' }]);
+  assert.deepEqual(dnsLook(artboard()).leasesHead(3), { text: 'On the network now · 3', right: 'IP' });
 });
 
 test('Enter adds the lease under the typed name, one-lined, and an empty name adds nothing', () => {
@@ -275,19 +266,12 @@ test('Enter adds the lease under the typed name, one-lined, and an empty name ad
 });
 
 test("the add list's key strip is the board's", () => {
-  assert.deepEqual(addKeys(listLook(theme('artboard'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
-  assert.deepEqual(addKeys(listLook(theme('paper'))).map((k) => `${k.key} ${k.word}`.trim()), ['↵ ADD IN KID MODE', 'tab NAME', 'j/k LEASE', 'esc BACK']);
+  assert.deepEqual(addKeys(listLook(artboard())).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
 });
 
-test("a refused write reads as the collector's reason, one-lined and stripped, in each theme's error voice", () => {
+test("a refused write reads as the collector's reason, one-lined and stripped", () => {
   assert.equal(writeError('dots-dns: that is not a domain name\n'), 'that is not a domain name');
   assert.equal(writeError('dots-dns: router unreachable (ssh exit 255)\n'), 'router unreachable (ssh exit 255)');
   assert.equal(writeError('dots-dns: esc\u001b[2Jape evil‮gnp.exe\tW\nsecond line\n'), 'esc [2Jape evilgnp.exe W');
   assert.equal(writeError(''), '');
-  const looks = ['paper', 'artboard', 'blueprint'].map((n) => dnsLook(theme(n)));
-  assert.deepEqual(looks.map((l) => l.errorText(writeError('dots-dns: the router has no lease for that device'))), [
-    'the router has no lease for that device',
-    'the router has no lease for that device',
-    '✕ THE ROUTER HAS NO LEASE FOR THAT DEVICE',
-  ]);
 });

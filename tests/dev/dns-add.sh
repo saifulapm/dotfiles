@@ -16,8 +16,6 @@ state_is() { dns_state | jq -e "$@" >/dev/null 2>&1; }
 logged() { if [ -e "$log" ]; then grep -cxF -- "$1" "$log"; else echo 0; fi; }
 logged_is() { [ "$(logged "$1")" = "$2" ]; }
 calls() { if [ -e "$log" ]; then wc -l <"$log"; else echo 0; fi; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 open_dns() { niri msg action spawn -- dots-call dns toggle; until_ok 3000 state_is '.open and .settled and .keyboard'; }
 close_dns() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 idle() { until_ok "${1:-3000}" state_is '.busy == false and (.rows | length) > 0'; }
@@ -30,8 +28,8 @@ idle
 wtype n
 adding
 echo "     add: $(dns_state | jq -c '{heading, add}')"
-check "n heads the card DNS SHIELD › ADD DEVICE in Paper" state_is '.heading == "DNS SHIELD › ADD DEVICE"'
-check "and lists the 3 leases with their addresses under ON THE NETWORK NOW · 3" state_is '.add.head == "ON THE NETWORK NOW · 3" and ([.add.leases[] | [.name, .ip]] == [["Galaxy-A54", "192.168.0.143"], ["android-7f2c", "192.168.0.151"], ["Chromecast", "192.168.0.160"]])'
+check "n heads the card DNS Shield › Add device" state_is '.heading == "DNS Shield › Add device"'
+check "and lists the 3 leases with their addresses under On the network now · 3" state_is '.add.head == "On the network now · 3" and ([.add.leases[] | [.name, .ip]] == [["Galaxy-A54", "192.168.0.143"], ["android-7f2c", "192.168.0.151"], ["Chromecast", "192.168.0.160"]])'
 list_width=$(dns_state | jq .add.listWidth)
 check "the lease list is $list_width px wide, its note on one line" state_is '(.add.listWidth | type) == "number" and .add.listWidth > 300 and .add.noteLines == 1'
 check "the cursor lease's hostname and address show at the right, and the name field starts from it" state_is --arg m "$galaxy" '.add.cursor == $m and .add.host == "Galaxy-A54" and .add.address == "192.168.0.143" and .add.name == "Galaxy-A54"'
@@ -104,27 +102,15 @@ check "space, n and a on a dimmed router row run nothing ($(tail -n +$((before +
 check "and open no add list or allow field" state_is '.add == null and .field == null'
 close_dns
 
-for t in "paper|DNS SHIELD › ADD DEVICE|router unreachable · as of" "artboard|DNS Shield › Add device|router unreachable · as of" "blueprint|DNS SHIELD // ADD DEVICE|✕ ROUTER UNREACHABLE · AS OF"; do
-  IFS='|' read -r name head line <<<"$t"
-  in_theme "$name"
-  open_dns
-  idle
-  check "$name: the unreachable line reads $line HH:MM ($(dns_state | jq -c '.groups[1].line'))" state_is --arg l "$line" '.groups[1].line | startswith($l)'
-  close_dns
-  rm "$DOTS_DEV_DIR/dns-router-down"
-  open_dns
-  idle
-  check "$name: with the router back the line and the dim clear by themselves" state_is '.groups[1].line == "" and all(.rows[]; .opacity == 1)'
-  wtype n
-  adding
-  check "$name: the add heading reads $head ($(dns_state | jq -c .heading))" state_is --arg h "$head" '.heading == $h'
-  wtype -k Escape
-  until_ok 1000 state_is '.add == null'
-  close_dns
-  touch "$DOTS_DEV_DIR/dns-router-down"
-done
+open_dns
+idle
+check "the unreachable line reads router unreachable · as of HH:MM ($(dns_state | jq -c '.groups[1].line'))" state_is '.groups[1].line | test("^router unreachable · as of [0-9]{2}:[0-9]{2}$")'
+close_dns
 rm "$DOTS_DEV_DIR/dns-router-down"
-in_theme paper
+open_dns
+idle
+check "with the router back the line and the dim clear by themselves" state_is '.groups[1].line == "" and all(.rows[]; .opacity == 1)'
+close_dns
 
 exit $((fails > 0))
 }

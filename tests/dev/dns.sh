@@ -17,8 +17,6 @@ state_is() { dns_state | jq -e "$@" >/dev/null 2>&1; }
 logged() { if [ -e "$log" ]; then grep -cxF -- "$1" "$log"; else echo 0; fi; }
 logged_is() { [ "$(logged "$1")" = "$2" ]; }
 fakes() { pgrep -f -- "$repo/bin/dev-fake-dns" >/dev/null; }
-status_theme() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
-in_theme() { legacy_theme "$1" >/dev/null; until_ok 4000 status_theme "$1"; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 bind=$(sed -n 's/^\s*Mod+Shift+D [^{]*{ spawn \(.*\); }$/\1/p' "$repo/home/dot_config/niri/binds.kdl" | tr -d '"')
 open_dns() { niri msg action spawn -- $bind; until_ok 3000 state_is '.open and .settled and .keyboard'; }
@@ -53,7 +51,7 @@ idle
 echo "     rows: $(dns_state | jq -c '[.rows[] | [.name, .badge, .age]]')"
 check "Mod+Shift+D draws 3 carried and 5 router rows" state_is '.carried == 3 and .router == 5 and (.rows | length) == 8'
 check "the rows read the board's names, badges and ages" state_is '[.rows[] | [.name, .badge, .age]] == [["Saiful'"'"'s iPhone", "OPEN", "—"], ["iPad", "KID", "2m"], ["Wife'"'"'s iPhone", "OPEN", "—"], ["macbook", "OPEN", "—"], ["nuc", "OPEN", "—"], ["mini", "OPEN", "—"], ["Sister'"'"'s phone", "KID", "41m"], ["Living-room TV", "KID", "1h"]]'
-check "Paper labels the groups CARRIED PROFILE · 3 and HOME ROUTER · 5 ($(dns_state | jq -c '[.groups[].text]'))" state_is '[.groups[].text] == ["CARRIED PROFILE · 3", "HOME ROUTER · 5"]'
+check "the groups read Carried profile · 3 and Home router · 5 ($(dns_state | jq -c '[.groups[].text]'))" state_is '[.groups[].text] == ["Carried profile · 3", "Home router · 5"]'
 check "the footer reads as of HH:MM ($(dns_state | jq -c .footer))" state_is '.footer | test("^as of [0-9]{2}:[0-9]{2}$")'
 check "the cursor starts on the first device" state_is '.cursor == "carried:dev00iphone"'
 
@@ -96,7 +94,7 @@ wtype -k space
 check "space on the iPad with the write refused logs a third kid $ipad off" until_ok 3000 logged_is "kid $ipad off" 3
 check "the card draws the reason under the pane ($(dns_state | jq -c .error))" until_ok 3000 state_is '.error == "router unreachable (ssh exit 255)"'
 shown_at=$(now_ms)
-check "in Paper's danger colour ($(dns_state | jq -c .errorColor))" state_is '.errorColor == "#c8381e" and .errorLines == 1'
+check "in the danger colour ($(dns_state | jq -c .errorColor))" state_is '.errorColor == "#cf222e" and .errorLines == 1'
 idle
 check "and the iPad still reads KID with its categories ($(row "$ipad"))" state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "KID") and ([.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"])'
 check "the reason goes within 7 s" until_ok 7000 state_is '.error == ""'
@@ -168,28 +166,22 @@ idle
 check "reopened with identical data, the drawn rows read back the same ($(dns_state | jq -c '[.rows[] | [.name, .badge]]'))" test "$(dns_state | jq -c '[.rows[] | [.name, .badge]]')" = "$before"
 check "and the pane is drawn" state_is '.pane.name != ""'
 
-for t in "paper|CARRIED PROFILE · 3|HOME ROUTER · 5|#FAF6EC|space 1-5 o O a n esc|router unreachable (ssh exit 255)|#c8381e" "artboard|Carried profile · 3|Home router · 5|#FFFFFF|space 1-5 o O a n esc|router unreachable (ssh exit 255)|#cf222e" "blueprint|CARRIED PROFILE · 3|HOME ROUTER · 5|#0A1526|[space] [1-5] [o] [O] [a] [n] [esc]|✕ ROUTER UNREACHABLE (SSH EXIT 255)|#ffb547"; do
-  IFS='|' read -r name carried router card keys reason danger <<<"$t"
-  close_dns
-  in_theme "$name"
-  open_dns
-  idle
-  check "$name: the groups read $carried and $router ($(dns_state | jq -c '[.groups[].text]'))" state_is --arg a "$carried" --arg b "$router" '[.groups[].text] == [$a, $b]'
-  # o opens for 30 minutes and O for 2 hours, so a theme's caps voice must not draw both as O.
-  check "$name: the key strip draws each key as typed, $keys ($(dns_state | jq -c .keys))" state_is --arg k "$keys" '.keys == ($k | split(" "))'
-  px=$(off_colour "$(cursor_geo)" "$card")
-  check "$name: the cursor row's strip $(cursor_geo) draws $px px off the card's $card, over half of it" test "$px" -ge 10000
-  wtype j
-  until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
-  check "$name: the iPad's pane draws 5 category rows, 1-5 ($(dns_state | jq -c '[.pane.categories[] | "\(.n) \(.label)"]'))" state_is '[.pane.categories[] | "\(.n) \(.label)"] == ["1 YouTube", "2 YouTube Kids", "3 Social", "4 Adult", "5 Gambling"]'
-  until_ok 7000 state_is '.error == ""'
-  echo "dots-dns: router unreachable (ssh exit 255)" >"$DOTS_DEV_DIR/dns-fail"
-  wtype 2
-  check "$name: a refused 2 draws $reason in $danger ($(dns_state | jq -c '[.error, .errorColor]'))" until_ok 3000 state_is --arg e "$reason" --arg c "$danger" '.error == $e and .errorColor == $c'
-  idle
-  check "$name: and leaves the iPad's categories as they were" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"]'
-done
-in_theme paper
+close_dns
+open_dns
+idle
+# o opens for 30 minutes and O for 2 hours, so the strip must not draw both as O.
+check "the key strip draws each key as typed, space 1-5 o O a n esc ($(dns_state | jq -c .keys))" state_is '.keys == ["space", "1-5", "o", "O", "a", "n", "esc"]'
+px=$(off_colour "$(cursor_geo)" "#FFFFFF")
+check "the cursor row's strip $(cursor_geo) draws $px px off the card's #FFFFFF, over half of it" test "$px" -ge 10000
+wtype j
+until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
+check "the iPad's pane draws 5 category rows, 1-5 ($(dns_state | jq -c '[.pane.categories[] | "\(.n) \(.label)"]'))" state_is '[.pane.categories[] | "\(.n) \(.label)"] == ["1 YouTube", "2 YouTube Kids", "3 Social", "4 Adult", "5 Gambling"]'
+until_ok 7000 state_is '.error == ""'
+echo "dots-dns: router unreachable (ssh exit 255)" >"$DOTS_DEV_DIR/dns-fail"
+wtype 2
+check "a refused 2 draws router unreachable (ssh exit 255) in #cf222e ($(dns_state | jq -c '[.error, .errorColor]'))" until_ok 3000 state_is '.error == "router unreachable (ssh exit 255)" and .errorColor == "#cf222e"'
+idle
+check "and leaves the iPad's categories as they were" state_is '[.pane.categories[].value] == ["ON", "ON", "ON", "ON", "OFF"]'
 close_dns
 
 # Names from a state file anyone on the network can write: a newline, a bidi override, an escape sequence, an empty name and 200 characters.
