@@ -160,7 +160,6 @@ Item {
             settled: motion.settled,
             drawing: centre.visible,
             cardBox: card.drawnBox(),
-            frameLabel: card.frameLabel(),
             heading: heading.text,
             headingBox: box(heading),
             ruleBox: box(headRule),
@@ -227,7 +226,6 @@ Item {
             height: column.implicitHeight
             tokens: centre.theme.tokens
             role: "card"
-            label: "Notifications"
             motion: centre.motion
 
             ColumnLayout {

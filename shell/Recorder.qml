@@ -80,7 +80,7 @@ Item {
         const hint = [];
         for (let i = 0; i < hintRepeater.count; i++)
             hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
-        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), frameLabel: hintCard.frameLabel(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
+        return JSON.stringify({ picking: shown, motion: motion.curves?.kind ?? null, settleMs: motion.settleMs, settled: motion.settled, drawing: recorder.visible, cardBox: hintCard.drawnBox(), recording: recording, pid: Root.State.recordingPid, region: region, step: R.STEP, file: file, hint: hint.join("  ") });
     }
 
     Process {
@@ -164,7 +164,6 @@ Item {
         width: hintRow.implicitWidth + 28
         height: hintRow.implicitHeight + 16
         tokens: recorder.theme.tokens
-        label: "Record"
         motion: recorder.motion
 
         Row {

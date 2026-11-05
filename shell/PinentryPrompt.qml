@@ -115,7 +115,6 @@ Item {
         width: 520
         height: column.implicitHeight
         tokens: prompt.theme.tokens
-        label: prompt.words.heading
         motion: prompt.motion
 
         ColumnLayout {

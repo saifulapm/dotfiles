@@ -235,7 +235,6 @@ Item {
         width: 640
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        label: "Tailscale"
         motion: panel.motion
 
         ColumnLayout {

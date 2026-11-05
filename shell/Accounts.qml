@@ -237,7 +237,6 @@ Item {
         width: 640
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        label: "Accounts"
         motion: panel.motion
 
         ColumnLayout {

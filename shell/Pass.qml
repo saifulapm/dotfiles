@@ -408,7 +408,6 @@ Item {
         width: 640
         height: column.implicitHeight
         tokens: pass.theme.tokens
-        label: "Pass"
         motion: pass.motion
 
         ColumnLayout {

@@ -34,8 +34,8 @@ function steps(file) {
     for (const n of names) if (!pixel.has(n) && (/\bgrim\b/.test(fns[n]) || calls(fns[n], [...pixel]))) grew = !!pixel.add(n);
   }
   // A switcher renders or switches to its first argument.
-  const switchers = names.filter((n) => /(bin\/dots"? colorscheme|legacy_theme|theme-render\.mjs"?|status_theme) "\$1"/.test(fns[n]) && n !== 'status_theme');
-  const switchAt = new RegExp(`^\\s*(${['"\\$repo/bin/dots" colorscheme', 'legacy_theme', 'until_ok \\d+ status_theme', ...switchers].join('|')})\\s+("?)(${THEMES}|\\S+)\\2(\\s|$)`);
+  const switchers = names.filter((n) => /(bin\/dots"? colorscheme|status_theme) "\$1"/.test(fns[n]) && n !== 'status_theme');
+  const switchAt = new RegExp(`^\\s*(${['"\\$repo/bin/dots" colorscheme', 'until_ok \\d+ status_theme', ...switchers].join('|')})\\s+("?)(${THEMES}|\\S+)\\2(\\s|$)`);
   // The scheme the nested session starts in is the first step, so a check that never switches has one too.
   const start = lines.join('\n').match(/^export\s.*\bDOTS_DEV_SCHEME=([a-z0-9-]+)/m)?.[1] ?? 'artboard';
   let cur = { step: `${file}:${start}`, pixels: false };
@@ -53,34 +53,14 @@ function steps(file) {
     if (cur && (/\bgrim\b/.test(line) || calls(line, [...pixel]))) cur.pixels = true;
     if (cur && /^\s*check\s/.test(line)) cur.checks = true;
   });
-  // A step that checks nothing, such as the switch back to Paper at the end, has nothing to read.
+  // A step that checks nothing, such as a switch back to artboard at the end, has nothing to read.
   return found.filter((s) => s.checks);
 }
 
 const checks = () => readdirSync(dir).filter((f) => /-(look|voice)\.sh$/.test(f)).sort();
 
 // The steps that read no pixels when the lint landed (ruling YCWS2MGM): a new bare step fails, and one that gains a pixel read is struck from here when it lands.
-const OLD = [
-  'cheatsheet-look.sh:hi-fi',
-  'cheatsheet-look.sh:paper',
-  'file-picker-look.sh:hi-fi',
-  'files-look.sh:paper',
-  'island-voice.sh:paper',
-  'launcher-look.sh:artboard',
-  'launcher-look.sh:hi-fi',
-  'lock-look.sh:hi-fi',
-  'lock-look.sh:paper',
-  'margins-voice.sh:artboard',
-  'margins-voice.sh:blueprint',
-  'margins-voice.sh:blueprint',
-  'margins-voice.sh:paper',
-  'picker-look.sh:blueprint',
-  'picker-look.sh:blueprint',
-  'picker-look.sh:hi-fi',
-  'urgency-voice.sh:artboard',
-  'urgency-voice.sh:blueprint',
-  'urgency-voice.sh:paper',
-];
+const OLD = [];
 
 test('every theme step of a tests/dev look or voice check reads the screen, past the old ones', () => {
   const left = OLD.slice();

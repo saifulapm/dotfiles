@@ -189,7 +189,6 @@ Item {
             closeTookMs: motion.closeTook,
             settled: motion.settled,
             drawing: launcher.visible,
-            frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
             glassFill: String(card.drawnFill),
             nameFont: nameBox ? nameBox.fontInfo.family : null,
@@ -314,7 +313,6 @@ Item {
             width: 640
             height: column.implicitHeight
             tokens: launcher.theme.tokens
-            label: "Launcher"
             motion: launcher.motion
 
             ColumnLayout {

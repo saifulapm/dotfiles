@@ -82,7 +82,6 @@ Item {
             settleMs: motion.settleMs,
             settled: motion.settled,
             drawing: prompt.visible,
-            frameLabel: card.frameLabel(),
             cardBox: card.drawnBox(),
             message: flow?.message ?? "",
             drawnMessage: messageText.text,
@@ -123,7 +122,6 @@ Item {
         width: 520
         height: column.implicitHeight
         tokens: prompt.theme.tokens
-        label: "Authenticate"
         motion: prompt.motion
 
         ColumnLayout {

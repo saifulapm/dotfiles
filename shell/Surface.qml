@@ -11,8 +11,6 @@ Item {
     property var tokens: null
     // island, card or chip; an island and its specimen chip are a slab, a card is framed.
     property string role: "card"
-    // A panel's name; the one design draws no frame label, so frameLabel() reports it hidden.
-    property string label: ""
     // Parts of the look swapped for a moment, as the island's lease draws its last minute; null keeps the scheme's.
     property var restyle: null
     readonly property var style: S.restyled(S.surfaceStyle(tokens, role), restyle)
@@ -39,9 +37,6 @@ Item {
         const a = mapToItem(null, 0, 0);
         const b = mapToItem(null, width, height);
         return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
-    }
-    function frameLabel() {
-        return { text: label, visible: false, truncated: false, box: null };
     }
     transform: Translate {
         y: surface.pose.lift

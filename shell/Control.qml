@@ -89,7 +89,6 @@ Item {
             drawing: control.visible,
             cardBox: card.drawnBox(),
             cardFill: String(card.drawnFill),
-            frameLabel: card.frameLabel(),
             heading: header.visible ? header.text : "",
             tabFill: tab ? String(tab.color) : null,
             tabText: tab ? tab.text : null,
@@ -145,7 +144,6 @@ Item {
         width: 720
         height: column.implicitHeight
         tokens: control.theme.tokens
-        label: "Control"
         motion: control.motion
 
         ColumnLayout {

@@ -263,7 +263,6 @@ Item {
             width: 680
             height: column.implicitHeight
             tokens: view.theme.tokens
-            label: "Goals"
             motion: view.motion
 
             ColumnLayout {

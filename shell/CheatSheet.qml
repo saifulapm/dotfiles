@@ -135,7 +135,6 @@ Item {
             width: Math.min(1160, parent.width - 48)
             height: Math.min(column.implicitHeight, parent.height - 96)
             tokens: sheet.theme.tokens
-            label: "Keys"
             motion: sheet.motion
 
             ColumnLayout {

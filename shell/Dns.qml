@@ -401,7 +401,6 @@ Item {
         width: Math.min(1040, parent.width - 48)
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        label: "DNS Shield"
         motion: panel.motion
 
         ColumnLayout {

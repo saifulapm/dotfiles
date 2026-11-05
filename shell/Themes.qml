@@ -142,7 +142,6 @@ Item {
             width: Lib.panelWidth(switcher.themes.length, parent.width)
             height: column.implicitHeight
             tokens: switcher.theme.tokens
-            label: "Themes"
             motion: switcher.motion
 
             Column {

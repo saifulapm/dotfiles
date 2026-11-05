@@ -463,7 +463,6 @@ Item {
             settled: motion.settled,
             drawing: picker.visible,
             cardBox: card.drawnBox(),
-            frameLabel: card.frameLabel(),
             keyboard: picker.Window.active
         });
     }
@@ -662,7 +661,6 @@ Item {
         width: Math.min(1080, parent.width - 32)
         height: Math.min(620, parent.height - 32)
         tokens: picker.theme.tokens
-        label: headingLabel.text
         motion: picker.motion
 
         ColumnLayout {
