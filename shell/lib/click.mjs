@@ -16,3 +16,13 @@ export function boxJson(root, name) {
   const at = area.mapToItem(root, 0, 0);
   return JSON.stringify({ x: at.x, y: at.y, w: area.width, h: area.height });
 }
+
+// Whether a press at x, y in item lands on a surface's card: a drawn item under it, however deep, is named card; holders are searched whatever their own size.
+export function onCard(item, x, y) {
+  for (const child of item.children) {
+    if (!child.visible) continue;
+    const p = item.mapToItem(child, x, y);
+    if (child.objectName === 'card' ? p.x >= 0 && p.y >= 0 && p.x < child.width && p.y < child.height : onCard(child, p.x, p.y)) return true;
+  }
+  return false;
+}

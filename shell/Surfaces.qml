@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Wayland
 import QtQuick
 import "." as Root
+import "lib/click.mjs" as ClickLib
 import "lib/launcher.mjs" as Lib
 
 // The one Overlay window every surface draws in; it stays mapped, since a remap costs 20 to 30 ms.
@@ -211,6 +212,18 @@ PanelWindow {
             if (typed)
                 host.openLauncher(Date.now(), null, typed);
             event.accepted = true;
+        }
+    }
+
+    // Under every surface, so it takes only the presses nothing drawn above it takes: one outside the shown card closes that surface as Escape does, and focus goes back to the window that had it.
+    MouseArea {
+        anchors.fill: parent
+        onPressed: mouse => {
+            const s = host.all.find(s => s?.shown);
+            if (!s || ClickLib.onCard(s, mouse.x, mouse.y))
+                mouse.accepted = false;
+            else
+                s.close();
         }
     }
 

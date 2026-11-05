@@ -27,6 +27,8 @@ Item {
     property var motion: null
     readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1 })
     default property alias content: inner.data
+    // The name the surfaces host knows a card by, so a press on it never counts as a click outside.
+    objectName: "card"
     // The fill as the body draws it, so a state function can report the colour on screen.
     readonly property alias drawnFill: fillRect.color
 
