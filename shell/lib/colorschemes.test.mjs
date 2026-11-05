@@ -88,3 +88,32 @@ test('the licence file names each upstream project and its licence', () => {
   for (const n of ['Catppuccin', 'Gruvbox', 'Rosé Pine', 'GitHub Primer']) assert.ok(text.includes(n), n);
   assert.ok(text.includes('MIT'));
 });
+
+const names = () => readdirSync(join(repo, 'colorschemes')).filter((f) => f.endsWith('.toml')).map((f) => f.slice(0, -5));
+
+test('forty colorschemes ship', () => {
+  assert.equal(names().length, 40);
+});
+
+test('catppuccin-latte and tokyo-night keep their upstream backgrounds', () => {
+  assert.equal(read('catppuccin-latte').color.surface, '#EFF1F5');
+  assert.equal(read('catppuccin-latte').color.paper, '#DCE0E8');
+  assert.equal(read('tokyo-night').color.surface, '#1A1B26');
+});
+
+// Each project's section opens with its name and the files it covers, then its licence.
+test("the licence file has a section for every scheme's family, naming the file and the scheme's licence", () => {
+  const sections = readFileSync(join(repo, 'colorschemes/THIRD_PARTY_LICENSES'), 'utf8').split(/^-{70}$/m).map((s) => s.trim());
+  for (const name of names().filter((n) => n !== 'artboard')) {
+    const { meta } = read(name);
+    const own = sections.find((s) => s.split('\n')[0].startsWith(meta.family) && s.includes(`${name}.toml`));
+    assert.ok(own, `a section opening with ${meta.family} names ${name}.toml`);
+    assert.ok(own.includes(`Licence: ${meta.licence}`), `${name}: Licence: ${meta.licence}`);
+  }
+});
+
+test('Tokyo Night is Apache-2.0 and the licence file holds the Apache 2.0 text once', () => {
+  assert.equal(read('tokyo-night').meta.licence, 'Apache-2.0');
+  const text = readFileSync(join(repo, 'colorschemes/THIRD_PARTY_LICENSES'), 'utf8');
+  assert.equal(text.match(/TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION/g)?.length, 1);
+});
