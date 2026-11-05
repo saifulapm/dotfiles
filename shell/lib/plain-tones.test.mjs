@@ -101,6 +101,15 @@ test("every scheme's lit row reads its text and detail at 4.5:1, its mode pill i
   }
 });
 
+// 2XV8P1VJ: backing the tint onto the surface kept the words readable and lost the lit row; Artboard's, the weakest seen as lit, is 1.125:1.
+test("every scheme's lit row stands off its surface at 1.1:1 or more", () => {
+  for (const n of SCHEMES) {
+    const t = schemeTokens(n);
+    const ratio = contrast(solid(launcherLook(t).cursor.fill), t.color.surface);
+    assert.ok(ratio >= 1.1, `${n} lit row ${launcherLook(t).cursor.fill} on ${t.color.surface}: ${ratio.toFixed(3)}`);
+  }
+});
+
 // A plain branch's white is Artboard's card; on a dark scheme it is a light slab, so it reads the table's card.
 test('no shell surface draws a literal white on a plain branch', () => {
   const found = [];
