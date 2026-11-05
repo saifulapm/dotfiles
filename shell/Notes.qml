@@ -185,6 +185,27 @@ FloatingWindow {
         closePicker();
     }
 
+    // Enter on a card: its text goes into the composer to change.
+    function edit() {
+        editing = current.id;
+        composer.text = current.text;
+        composer.cursorPosition = composer.text.length;
+        useComposer();
+    }
+
+    // A click on a card selects it and does what Enter does.
+    function clickCard(index) {
+        useList();
+        selected = index;
+        edit();
+    }
+
+    // A click on a tab shows that section, as Ctrl+K's picker does.
+    function showSection(name) {
+        notes.save(N.useSection(store, name));
+        selected = 0;
+    }
+
     function closePicker() {
         picking = "";
         if (pickFrom === "composer")
@@ -224,12 +245,9 @@ FloatingWindow {
             return false;
         else if (event.key === Qt.Key_Space)
             notes.save(N.toggleDone(store, current.id, now));
-        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            editing = current.id;
-            composer.text = current.text;
-            composer.cursorPosition = composer.text.length;
-            useComposer();
-        } else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6)
+        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+            edit();
+        else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_6)
             notes.save(N.toggleTag(store, current.id, String(event.key - Qt.Key_0), now));
         else if (event.key === Qt.Key_Y && shift && N.firstImage(current))
             notes.copyFile(N.firstImage(current));
@@ -388,6 +406,12 @@ FloatingWindow {
             border.width: win.look ? win.look.pinned.border : 1
             border.color: win.look ? win.look.pinned.color : "red"
 
+            // A click on the pinned badge unpins Notes, as its key does.
+            Root.Click {
+                name: "notes-pin"
+                onTapped: win.pin()
+            }
+
             Text {
                 id: pinnedText
                 anchors.centerIn: parent
@@ -427,6 +451,11 @@ FloatingWindow {
                 Rectangle {
                     id: tab
                     required property var modelData
+
+                    Root.Click {
+                        name: "notes-tab:" + tab.modelData.name
+                        onTapped: win.showSection(tab.modelData.name)
+                    }
                     readonly property string drawn: tabText.text
                     width: tabContent.width + 16
                     height: tabRow.height
@@ -572,7 +601,10 @@ FloatingWindow {
                 Root.DragOut {
                     id: bodyDrag
                     anchors.fill: frame
+                    name: "notes-card:" + card.index
+                    cursorShape: Qt.PointingHandCursor
                     mime: N.dragOffer(card.modelData)
+                    onClicked: win.clickCard(card.index)
                 }
 
                 Item {

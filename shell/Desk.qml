@@ -3,6 +3,7 @@ import Quickshell.Io
 import QtQuick
 import "." as Root
 import "services" as Services
+import "lib/click.mjs" as ClickLib
 import "lib/margins.mjs" as MarginsLib
 import "lib/goals.mjs" as GoalsLib
 import "lib/idle.mjs" as IdleLib
@@ -110,6 +111,11 @@ Scope {
         function toggle(): void {
             notesLoader.active = true;
             notesLoader.item.toggle();
+        }
+
+        // Where a click area is drawn in the Notes window, {x, y, w, h}, or null when none by that name shows.
+        function box(name: string): string {
+            return notesLoader.item ? ClickLib.boxJson(notesLoader.item.contentItem, name) : "null";
         }
 
         function pin(): void {
