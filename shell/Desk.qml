@@ -208,6 +208,11 @@ Scope {
             island.focusIsland();
         }
 
+        // Where a click area is drawn on the island's output, {x, y, w, h}, or null when none by that name shows.
+        function box(name: string): string {
+            return island.box(name);
+        }
+
         // dots-capture's result: ocr, qr or colour, a title ("" for a miss) and a detail, a colour's being its hex.
         function capture(kind: string, title: string, detail: string): void {
             island.showCapture(kind, title, detail);

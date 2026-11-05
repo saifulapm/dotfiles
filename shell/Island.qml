@@ -12,6 +12,8 @@ import "lib/questions.mjs" as Q
 import "lib/voice.mjs" as V
 import "lib/notifs.mjs" as N
 import "lib/worldclock.mjs" as W
+import "lib/control.mjs" as C
+import "lib/click.mjs" as ClickLib
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
 PanelWindow {
@@ -773,6 +775,23 @@ PanelWindow {
         toastTick.restart();
     }
 
+    // The wheel over the island turns the volume as the volume keys do (binds.kdl), 5 % a notch; a touchpad's small turns add up to a notch first.
+    property real wheelRest: 0
+    function wheeled(angle) {
+        const t = C.wheelSteps(wheelRest, angle);
+        wheelRest = t.rest;
+        if (t.steps > 0)
+            Quickshell.execDetached(["sh", "-c", `wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ ${5 * t.steps}%+`]);
+        else if (t.steps < 0)
+            Quickshell.execDetached(["sh", "-c", `wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ ${-5 * t.steps}%-`]);
+    }
+
+    // Where a click area is drawn on the island's output, {x, y, w, h}, or null: the window is centred at the top of its output.
+    function box(name) {
+        const b = JSON.parse(ClickLib.boxJson(contentItem, name));
+        return JSON.stringify(b ? Object.assign(b, { x: b.x + Math.round((screen.width - width) / 2) }) : null);
+    }
+
     function release() {
         focused = false;
         leaseOpen = false;
@@ -967,6 +986,13 @@ PanelWindow {
         role: "island"
         // The open lease card is framed in the accent.
         restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : null
+
+        // Under every part, so a question's scroll and a notification's own area take the pointer first.
+        Root.Click {
+            name: "island"
+            acceptedButtons: Qt.NoButton
+            onWheel: event => island.wheeled(event.angleDelta.y)
+        }
 
         // Each part is drawn at its own size and clipped to the box as it morphs.
         Item {
