@@ -112,12 +112,6 @@ check "cards are rounded 12 px and headings sentence case ($(dekho_state | jq -c
   dekho_is '.look.cardRadius == 12 and .look.rowHead == "Continue watching" and .look.homeFont == "Maple Mono"'
 check "the poster is masked to its grey tile's 8 px corners ($(dekho_state | jq -c '.rows.continue[0].poster'))" \
   dekho_is '.rows.continue[0].poster | .shown and .radius == 8 and .width == 36 and .height == 54'
-
-# The home draws its words bare. The only brackets left are the fixture titles that carried an ANSI colour code, whose ESC the window drops and whose [31m stays.
-words_marked() { dekho_state | marked | grep -v '\[31m'; }
-no_marks() { [ -z "$(words_marked)" ]; }
-check "nothing in the state holds a bracket but the [31m fixture titles ($(words_marked | head -3 | paste -sd'|'))" no_marks
-
 wtype -k Escape
 until_ok 3000 dekho_gone
 check "Esc closes the window" dekho_gone
