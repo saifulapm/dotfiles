@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import "lib/youtube-queue.mjs" as Q
 import "lib/youtube.mjs" as YT
+import "lib/dekho.mjs" as D
 
 // The YouTube window as its board draws it: the title strip, the sidebar of views beside the list pane, the now-playing line and the key legend.
 Rectangle {
@@ -112,6 +113,19 @@ Rectangle {
         function onPickingChanged() {
             Qt.callLater(board.revealPick);
         }
+    }
+
+    // Enter in the list, and a click on a row once the cursor is on it: a failed search asks again, a failed download downloads again, a Playlist plays, else the row plays or opens.
+    function enterList() {
+        const row = yt.rows[yt.cursor];
+        if (failing)
+            yt.retry();
+        else if (row && yt.downloadFailed(row.id))
+            yt.retryDownload(row);
+        else if (yt.playlist)
+            yt.playPlaylist();
+        else
+            yt.enter(row);
     }
 
     function focusName(text) {
@@ -260,14 +274,8 @@ Rectangle {
                 board.yt.moveType(1);
             else if (k === Qt.Key_Escape)
                 board.yt.back();
-            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.failing)
-                board.yt.retry();
-            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.yt.rows[board.yt.cursor] && board.yt.downloadFailed(board.yt.rows[board.yt.cursor].id))
-                board.yt.retryDownload(board.yt.rows[board.yt.cursor]);
-            else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list" && board.yt.playlist)
-                board.yt.playPlaylist();
             else if ((k === Qt.Key_Return || k === Qt.Key_Enter) && board.yt.pane === "list")
-                board.yt.enter(board.yt.rows[board.yt.cursor]);
+                board.enterList();
             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                 board.yt.focusPane("list");
             else if (t === "s" && board.yt.pane === "list")
@@ -900,6 +908,13 @@ Rectangle {
                         // A new model resets the view to its first row, so a page landing below would take the cursor's row out of view; the cursor's binding comes back with it.
                         onCountChanged: currentIndex = Qt.binding(() => board.yt.cursor)
 
+                        // Under the rows, the wheel scrolls the list and leaves the cursor where it is; j or k brings the cursor's row back into view.
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.NoButton
+                            onWheel: event => rowList.contentY = D.wheeled(rowList.contentY, event.angleDelta.y, rowList.contentHeight, rowList.height)
+                        }
+
                         delegate: Rectangle {
                             id: rowItem
                             required property var modelData
@@ -934,6 +949,15 @@ Rectangle {
                             // The lit row is outlined in the accent.
                             border.width: lit ? 1.5 : 0
                             border.color: c.accent ?? "blue"
+
+                            Click {
+                                name: "yt-row:" + rowItem.index
+                                onTapped: {
+                                    board.yt.cursor = rowItem.index;
+                                    board.yt.focusPane("list");
+                                    board.enterList();
+                                }
+                            }
 
                             // The columns: the thumbnail, the title over the channel, the download mark's slot and the duration.
                             RowLayout {

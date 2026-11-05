@@ -10,6 +10,7 @@ import "lib/youtube-find.mjs" as F
 import "lib/youtube-queue.mjs" as Q
 import "lib/youtube-playlists.mjs" as P
 import "lib/youtube-get.mjs" as G
+import "lib/click.mjs" as C
 
 // The YouTube App: its own qs process started by bin/dots-youtube, one window in the shell's theme with a sidebar of views beside their list; the process ends with its window.
 ShellRoot {
@@ -736,6 +737,11 @@ ShellRoot {
 
     IpcHandler {
         target: "youtube"
+
+        // Where a click area is in the window, {x, y, w, h}, or null when none by that name is drawn.
+        function box(name: string): string {
+            return C.boxJson(win.contentItem, name);
+        }
 
         function state(): string {
             procStatus.reload();
