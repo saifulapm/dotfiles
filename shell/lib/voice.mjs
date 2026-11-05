@@ -1,719 +1,253 @@
-// How the shell speaks under a token set, from its voice, as the three themes' boards draw it: the launcher and the lists that share its idioms, the island's notification and OSD, and the margins.
+// How the shell speaks under a token set, in its one plain voice: the launcher and the lists that share its idioms, the island's notification and OSD, and the margins.
 
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
 import { captureText } from './island.mjs';
-import { HIFI } from './hifi.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder'];
 
-// Each mode's prefix and the word the boards give it; Artboard spells calculator out.
-const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'calc'], ['>', 'commands']];
-const PLAIN_WORD = { calc: 'calculator' };
-const CAPS_NAME = { calculator: 'CALC', reminder: 'REMIND' };
+// Each mode's prefix and the word the footer gives it.
+const PREFIXES = [['w', 'windows'], ['v', 'clipboard'], [':', 'emoji'], ['=', 'calculator'], ['>', 'commands']];
+// The keys a mode's rows take: reminder's delete, and clipboard's Shift+Enter, which copies a clip without pasting it.
+const MODE_KEYS = { reminder: [['d', 'delete']], clipboard: [['⇧↵', 'copy']] };
 
-// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text, a card, and the island's text and tile on its slab. A plain theme without its own row draws Artboard's.
+// The plain voice's board colours, which no token carries and no mix of tokens lands on: the lit row's tint and its deep text, tiles, fields, thumbnails, rules, a meter's bar, the online and outline marks, the warning and its chip, strong text, a card, and the island's text and tile on its slab. Every scheme draws Artboard's.
 const PLAIN = {
-  artboard: { tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' } },
-  frost: { tint: '#475666', deep: '#ECEFF4', tile: '#434C5E', field: '#323845', thumb: '#434C5E', rule: '#434C5E', bar: '#88C0D0', online: '#A3BE8C', outline: '#AEB7C6', warn: '#EBCB8B', warnChip: '#434C5E', strong: '#ECEFF4', card: '#3B4252', island: { head: '#AEB7C6', body: '#D8DEE9', summary: '#ECEFF4', tile: '#434C5E' } },
+  tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' },
 };
-export const plainTones = (tokens) => PLAIN[tokens?.name] ?? PLAIN.artboard;
+export const plainTones = () => PLAIN;
 
-// An open can come before the theme's tokens load; until then the launcher draws in black and white.
-const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '', voice: 'caps' } };
+// An open can come before the theme's tokens load; until then the shell draws the plain look in black and white.
+const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '' } };
 
 // Bidi marks, embeddings, overrides and isolates, which let an app's name redraw itself in another order.
-const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
+const BIDI = /[‎‏؜‪-‮⁦-⁩]/g;
 // Control characters other than tab, newline and return, which a font draws as tofu; they go, as the chip's do.
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
 const same = (s) => (s || '').replace(BIDI, '').replace(CONTROL, '');
 // Text a sender wrote, drawn in the order it is spelt; its lines stay.
 export const inOrder = same;
-const upper = (s) => same(s).toUpperCase();
 // A one-line label: newlines and tabs become single spaces, so a sender cannot stack lines.
 export const line = (s) => same(s).replace(/\s+/g, ' ').trim();
-// Blueprint's square marks around a word the shell wrote; the engraved voice draws the word bare. Text a person wrote never goes through here.
-export const mark = (engraved, s, pad = '') => (engraved ? s : `[${pad}${s}${pad}]`);
-// Hi-Fi's engraved labels: Qt's raised style draws a 1 px line of ink at 8 % (Qt's #AARRGGBB) under each letter.
-export const engraving = (tokens) => (tokens?.type.engraved === true ? { on: true, color: `#14${tokens.color.ink.slice(1)}` } : { on: false, color: 'transparent' });
 
 export function launcherLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const engraved = t.engraved === true;
+  // A dark theme's accent and muted fall under 4.5:1 on its tint, so its pill word and lit detail take the deep text and the ink.
   const dark = tokens?.mode === 'dark';
-  const caps = voice !== 'plain';
-  const key = (k) => (voice === 'bracket' ? mark(engraved, upper(k)) : caps ? upper(k) : k);
-  // Reminder mode names the keys its rows take; Paper also names Enter's, as its board does.
-  const REMINDER_KEYS = voice === 'caps' ? [['↵', 'set'], ['d', 'delete']] : [['d', 'delete']];
-  // Clipboard mode names Shift+Enter, which copies a clip without pasting it.
-  const CLIP_KEYS = [['⇧↵', 'copy']];
   const legend = (mode) => ({
-    keys:
-      mode === 'apps'
-        ? PREFIXES.map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : PLAIN_WORD[w] || w }))
-        : mode === 'reminder' || mode === 'clipboard'
-          ? (mode === 'reminder' ? REMINDER_KEYS : CLIP_KEYS).map(([k, w]) => ({ key: key(k), word: caps ? upper(w) : w }))
-          : [],
-    tail: engraved ? 'J K · ↵ · ESC' : caps ? 'J/K · ↵ · ESC' : 'j/k · ↵ · esc',
-    chips: voice === 'plain',
+    keys: (mode === 'apps' ? PREFIXES : MODE_KEYS[mode] ?? []).map(([key, word]) => ({ key, word })),
+    tail: 'j/k · ↵ · esc',
   });
-  const base = {
-    voice,
-    engraved,
+  return {
     legend,
     legendLine(mode) {
       const l = legend(mode);
       return l.keys.map((k) => `${k.key} ${k.word}`).concat([l.tail]).join('  ');
     },
-    number: (i) => String(i + 1).padStart(2, '0'),
     title: same,
     detailText: same,
-    // A row's global key: Artboard writes it as niri does, Paper in tracked caps and Blueprint in brackets.
-    rowKey: (k) => (!k ? '' : voice === 'plain' ? k : key(k.replace(/\+/g, ' ').replace(/\bShift\b/, '⇧'))),
-    // Paper names a capture row's tool and Blueprint leaves it bare, as the m24 boards draw them.
-    rowDetail(row) {
-      if (row.tool && voice === 'caps') return same(row.tool);
-      if (row.tool && voice === 'bracket') return '';
-      return this.detailText(row.detail);
-    },
-    count: () => '',
-    pendingCount: (n) => (caps ? `${n} PENDING` : ''),
-    // The head over the pending reminders; Blueprint counts them against the cap at the right.
-    pendingHead: (n) => (voice === 'plain' ? { text: `Pending · ${n}`, right: '' } : { text: 'PENDING', right: voice === 'bracket' ? `${n} OF 50` : '' }),
-    prompt: { text: '', color: c.accent, search: false },
-    caret: 'line',
-    rule: { color: c.ink, dashed: false },
-    small: { font: t.ui, size: 10, spacing: 1.4, color: c.muted },
-    tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
+    // A row's global key, written as niri writes it.
+    rowKey: (k) => k || '',
+    rowDetail: (row) => same(row.detail),
+    // The head over the pending reminders, with their count.
+    pendingHead: (n) => ({ text: `Pending · ${n}`, right: '' }),
+    prompt: { text: '', color: c.muted },
+    query: { font: t.ui, size: 20 },
+    label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: PLAIN.tint, color: dark ? PLAIN.deep : c.accent },
+    name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
+    detail: { font: t.ui, size: 12, italic: false, color: c.muted },
+    cursor: { fill: PLAIN.tint, text: PLAIN.deep, detail: dark ? c.ink : c.muted, radius: 10, weight: 600, badge: '↵' },
+    rule: { color: c.line, dashed: false },
+    small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
+    tile: { size: 32, radius: 9, fill: PLAIN.tile },
+    chip: { fill: PLAIN.tile, key: c.ink },
+    keyChip: { fill: PLAIN.tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: PLAIN.deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0 },
   };
-  if (voice === 'plain') {
-    // A theme that blurs draws its field as a well of paper at 70 % (Qt's #AARRGGBB) with a tile-coloured edge, an accent › and caret and accent mono keys, and a 1 px highlight of its deep text at 6 % inside the pane.
-    const frosted = tokens?.niri?.blur === true;
-    const tones = plainTones(tokens);
-    const frostLook = frosted
-      ? {
-          prompt: { text: '›', color: c.accent, search: false },
-          // The board heads the pane Launch · Apps and counts the matches, both muted, over the field.
-          label: { kind: 'header', text: (m) => `Launch · ${m.charAt(0).toUpperCase() + m.slice(1)}`, fill: 'transparent', color: c.muted },
-          count: (n) => `${n} ${n === 1 ? 'match' : 'matches'}`,
-          field: { fill: `#B3${c.paper.slice(1)}`, border: tones.tile, caret: c.accent },
-          highlight: `#0F${tones.deep.slice(1)}`,
-        }
-      : {};
-    return Object.assign(base, {
-      query: { font: t.ui, size: 20, italic: false },
-      prompt: { text: '', color: c.muted, search: true },
-      // A dark theme's accent and muted fall under 4.5:1 on its tint, so its pill word and lit detail take the deep text and the ink.
-      label: { kind: 'pill', text: (m) => m.charAt(0).toUpperCase() + m.slice(1), fill: plainTones(tokens).tint, color: dark ? plainTones(tokens).deep : c.accent },
-      slot: 'icon',
-      name: { font: t.ui, size: 15, weight: 500, spacing: 0, color: c.ink },
-      detail: { font: t.ui, size: 12, italic: false, color: c.muted },
-      cursor: { fill: plainTones(tokens).tint, text: plainTones(tokens).deep, detail: dark ? c.ink : c.muted, marker: 'transparent', radius: 10, weight: 600, badge: '↵' },
-      rule: { color: c.line, dashed: false },
-      small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
-      chip: frosted ? { fill: tones.tile, key: c.accent, font: t.mono } : { fill: tones.tile, key: c.ink },
-      keyChip: { fill: plainTones(tokens).tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: plainTones(tokens).deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0, column: 0 },
-    }, frostLook);
-  }
-  if (voice === 'bracket') {
-    // Hi-Fi lights the cursor row like a lamp: a #32302F row with an amber name and an ink category, its own lamp in place of Blueprint's number.
-    const lamp = engraved;
-    return Object.assign(base, {
-      query: { font: t.mono, size: 22, italic: false },
-      prompt: { text: lamp ? '›' : '>', color: c.accent, search: false },
-      caret: 'block',
-      label: { kind: 'header', text: (m) => `LAUNCH ${lamp ? '·' : '//'} ${upper(m)}`, fill: 'transparent', color: c.muted },
-      count: (n) => `${n} MATCHES`,
-      slot: lamp ? 'lamp' : 'number',
-      title: upper,
-      detailText: upper,
-      name: { font: t.mono, size: 15, weight: 400, spacing: 0.6, color: c.ink },
-      detail: { font: t.mono, size: 11, italic: false, spacing: 1.3, color: c.muted },
-      cursor: lamp
-        ? { fill: HIFI.lit, text: c.accent, detail: c.ink, marker: 'transparent', radius: 0, weight: 700, badge: '', glow: c.accent }
-        : { fill: c.accent, text: c.surface, detail: c.surface, marker: 'transparent', radius: 0, weight: 700, badge: '' },
-      rule: { color: c.line, dashed: true },
-      small: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
-      chip: { fill: 'transparent', key: c.accent },
-      keyChip: { fill: 'transparent', text: c.muted, border: 0, borderColor: 'transparent', cursorFill: 'transparent', cursorText: c.surface, cursorBorder: 'transparent', radius: 0, size: 11, spacing: 1.3, column: 0 },
-    });
-  }
-  return Object.assign(base, {
-    query: { font: t.display, size: 34, italic: false },
-    label: { kind: 'chip', text: (m) => CAPS_NAME[m] || upper(m), fill: c.ink, color: c.surface },
-    count: (n) => `${n} FOUND`,
-    slot: 'marker',
-    name: { font: t.ui, size: 15, weight: 400, spacing: 0, color: c.ink },
-    detail: { font: t.display, size: 16, italic: true, color: c.muted },
-    cursor: { fill: c.ink, text: c.surface, detail: c.line, marker: c.accent, radius: 0, weight: 500, badge: '' },
-    chip: { fill: 'transparent', key: c.ink },
-    keyChip: { fill: 'transparent', text: c.ink, border: 1, borderColor: c.ink, cursorFill: 'transparent', cursorText: c.surface, cursorBorder: c.surface, radius: 0, size: 10, spacing: 1.4, column: 96 },
-  });
 }
-
-// The island's board tints on its dark box, which no token carries.
-const ISLAND = {
-  caps: { head: '#B9AE99', body: '#D9CFBB', track: '#4A4338' },
-};
 
 // How the island draws a notification; every colour not named here is the island's own text colour.
 export function islandLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const engraved = t.engraved === true;
-  const appText = (app) => (voice === 'plain' ? line(app) : line(app).toUpperCase());
-  const base = {
-    voice,
-    appText,
-    brackets: voice === 'bracket' && !engraved,
-    appLabel(app) {
-      const a = appText(app);
-      return a && voice === 'bracket' ? mark(engraved, a, ' ') : a;
-    },
+  return {
+    appText: line,
     summaryText: line,
     bodyText: same,
-    glyph: (app) => upper(app).charAt(0) || '•',
-    tile: null,
-    // Hi-Fi's glass display: a highlight under the top border and a tuning scale along the bottom.
-    glass: false,
+    glyph: (app) => same(app).toUpperCase().charAt(0) || '•',
+    width: 440,
+    age: 'now',
+    pad: { x: 16, top: 14, bottom: 14 },
+    head: { font: t.ui, size: 12, spacing: 0, color: PLAIN.island.head },
+    summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: PLAIN.island.summary },
+    body: { font: t.ui, size: 13, color: PLAIN.island.body },
+    tile: { size: 40, radius: 12, fill: PLAIN.island.tile },
   };
-  if (voice === 'plain') {
-    // Frost's glass card: a smaller muted head and body, and an accent icon on accent at 16 % (Qt's #AARRGGBB).
-    const glass = (tokens || UNTHEMED).niri?.blur === true;
-    return Object.assign(base, {
-      width: 440,
-      age: 'now',
-      pad: { x: 16, top: 14, bottom: 14 },
-      head: { font: t.ui, size: glass ? 11.5 : 12, spacing: 0, color: plainTones(tokens).island.head },
-      summary: { font: t.ui, size: 15, weight: 600, spacing: 0, color: plainTones(tokens).island.summary },
-      body: { font: t.ui, size: 13, color: glass ? c.muted : plainTones(tokens).island.body },
-      tile: glass ? { size: 32, radius: 9, fill: `#29${c.accent.slice(1)}`, ink: c.accent } : { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
-    });
-  }
-  if (voice === 'bracket') {
-    return Object.assign(base, {
-      width: 420,
-      age: engraved ? 'NOW' : 'T+0S',
-      // Hi-Fi's 10 px tuning scale sits under the body, 8 px above the bottom border.
-      pad: { x: 18, top: 12, bottom: engraved ? 30 : 14 },
-      head: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
-      summary: { font: t.mono, size: 15, weight: 700, spacing: 0.6, color: c.accent, glow: engraved ? c.accent : '' },
-      glass: engraved,
-      summaryText: (x) => line(x).toUpperCase(),
-      body: { font: t.mono, size: 12, color: c.ink },
-    });
-  }
-  return Object.assign(base, {
-    width: 420,
-    age: 'NOW',
-    pad: { x: 16, top: 12, bottom: 14 },
-    head: { font: t.ui, size: 10, spacing: 1.4, color: tokens ? ISLAND.caps.head : c.muted },
-    summary: { font: t.display, size: 24, weight: 400, spacing: 0, color: '' },
-    body: { font: t.mono, size: 12, color: tokens ? ISLAND.caps.body : c.ink },
-  });
 }
 
-// What each capture card says under its result: Artboard's line names how it was read; niri's pick gives no place, so a colour says only that it was picked.
+// What each capture card says under its result: the line names how it was read; niri's pick gives no place, so a colour says only that it was picked.
 const CAPTURE_BODY = { ocr: 'eng + ben · from region', qr: 'from region', colour: 'colour picked' };
 
-// How the island draws dots-capture's result, as each theme's board does: Paper's pill (a check, the title in caps, the count in serif, a colour's swatch and hex), or Artboard's and Blueprint's notification card, fed a note the card already draws. A colour left empty is the island's own text colour.
-export function captureLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
-  const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const card = (note) => ({ card: true, note: (r) => Object.assign({ swatch: r.swatch, icon: '', files: [] }, note(r)) });
-  if (voice === 'plain') return card((r) => ({ app: 'Capture', summary: captureText(r), body: CAPTURE_BODY[r.kind] }));
-  if (voice === 'bracket')
-    return card((r) => ({
-      app: r.kind.toUpperCase(),
-      summary: r.kind === 'colour' || !r.title ? captureText(r) : r.title,
-      body: r.kind === 'colour' ? CAPTURE_BODY.colour : r.title ? r.detail : '',
-    }));
-  return {
-    card: false,
-    height: 34,
-    pad: 14,
-    gap: 10,
-    check: 12,
-    swatch: 14,
-    titleText: (s) => line(s).toUpperCase(),
-    title: { font: t.ui, size: 10, spacing: 1.4 },
-    // A colour's hex in mono, a count in the italic serif; a miss's words are muted.
-    detail: (r) =>
-      r.kind === 'colour'
-        ? { font: t.mono, size: 12, weight: 500, spacing: 0.72, italic: false, color: '' }
-        : { font: t.display, size: 17, weight: 400, spacing: 0, italic: true, color: r.title ? '' : tokens ? ISLAND.caps.head : c.muted },
-  };
+// How the island draws dots-capture's result: the notification card, fed a note from Capture with the result as its summary.
+export function captureLook() {
+  return { note: (r) => ({ swatch: r.swatch, icon: '', files: [], app: 'Capture', summary: captureText(r), body: CAPTURE_BODY[r.kind] }) };
 }
 
-// How the island draws an agent's lease in place of the clock, its last minute and its Mod+I card, as the m21 boards do (XX2P8V57); a colour left empty is the island's own text colour.
+// How the island draws an agent's lease in place of the clock, its last minute and its Mod+I card; a colour left empty is the island's own text colour.
 export function leaseLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const minutes = (ms) => {
+  const time = (ms) => {
     const s = Math.max(0, Math.ceil(ms / 1000));
     return `${Math.floor(s / 60)}:${pad2(s % 60)}`;
   };
-  const time = (ms) => (voice === 'bracket' ? 'T−' : '') + minutes(ms);
   const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
-  if (voice === 'plain') {
-    const head = tokens ? plainTones(tokens).island.head : c.muted;
-    return {
-      voice,
-      time,
-      slot: {
-        width: 264,
-        height: 40,
-        pad: 16,
-        gap: 10,
-        mark: { shape: 'dot', size: 8, color: tokens ? plainTones(tokens).bar : c.accent },
-        label: Object.assign(text(13, ''), { text: '' }),
-        who: Object.assign(text(13, tokens ? plainTones(tokens).island.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
-        time: text(13, tokens ? plainTones(tokens).island.summary : '', { weight: 500 }),
-      },
-      warning: { box: null, label: '', time: plainTones(tokens).warn, chip: plainTones(tokens).warnChip, ring: plainTones(tokens).warnChip, mark: plainTones(tokens).warn },
-      card: {
-        layout: 'card',
-        width: 440,
-        // The board draws the open card as a selected frame, named Island beside its corner.
-        box: tokens ? { frame: { width: 1.5, color: c.accent }, handles: true, handleFill: c.surface } : null,
-        label: 'Island',
-        ink: tokens ? plainTones(tokens).island.summary : '',
-        head: 'Agent · lease',
-        headColor: head,
-        who: line,
-        unlocked: (hhmm) => `unlocked ${hhmm}`,
-        unlockedColor: tokens ? plainTones(tokens).island.body : c.muted,
-        left: 'left',
-        tile: tokens ? plainTones(tokens).island.tile : c.muted,
-        bar: 'round',
-        barFill: tokens ? plainTones(tokens).bar : c.accent,
-        keys: [['↵', 'lock now'], ['esc', 'close']],
-      },
-    };
-  }
-  if (voice === 'bracket') {
-    return {
-      voice,
-      time,
-      slot: {
-        width: 320,
-        height: 34,
-        pad: 16,
-        gap: 10,
-        mark: null,
-        label: Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: mark(t.engraved === true, 'AGENT', ' ') }),
-        who: Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6 }), { text: (who) => upper(line(who)) }),
-        time: text(12, c.accent, { font: t.mono, weight: 700, spacing: 0.6 }),
-      },
-      warning: { box: { frame: { width: 1, color: c.danger }, glow: c.danger }, label: '', time: c.danger, chip: '', ring: '', mark: '' },
-      card: {
-        layout: 'sheet',
-        width: 420,
-        box: null,
-        label: '',
-        title: (who) => `${upper(line(who))} HAS THE SESSION`,
-        who: (who) => upper(line(who)),
-        unlocked: (hhmm) => `UNLOCKED ${hhmm}`,
-        bar: 'blocks',
-        keys: [[mark(t.engraved === true, '↵'), 'LOCK NOW'], [mark(t.engraved === true, 'ESC'), 'CLOSE']],
-      },
-    };
-  }
   return {
-    voice,
     time,
     slot: {
-      width: 300,
-      height: 34,
-      pad: 14,
-      gap: 10,
-      mark: { shape: 'square', size: 8, color: c.accent },
-      label: Object.assign(text(10, tokens ? ISLAND.caps.body : c.muted, { spacing: 1.4 }), { text: 'AGENT' }),
-      who: Object.assign(text(10, '', { weight: 500, spacing: 1.4 }), { text: (who) => upper(line(who)) }),
-      time: text(20, '', { font: t.display }),
-    },
-    warning: { box: { fill: c.surface, text: c.ink, frame: { width: 1.5, color: c.danger } }, label: c.muted, time: c.danger, chip: '', ring: '', mark: '' },
-    card: {
-      layout: 'print',
-      width: 420,
-      box: tokens ? { frame: { width: 1.5, color: c.accent } } : null,
-      label: '',
-      headColor: tokens ? ISLAND.caps.head : c.muted,
-      who: line,
-      unlocked: (hhmm) => `unlocked ${hhmm}`,
-      unlockedColor: tokens ? ISLAND.caps.body : c.muted,
-      left: 'LEFT',
-      bar: null,
-      keys: [['↵', 'LOCK NOW'], ['ESC', 'CLOSE']],
-    },
-  };
-}
-
-// How the island draws a Taildrop send in place of the clock, as each m22 board does: a mark, the words in parts (the one naming the machine elides), the percent at the right and a bar along the bottom edge or after the words; a colour left empty is the island's own text colour.
-export function sendingLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
-  const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const files = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
-  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0, name: false }, extra);
-  if (voice === 'plain') {
-    return {
-      width: 380,
+      width: 264,
       height: 40,
       pad: 16,
       gap: 10,
-      mark: { shape: 'upload', size: 16, color: '' },
-      parts: [Object.assign(text(13, '', { weight: 500, name: true }), { text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` })],
-      pct: null,
-      bar: { at: 'inline', height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
-    };
-  }
-  if (voice === 'bracket') {
-    return {
-      width: 420,
-      height: 34,
-      pad: 16,
-      gap: 10,
-      mark: null,
-      parts: [
-        Object.assign(text(12, c.muted, { font: t.mono, spacing: 1.68 }), { text: () => mark(t.engraved === true, 'TAILDROP', ' ') }),
-        Object.assign(text(12, c.ink, { font: t.mono, weight: 700, spacing: 0.6, name: true }), { text: (count, to) => `→ ${upper(line(to))}` }),
-        Object.assign(text(10, c.muted, { font: t.mono, spacing: 1 }), { text: (count) => upper(files(count)) }),
-      ],
-      pct: Object.assign(text(12, c.accent, { font: t.mono, weight: 700, spacing: 0.6 }), { text: (p) => `${p}%` }),
-      bar: { at: 'bottom', height: 3, radius: 0, track: c.line, fill: c.accent },
-    };
-  }
-  return {
-    width: 300,
-    height: 34,
-    pad: 14,
-    gap: 10,
-    mark: { shape: 'square', size: 8, color: c.accent },
-    parts: [Object.assign(text(10, '', { spacing: 1.4, name: true }), { text: (count, to) => `SENDING ${upper(files(count))} TO ${upper(line(to))} ·` })],
-    pct: Object.assign(text(20, '', { font: t.display }), { text: (p) => `${p}%` }),
-    bar: { at: 'bottom', height: 4, radius: 0, track: c.paper, fill: c.accent },
+      mark: { shape: 'dot', size: 8, color: tokens ? PLAIN.bar : c.accent },
+      label: Object.assign(text(13, ''), { text: '' }),
+      who: Object.assign(text(13, tokens ? PLAIN.island.body : c.ink, { weight: 500 }), { text: (who) => `Agent · ${line(who)}` }),
+      time: text(13, tokens ? PLAIN.island.summary : '', { weight: 500 }),
+    },
+    warning: { label: '', time: PLAIN.warn, chip: PLAIN.warnChip, ring: PLAIN.warnChip, mark: PLAIN.warn },
+    card: {
+      width: 440,
+      // The board draws the open card as a selected frame, named Island beside its corner.
+      box: tokens ? { frame: { width: 1.5, color: c.accent } } : null,
+      label: 'Island',
+      ink: tokens ? PLAIN.island.summary : '',
+      head: 'Agent · lease',
+      headColor: tokens ? PLAIN.island.head : c.muted,
+      who: line,
+      unlocked: (hhmm) => `unlocked ${hhmm}`,
+      unlockedColor: tokens ? PLAIN.island.body : c.muted,
+      left: 'left',
+      tile: tokens ? PLAIN.island.tile : c.muted,
+      bar: 'round',
+      barFill: tokens ? PLAIN.bar : c.accent,
+      keys: [['↵', 'lock now'], ['esc', 'close']],
+    },
   };
 }
 
-// How the island draws a YouTube download in place of the clock, as the boards do: a line over a bar, with Artboard's tile and folder and Blueprint's [ YOUTUBE ] and clock above it; a failure keeps the box and drops the bar. A colour left empty is the island's own text colour.
-export function downloadingLook(tokens) {
+// How the island draws a Taildrop send in place of the clock: an upload mark, the words with the percent in them (the machine's name elides) and a rounded bar after them; a colour left empty is the island's own text colour.
+export function sendingLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const text = (font, size, color, extra) => Object.assign({ font, size, color, weight: 400, spacing: 0 }, extra);
-  if (voice === 'plain') {
-    const folders = { audio: '~/Music/YouTube', video: '~/Videos/YouTube' };
-    return {
-      width: 440,
-      height: 76,
-      pad: 16,
-      gap: 6,
-      tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
-      head: Object.assign(text(t.ui, 12, plainTones(tokens).island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
-      line: text(t.ui, 15, '', { weight: 700 }),
-      bar: { height: 4, radius: 2, track: plainTones(tokens).island.tile, fill: plainTones(tokens).bar },
-      chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
-      failure: { mark: null, color: '', box: null },
-    };
-  }
-  if (voice === 'bracket') {
-    return {
-      width: 420,
-      height: 70,
-      pad: 18,
-      gap: 6,
-      tile: null,
-      head: Object.assign(text(t.mono, 10, c.muted, { spacing: 1.6 }), { left: mark(t.engraved === true, 'YOUTUBE', ' '), right: (kind, clock) => clock }),
-      line: text(t.mono, 14, c.accent, { weight: 700 }),
-      bar: { height: 3, radius: 0, track: c.line, fill: c.accent },
-      chip: null,
-      failure: { mark: null, color: c.danger, box: { frame: { width: 1, color: c.danger }, glow: c.danger } },
-    };
-  }
+  const files = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
   return {
-    width: 480,
-    height: 46,
+    width: 380,
+    height: 40,
     pad: 16,
-    gap: 7,
-    tile: null,
-    head: null,
-    line: text(t.mono, 12, ''),
-    bar: { height: 4, radius: 0, track: tokens ? ISLAND.caps.track : c.muted, fill: c.accent },
-    chip: null,
-    failure: { mark: { shape: 'square', size: 8, color: c.accent }, color: '', box: null },
+    gap: 10,
+    mark: { shape: 'upload', size: 16, color: '' },
+    parts: [{ font: t.ui, size: 13, color: '', weight: 500, spacing: 0, name: true, text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` }],
+    pct: null,
+    bar: { at: 'inline', height: 6, radius: 3, track: tokens ? PLAIN.island.tile : c.muted, fill: tokens ? PLAIN.bar : c.accent },
+  };
+}
+
+// How the island draws a YouTube download in place of the clock: a tile and the folder over a line and a bar; a failure keeps the box, drops the bar and shows a chip. A colour left empty is the island's own text colour.
+export function downloadingLook(tokens) {
+  const t = (tokens || UNTHEMED).type;
+  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
+  const folders = { audio: '~/Music/YouTube', video: '~/Videos/YouTube' };
+  return {
+    width: 440,
+    height: 76,
+    pad: 16,
+    gap: 6,
+    tile: { size: 40, radius: 12, fill: PLAIN.island.tile },
+    head: Object.assign(text(12, PLAIN.island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
+    line: text(15, '', { weight: 700 }),
+    bar: { height: 4, radius: 2, track: PLAIN.island.tile, fill: PLAIN.bar },
+    chip: { fill: PLAIN.warnChip, color: PLAIN.warn, radius: 8, padX: 8, padY: 2 },
+    failure: { mark: null, color: '', box: null },
   };
 }
 
 // C0 controls and DEL, which a file name from another machine may carry.
 const CONTROLS = /[\u0000-\u001f\u007f]/g;
 
-// How a file notification's chip draws in the toast, a centre row and the cursor row, its empty slot and the drag image, as the m22 boards do; every per-theme value sits here.
+// How a file notification's chip draws in the toast, a centre row and the cursor row, its empty slot and the drag image.
 export function chipLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
   const label = (files) => line(chipLabel(files));
   const name = (files) => (files.length === 1 ? line(files[0].slice(files[0].lastIndexOf('/') + 1)).replace(CONTROLS, '') : label(files));
   const place = (fill, frame, text, grip, glyph, pad, radius) => ({ fill, frame, text, grip, glyph, pad, radius });
-  if (voice === 'plain') {
-    const row = place(plainTones(tokens).tile, plainTones(tokens).tile, c.muted, plainTones(tokens).outline, c.muted, [5, 8, 5, 8], 8);
-    return {
-      label,
-      name,
-      font: t.ui,
-      size: 11,
-      spacing: 0,
-      gap: 6,
-      cut: 0,
-      grip: { w: 8, h: 12, r: 1 },
-      glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
-      toastPlace: 'column',
-      rowPlace: 'afterAge',
-      toast: place(plainTones(tokens).island.tile, plainTones(tokens).island.tile, plainTones(tokens).island.body, plainTones(tokens).island.head, plainTones(tokens).island.summary, [8, 10, 8, 10], 10),
-      row,
-      cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
-      empty: { color: plainTones(tokens).bar, width: 1.5, content: false },
-      frame: null,
-      dragAge: '',
-      drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: plainTones(tokens).deep, shadow: null, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10, cut: 0 },
-    };
-  }
-  if (voice === 'bracket') {
-    const row = place(c.surface, c.accent, c.accent, c.muted, c.accent, [3, 10, 3, 6], 0);
-    return {
-      label,
-      name,
-      font: t.mono,
-      size: 10,
-      spacing: 1.2,
-      gap: 6,
-      cut: 7,
-      grip: { w: 6, h: 10, r: 1 },
-      glyph: { w: 9, h: 11, stroke: 1, path: 'M.5 .5h5l3 3v7h-8z' },
-      toastPlace: 'body',
-      rowPlace: 'underAge',
-      toast: row,
-      row,
-      cursor: place(c.accent, c.surface, c.surface, c.surface, c.surface, [3, 10, 3, 6], 0),
-      empty: { color: c.muted, width: 1, content: false },
-      frame: null,
-      dragAge: 'DRAGGING',
-      drag: { fill: c.surface, frame: c.accent, frameWidth: 1, text: c.ink, grip: c.muted, glyph: c.accent, shadow: null, pad: [6, 14, 6, 9], gap: 8, size: 12, weight: 400, spacing: 0.72, radius: 0, cut: 9 },
-    };
-  }
+  const row = place(PLAIN.tile, PLAIN.tile, c.muted, PLAIN.outline, c.muted, [5, 8, 5, 8], 8);
   return {
     label,
     name,
     font: t.ui,
-    size: 10,
-    spacing: 1.4,
-    gap: 7,
-    cut: 0,
-    grip: { w: 8, h: 12, r: 1.1 },
-    glyph: { w: 12, h: 14, stroke: 1.2, path: 'M1.5 1.5h6l3 3v8h-9z M7.5 1.5v3h3' },
-    toastPlace: 'body',
-    rowPlace: 'beforeAge',
-    toast: place(c.surface, c.surface, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
-    row: place(c.surface, c.ink, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
-    cursor: place(c.surface, c.surface, c.ink, c.ink, c.ink, [3, 9, 3, 7], 0),
-    empty: { color: c.paper, width: 1, content: true },
-    frame: { width: 1.5, color: c.accent },
-    dragAge: '',
-    drag: { fill: c.surface, frame: c.ink, frameWidth: 1, text: c.ink, grip: c.ink, glyph: c.ink, shadow: c.ink, pad: [6, 12, 6, 9], gap: 9, size: 12, weight: 500, spacing: 0, radius: 0, cut: 0 },
+    size: 11,
+    spacing: 0,
+    gap: 6,
+    grip: { w: 8, h: 12, r: 1 },
+    glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
+    // The toast's chip sits in a column beside the card.
+    toastPlace: 'column',
+    toast: place(PLAIN.island.tile, PLAIN.island.tile, PLAIN.island.body, PLAIN.island.head, PLAIN.island.summary, [8, 10, 8, 10], 10),
+    row,
+    cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
+    empty: { color: PLAIN.bar, width: 1.5, content: false },
+    drag: { fill: c.surface, frame: c.accent, frameWidth: 1.5, text: c.ink, grip: null, glyph: PLAIN.deep, pad: [9, 12, 9, 12], gap: 8, size: 12, weight: 500, spacing: 0, radius: 10 },
   };
 }
 
-// How the island draws the volume or brightness OSD: 20 bars, Blueprint's blocks or Artboard's one rounded bar.
+// How the island draws the volume or brightness OSD: one rounded bar of 20 steps and the value beside it.
 export function osdLook(tokens) {
   const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
-  const base = {
-    voice,
+  return {
     litCount: (v) => Math.round(Math.max(0, Math.min(100, v)) / 5),
-    word: (kind) => (kind === 'brightness' ? 'BRT' : 'VOL'),
     valueText: (v) => String(v),
-    kind: () => 'bar',
-    meter: null,
+    width: 300,
+    height: 40,
+    bars: 'round',
+    lit: { color: tokens ? PLAIN.bar : c.accent },
+    unlit: { color: tokens ? PLAIN.island.tile : c.muted },
+    value: { font: t.ui, size: 13, weight: 600, color: '' },
   };
-  // Hi-Fi's VU meter as its launcher board draws it: a 100 px dial over a 26 px strip, the arc's pivot 170 px down the dial so only the top 90 degrees show. The needle points -45 degrees from upright at 0 and +45 at 100, and pins there above 100, which PipeWire allows up to 150.
-  const meter = {
-    width: 320,
-    height: 128,
-    dial: 100,
-    pivot: { x: 160, y: 170 },
-    radius: 120,
-    ticks: 11,
-    red: 90,
-    labels: [0, 50, 100],
-    angle: (v) => Math.round((-45 + 0.9 * Math.max(0, Math.min(100, v))) * 10) / 10,
-    word: 'VOLUME',
-    valueText: (v) => String(v),
-    scale: { color: c.muted, font: t.mono, size: 9 },
-    redColor: c.danger,
-    needle: { length: 112, width: 1.5, color: c.accent },
-    strip: { height: 26, fill: c.paper },
-    label: { font: t.mono, size: 10, spacing: 1.6, color: c.muted },
-    value: { font: t.mono, size: 12, weight: 700, spacing: 1, color: c.accent },
-  };
-  if (voice === 'plain') {
-    // Frost's volume is a 320 x 52 glass bar: a 6 px track of the strong ink at 12 % (Qt's #AARRGGBB) filled in the accent over 160 ms. Brightness keeps the round bar.
-    const glass = tokens?.niri?.blur === true;
-    const strong = tokens ? plainTones(tokens).strong : c.ink;
-    return Object.assign(base, {
-      kind: (k) => (glass && k === 'volume' ? 'track' : 'bar'),
-      track: glass ? { width: 320, height: 52, thickness: 6, color: `#1F${strong.slice(1)}`, fill: c.accent, duration: 160, value: { font: t.ui, size: 13, weight: 600, color: strong } } : null,
-      width: 300,
-      height: 40,
-      word: () => '',
-      bars: 'round',
-      lit: { color: tokens ? plainTones(tokens).bar : c.accent },
-      unlit: { color: tokens ? plainTones(tokens).island.tile : c.muted },
-      value: { font: t.ui, size: 13, weight: 600, color: '' },
-    });
-  }
-  if (voice === 'bracket') {
-    return Object.assign(base, {
-      width: 320,
-      height: 34,
-      bars: 'blocks',
-      lit: { color: c.accent },
-      unlit: { color: c.line },
-      valueText: (v) => String(v).padStart(3, '0'),
-      value: { font: t.mono, size: 12, weight: 700, color: c.accent },
-      label: { font: t.mono, size: 12, spacing: 1.7, color: c.muted },
-      kind: (k) => (t.engraved === true && k === 'volume' ? 'meter' : 'bar'),
-      meter: t.engraved === true ? meter : null,
-    });
-  }
-  return Object.assign(base, {
-    width: 280,
-    height: 34,
-    bars: 'bars',
-    lit: { color: c.accent },
-    unlit: { color: c.muted },
-    value: { font: t.display, size: 18, weight: 400, color: '' },
-    label: { font: t.ui, size: 10, spacing: 1.4, color: '' },
-  });
 }
 
-const MONDAY_FIRST = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-// The resting clock's text: Hi-Fi lights it amber with a glow, as its picker card draws it; empty keeps the island's own text colour.
-export const restLook = (tokens) => (tokens?.type.engraved === true ? { color: tokens.color.accent, glow: tokens.color.accent } : { color: '', glow: '' });
-
-// How the calendar card's city column reads, as each m24 board draws it beside the month: home first and large with its mark (Paper's boxed HOME), then a rule above each city. place puts the offset beside the city's name, under it or at the row's right; the day word always sits under the name. A colour left empty is the island's own text colour.
+// How the calendar card's city column reads beside the month: home first and large with its mark, then a rule above each city, the offset and the day word under each name. A colour left empty is the island's own text colour.
 export function clockLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
   const t = (tokens || UNTHEMED).type;
-  const voice = t.voice;
   const text = (font, size, extra) => Object.assign({ font, size, weight: 400, spacing: 0, color: '' }, extra);
-  if (voice === 'plain') {
-    const head = plainTones(tokens).island.head;
-    return {
-      gridWidth: 224,
-      gap: 22,
-      head: '',
-      homeLabel: text(t.ui, 12, { color: head }),
-      mark: { text: ' · home', boxed: false },
-      homeTime: text(t.ui, 26, { weight: 700 }),
-      name: text(t.ui, 14, { weight: 500 }),
-      time: text(t.ui, 17, { weight: 700 }),
-      offset: text(t.ui, 12, { color: head }),
-      place: 'under',
-      offsetWidth: 0,
-      city: same,
-      offsetText: same,
-      dayText: same,
-      rule: { color: plainTones(tokens).island.tile, dashed: false },
-      grid: {
-        head: '',
-        header: '',
-        weekStart: 0,
-        weekdays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
-        cell: 32,
-        rowHeight: 28,
-        weekHeight: 28,
-        rowGap: 0,
-        gap: 6,
-        title: { place: 'line', parts: (g) => [`${g.month} ${g.year}`], left: text(t.ui, 15, { weight: 500 }), right: null },
-        weekday: text(t.mono, 11, { color: plainTones(tokens).island.head }),
-        day: text(t.mono, 12, { color: plainTones(tokens).island.body }),
-        today: { w: 28, h: 24, radius: 8, inverted: true, fill: '', border: 0, borderColor: '', weight: 700 },
-      },
-    };
-  }
-  if (voice === 'bracket') {
-    const small = text(t.mono, 10, { spacing: 1.6, color: c.muted });
-    return {
-      gridWidth: 224,
-      gap: 20,
-      head: '',
-      homeLabel: small,
-      mark: { text: ' · HOME', boxed: false },
-      homeTime: text(t.mono, 15, { weight: 700, color: c.accent }),
-      name: small,
-      time: text(t.mono, 15, { weight: 700, color: c.ink }),
-      offset: text(t.mono, 10, { spacing: 1.2, color: c.muted }),
-      place: 'right',
-      offsetWidth: 34,
-      city: upper,
-      offsetText: upper,
-      dayText: upper,
-      rule: { color: c.line, dashed: true },
-      grid: {
-        head: '',
-        header: mark(t.engraved === true, 'CALENDAR', ' '),
-        weekStart: 1,
-        weekdays: MONDAY_FIRST,
-        cell: 32,
-        rowHeight: 26,
-        weekHeight: 22,
-        rowGap: 2,
-        gap: 0,
-        title: { place: 'header', parts: (g) => [`${g.abbr} ${g.year}`.toUpperCase()], left: small, right: null },
-        weekday: text(t.mono, 10, { spacing: 0.8, color: c.muted }),
-        day: text(t.mono, 12),
-        today: { w: 32, h: 26, radius: 0, inverted: true, fill: c.accent, border: 0, borderColor: '', weight: 700 },
-      },
-    };
-  }
+  const head = PLAIN.island.head;
   return {
-    gridWidth: 238,
-    gap: 20,
-    head: 'WORLD CLOCK',
-    homeLabel: text(t.display, 24),
-    mark: { text: 'HOME', boxed: true },
-    homeTime: text(t.display, 34),
-    name: text(t.display, 20),
-    time: text(t.display, 28),
-    offset: text(t.ui, 10, { spacing: 1.4 }),
-    place: 'name',
+    gridWidth: 224,
+    gap: 22,
+    homeLabel: text(t.ui, 12, { color: head }),
+    mark: { text: ' · home', boxed: false },
+    homeTime: text(t.ui, 26, { weight: 700 }),
+    name: text(t.ui, 14, { weight: 500 }),
+    time: text(t.ui, 17, { weight: 700 }),
+    offset: text(t.ui, 12, { color: head }),
+    place: 'under',
     offsetWidth: 0,
     city: same,
     offsetText: same,
-    dayText: upper,
-    rule: { color: '', dashed: false },
+    dayText: same,
+    rule: { color: PLAIN.island.tile },
     grid: {
-      head: 'CALENDAR',
-      header: '',
-      weekStart: 1,
-      weekdays: MONDAY_FIRST,
-      cell: 34,
-      rowHeight: 26,
-      weekHeight: 26,
+      weekStart: 0,
+      weekdays: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+      cell: 32,
+      rowHeight: 28,
+      weekHeight: 28,
       rowGap: 0,
-      gap: 8,
-      title: { place: 'split', parts: (g) => [g.month, String(g.year)], left: text(t.display, 24), right: text(t.display, 16, { italic: true }) },
-      weekday: text(t.ui, 10, { spacing: 1 }),
-      day: text(t.ui, 12),
-      today: { w: 26, h: 22, radius: 0, inverted: false, fill: '', border: 1.5, borderColor: c.accent, weight: 700 },
+      gap: 6,
+      title: { parts: (g) => [`${g.month} ${g.year}`], left: text(t.ui, 15, { weight: 500 }) },
+      weekday: text(t.mono, 11, { color: PLAIN.island.head }),
+      day: text(t.mono, 12, { color: PLAIN.island.body }),
+      today: { w: 28, h: 24, radius: 8, inverted: true, fill: '', border: 0, borderColor: '', weight: 700 },
     },
   };
 }
@@ -721,112 +255,61 @@ export function clockLook(tokens) {
 // Control, the notification centre, the cheat sheet, polkit and the recorder draw as the launcher does: its cursor row, rules and legend.
 export function listLook(tokens) {
   const l = launcherLook(tokens);
-  const voice = l.voice;
-  const keyText = (k) => (voice === 'bracket' ? mark(l.engraved, upper(k)) : voice === 'caps' ? upper(k) : same(k));
-  const wordText = (w) => (voice === 'plain' ? same(w) : upper(w));
-  const label = l.label;
   return Object.assign(l, {
-    heading(name, section) {
-      if (label.kind === 'header') return section ? `${upper(name)} ${l.engraved ? '·' : '//'} ${upper(section)}` : upper(name);
-      return label.kind === 'pill' ? name.charAt(0).toUpperCase() + same(name.slice(1)) : upper(name);
-    },
-    tab: { fill: label.kind === 'header' ? l.cursor.fill : label.fill, text: label.kind === 'header' ? l.cursor.text : label.color, radius: label.kind === 'pill' ? 8 : 0 },
-    tabText: wordText,
-    keyText,
-    keys: (pairs) => pairs.map(([k, w]) => ({ key: keyText(k), word: wordText(w) })),
-    groupHead: (app, n) => (line(app || '') ? `${wordText(line(app))} · ${n}` : String(n)),
-    // An age in whole units, floored; under a minute it is the island's word for arrival. Blueprint counts it like a mission clock; Hi-Fi's island says NOW, so its lists do too.
+    heading: (name) => name.charAt(0).toUpperCase() + same(name.slice(1)),
+    tab: { fill: l.label.fill, text: l.label.color, radius: 8 },
+    tabText: same,
+    keyText: same,
+    keys: (pairs) => pairs.map(([k, w]) => ({ key: same(k), word: same(w) })),
+    groupHead: (app, n) => (line(app || '') ? `${line(app)} · ${n}` : String(n)),
+    // An age in whole units, floored; under a minute it is the island's word for arrival.
     ageText(ms) {
       const s = Math.floor(ms / 1000);
-      const clock = voice === 'bracket' && !l.engraved;
-      const age = s < 60 ? (clock ? '0S' : 'NOW') : s < 3600 ? `${Math.floor(s / 60)}M` : s < 86400 ? `${Math.floor(s / 3600)}H` : `${Math.floor(s / 86400)}D`;
-      return clock ? `T+${age}` : voice === 'plain' ? age.toLowerCase() : age;
+      return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`;
     },
   });
 }
 
-// How the margins read under a token set: Paper's caps and dashes, Artboard's Page 03 and accent dot, Blueprint's brackets and ISO date.
+// How the margins read under a token set: Page 03, the app and title, an accent dot before the goal, and the date.
 export function marginLook(tokens) {
   const c = (tokens || UNTHEMED).color;
-  const voice = (tokens || UNTHEMED).type.voice;
-  const say = voice === 'plain' ? same : upper;
-  const plain = voice === 'plain';
-  const bracket = voice === 'bracket';
-  const engraved = (tokens || UNTHEMED).type.engraved === true;
-  // Frost: glass under the workspace number, a danger dot, the app and path split as Hi-Fi's.
-  const glass = (tokens || UNTHEMED).niri?.blur === true;
   // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
-  const words = (s) => say(line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')));
+  const words = (s) => line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
   const look = {
-    voice,
-    number: (idx) => (glass ? String(idx) : plain ? `Page ${pad2(idx)}` : bracket ? mark(engraved, pad2(idx)) : pad2(idx)),
-    numberColor: bracket || glass ? c.accent : c.ink,
-    // The margins' own type size, where the theme sets one; the others take the surface style's.
-    size: glass ? 12.5 : undefined,
-    chip: glass,
-    numberWeight: plain ? 600 : bracket ? 400 : 700,
-    engraved,
-    // Hi-Fi shows only the shown workspace, as the other themes do: a lit amber lamp before its number in amber.
-    lamps: (workspaces) => (engraved ? workspaces.filter((w) => w.active).map((w) => ({ idx: w.idx, text: pad2(w.idx), light: 'lit', color: c.accent })) : []),
-    // The focused column of its columns, after the number; a workspace of one column draws none. Hi-Fi's bare count stands two spaces off its number, as Paper's does.
-    column: (pos) => (!pos || pos.of < 2 ? '' : bracket && !engraved ? ` ${mark(engraved, `${pos.at} / ${pos.of}`)}` : `  ${pos.at} / ${pos.of}`),
-    tail(view) {
-      if (view.app === null && view.title === null) return '';
-      const app = words(view.app);
-      const title = words(view.title);
-      if (engraved || glass) return `  ${app}`;
-      return plain ? ` / ${app} — ${title}` : bracket ? ` ${app} — ${title}` : ` — ${app} · ${title}`;
-    },
-    // Hi-Fi draws the app in ink and the path after it in muted, so the path is a word of its own there.
-    tailColor: engraved || glass ? c.ink : c.muted,
-    path: (view) => ((engraved || glass) && view.title !== null ? `  ${words(view.title)}` : ''),
-    goal(g) {
-      if (!g) return '';
-      const title = say(g.title);
-      if (g.left === null) return title;
-      if (bracket && !engraved) return g.left === 'late' ? `${title} LATE` : `${title} T−${upper(g.left)}`;
-      return `${title} · ${say(g.left)}`;
-    },
-    // Paper's accent bold, Artboard's ink medium after an accent dot, Blueprint's amber (its danger token), Hi-Fi's ink after a red lamp.
-    goalColor: engraved ? c.ink : bracket ? c.danger : plain ? c.ink : c.accent,
-    goalLamp: engraved ? 'red' : '',
-    goalWeight: bracket ? 400 : plain ? 500 : 700,
-    dot: plain,
-    dotColor: glass ? c.danger : c.accent,
-    // Unread mail is something to act on: ink in Paper (bold) and Artboard (medium), Blueprint's accent.
-    mail: (n) => (n > 0 ? (plain ? `mail ${n}` : `MAIL ${n}`) : ''),
-    mailColor: bracket ? c.accent : c.ink,
-    mailWeight: bracket ? 400 : plain ? 500 : 700,
-    word: (w) => (plain ? same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi') : upper(w)),
-    date: (d) => (bracket && !engraved ? `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` : say(dateText(d))),
-    dateColor: engraved || glass ? c.ink : c.muted,
-    // Hi-Fi's board spaces its right-hand words 18 px apart with no separator.
-    sep: plain || engraved ? '' : bracket ? '·' : '—',
-    spacing: engraved ? 18 : plain ? 16 : 14,
-    // The urgent workspaces after the title, three spaces on: at most 3, then a count of the rest; each segment is drawn in its own colour, Hi-Fi's after its own lamp.
+    number: (idx) => `Page ${pad2(idx)}`,
+    numberColor: c.ink,
+    numberWeight: 600,
+    // The focused column of its columns, two spaces after the number; a workspace of one column draws none.
+    column: (pos) => (!pos || pos.of < 2 ? '' : `  ${pos.at} / ${pos.of}`),
+    tail: (view) => (view.app === null && view.title === null ? '' : ` / ${words(view.app)} — ${words(view.title)}`),
+    tailColor: c.muted,
+    goal: (g) => (!g ? '' : g.left === null ? same(g.title) : `${same(g.title)} · ${same(g.left)}`),
+    goalColor: c.ink,
+    goalWeight: 500,
+    dot: true,
+    dotColor: c.accent,
+    // Unread mail is something to act on, so it reads in ink.
+    mail: (n) => (n > 0 ? `mail ${n}` : ''),
+    mailColor: c.ink,
+    mailWeight: 500,
+    word: (w) => same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi'),
+    date: (d) => same(dateText(d)),
+    dateColor: c.muted,
+    spacing: 16,
+    // The urgent workspaces after the title, three spaces on: at most 3 accent dots before their ink numbers, then a count of the rest; each segment is drawn in its own colour.
     marks(idxs) {
       if (idxs.length === 0) return [];
       const rest = idxs.length - 3;
-      // Red is never text in Hi-Fi, so each urgent workspace is a red lamp before its muted number.
-      if (engraved) {
-        const shown = idxs.slice(0, 3).map((idx) => ({ text: pad2(idx), color: c.muted, lamp: 'red' }));
-        return rest > 0 ? shown.concat([{ text: `+${rest}`, color: c.muted, lamp: '' }]) : shown;
-      }
-      if (plain) {
-        const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
-        return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;
-      }
-      const words = idxs.slice(0, 3).map((idx) => (bracket ? mark(engraved, `!${pad2(idx)}`) : `!${pad2(idx)}`));
-      if (rest > 0) words.push(bracket ? mark(engraved, `+${rest}`) : `+${rest}`);
-      return [{ text: `   ${words.join(bracket && !engraved ? '' : ' ')}`, color: c.danger }];
+      const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
+      return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;
     },
   };
-  // The words on screen, in order, for `qs ipc call margins state`.
+  // The words on screen, in order, as the tests read them.
   look.drawn = (view, now, right) => ({
-    left: look.number(view.idx) + look.tail(view) + look.path(view),
+    left: look.number(view.idx) + look.tail(view),
     right: [right.sync && look.word(right.sync), look.goal(right.goal), look.mail(right.mail), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
       .filter((p) => p)
-      .join(look.sep ? ` ${look.sep} ` : ' '),
+      .join(' '),
   });
   return look;
 }
