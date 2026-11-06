@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { listLook } from './voice.mjs';
 import { schemeTokens } from './colorscheme-file.mjs';
-import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice } from './accounts.mjs';
+import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice, context7Target, context7Notice } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -31,7 +31,7 @@ const rows = [
   row({ provider: 'elevenlabs', label: 'ElevenLabs', metric: 'characters', kind: 'count', value: 11500, limit: 32000, unit: 'characters', resets_at: '2026-11-03T00:00:00Z' }),
   row({ provider: 'codex', label: 'Codex', metric: 'monthly', kind: 'percent', value: 0, limit: 100, resets_at: '2026-11-19T06:00:00Z' }),
 ];
-const view = (r = rows, reg = registry, busy = false) => accountsView(reg, JSON.stringify(r), NOW, busy);
+const view = (r = rows, reg = registry, busy = false, context7 = '') => accountsView(reg, JSON.stringify(r), NOW, busy, context7);
 
 test('the recorded rows give two Claude accounts, five balances and two usage rows', () => {
   const v = view();
@@ -211,6 +211,19 @@ test("a warning draws in the scheme's danger token, a stale row in its muted one
 
 test("ACTIVE's text is the surface it sits on in a dark scheme too, never white on light ink", () => {
   assert.equal(accountsLook(schemeTokens('gruvbox-dark')).active.color, '#282828');
+});
+
+test("the device's Context7 key reads ACTIVE, main when none was picked, and Enter on another makes it the device's", () => {
+  const keys = ['main', 'alt', 'clt'].map((id) => row({ provider: 'context7', label: 'Context7 ' + id, account: id, metric: 'requests', kind: 'count', value: 24, limit: 1000, unit: 'requests' }));
+  const marks = (text) => view([...rows, ...keys], registry, false, text).usage.filter((u) => u.context7).map((u) => [u.context7, u.active]);
+  assert.deepEqual(marks(''), [['main', true], ['alt', false], ['clt', false]]);
+  assert.deepEqual(marks('alt\n'), [['main', false], ['alt', true], ['clt', false]]);
+  const items = accountsItems(view([...rows, ...keys], registry, false, 'alt\n'));
+  const at = (label) => items.find((i) => i.label === label);
+  assert.deepEqual(['Context7 main', 'Context7 alt', 'Codex', 'DeepSeek', 'work'].map((l) => context7Target(at(l))), ['main', null, null, null, null]);
+  assert.equal(useTarget(at('Context7 main')), null);
+  assert.equal(context7Target(undefined), null);
+  assert.equal(context7Notice('alt'), 'Context7 · alt is active on this device');
 });
 
 test('Enter makes an account that is not active the active one, and does nothing on a balance, a usage row or the active account', () => {

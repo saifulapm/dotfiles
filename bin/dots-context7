@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# dots context7 use <id> | apply: the ctx7 CLI logs in with the key in ~/.config/context7/credentials.json. use makes AI/context7/<id> this device's key and writes the file; apply writes it from the key this device uses, main until use picks another, so dots secrets never puts main back over a choice. The choice sits in the state dir, which no sync carries to another machine.
+set -euo pipefail
+die() {
+  echo "dots context7: $*" >&2
+  exit 1
+}
+
+state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+creds=${XDG_CONFIG_HOME:-$HOME/.config}/context7/credentials.json
+
+# write <id>: the key goes from pass through jq's stdin to a temp file renamed over the credentials, mode 600, so it is never in an argv; an unchanged file keeps its mtime.
+write() {
+  local key new
+  key=$(pass show "AI/context7/$1" 2>/dev/null | sed -n 1p) || true
+  [[ -n $key ]] || die "no AI/context7/$1 in pass"
+  mkdir -p "$(dirname "$creds")"
+  new=$(mktemp "$creds.XXXXXX")
+  printf '%s' "$key" | jq -R '{access_token: ., token_type: "Bearer"}' >"$new"
+  chmod 600 "$new"
+  if cmp -s "$new" "$creds"; then
+    rm -f "$new"
+  else
+    mv "$new" "$creds"
+  fi
+}
+
+# An id names a pass entry under AI/context7, so anything but the label alphabet is refused.
+valid() { [[ $1 =~ ^[a-z0-9-]+$ ]]; }
+
+case ${1:-} in
+use)
+  id=${2:-}
+  valid "$id" || die "usage: dots context7 use <id>, where AI/context7/<id> is in pass"
+  write "$id"
+  mkdir -p "$state"
+  printf '%s\n' "$id" >"$state/context7-active.tmp"
+  mv "$state/context7-active.tmp" "$state/context7-active"
+  ;;
+apply)
+  id=main
+  [[ -r $state/context7-active ]] && id=$(sed -n 1p "$state/context7-active")
+  valid "$id" || die "$state/context7-active names no key. Next: dots context7 use main"
+  write "$id"
+  ;;
+*) die "usage: dots context7 use <id> | apply" ;;
+esac

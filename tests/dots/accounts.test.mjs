@@ -370,7 +370,7 @@ const MONEY = [
 const ELEVEN_ROW = R('elevenlabs', 'ElevenLabs', 'characters', 'count', 11500, 32000, 'characters', '2026-10-26T07:33:20Z');
 const FAL_ROW = R('fal', 'fal', 'balance', 'money', 24.5, null, 'USD', null);
 const JINA_ROW = R('jina', 'Jina', 'balance', 'tokens', 953604107, null, 'tokens', null);
-const CONTEXT7_ROWS = ['main', 'alt', 'clt'].map((id) => R('context7', 'Context7 ' + id, 'requests', 'count', 240, 1000, 'requests', '2026-12-01T00:00:00Z'));
+const CONTEXT7_ROWS = ['main', 'alt', 'clt'].map((id) => ({ ...R('context7', 'Context7 ' + id, 'requests', 'count', 240, 1000, 'requests', '2026-12-01T00:00:00Z'), account: id }));
 // With no grant, spend counts from the first of this UTC month, whenever the test runs.
 const monthStart = () => {
   const d = new Date();
@@ -570,11 +570,12 @@ test('a Context7 key it refuses is a no-key row in the usage, and a body without
   const ctx = scratch(t, s.url, ['main']);
   const c7 = async () => strip((await everything(ctx)).out.filter((row) => row.provider === 'context7'));
   s.context7 = 401;
-  assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => placeholder('context7', 'Context7 ' + id, 'auth', 'no-key')));
+  const keyed = (id, state, reason) => ({ ...placeholder('context7', 'Context7 ' + id, state, reason), account: id });
+  assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => keyed(id, 'auth', 'no-key')));
   s.context7 = 200;
   CONTEXT7.member.requests = 'forged';
   try {
-    assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => placeholder('context7', 'Context7 ' + id, 'error', 'shape')));
+    assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => keyed(id, 'error', 'shape')));
   } finally {
     CONTEXT7.member.requests = 240;
   }

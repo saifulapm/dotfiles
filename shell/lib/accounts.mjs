@@ -114,7 +114,8 @@ function accountsOf(registryText) {
   return { active: reg.active, list };
 }
 
-export function accountsView(registryText, rowsText, now, busy) {
+// context7Text is the state file dots context7 use writes: the id of this device's key, main when it is empty.
+export function accountsView(registryText, rowsText, now, busy, context7Text) {
   const parsed = parse(rowsText, []);
   const rows = Array.isArray(parsed) ? parsed.filter((r) => r && typeof r === 'object') : [];
   const reg = accountsOf(registryText);
@@ -140,7 +141,9 @@ export function accountsView(registryText, rowsText, now, busy) {
   });
   const others = rows.filter((r) => r.provider !== 'claude');
   const balances = others.filter((r) => r.kind === 'money' || r.kind === 'tokens').slice(0, MOST.balances).map((r) => figureOf(r, now));
-  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count' || r.kind === 'spend').slice(0, MOST.usage).map((r) => figureOf(r, now));
+  const ctx7 = String(context7Text || '').split('\n')[0].trim() || 'main';
+  const keyOf = (r) => (r.provider === 'context7' && typeof r.account === 'string' ? { context7: r.account, active: r.account === ctx7 } : {});
+  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count' || r.kind === 'spend').slice(0, MOST.usage).map((r) => Object.assign(figureOf(r, now), keyOf(r)));
   const groups = [['Claude', accounts.length]];
   if (balances.length) groups.push(['Balances', balances.length]);
   if (usage.length) groups.push(['Usage', usage.length]);
@@ -168,8 +171,14 @@ export function accountsItems(view) {
 
 export const accountsKeys = (look) => look.keys([['↵', 'make active'], ['r', 'refresh'], ['esc', '']]);
 
-// The account Enter makes active: an account row that is not active already; a provider row takes no Enter.
+// The account Enter makes active: an account row that is not active already; a provider row takes none here, and a Context7 key's row goes to context7Target.
 export const useTarget = (item) => (item && item.kind === 'account' && !item.active ? item.account : null);
+
+// The Context7 key Enter makes this device's: a key row that is not the active one already.
+export const context7Target = (item) => (item && item.kind === 'usage' && item.context7 && !item.active ? item.context7 : null);
+
+// What the island says once the state file names the key.
+export const context7Notice = (id) => `Context7 · ${clean(id)} is active on this device`;
 
 // What the island says once the registry names the account; the label is the card's, already one line.
 export const activeNotice = (label) => `Claude · ${label} is active for new sessions`;

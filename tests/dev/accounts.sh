@@ -85,6 +85,21 @@ check "the drawn ACTIVE mark sits on work's row" state_is '[.rows[] | select(.ki
 island_says() { island | jq -e '.text == "Claude · work is active for new sessions"' >/dev/null; }
 check "the island reads Claude · work is active for new sessions ($(island | jq -c .text))" until_ok 3000 island_says
 
+# Enter on a Context7 key runs dots context7 use, which finds no key in the nested pass store and changes nothing. The nested shell shares the live ~/.config, so the check never lets a use succeed: the live login keeps its bytes.
+ctx7_active=$XDG_STATE_HOME/dots/context7-active
+creds=${XDG_CONFIG_HOME:-$HOME/.config}/context7/credentials.json
+creds_sum=$(sha256sum <"$creds" 2>/dev/null || true)
+c7() { acc_state | jq -c '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]]'; }
+check "with no key picked, Context7 main reads ACTIVE ($(c7))" state_is '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]] == [["Context7 main", "ACTIVE"], ["Context7 alt", ""]]'
+for _ in $(seq 12); do state_is '.selected == "usage:Context7 alt"' && break; wtype -k Down; sleep 0.1; done
+check "Down reaches Context7 alt" state_is '.selected == "usage:Context7 alt"'
+wtype -k Return
+sleep 1
+check "Enter on a key the store lacks writes no choice" test ! -e "$ctx7_active"
+check "and ACTIVE stays on main ($(c7))" state_is '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]] == [["Context7 main", "ACTIVE"], ["Context7 alt", ""]]'
+check "and the island says nothing of Context7 ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Context7\")' >/dev/null"
+check "and the live ctx7 login keeps its bytes" test "$(sha256sum <"$creds" 2>/dev/null || true)" = "$creds_sum"
+
 # A new cx session runs claude in work's home: a stub claude first on PATH prints the CLAUDE_CONFIG_DIR it was given.
 mkdir -p "$DOTS_DEV_DIR/stub"
 printf '#!/bin/sh\nprintf "%%s\\n" "$CLAUDE_CONFIG_DIR"\n' >"$DOTS_DEV_DIR/stub/claude"

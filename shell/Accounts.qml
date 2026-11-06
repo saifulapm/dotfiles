@@ -23,18 +23,21 @@ Item {
     property bool rowsIn: false
     property string registryText: ""
     property string rowsText: "[]"
+    // The id of this device's Context7 key, from the state file dots context7 use writes.
+    property string context7Text: ""
     // The cursor's place among the rows it stops on.
     property int selected: 0
-    readonly property bool busy: registryReader.running || cachedReader.running || fetcher.running || user.running || registryRereader.running
+    readonly property bool busy: registryReader.running || cachedReader.running || fetcher.running || user.running || registryRereader.running || keyUser.running || context7Reader.running
     readonly property string dotsBin: Quickshell.shellDir + "/bin/dots"
 
     readonly property string command: Quickshell.env("DOTS_ACCOUNTS") || Quickshell.shellDir + "/bin/dots-accounts"
     readonly property string registryPath: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/claude-accounts.json"
+    readonly property string context7Path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/context7-active"
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
     readonly property var look: L.listLook(theme.tokens)
     readonly property var marks: A.accountsLook(theme.tokens ?? { color: {} })
-    readonly property var view: A.accountsView(registryText, rowsText, Date.now(), fetcher.running)
+    readonly property var view: A.accountsView(registryText, rowsText, Date.now(), fetcher.running, context7Text)
     readonly property var items: A.accountsItems(view)
     readonly property var stops: items.map((it, i) => it.stop ? i : -1).filter(i => i >= 0)
     readonly property int current: stops.length ? stops[Math.min(selected, stops.length - 1)] : -1
@@ -52,8 +55,11 @@ Item {
         opens += 1;
         selected = 0;
         rowsIn = busy;
-        if (!busy)
+        if (!busy) {
+            context7Reader.used = false;
+            context7Reader.running = true;
             registryReader.running = true;
+        }
         shown = true;
         keyTarget.forceActiveFocus();
     }
@@ -69,7 +75,17 @@ Item {
     }
 
     // dots claude-account is the registry's only writer, so ACTIVE moves only once it has written and the registry is read again.
+    // On a Context7 key row, dots context7 use makes the key this device's, and the state file is read again.
     function use() {
+        const key = A.context7Target(items[current]);
+        if (key) {
+            if (keyUser.running)
+                return;
+            keyUser.key = key;
+            keyUser.command = [dotsBin, "context7", "use", key];
+            keyUser.running = true;
+            return;
+        }
         const id = A.useTarget(items[current]);
         if (!id || user.running)
             return;
@@ -206,6 +222,30 @@ Item {
             panel.registryText = rereadOut.text;
             if (used && panel.activeAccount && panel.activeAccount.id === user.account)
                 panel.theme.notice(A.activeNotice(user.label));
+        }
+    }
+
+    Process {
+        id: keyUser
+        property string key: ""
+        onExited: code => {
+            context7Reader.used = code === 0;
+            context7Reader.running = true;
+        }
+    }
+
+    // No state file reads as empty, which the view takes as main; a refused use leaves it as it was and the island says nothing.
+    Process {
+        id: context7Reader
+        property bool used: false
+        command: ["cat", panel.context7Path]
+        stdout: StdioCollector {
+            id: context7Out
+        }
+        onExited: {
+            panel.context7Text = context7Out.text;
+            if (used && panel.view.usage.some(u => u.context7 === keyUser.key && u.active))
+                panel.theme.notice(A.context7Notice(keyUser.key));
         }
     }
 
@@ -611,7 +651,7 @@ Item {
                             // ACTIVE as an ink chip with its dot.
                             Rectangle {
                                 id: activeMark
-                                visible: rowItem.isAccount && rowItem.it.active
+                                visible: (rowItem.isAccount || rowItem.it.kind === "usage") && rowItem.it.active === true
                                 implicitWidth: activeRow.implicitWidth + 18
                                 implicitHeight: activeRow.implicitHeight + 6
                                 radius: marks.active.radius
