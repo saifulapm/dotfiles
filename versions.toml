@@ -59,23 +59,23 @@ sha256 = "dfee3ae8ff4a4a5d671be032db8463f8b72798535183d2bdaf9331b22550cd7a"
 
 [[pin]]
 name = "amx"
-version = "c44f9a85abc3d0570792f1249bf66f2a2febdf9a"
+version = "03036bfebe6551c6254350839c1b8645285c60ea"
 repo = "saifulapm/amx"
 track = "commit"
 install = "~/.local/bin/amx, built with cargo"
 runs = "amx --version"
 url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
-sha256 = "64b35b6c4b320cb66fdeec82897b6254d35c43f157b2d68c7f450094cf312fa7"
+sha256 = "6bb0efd51198f61b696e5d073ef3f05d6f6113051896853e1ea000cdf087e8d9"
 
 [[pin]]
 name = "workflow"
-version = "aac1868bb8329f0fe97b66f79988002cb5035474"
+version = "a50c8b43d82a1333e1134cbd451a698c0a80f44a"
 repo = "saifulapm/workflow"
 track = "commit"
 install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
 runs = "mem --version && workflow --version && hub --version"
 url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
-sha256 = "016c081f5ef9e7eab7761bd3adc3a924d62072d2a385d036f602759ae933c0b2"
+sha256 = "a817b019fc510a64b92329ce4d07e90999a694d70bd67ac54fa0f4b757f644eb"
 
 [[pin]]
 name = "pxy"
