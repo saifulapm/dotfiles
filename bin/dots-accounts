@@ -13,6 +13,7 @@ const ANTHROPIC = env.DOTS_ACCOUNTS_ANTHROPIC_URL || 'https://api.anthropic.com'
 const ELEVENLABS = env.DOTS_ACCOUNTS_ELEVENLABS_URL || 'https://api.elevenlabs.io';
 const FAL = env.DOTS_ACCOUNTS_FAL_URL || 'https://api.fal.ai';
 const JINA = env.DOTS_ACCOUNTS_JINA_URL || 'https://embeddings-dashboard-api.jina.ai';
+const CONTEXT7 = env.DOTS_ACCOUNTS_CONTEXT7_URL || 'https://context7.com';
 const AUTH = new Set(['expired', 'forbidden', 'locked', 'no-key']);
 
 // A source's failure carries only a reason from the fixed list, never text from a response.
@@ -174,6 +175,16 @@ async function jina(signal) {
   return [{ ...own('jina', 'Jina', 'tokens'), metric: 'balance', value: left, limit: null, unit: 'tokens', resets_at: null }];
 }
 
+// Context7's requests this month against the plan's, per key; reading them costs no request.
+const CONTEXT7_KEYS = { main: 'AI/context7/main', alt: 'AI/context7/alt', clt: 'AI/context7/clt' };
+async function context7(id, signal) {
+  const body = await fetchJSON(CONTEXT7 + '/api/v2/usage?days=1', { authorization: 'Bearer ' + (await key(CONTEXT7_KEYS[id], signal)) }, signal, 'no-key');
+  const used = num(body && body.member && body.member.requests);
+  const cap = num(body && body.member && body.member.includedInPlan);
+  if (used === null || cap === null) throw new Failure('shape');
+  return [{ ...own('context7', 'Context7 ' + id, 'count'), metric: 'requests', value: used, limit: cap, unit: 'requests', resets_at: typeof body.usageResetsAt === 'string' ? iso(body.usageResetsAt) : null }];
+}
+
 // A Console org's spend in cents since a time, from the daily cost report, page by page. cost_report is the legacy endpoint, kept because analytics/cost needs read:analytics, which an Admin key lacks. It allows 90 requests a window, so a day two days past its end, which no longer changes, is summed into the org's cache file, and a run asks only for the days after the last one kept.
 const SETTLED_MS = 2 * 86400000;
 async function cost(org, from, headers, signal) {
@@ -285,6 +296,7 @@ function sources() {
     { name: 'fal', names: own('fal', 'fal'), run: fal },
     ...['main', 'alt'].map((org) => ({ name: 'anthropic-' + org, names: own('anthropic', 'Anthropic ' + org), run: (signal) => anthropic(org, signal) })),
     { name: 'jina', names: own('jina', 'Jina', 'tokens'), run: jina },
+    ...Object.keys(CONTEXT7_KEYS).map((id) => ({ name: 'context7-' + id, names: own('context7', 'Context7 ' + id, 'count'), run: (signal) => context7(id, signal) })),
   ];
 }
 

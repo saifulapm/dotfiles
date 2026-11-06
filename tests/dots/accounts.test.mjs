@@ -57,6 +57,7 @@ const ELEVEN = { tier: 'creator', character_count: 11500, character_limit: 32000
 // A dollar bucket as the usage endpoint gave it on 2026-10-28, under a codename that may change.
 const CREDIT = { utilization: 1.52, resets_at: '2026-11-05T07:59:00+00:00', limit_dollars: 250, used_dollars: 3.799662, remaining_dollars: 246.200338, locked_reason: null };
 const FAL = { username: 'my-team', credits: { current_balance: 24.5, currency: 'USD' } };
+const CONTEXT7 = { plan: 'free', usageResetsAt: '2026-12-01T00:00:00.000Z', member: { requests: 240, includedInPlan: 1000 }, teamspace: { extraRequests: 0, extraCostUsd: 0, spendingLimitUsd: null, daily: [] } };
 const JINA = { customer_id: 'cus_x', wallet: { trial_balance: 0, regular_balance: 953604107, total_balance: 953604107 }, metadata: { auto_recharge: false } };
 // A Console org's cost report as it answered on 2026-11-06: daily buckets, amounts in cents as strings, a day with no spend empty.
 const COST = {
@@ -71,7 +72,7 @@ const COST = {
 
 // The stub answers with whatever `mode` holds at the time and records every request. `claude` is the usage endpoint's mode, `eleven` and `fal` the others' status.
 async function stub(t) {
-  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200, cost: 200, jina: 200 };
+  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200, cost: 200, jina: 200, context7: 200 };
   const server = createServer((req, res) => {
     const send = (status, body) => {
       res.writeHead(status, { 'content-type': 'application/json' });
@@ -82,6 +83,10 @@ async function stub(t) {
       const eleven = req.url.startsWith('/v1/user');
       const status = eleven ? s.eleven : s.fal;
       return send(status, status === 200 ? JSON.stringify(eleven ? ELEVEN : FAL) : '{"error":{"type":"x","message":"forged"}}');
+    }
+    if (req.url.startsWith('/api/v2/usage')) {
+      s.other.push({ url: req.url, method: req.method, headers: req.headers });
+      return send(s.context7, s.context7 === 200 ? JSON.stringify(CONTEXT7) : '{"error":"invalid_api_key","message":"forged"}');
     }
     if (req.url.startsWith('/api/v1/api_key/user')) {
       s.other.push({ url: req.url, method: req.method, headers: req.headers });
@@ -153,6 +158,7 @@ function scratch(t, url, ids = ['main', 'work'], homeless = []) {
     DOTS_ACCOUNTS_ELEVENLABS_URL: url,
     DOTS_ACCOUNTS_FAL_URL: url,
     DOTS_ACCOUNTS_JINA_URL: url,
+    DOTS_ACCOUNTS_CONTEXT7_URL: url,
     PATH: stubBin,
     STUB_CTL: ctl,
   };
@@ -364,6 +370,7 @@ const MONEY = [
 const ELEVEN_ROW = R('elevenlabs', 'ElevenLabs', 'characters', 'count', 11500, 32000, 'characters', '2026-10-26T07:33:20Z');
 const FAL_ROW = R('fal', 'fal', 'balance', 'money', 24.5, null, 'USD', null);
 const JINA_ROW = R('jina', 'Jina', 'balance', 'tokens', 953604107, null, 'tokens', null);
+const CONTEXT7_ROWS = ['main', 'alt', 'clt'].map((id) => R('context7', 'Context7 ' + id, 'requests', 'count', 240, 1000, 'requests', '2026-12-01T00:00:00Z'));
 // With no grant, spend counts from the first of this UTC month, whenever the test runs.
 const monthStart = () => {
   const d = new Date();
@@ -374,7 +381,7 @@ const ymd = (days) => new Date(Date.now() + days * 86400e3).toISOString().slice(
 const PXY_KEYS = new Set(['deepseek-ai', 'openrouter']);
 const pxyRows = (out) => out.filter((row) => PXY_KEYS.has(row.provider));
 // A placeholder keeps its source's kind, so the card knows which group it draws in.
-const KIND = { elevenlabs: 'count', jina: 'tokens' };
+const KIND = { elevenlabs: 'count', jina: 'tokens', context7: 'count' };
 const placeholder = (provider, label, state, reason) => R(provider, label, null, KIND[provider] || 'money', null, null, null, null, state, reason);
 const ctlLog = (ctx, name) => (existsSync(join(ctx.ctl, name)) ? readFileSync(join(ctx.ctl, name), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const OPTS = '--pinentry-mode error';
@@ -385,13 +392,15 @@ test('every stub answering gives the money, token and spend rows and the usage r
   const start = Date.now();
   const { out, r } = await everything(ctx);
   const wall = Date.now() - start;
-  assert.deepEqual(strip(out), [...limits('main'), ...MONEY, ELEVEN_ROW, FAL_ROW, ...SPEND_ROWS(), JINA_ROW]);
+  assert.deepEqual(strip(out), [...limits('main'), ...MONEY, ELEVEN_ROW, FAL_ROW, ...SPEND_ROWS(), JINA_ROW, ...CONTEXT7_ROWS]);
   assert.ok(wall < 2000, `took ${wall} ms`);
   for (const row of out) assert.equal(typeof row.as_of, 'string');
   const eleven = s.other.find((q) => q.url === '/v1/user/subscription');
   const fal = s.other.find((q) => q.url === '/v1/account/billing?expand=credits');
   assert.equal(eleven.headers['xi-api-key'], 'FAKEKEY-AI-elevenlabs-main');
   assert.equal(fal.headers.authorization, 'Key FAKEKEY-AI-fal-billing');
+  const c7 = s.other.filter((q) => q.url.startsWith('/api/v2/usage'));
+  assert.deepEqual(c7.map((q) => q.headers.authorization).sort(), ['Bearer FAKEKEY-AI-context7-alt', 'Bearer FAKEKEY-AI-context7-clt', 'Bearer FAKEKEY-AI-context7-main']);
   assert.equal(s.other.find((q) => q.url.startsWith('/api/v1/api_key/user')).url, '/api/v1/api_key/user?api_key=FAKEKEY-AI-jina-reader-main');
   const cost = s.other.filter((q) => q.url.startsWith('/v1/organizations/cost_report'));
   assert.deepEqual(cost.map((q) => q.headers['x-api-key']).sort(), ['FAKEKEY-AI-anthropic-alt-admin', 'FAKEKEY-AI-anthropic-main-admin']);
@@ -400,13 +409,13 @@ test('every stub answering gives the money, token and spend rows and the usage r
     assert.equal(q.headers['anthropic-version'], '2023-06-01');
   }
   const pass = ctlLog(ctx, 'pass.log');
-  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main']]);
+  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/context7/alt'], ['show', 'AI/context7/clt'], ['show', 'AI/context7/main'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main']]);
   for (const l of pass) assert.equal(l.opts, OPTS);
   assert.deepEqual(ctlLog(ctx, 'pxy.log'), [{ argv: ['status', '--remote', '--json'], opts: OPTS }]);
   for (const text of [...['pass.log', 'pxy.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
     assert.ok(!text.includes('FAKEKEY'), text);
   }
-  assert.deepEqual(readdirSync(ctx.cache).sort(), ['anthropic-alt-days.json', 'anthropic-alt.json', 'anthropic-main-days.json', 'anthropic-main.json', 'claude-main.json', 'elevenlabs.json', 'fal.json', 'jina.json', 'pxy.json']);
+  assert.deepEqual(readdirSync(ctx.cache).sort(), ['anthropic-alt-days.json', 'anthropic-alt.json', 'anthropic-main-days.json', 'anthropic-main.json', 'claude-main.json', 'context7-alt.json', 'context7-clt.json', 'context7-main.json', 'elevenlabs.json', 'fal.json', 'jina.json', 'pxy.json']);
 });
 
 test('pxy with the store locked: every pxy row is locked, and pxy ran without a pinentry', async (t) => {
@@ -554,6 +563,21 @@ test('a locked store makes Jina an auth row in the balances; a refused key is no
   s.other.length = 0;
   assert.deepEqual(strip((await everything(ctx)).out.filter((row) => row.provider === 'jina')), [placeholder('jina', 'Jina', 'auth', 'locked')]);
   assert.equal(s.other.length, 0);
+});
+
+test('a Context7 key it refuses is a no-key row in the usage, and a body without the member counts is shape', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  const c7 = async () => strip((await everything(ctx)).out.filter((row) => row.provider === 'context7'));
+  s.context7 = 401;
+  assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => placeholder('context7', 'Context7 ' + id, 'auth', 'no-key')));
+  s.context7 = 200;
+  CONTEXT7.member.requests = 'forged';
+  try {
+    assert.deepEqual(await c7(), ['main', 'alt', 'clt'].map((id) => placeholder('context7', 'Context7 ' + id, 'error', 'shape')));
+  } finally {
+    CONTEXT7.member.requests = 240;
+  }
 });
 
 test('fal falls back to the main key when there is no billing key', async (t) => {

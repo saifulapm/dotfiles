@@ -50,7 +50,8 @@ check "and the fake has no calls" test "$(ncalls)" = 0
 open_acc
 fetched
 echo "     accounts: $(acc_state | jq -c '{accounts: [.accounts[] | [.id, .plan, .active, [.limits[] | .figure]]], balances: [.balances[].figure], usage: [.usage[].figure], footer, groups: [.groups[].text]}')"
-check "Mod+U draws 2 accounts, 6 balances and 1 usage row" state_is '(.accounts | length) == 2 and (.balances | length) == 6 and (.usage | length) == 1'
+check "Mod+U draws 2 accounts, 6 balances and 3 usage rows" state_is '(.accounts | length) == 2 and (.balances | length) == 6 and (.usage | length) == 3'
+check "Context7 reads its requests of the plan's ($(acc_state | jq -c '[.rows[] | select(.name == "Context7 main") | [.figure, .reset]]'))" state_is 'any(.rows[]; .kind == "usage" and .name == "Context7 main" and .figure == "240 of 1,000 requests")'
 check "a Console grant reads what is left of it, with its expiry under the name ($(acc_state | jq -c '[.rows[] | select(.name == "Anthropic main") | [.figure, .reset]]'))" state_is 'any(.rows[]; .name == "Anthropic main" and .figure == "$38.87 of $205 left" and (.reset | test("^expires [0-9]+ [A-Z][a-z]{2}$")))'
 check "Jina reads its tokens among the balances" state_is 'any(.rows[]; .kind == "balance" and .name == "Jina" and .figure == "953,604,107 tokens")'
 check "main is active, work is not" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
