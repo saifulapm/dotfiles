@@ -1,7 +1,7 @@
 // dots claude-account, the claude wrapper every launcher runs and the fish cx, with claude and its login played by a stub in a scratch home.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, existsSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 const dots = new URL('../../bin/dots', import.meta.url).pathname;
 const cxFn = new URL('../../home/dot_config/fish/functions/cx.fish', import.meta.url).pathname;
 const wrapperSrc = new URL('../../home/dot_local/libexec/dots/executable_claude', import.meta.url).pathname;
-const links = ['skills', 'agents', 'settings.json', 'CLAUDE.md', 'history.jsonl', 'projects'];
+const links = ['skills', 'agents', 'settings.json', 'CLAUDE.md', 'history.jsonl', 'projects', 'themes'];
 
 const stub = `#!/usr/bin/env bash
 if [ "$1 $2" = "auth login" ]; then
@@ -37,7 +37,7 @@ function scratch(t) {
     chmodSync(p, 0o755);
   }
   symlinkSync(wrapperSrc, join(home, '.local/libexec/dots/claude'));
-  for (const n of ['skills', 'agents', 'projects']) mkdirSync(join(home, '.claude', n));
+  for (const n of ['skills', 'agents', 'projects', 'themes']) mkdirSync(join(home, '.claude', n));
   for (const n of ['settings.json', 'CLAUDE.md', 'history.jsonl']) writeFileSync(join(home, '.claude', n), '');
   const env = {
     ...process.env,
@@ -85,6 +85,21 @@ test('use switches the active account and an unknown id changes nothing', (t) =>
   const r = s.run(['use', 'nope']);
   assert.notEqual(r.status, 0);
   assert.deepEqual(readFileSync(s.reg), before);
+});
+
+test('use links what a home made before an entry was shared lacks, and leaves an entry the home made itself', (t) => {
+  const s = scratch(t);
+  assert.equal(s.run(['add', 'work']).status, 0);
+  const work = join(s.root, 'state/dots/claude-accounts/work');
+  rmSync(join(work, 'themes'));
+  rmSync(join(work, 'agents'));
+  mkdirSync(join(work, 'agents'));
+  assert.equal(s.run(['use', 'work']).status, 0);
+  assert.equal(readlinkSync(join(work, 'themes')), join(s.home, '.claude', 'themes'));
+  assert.ok(!lstatSync(join(work, 'agents')).isSymbolicLink());
+  assert.ok(!existsSync(join(work, 'agents', 'agents')));
+  assert.equal(s.run(['use', 'main']).status, 0);
+  assert.ok(!existsSync(join(s.home, '.claude', 'themes', 'themes')));
 });
 
 test('a failed login leaves no registry and no home', (t) => {

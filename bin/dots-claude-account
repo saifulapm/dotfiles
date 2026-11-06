@@ -47,9 +47,7 @@ add() {
   home=$state/claude-accounts/$id
   [ -e "$home" ] || made=1
   mkdir -p "$home" || die "cannot make $home"
-  for i in skills agents settings.json CLAUDE.md history.jsonl projects; do
-    ln -sfn "$main_home/$i" "$home/$i"
-  done
+  share "$home"
   # claude keeps the terminal here, since the login opens a browser and may ask for a code.
   if ! CLAUDE_CONFIG_DIR=$home claude auth login; then
     [ -z "$made" ] || rm -rf "$home"
@@ -65,6 +63,15 @@ add() {
     '.accounts += [{id: $id, label: $id, home: $h, email: (if $e == "" then null else $e end), plan: (if $p == "" then null else $p end)}]' "$reg" | save
 }
 
+# A second account's home links the main account's shared entries; themes holds the dots theme settings.json names. use links them again, so a home made before an entry was shared gets it; an entry the home made for itself is left alone.
+share() {
+  local i
+  for i in skills agents settings.json CLAUDE.md history.jsonl projects themes; do
+    [ -e "$1/$i" ] && [ ! -L "$1/$i" ] && continue
+    ln -sfn "$main_home/$i" "$1/$i"
+  done
+}
+
 use() {
   local id=${1:-} home
   if [ ! -f "$reg" ]; then
@@ -75,6 +82,7 @@ use() {
   # A hand-edited account with no home would start claude in a fresh, logged-out config dir.
   home=$(jq -r --arg id "$id" 'first(.accounts[] | select(.id == $id)) | .home // ""' "$reg")
   [ -n "$home" ] && [ -d "$home" ] || die "account $id has no home${home:+ at $home}"
+  [ "$home" = "$main_home" ] || share "$home"
   jq --arg id "$id" '.active = $id' "$reg" | save
 }
 
