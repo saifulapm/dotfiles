@@ -50,7 +50,9 @@ check "and the fake has no calls" test "$(ncalls)" = 0
 open_acc
 fetched
 echo "     accounts: $(acc_state | jq -c '{accounts: [.accounts[] | [.id, .plan, .active, [.limits[] | .figure]]], balances: [.balances[].figure], usage: [.usage[].figure], footer, groups: [.groups[].text]}')"
-check "Mod+U draws 2 accounts, 5 balances and 2 usage rows" state_is '(.accounts | length) == 2 and (.balances | length) == 5 and (.usage | length) == 2'
+check "Mod+U draws 2 accounts, 6 balances and 1 usage row" state_is '(.accounts | length) == 2 and (.balances | length) == 6 and (.usage | length) == 1'
+check "a Console grant reads what is left of it, with its expiry under the name ($(acc_state | jq -c '[.rows[] | select(.name == "Anthropic main") | [.figure, .reset]]'))" state_is 'any(.rows[]; .name == "Anthropic main" and .figure == "$38.87 of $205 left" and (.reset | test("^expires [0-9]+ [A-Z][a-z]{2}$")))'
+check "Jina reads its tokens among the balances" state_is 'any(.rows[]; .kind == "balance" and .name == "Jina" and .figure == "953,604,107 tokens")'
 check "main is active, work is not" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
 check "main's 5-hour reads 34% used, resets 17:00 ($(acc_state | jq -c '.accounts[0].limits[0]'))" state_is '.accounts[0].limits[0] | .name == "5-hour" and .figure == "34% used" and .reset == "resets 17:00" and .warning == false'
 check "the card draws that row as 34% and resets 17:00" state_is 'any(.rows[]; .kind == "limit" and .name == "5-hour" and .figure == "34%" and .reset == "resets 17:00")'
@@ -165,23 +167,23 @@ echo "     offline: $(acc_state | jq -c '{accounts: [.accounts[].note], provider
 check "offline, every account reads stale · as of HH:MM" state_is 'all(.accounts[]; .note | test("^stale · as of [0-9]{2}:[0-9]{2}$"))'
 check "every balance and usage row keeps its figure with as of HH:MM" state_is 'all((.balances + .usage)[]; (.note | test("^as of [0-9]{2}:[0-9]{2}$")) and .figure != "")'
 check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .error == false) and all(.rows[]; (.note | startswith("✕")) | not)'
-# Every drawn text of a row ends inside the card: a stale Codex row once ran its reset past the right border.
+# Every drawn text of a row ends inside the card: a stale row once ran its reset past the right border.
 inside() { state_is '.cardBox as $c | all(.rows[]; .right <= $c.x + $c.w + 0.5)'; }
 edges() { acc_state | jq -c '[(.cardBox.x + .cardBox.w | floor), ([.rows[].right] | max | floor)]'; }
 check "offline, every row stays inside the card (card, rows right: $(edges))" inside
 check "offline, no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
-# A reset column once kept 50 px idle while Codex's figure beside its note was cut short; ElevenLabs' longer figure fills its row and may elide.
-check "offline, Codex's figure is whole beside its note ($(acc_state | jq -c '[.rows[] | select(.name | test("codex"; "i")) | [.figure, .figureElided]]'))" state_is 'any(.rows[]; (.name | test("codex"; "i")) and .figureElided == false)'
+# A reset column once kept 50 px idle while a figure beside its note was cut short; ElevenLabs' longer figure fills its row and may elide.
+check "offline, Anthropic alt's figure is whole beside its bar and note ($(acc_state | jq -c '[.rows[] | select(.name == "Anthropic alt") | [.figure, .figureElided]]'))" state_is 'any(.rows[]; .name == "Anthropic alt" and .figureElided == false)'
 rm "$DOTS_DEV_DIR/accounts-offline"
 close_acc
 
-# Rows from a file anyone can write: a 200-character unit and label, a stale usage row with its reset, and a thousand balances.
+# Rows from a file anyone can write: a 200-character unit and label, a stale grant with its expiry, and a thousand balances.
 node -e '
   const now = Date.now(), iso = (t) => new Date(t).toISOString();
   const row = (o) => Object.assign({ account: null, limit: null, unit: "USD", resets_at: null, as_of: iso(now - 7200e3), state: "stale", reason: "network" }, o);
   const rows = [
     row({ provider: "claude", label: "work", account: "work", metric: "5-hour", kind: "percent", value: 12, limit: 100, unit: "%", reason: "expired" }),
-    row({ provider: "codex", label: "Codex", metric: "monthly", kind: "percent", value: 0, limit: 100, unit: "%", resets_at: iso(now + 30 * 86400e3) }),
+    row({ provider: "anthropic", label: "Anthropic main", metric: "grant", kind: "money", value: 38.87, limit: 205, resets_at: iso(now + 14 * 86400e3) }),
     row({ provider: "elevenlabs", label: "ElevenLabs", metric: "characters", kind: "count", value: 1, limit: 2, unit: "L".repeat(200), resets_at: iso(now + 12 * 86400e3) }),
     row({ provider: "x", label: "W".repeat(200), metric: "balance", kind: "money", value: 123456789.12, limit: 999999999 }),
   ];

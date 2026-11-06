@@ -55,10 +55,18 @@ function money(v, unit, grant) {
   return usd ? `$${amount}` : `${amount} ${clean(unit)}`;
 }
 
+// A Console grant ends on a UTC date, so it reads as that date alone.
+function expiresText(iso) {
+  const at = Date.parse(iso);
+  if (!iso || Number.isNaN(at)) return '';
+  const d = new Date(at);
+  return `expires ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+}
+
 // One drawn row: its figure, a bar's fraction (null for none), the warning from 80% used, and a note for a stale or failed value.
 function figureOf(r, now) {
   const placeholder = !num(r.value);
-  const out = { label: clean(r.label), figure: '', fraction: null, warning: false, reset: placeholder ? '' : resetText(r.resets_at, now), note: '', error: false };
+  const out = { label: clean(r.label), figure: '', fraction: null, warning: false, reset: placeholder ? '' : r.metric === 'grant' ? expiresText(r.resets_at) : resetText(r.resets_at, now), note: '', error: false };
   if (placeholder) {
     out.note = reasonText(r.reason);
     out.error = true;
@@ -70,6 +78,12 @@ function figureOf(r, now) {
     out.fraction = clamp(r.value / 100);
     out.warning = r.value >= 80;
     out.figure = r.provider === 'claude' ? `${pct}% used` : `${pct}% of ${clean(r.metric)} window`;
+  } else if (r.kind === 'spend') {
+    // Money spent in a window, never what is left, so it draws with no bar.
+    out.figure = `${money(r.value, r.unit)} ${clean(r.metric)}`;
+  } else if (r.kind === 'tokens') {
+    // A balance kept in tokens, not money.
+    out.figure = `${grouped(r.value)} tokens`;
   } else if (r.kind === 'count') {
     out.figure = num(r.limit) ? `${grouped(r.value)} of ${grouped(r.limit)} ${clean(r.unit)}` : `${grouped(r.value)} ${clean(r.unit)}`;
     if (num(r.limit) && r.limit > 0) {
@@ -125,8 +139,8 @@ export function accountsView(registryText, rowsText, now, busy) {
     };
   });
   const others = rows.filter((r) => r.provider !== 'claude');
-  const balances = others.filter((r) => r.kind === 'money').slice(0, MOST.balances).map((r) => figureOf(r, now));
-  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count').slice(0, MOST.usage).map((r) => figureOf(r, now));
+  const balances = others.filter((r) => r.kind === 'money' || r.kind === 'tokens').slice(0, MOST.balances).map((r) => figureOf(r, now));
+  const usage = others.filter((r) => r.kind === 'percent' || r.kind === 'count' || r.kind === 'spend').slice(0, MOST.usage).map((r) => figureOf(r, now));
   const groups = [['Claude', accounts.length]];
   if (balances.length) groups.push(['Balances', balances.length]);
   if (usage.length) groups.push(['Usage', usage.length]);

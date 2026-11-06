@@ -79,6 +79,32 @@ test('balances read in money, OpenRouter of its grant with a bar of credit left;
   assert.equal(v.usage[0].warning, false);
 });
 
+test("a Console org's spend reads under usage as money spent this month, with no bar and its reset", () => {
+  const spend = row({ provider: 'anthropic', label: 'Anthropic main', metric: 'this month', kind: 'spend', value: 87.617075, unit: 'USD' });
+  const v = view([...rows, spend]);
+  assert.equal(v.balances.length, 5);
+  assert.deepEqual(v.usage.map((u) => [u.label, u.figure, u.fraction, u.reset]).at(-1), ['Anthropic main', '$87.62 this month', null, '']);
+  const item = accountsItems(v).at(-1);
+  assert.equal(accountsLook(schemeTokens('artboard')).figure(item), '$87.62 this month');
+});
+
+test("a Console grant reads as a balance of what is left of it, with its UTC expiry date under the name", () => {
+  const grant = row({ provider: 'anthropic', label: 'Anthropic alt', metric: 'grant', kind: 'money', value: 170.931814, limit: 200, unit: 'USD', resets_at: '2026-10-24T00:00:00Z' });
+  const v = view([...rows, grant]);
+  assert.deepEqual(v.balances.map((b) => [b.label, b.figure, b.reset]).at(-1), ['Anthropic alt', '$170.93 of $200', 'expires 24 Oct']);
+  assert.equal(v.balances.at(-1).fraction, 170.931814 / 200);
+  const item = accountsItems(v).filter((i) => i.kind === 'balance').at(-1);
+  assert.equal(accountsLook(schemeTokens('artboard')).figure(item), '$170.93 of $200 left');
+});
+
+test('a balance kept in tokens reads as a whole count of tokens among the balances, with no bar', () => {
+  const jina = row({ provider: 'jina', label: 'Jina', metric: 'balance', kind: 'tokens', value: 953604107, unit: 'tokens' });
+  const v = view([...rows, jina]);
+  assert.deepEqual(v.balances.map((b) => [b.label, b.figure, b.fraction]).at(-1), ['Jina', '953,604,107 tokens', null]);
+  const placeholder = view([...rows, row({ provider: 'jina', label: 'Jina', metric: null, kind: 'tokens', value: null, unit: null, state: 'auth', reason: 'no-key' })]);
+  assert.deepEqual(placeholder.balances.map((b) => [b.label, b.note, b.error]).at(-1), ['Jina', 'no key', true]);
+});
+
 test('a usage count at 80% of its cap warns', () => {
   const r = [row({ provider: 'elevenlabs', label: 'ElevenLabs', metric: 'characters', kind: 'count', value: 26000, limit: 32000, unit: 'characters' })];
   assert.equal(view(r).usage[0].warning, true);

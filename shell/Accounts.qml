@@ -58,7 +58,7 @@ Item {
         keyTarget.forceActiveFocus();
     }
 
-    // A fetch that is running finishes within its 10 s limit: killing node would orphan codex's process group.
+    // A fetch that is running finishes within its 10 s limit: killing node would orphan its children's process groups.
     function close() {
         shown = false;
     }
@@ -468,10 +468,10 @@ Item {
                                     font.weight: rowItem.isLimit ? Font.Normal : Font.Medium
                                     font.letterSpacing: 0
                                 }
-                                // The plan under an account's name, the reset under a usage row's.
+                                // The plan under an account's name, the reset under a usage or balance row's.
                                 Text {
                                     id: resetUnder
-                                    visible: (rowItem.isAccount || rowItem.it.kind === "usage") && text !== ""
+                                    visible: (rowItem.isAccount || rowItem.it.kind === "usage" || rowItem.it.kind === "balance") && text !== ""
                                     textFormat: Text.PlainText
                                     text: rowItem.isAccount ? rowItem.it.plan : rowItem.it.reset || ""
                                     color: c.muted

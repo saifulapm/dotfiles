@@ -35,7 +35,8 @@ five_work=${today}T16:40:00${z:0:3}:${z:3}
 iso as_of "$fetched"
 iso week $((now + 6 * 86400))
 iso month $((now + 12 * 86400))
-iso codex $((now + 28 * 86400))
+iso main_grant $((now + 14 * 86400))
+iso alt_grant $((now + 3 * 86400))
 
 rows=()
 row() {
@@ -56,11 +57,11 @@ row claude work work 5-hour percent 8 100 % "$five_work"
 row claude work work weekly percent 12 100 % -
 row deepseek-ai DeepSeek - balance money 12.4 - USD -
 row openrouter OpenRouter - balance money 3.1 10 USD -
-row zenmux ZenMux - balance money 7 - USD -
-row vercel 'Vercel AI' - balance money 4.5 - USD -
 row fal fal - balance money 18.2 - USD -
+row anthropic 'Anthropic main' - grant money 38.87 205 USD "$main_grant"
+row anthropic 'Anthropic alt' - grant money 170.93 200 USD "$alt_grant"
+row jina Jina - balance tokens 953604107 - tokens -
 row elevenlabs ElevenLabs - characters count 11500 32000 characters "$month"
-row codex Codex - monthly percent 0 100 % "$codex"
 (IFS=,; printf '[%s]\n' "${rows[*]}")
 exit
 }

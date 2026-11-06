@@ -12,6 +12,7 @@ const CACHE = join(env.XDG_CACHE_HOME || env.HOME + '/.cache', 'dots', 'accounts
 const ANTHROPIC = env.DOTS_ACCOUNTS_ANTHROPIC_URL || 'https://api.anthropic.com';
 const ELEVENLABS = env.DOTS_ACCOUNTS_ELEVENLABS_URL || 'https://api.elevenlabs.io';
 const FAL = env.DOTS_ACCOUNTS_FAL_URL || 'https://api.fal.ai';
+const JINA = env.DOTS_ACCOUNTS_JINA_URL || 'https://embeddings-dashboard-api.jina.ai';
 const AUTH = new Set(['expired', 'forbidden', 'locked', 'no-key']);
 
 // A source's failure carries only a reason from the fixed list, never text from a response.
@@ -120,13 +121,16 @@ const killGroup = (child) => {
 };
 
 // pass runs with no passphrase prompt: a locked store fails at once and says so on stderr.
-async function key(name, signal) {
+// An entry's lines, the key first.
+async function entry(name, signal) {
   const r = await exec('pass', ['show', name], signal);
   if (r.code !== 0) throw new Failure(/pinentry|decryption failed/.test(r.stderr) ? 'locked' : 'no-key');
-  const first = r.stdout.split('\n')[0].trim();
-  if (!first) throw new Failure('no-key');
-  return first;
+  const lines = r.stdout.split('\n').map((l) => l.trim());
+  if (!lines[0]) throw new Failure('no-key');
+  return lines;
 }
+
+const key = async (name, signal) => (await entry(name, signal))[0];
 
 // Text from a response reaches a row only as a number or as a three-letter currency code.
 const num = (v) => (typeof v === 'number' && isFinite(v) ? Math.round(v * 1e6) / 1e6 : null);
@@ -161,79 +165,87 @@ async function fal(signal) {
   return [money(own('fal', 'fal'), left, null, currency(body.credits.currency))];
 }
 
-// One rate-limit window as a percent row, named by its length.
-const window = (w) => {
-  const mins = w.windowDurationMins;
-  const metric = { 300: '5-hour', 10080: 'weekly', 43200: 'monthly' }[mins] || (typeof mins === 'number' && mins > 0 ? Math.round(mins / 60) + 'h' : null);
-  if (!metric || num(w.usedPercent) === null) throw new Failure('shape');
-  return { ...own('codex', 'Codex'), metric, kind: 'percent', value: num(w.usedPercent), limit: 100, unit: '%', resets_at: unix(w.resetsAt) };
-};
+// Jina's dashboard reads the wallet with the key in the query; it takes no header. The balance is in tokens.
+async function jina(signal) {
+  const k = await key('AI/jina-reader/main', signal);
+  const body = await fetchJSON(JINA + '/api/v1/api_key/user?api_key=' + encodeURIComponent(k), {}, signal, 'no-key');
+  const left = num(body && body.wallet && body.wallet.total_balance);
+  if (left === null) throw new Failure('shape');
+  return [{ ...own('jina', 'Jina', 'tokens'), metric: 'balance', value: left, limit: null, unit: 'tokens', resets_at: null }];
+}
 
-// Codex answers JSON-RPC lines on stdout. The child is killed on every path, and the limit's abort rejects the wait.
-async function codex(signal) {
-  const child = spawn('codex', ['-s', 'read-only', 'app-server'], { detached: true, stdio: ['pipe', 'pipe', 'ignore'] });
-  try {
-    const waiting = new Map();
-    const answered = new Map();
-    const answer = (id) => answered.get(id) || new Promise((resolve) => waiting.set(id, resolve));
-    let buf = '';
-    child.stdout.on('data', (d) => {
-      buf += d;
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) {
-        let msg = null;
-        try {
-          msg = JSON.parse(buf.slice(0, i));
-        } catch {}
-        buf = buf.slice(i + 1);
-        if (msg && msg.id !== undefined) {
-          answered.set(msg.id, msg);
-          if (waiting.has(msg.id)) waiting.get(msg.id)(msg);
-        }
+// A Console org's spend in cents since a time, from the daily cost report, page by page. cost_report is the legacy endpoint, kept because analytics/cost needs read:analytics, which an Admin key lacks. It allows 90 requests a window, so a day two days past its end, which no longer changes, is summed into the org's cache file, and a run asks only for the days after the last one kept.
+const SETTLED_MS = 2 * 86400000;
+async function cost(org, from, headers, signal) {
+  const name = `anthropic-${org}-days`;
+  const kept = readJSON(join(CACHE, name + '.json'));
+  const known = kept && kept.from === from && typeof kept.until === 'string' && num(kept.cents) !== null;
+  const start = known ? kept.until : from;
+  let settled = known ? kept.cents : 0;
+  let until = start;
+  let cents = settled;
+  let open = false;
+  let page = null;
+  do {
+    const url = `${ANTHROPIC}/v1/organizations/cost_report?starting_at=${start}&limit=31` + (page ? '&page=' + encodeURIComponent(page) : '');
+    const body = await fetchJSON(url, headers, signal, 'no-key');
+    if (!body || !Array.isArray(body.data)) throw new Failure('shape');
+    for (const day of body.data) {
+      let c = 0;
+      for (const r of (day && Array.isArray(day.results) && day.results) || []) {
+        const v = amount(r && r.amount);
+        if (v === null) throw new Failure('shape');
+        c += v;
       }
-    });
-    const dead = new Promise((_, reject) => {
-      child.on('error', () => reject(new Failure('network')));
-      child.on('close', () => reject(new Failure('network')));
-      signal.addEventListener('abort', () => reject(new Failure('timeout')), { once: true });
-    });
-    dead.catch(() => {});
-    child.stdin.on('error', () => {});
-    const send = (msg) => child.stdin.write(JSON.stringify(msg) + '\n');
-    const ask = async (id) => {
-      const msg = await Promise.race([answer(id), dead]);
-      if (msg.error || !msg.result) throw new Failure('shape');
-      return msg.result;
-    };
-    send({ id: 1, method: 'initialize', params: { clientInfo: { name: 'dots-accounts', version: '1' } } });
-    await ask(1);
-    send({ method: 'initialized', params: {} });
-    send({ id: 2, method: 'account/read', params: {} });
-    send({ id: 3, method: 'account/rateLimits/read', params: {} });
-    if (!(await ask(2)).account) throw new Failure('no-key');
-    const limits = (await ask(3)).rateLimits;
-    const rows = limits ? [limits.primary, limits.secondary].filter((w) => w && typeof w === 'object').map(window) : [];
-    if (!rows.length) throw new Failure('shape');
-    return rows;
-  } finally {
-    killGroup(child);
+      cents += c;
+      const end = Date.parse(day && day.ending_at);
+      if (!open && end <= Date.now() - SETTLED_MS) {
+        settled += c;
+        until = iso(end);
+      } else open = true;
+    }
+    page = body.has_more ? body.next_page : null;
+    if (body.has_more && typeof page !== 'string') throw new Failure('shape');
+  } while (page);
+  mkdirSync(CACHE, { recursive: true });
+  save(name, { from, until, cents: settled });
+  return cents;
+}
+
+// No key can read a Console org's credit, so its grants are lines under the key in pass: `grant <dollars> <granted YYYY-MM-DD> <expires YYYY-MM-DD>`, dates in UTC as the Console shows them. A grant lasts through its expiry day.
+const GRANT = /^grant\s+(\d+(?:\.\d+)?)\s+(\d{4}-\d{2}-\d{2})\s+(\d{4}-\d{2}-\d{2})$/;
+const day = (d) => Date.parse(d + 'T00:00:00Z');
+
+// With grants in force, what is left of them: their total less all spend since the first was granted. With none, the spend since the first of this UTC month.
+async function anthropic(org, signal) {
+  const lines = await entry(`AI/anthropic/${org}-admin`, signal);
+  const headers = { 'x-api-key': lines[0], 'anthropic-version': '2023-06-01' };
+  const names = own('anthropic', 'Anthropic ' + org);
+  const grants = lines
+    .map((l) => GRANT.exec(l))
+    .filter((m) => m && !isNaN(day(m[2])) && Date.now() < day(m[3]) + 86400000)
+    .map((m) => ({ dollars: Number(m[1]), from: day(m[2]), until: day(m[3]) }));
+  if (grants.length) {
+    const total = grants.reduce((t, g) => t + g.dollars, 0);
+    const spent = (await cost(org, iso(Math.min(...grants.map((g) => g.from))), headers, signal)) / 100;
+    return [{ ...names, metric: 'grant', kind: 'money', value: num(Math.max(0, total - spent)), limit: num(total), unit: 'USD', resets_at: iso(Math.min(...grants.map((g) => g.until))) }];
   }
+  const now = new Date();
+  const cents = await cost(org, iso(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), headers, signal);
+  return [{ ...names, metric: 'this month', kind: 'spend', value: num(cents / 100), limit: null, unit: 'USD', resets_at: null }];
 }
 
 // pxy names its providers; only these have a balance body read here, under the label the card shows.
-const PXY = { 'deepseek-ai': 'DeepSeek', openrouter: 'OpenRouter', zenmux: 'ZenMux', vercel: 'Vercel AI', aihubmix: 'AIHubMix' };
+const PXY = { 'deepseek-ai': 'DeepSeek', openrouter: 'OpenRouter' };
 
-// The shapes pxy's own parsers know, tried in its order (it has none for Vercel: that is the gateway's {balance, total_used} in strings). A shape none of them knows returns null.
+// The shapes pxy's own parsers know for those providers, tried in its order. A shape none of them knows returns null.
 function balances(data, names) {
   const d = data.data;
   if (d && num(d.total_credits) !== null && num(d.total_usage) !== null) return [money(names, num(d.total_credits - d.total_usage), num(d.total_credits), 'USD')];
-  if (data.success === true && d && typeof d.currency === 'string' && num(d.total_credits) !== null) return [money(names, num(d.total_credits), null, currency(d.currency))];
-  if (d && num(d.quota) !== null && num(d.used_quota) !== null) return [money(names, num(d.quota / 500000), num((d.quota + d.used_quota) / 500000), 'USD')];
   if (Array.isArray(data.balance_infos) && data.balance_infos.length) {
     const rows = data.balance_infos.map((b) => (amount(b && b.total_balance) === null ? null : money(names, amount(b.total_balance), null, currency(b.currency))));
     return rows.includes(null) ? null : rows;
   }
-  if (names.provider === 'vercel' && amount(data.balance) !== null) return [money(names, amount(data.balance), null, 'USD')];
   return null;
 }
 
@@ -271,7 +283,8 @@ function sources() {
     { name: 'pxy', names: own('pxy', 'pxy'), run: pxy },
     { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs', 'count'), run: elevenlabs },
     { name: 'fal', names: own('fal', 'fal'), run: fal },
-    { name: 'codex', names: own('codex', 'Codex', 'percent'), run: codex },
+    ...['main', 'alt'].map((org) => ({ name: 'anthropic-' + org, names: own('anthropic', 'Anthropic ' + org), run: (signal) => anthropic(org, signal) })),
+    { name: 'jina', names: own('jina', 'Jina', 'tokens'), run: jina },
   ];
 }
 

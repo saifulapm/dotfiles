@@ -6,7 +6,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readF
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 
 const bin = new URL('../../bin/dots-accounts', import.meta.url).pathname;
 const usage = readFileSync(new URL('./fixtures/claude-usage.json', import.meta.url));
@@ -16,13 +16,12 @@ const HOUR = 3600e3;
 const fixture = (name) => new URL('./fixtures/' + name, import.meta.url).pathname;
 const FORGED = ['Fa\nke', 'Fake\u202Eevil', 'Fake\u001b[31m', '', 'x'.repeat(200), '\n'];
 
-// What pxy prints with the store open, one body per parser: DeepSeek (string amounts), OpenRouter, ZenMux, Vercel, and a provider no row is made for.
+// What pxy prints with the store open, one body per parser: DeepSeek (string amounts), OpenRouter, and providers no row is made for.
 const PXY_OK = {
   remote: {
     'deepseek-ai': { summary: 'x', data: { is_available: true, balance_infos: [{ currency: 'USD', total_balance: '12.34', granted_balance: '0.00' }] } },
     openrouter: { summary: 'x', data: { data: { total_credits: 25, total_usage: 7.5 } } },
     zenmux: { summary: 'x', data: { success: true, data: { currency: 'usd', total_credits: 482.74, top_up_credits: 35, bonus_credits: 447.74 } } },
-    vercel: { summary: 'x', data: { balance: '8.50', total_used: '1.50' } },
     'tokenharbor#pass': { summary: 'x', data: { usedPct: 0 } },
   },
 };
@@ -41,7 +40,9 @@ if (fs.existsSync(ctl + '/missing-' + process.argv[3].replace(/\\//g, '-'))) {
   process.stderr.write('Error: ' + process.argv[3] + ' is not in the password store.\\n');
   process.exit(1);
 }
-console.log('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\nsecond line');
+const entry = ctl + '/entry-' + process.argv[3].replace(/\\//g, '-');
+if (fs.existsSync(entry)) process.stdout.write('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\n' + fs.readFileSync(entry, 'utf8'));
+else console.log('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\nsecond line');
 `,
   pxy: `
 const fs = require('fs');
@@ -50,37 +51,27 @@ fs.appendFileSync(ctl + '/pxy.log', JSON.stringify({ argv: process.argv.slice(2)
 const delay = fs.existsSync(ctl + '/pxy-delay') ? Number(fs.readFileSync(ctl + '/pxy-delay', 'utf8')) : 0;
 setTimeout(() => process.stdout.write(fs.readFileSync(ctl + '/pxy.json')), delay);
 `,
-  codex: `
-const fs = require('fs');
-const ctl = process.env.STUB_CTL;
-fs.appendFileSync(ctl + '/codex.log', JSON.stringify({ argv: process.argv.slice(2), pid: process.pid }) + '\\n');
-const mode = fs.existsSync(ctl + '/codex-mode') ? fs.readFileSync(ctl + '/codex-mode', 'utf8').trim() : 'ok';
-const answers = {};
-for (const line of fs.readFileSync(ctl + '/codex.jsonl', 'utf8').split('\\n')) if (line) answers[JSON.parse(line).id] = JSON.parse(line);
-setInterval(() => {}, 1000);
-let buf = '';
-process.stdin.on('data', (d) => {
-  buf += d;
-  let i;
-  while ((i = buf.indexOf('\\n')) >= 0) {
-    const msg = JSON.parse(buf.slice(0, i));
-    buf = buf.slice(i + 1);
-    if (mode === 'hang' || msg.id === undefined) continue;
-    const answer = mode === 'rpcerror' && msg.id === 2 ? { id: 2, error: { code: -1, message: 'forged' } } : mode === 'noaccount' && msg.id === 2 ? { id: 2, result: { account: null, requiresOpenaiAuth: true } } : answers[msg.id];
-    process.stdout.write(JSON.stringify(answer) + '\\n');
-  }
-});
-`,
 };
 
 const ELEVEN = { tier: 'creator', character_count: 11500, character_limit: 32000, next_character_count_reset_unix: 1793000000, currency: 'usd' };
 // A dollar bucket as the usage endpoint gave it on 2026-10-28, under a codename that may change.
 const CREDIT = { utilization: 1.52, resets_at: '2026-11-05T07:59:00+00:00', limit_dollars: 250, used_dollars: 3.799662, remaining_dollars: 246.200338, locked_reason: null };
 const FAL = { username: 'my-team', credits: { current_balance: 24.5, currency: 'USD' } };
+const JINA = { customer_id: 'cus_x', wallet: { trial_balance: 0, regular_balance: 953604107, total_balance: 953604107 }, metadata: { auto_recharge: false } };
+// A Console org's cost report as it answered on 2026-11-06: daily buckets, amounts in cents as strings, a day with no spend empty.
+const COST = {
+  data: [
+    { starting_at: '2026-11-01T00:00:00Z', ending_at: '2026-11-02T00:00:00Z', results: [{ currency: 'USD', amount: '113.04', workspace_id: null }] },
+    { starting_at: '2026-11-02T00:00:00Z', ending_at: '2026-11-03T00:00:00Z', results: [] },
+    { starting_at: '2026-11-03T00:00:00Z', ending_at: '2026-11-04T00:00:00Z', results: [{ currency: 'USD', amount: '8648.6675', workspace_id: null }] },
+  ],
+  has_more: false,
+  next_page: null,
+};
 
 // The stub answers with whatever `mode` holds at the time and records every request. `claude` is the usage endpoint's mode, `eleven` and `fal` the others' status.
 async function stub(t) {
-  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200 };
+  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200, cost: 200, jina: 200 };
   const server = createServer((req, res) => {
     const send = (status, body) => {
       res.writeHead(status, { 'content-type': 'application/json' });
@@ -91,6 +82,19 @@ async function stub(t) {
       const eleven = req.url.startsWith('/v1/user');
       const status = eleven ? s.eleven : s.fal;
       return send(status, status === 200 ? JSON.stringify(eleven ? ELEVEN : FAL) : '{"error":{"type":"x","message":"forged"}}');
+    }
+    if (req.url.startsWith('/api/v1/api_key/user')) {
+      s.other.push({ url: req.url, method: req.method, headers: req.headers });
+      return send(s.jina, s.jina === 200 ? JSON.stringify(JINA) : '{"detail":"forged"}');
+    }
+    if (req.url.startsWith('/v1/organizations/cost_report')) {
+      s.other.push({ url: req.url, method: req.method, headers: req.headers });
+      if (s.cost !== 200) return send(s.cost, '{"error":{"type":"x","message":"forged"}}');
+      // Paged, the report gives its first day, then the rest under the page it named.
+      if (s.costBody) return send(200, JSON.stringify(s.costBody));
+      if (!s.paged) return send(200, JSON.stringify(COST));
+      const second = req.url.includes('&page=next%2Fpage');
+      return send(200, JSON.stringify({ data: second ? COST.data.slice(1) : COST.data.slice(0, 1), has_more: !second, next_page: second ? null : 'next/page' }));
     }
     s.seen.push({ url: req.url, method: req.method, headers: req.headers });
     if (s.mode === 'ok') send(200, usage);
@@ -136,7 +140,6 @@ function scratch(t, url, ids = ['main', 'work'], homeless = []) {
   mkdirSync(ctl);
   symlinkSync(process.execPath, join(stubBin, 'node'));
   for (const [name, code] of Object.entries(STUBS)) writeFileSync(join(stubBin, name), `#!${process.execPath}\n${code}`, { mode: 0o755 });
-  copyFileSync(fixture('codex-app-server.jsonl'), join(ctl, 'codex.jsonl'));
   writeFileSync(join(ctl, 'pxy.json'), JSON.stringify(PXY_OK));
   const env = {
     HOME: home,
@@ -149,6 +152,7 @@ function scratch(t, url, ids = ['main', 'work'], homeless = []) {
     DOTS_ACCOUNTS_ANTHROPIC_URL: url,
     DOTS_ACCOUNTS_ELEVENLABS_URL: url,
     DOTS_ACCOUNTS_FAL_URL: url,
+    DOTS_ACCOUNTS_JINA_URL: url,
     PATH: stubBin,
     STUB_CTL: ctl,
   };
@@ -356,56 +360,53 @@ const R = (provider, label, metric, kind, value, limit, unit, resets_at, state =
 const MONEY = [
   R('deepseek-ai', 'DeepSeek', 'balance', 'money', 12.34, null, 'USD', null),
   R('openrouter', 'OpenRouter', 'balance', 'money', 17.5, 25, 'USD', null),
-  R('zenmux', 'ZenMux', 'balance', 'money', 482.74, null, 'USD', null),
-  R('vercel', 'Vercel AI', 'balance', 'money', 8.5, null, 'USD', null),
 ];
 const ELEVEN_ROW = R('elevenlabs', 'ElevenLabs', 'characters', 'count', 11500, 32000, 'characters', '2026-10-26T07:33:20Z');
 const FAL_ROW = R('fal', 'fal', 'balance', 'money', 24.5, null, 'USD', null);
-const CODEX_ROW = R('codex', 'Codex', 'monthly', 'percent', 0, 100, '%', '2026-11-21T09:41:22Z');
-const PXY_KEYS = new Set(['deepseek-ai', 'openrouter', 'zenmux', 'vercel', 'aihubmix']);
+const JINA_ROW = R('jina', 'Jina', 'balance', 'tokens', 953604107, null, 'tokens', null);
+// With no grant, spend counts from the first of this UTC month, whenever the test runs.
+const monthStart = () => {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1)).toISOString().replace('.000Z', 'Z');
+};
+const SPEND_ROWS = () => ['main', 'alt'].map((org) => R('anthropic', 'Anthropic ' + org, 'this month', 'spend', 87.617075, null, 'USD', null));
+const ymd = (days) => new Date(Date.now() + days * 86400e3).toISOString().slice(0, 10);
+const PXY_KEYS = new Set(['deepseek-ai', 'openrouter']);
 const pxyRows = (out) => out.filter((row) => PXY_KEYS.has(row.provider));
 // A placeholder keeps its source's kind, so the card knows which group it draws in.
-const KIND = { codex: 'percent', elevenlabs: 'count' };
+const KIND = { elevenlabs: 'count', jina: 'tokens' };
 const placeholder = (provider, label, state, reason) => R(provider, label, null, KIND[provider] || 'money', null, null, null, null, state, reason);
 const ctlLog = (ctx, name) => (existsSync(join(ctx.ctl, name)) ? readFileSync(join(ctx.ctl, name), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const OPTS = '--pinentry-mode error';
 
-// A killed child can linger as a zombie for a moment, so the check waits for it to vanish.
-async function gone(pid) {
-  for (let i = 0; i < 50; i++) {
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return true;
-    }
-    await new Promise((r) => setTimeout(r, 20));
-  }
-  return false;
-}
-
-test('every stub answering gives five money rows and two usage rows, in parallel, with no key in any argv', async (t) => {
+test('every stub answering gives the money, token and spend rows and the usage row, in parallel, with no key in any argv', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
   const start = Date.now();
   const { out, r } = await everything(ctx);
   const wall = Date.now() - start;
-  assert.deepEqual(strip(out), [...limits('main'), ...MONEY, ELEVEN_ROW, FAL_ROW, CODEX_ROW]);
+  assert.deepEqual(strip(out), [...limits('main'), ...MONEY, ELEVEN_ROW, FAL_ROW, ...SPEND_ROWS(), JINA_ROW]);
   assert.ok(wall < 2000, `took ${wall} ms`);
   for (const row of out) assert.equal(typeof row.as_of, 'string');
   const eleven = s.other.find((q) => q.url === '/v1/user/subscription');
   const fal = s.other.find((q) => q.url === '/v1/account/billing?expand=credits');
   assert.equal(eleven.headers['xi-api-key'], 'FAKEKEY-AI-elevenlabs-main');
   assert.equal(fal.headers.authorization, 'Key FAKEKEY-AI-fal-billing');
+  assert.equal(s.other.find((q) => q.url.startsWith('/api/v1/api_key/user')).url, '/api/v1/api_key/user?api_key=FAKEKEY-AI-jina-reader-main');
+  const cost = s.other.filter((q) => q.url.startsWith('/v1/organizations/cost_report'));
+  assert.deepEqual(cost.map((q) => q.headers['x-api-key']).sort(), ['FAKEKEY-AI-anthropic-alt-admin', 'FAKEKEY-AI-anthropic-main-admin']);
+  for (const q of cost) {
+    assert.equal(q.url, `/v1/organizations/cost_report?starting_at=${monthStart()}&limit=31`);
+    assert.equal(q.headers['anthropic-version'], '2023-06-01');
+  }
   const pass = ctlLog(ctx, 'pass.log');
-  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing']]);
+  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main']]);
   for (const l of pass) assert.equal(l.opts, OPTS);
   assert.deepEqual(ctlLog(ctx, 'pxy.log'), [{ argv: ['status', '--remote', '--json'], opts: OPTS }]);
-  assert.deepEqual(ctlLog(ctx, 'codex.log').map((l) => l.argv), [['-s', 'read-only', 'app-server']]);
-  for (const text of [...['pass.log', 'pxy.log', 'codex.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
+  for (const text of [...['pass.log', 'pxy.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
     assert.ok(!text.includes('FAKEKEY'), text);
   }
-  for (const pid of ctlLog(ctx, 'codex.log').map((l) => l.pid)) assert.ok(await gone(pid), 'codex is gone after an ok run');
-  assert.deepEqual(readdirSync(ctx.cache).sort(), ['claude-main.json', 'codex.json', 'elevenlabs.json', 'fal.json', 'pxy.json']);
+  assert.deepEqual(readdirSync(ctx.cache).sort(), ['anthropic-alt-days.json', 'anthropic-alt.json', 'anthropic-main-days.json', 'anthropic-main.json', 'claude-main.json', 'elevenlabs.json', 'fal.json', 'jina.json', 'pxy.json']);
 });
 
 test('pxy with the store locked: every pxy row is locked, and pxy ran without a pinentry', async (t) => {
@@ -415,7 +416,7 @@ test('pxy with the store locked: every pxy row is locked, and pxy ran without a 
   const { out } = await everything(ctx);
   assert.deepEqual(
     strip(pxyRows(out)),
-    [['deepseek-ai', 'DeepSeek'], ['openrouter', 'OpenRouter'], ['zenmux', 'ZenMux'], ['vercel', 'Vercel AI'], ['aihubmix', 'AIHubMix']].map(([p, l]) => placeholder(p, l, 'auth', 'locked')),
+    [['deepseek-ai', 'DeepSeek'], ['openrouter', 'OpenRouter']].map(([p, l]) => placeholder(p, l, 'auth', 'locked')),
   );
   assert.deepEqual(ctlLog(ctx, 'pxy.log').map((l) => l.opts), [OPTS]);
   assert.ok(!JSON.stringify(out).includes('pinentry'), 'no text from the summary reaches a row');
@@ -441,7 +442,7 @@ test('pxy locked after a good run serves the cached rows as stale', async (t) =>
   await everything(ctx);
   copyFileSync(fixture('pxy-locked.json'), join(ctx.ctl, 'pxy.json'));
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(pxyRows(out)), [...MONEY.map((row) => ({ ...row, state: 'stale', reason: 'locked' })), placeholder('aihubmix', 'AIHubMix', 'auth', 'locked')]);
+  assert.deepEqual(strip(pxyRows(out)), MONEY.map((row) => ({ ...row, state: 'stale', reason: 'locked' })));
   const cached = JSON.parse(readFileSync(join(ctx.cache, 'pxy.json'), 'utf8'));
   assert.deepEqual(cached.map((row) => [row.provider, row.state]), MONEY.map((row) => [row.provider, 'ok']));
 });
@@ -451,7 +452,7 @@ test('a pxy provider with an unknown body shape is one shape row and the others 
   const ctx = scratch(t, s.url, ['main']);
   writeFileSync(join(ctx.ctl, 'pxy.json'), JSON.stringify({ remote: { ...PXY_OK.remote, openrouter: { summary: 'x', data: { surprise: 'sk-ant-forged' } } } }));
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(pxyRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape'), MONEY[2], MONEY[3]]);
+  assert.deepEqual(strip(pxyRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
 });
 
 test('a locked pass store makes elevenlabs and fal auth rows and sends no request', async (t) => {
@@ -480,6 +481,81 @@ test('a 401 from a pass-key source reads as no-key, not expired', async (t) => {
   assert.deepEqual(strip(out.filter((row) => row.provider === 'elevenlabs')), [placeholder('elevenlabs', 'ElevenLabs', 'auth', 'no-key')]);
 });
 
+test('a Console key that cannot read cost is a forbidden row, a bad one no-key, a missing one no-key with no request', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  const spend = async () => strip((await everything(ctx)).out.filter((row) => row.provider === 'anthropic'));
+  s.cost = 403;
+  assert.deepEqual(await spend(), ['main', 'alt'].map((org) => placeholder('anthropic', 'Anthropic ' + org, 'auth', 'forbidden')));
+  s.cost = 401;
+  assert.deepEqual(await spend(), ['main', 'alt'].map((org) => placeholder('anthropic', 'Anthropic ' + org, 'auth', 'no-key')));
+  s.other.length = 0;
+  writeFileSync(join(ctx.ctl, 'missing-AI-anthropic-alt-admin'), '');
+  s.cost = 200;
+  const got = await spend();
+  assert.deepEqual(got, [SPEND_ROWS()[0], placeholder('anthropic', 'Anthropic alt', 'auth', 'no-key')]);
+  assert.deepEqual(s.other.filter((q) => q.url.startsWith('/v1/organizations')).map((q) => q.headers['x-api-key']), ['FAKEKEY-AI-anthropic-main-admin']);
+});
+
+test('grants under the key are what is left of them since the first was granted; an expired one is spend this month', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  writeFileSync(join(ctx.ctl, 'entry-AI-anthropic-main-admin'), `grant 150 ${ymd(-10)} ${ymd(3)}\ngrant 50.5 ${ymd(-4)} ${ymd(20)}\nnot a grant\n`);
+  writeFileSync(join(ctx.ctl, 'entry-AI-anthropic-alt-admin'), `grant 200 ${ymd(-40)} ${ymd(-1)}\n`);
+  const { out } = await everything(ctx);
+  assert.deepEqual(strip(out.filter((row) => row.provider === 'anthropic')), [
+    R('anthropic', 'Anthropic main', 'grant', 'money', 112.882925, 200.5, 'USD', `${ymd(3)}T00:00:00Z`),
+    SPEND_ROWS()[1],
+  ]);
+  const urls = s.other.filter((q) => q.url.startsWith('/v1/organizations')).map((q) => q.url).sort();
+  assert.deepEqual(urls, [`/v1/organizations/cost_report?starting_at=${monthStart()}&limit=31`, `/v1/organizations/cost_report?starting_at=${ymd(-10)}T00:00:00Z&limit=31`].sort());
+});
+
+test('days two days past their end are kept as one sum, and the next run asks only for the days after them', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  const day = (n) => new Date(Date.UTC(...ymd(n).split('-').map((v, i) => (i === 1 ? v - 1 : +v)))).toISOString().replace('.000Z', 'Z');
+  const bucket = (n, cents) => ({ starting_at: day(n), ending_at: day(n + 1), results: [{ currency: 'USD', amount: String(cents) }] });
+  writeFileSync(join(ctx.ctl, 'entry-AI-anthropic-main-admin'), `grant 100 ${ymd(-5)} ${ymd(20)}\n`);
+  s.costBody = { data: [bucket(-5, 1000), bucket(-4, 500), bucket(-1, 250), bucket(0, 0)], has_more: false, next_page: null };
+  const left = async () => (await everything(ctx)).out.find((row) => row.label === 'Anthropic main').value;
+  assert.equal(await left(), 82.5);
+  assert.deepEqual(JSON.parse(readFileSync(join(ctx.cache, 'anthropic-main-days.json'), 'utf8')), { from: day(-5), until: day(-3), cents: 1500 });
+  s.other.length = 0;
+  s.costBody = { data: [bucket(-1, 250), bucket(0, 100)], has_more: false, next_page: null };
+  assert.equal(await left(), 81.5);
+  const asked = s.other.filter((q) => q.url.startsWith('/v1/organizations') && q.headers['x-api-key'] === 'FAKEKEY-AI-anthropic-main-admin');
+  assert.deepEqual(asked.map((q) => q.url), [`/v1/organizations/cost_report?starting_at=${day(-3)}&limit=31`]);
+});
+
+test('a grant lasts through its expiry day', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  writeFileSync(join(ctx.ctl, 'entry-AI-anthropic-main-admin'), `grant 200 ${ymd(-10)} ${ymd(0)}\n`);
+  const { out } = await everything(ctx);
+  assert.equal(out.find((row) => row.label === 'Anthropic main').metric, 'grant');
+});
+
+test('a cost report over many pages is summed across them all', async (t) => {
+  const s = await stub(t);
+  s.paged = true;
+  const ctx = scratch(t, s.url, ['main']);
+  const { out } = await everything(ctx);
+  assert.deepEqual(strip(out.filter((row) => row.provider === 'anthropic')), SPEND_ROWS());
+  assert.equal(s.other.filter((q) => q.url.includes('&page=next%2Fpage')).length, 2);
+});
+
+test('a locked store makes Jina an auth row in the balances; a refused key is no-key', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  s.jina = 401;
+  assert.deepEqual(strip((await everything(ctx)).out.filter((row) => row.provider === 'jina')), [placeholder('jina', 'Jina', 'auth', 'no-key')]);
+  writeFileSync(join(ctx.ctl, 'pass-locked'), '');
+  s.other.length = 0;
+  assert.deepEqual(strip((await everything(ctx)).out.filter((row) => row.provider === 'jina')), [placeholder('jina', 'Jina', 'auth', 'locked')]);
+  assert.equal(s.other.length, 0);
+});
+
 test('fal falls back to the main key when there is no billing key', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
@@ -487,34 +563,6 @@ test('fal falls back to the main key when there is no billing key', async (t) =>
   const { out } = await everything(ctx);
   assert.deepEqual(strip(out.filter((row) => row.provider === 'fal')), [FAL_ROW]);
   assert.equal(s.other.find((q) => q.url.startsWith('/v1/account')).headers.authorization, 'Key FAKEKEY-AI-fal-main');
-});
-
-test('codex errors and a missing login are rows, and the child is gone each time', async (t) => {
-  const s = await stub(t);
-  const ctx = scratch(t, s.url, ['main']);
-  const codexOnly = (out) => strip(out.filter((row) => row.provider === 'codex'));
-  writeFileSync(join(ctx.ctl, 'codex-mode'), 'rpcerror');
-  assert.deepEqual(codexOnly((await everything(ctx)).out), [placeholder('codex', 'Codex', 'error', 'shape')]);
-  writeFileSync(join(ctx.ctl, 'codex-mode'), 'noaccount');
-  assert.deepEqual(codexOnly((await everything(ctx)).out), [placeholder('codex', 'Codex', 'auth', 'no-key')]);
-  const pids = ctlLog(ctx, 'codex.log').map((l) => l.pid);
-  assert.equal(pids.length, 2);
-  for (const pid of pids) assert.ok(await gone(pid), 'codex is gone after a failed run');
-});
-
-test('a codex that never answers is a timeout row at the limit and leaves no process', async (t) => {
-  const s = await stub(t);
-  const ctx = scratch(t, s.url, ['main']);
-  ctx.env.DOTS_ACCOUNTS_LIMIT_MS = '800';
-  writeFileSync(join(ctx.ctl, 'codex-mode'), 'hang');
-  const start = Date.now();
-  const { out } = await everything(ctx);
-  const wall = Date.now() - start;
-  assert.ok(wall >= 700 && wall < 3000, `took ${wall} ms`);
-  assert.deepEqual(strip(out.filter((row) => row.provider === 'codex')), [placeholder('codex', 'Codex', 'error', 'timeout')]);
-  assert.deepEqual(strip(out.filter((row) => row.provider === 'fal')), [FAL_ROW]);
-  for (const pid of ctlLog(ctx, 'codex.log').map((l) => l.pid)) assert.ok(await gone(pid), 'codex is gone after the limit');
-  assert.equal(spawnSync('pgrep', ['-f', join(ctx.stubBin, 'codex')]).status, 1);
 });
 
 test('a forged model name never reaches a metric as more than one clean short line', async (t) => {
