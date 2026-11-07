@@ -22,7 +22,7 @@ Scope {
     readonly property bool away: lock.secure || lock.leased
     // Claude Code sends Remote Control sessions' pushes to the phone only while this file is missing, so it stands while neither dimmed nor away; environment.d names it in the runtime dir, and with none named nothing is written.
     readonly property string presence: Quickshell.env("CLAUDE_CLIENT_PRESENCE_FILE") || ""
-    // The keyboard light's level from before a dim, kept while the dim turns it off. Not brightnessctl's own -s: lid-close saves into that one slot, so a lid shut while dimmed would leave 0 to come back.
+    // The keyboard light's level from before a dim, kept while the dim turns it off. aurora-kbd-light holds a light set to 0 off, and takes it up again when the level it last set comes back.
     readonly property string kbdSaved: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/kbd-light"
 
     // One writer at a time, so a dim lifted at once cannot have its rm land before its create; a flag keeps its first time, which the hub reads as how long it has stood. The command is built here, since a change handler runs before a binding on the same change would update.
@@ -42,8 +42,7 @@ Scope {
     Process {
         id: flagWriter
         property bool dirty: false
-        // First the keyboard light: a dim saves a lit level and turns it off, and the dim's end puts it back; one already off is left alone, so a lid's own 0 is never saved. A machine without the light fails its g, and nothing runs.
-        // v1's stay-awake flag would hold the hub at watching through any idle; v2's stay awake removes the steps instead, so the idle flag already reads right.
+        // First the keyboard light: a dim saves a lit level and turns it off, and the dim's end puts it back; one already off (a bright room, a shut lid) is left alone, and a machine without the light fails its g, so nothing runs. Then v1's stay-awake flag, which would hold the hub at watching through any idle; v2's stay awake removes the steps instead, so the idle flag already reads right.
         readonly property string script: 'k=$6; if [ "$2" = 1 ]; then [ -e "$k" ] || { c=$(brightnessctl -d kbd_backlight g 2>/dev/null) && [ "$c" -gt 0 ] && mkdir -p "${k%/*}" && echo "$c" >"$k" && brightnessctl -q -d kbd_backlight set 0; }; elif [ -e "$k" ]; then brightnessctl -q -d kbd_backlight set "$(cat "$k")"; rm -f "$k"; fi; mkdir -p "$1" && rm -f "$1/stay-awake" || exit 1; set_flag() { if [ "$2" = 1 ]; then [ -e "$1" ] || : >"$1"; else rm -f "$1"; fi; }; set_flag "$1/idle" "$2"; set_flag "$1/locked" "$3"; [ -z "$4" ] || set_flag "$4" "$5"'
         onExited: {
             if (!dirty)

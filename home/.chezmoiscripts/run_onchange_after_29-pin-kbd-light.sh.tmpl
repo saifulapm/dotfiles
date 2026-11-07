@@ -1,0 +1,18 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+{{ template "pin.sh" (dict "chezmoi" .chezmoi "name" "kbd-light") }}
+# Only a Mac with both a keyboard light and an ambient light sensor: the MacBook, not the mini.
+if ! compgen -G '/sys/class/leds/*kbd_backlight' >/dev/null || ! compgen -G '/sys/bus/iio/devices/iio:device*/in_illuminance_input' >/dev/null || systemd-detect-virt -q --container; then
+  log "kbd-light: no keyboard light and light sensor here"
+  exit 0
+fi
+tarball=$(pin_fetch)
+tar -xzf "$tarball" -C "$pin_tmp"
+src=$pin_tmp/kbd-light-$pin_version
+make -C "$src" >/dev/null || die "kbd-light: build failed"
+# The unit runs /usr/bin/aurora-kbd-light, so the prefix stays /usr.
+root make -C "$src" install PREFIX=/usr >/dev/null || die "kbd-light: install failed"
+root systemctl daemon-reload
+root systemctl enable aurora-kbd-light.service >/dev/null 2>&1 || die "kbd-light: could not enable its unit"
+root systemctl restart aurora-kbd-light.service || die "kbd-light: its unit did not start"
+pin_done

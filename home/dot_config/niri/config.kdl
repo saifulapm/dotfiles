@@ -43,10 +43,10 @@ cursor {
     xcursor-size 24
 }
 
-// logind ignores the lid (there is no suspend), so closing it locks and darkens the screens and keyboard; opening it lights them again.
+// logind ignores the lid (there is no suspend), so closing it locks and darkens the screens; opening it lights them again. aurora-kbd-light turns the keyboard light off with the lid shut and back on after.
 switch-events {
-    lid-close { spawn "sh" "-c" "dots-call lock lock; niri msg action power-off-monitors; brightnessctl -q -d kbd_backlight -s set 0"; }
-    lid-open { spawn "sh" "-c" "niri msg action power-on-monitors; brightnessctl -q -d kbd_backlight -r"; }
+    lid-close { spawn "sh" "-c" "dots-call lock lock; niri msg action power-off-monitors"; }
+    lid-open { spawn "niri" "msg" "action" "power-on-monitors"; }
 }
 
 hotkey-overlay {

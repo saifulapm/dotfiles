@@ -158,6 +158,15 @@ url = "https://github.com/AsahiLinux/asahi-va-driver/archive/{version}.tar.gz"
 sha256 = "90e38019e76760d8ad11f04878331a90b56d18257f85f620daf57b10e50c71c4"
 
 [[pin]]
+name = "kbd-light"
+version = "727076b83eb65b0162317a9e2fa0ba850df1f5ca"
+repo = "aurora-silicon/kbd-light"
+track = "commit"
+install = "/usr/bin/aurora-kbd-light and its system unit on the MacBook, the keyboard light following the room's light"
+url = "https://github.com/aurora-silicon/kbd-light/archive/{version}.tar.gz"
+sha256 = "9419eea57c51fd4ccf83fe764bb85c18f9054d684d21415d189fa46fe568e88c"
+
+[[pin]]
 name = "elfeed-kak"
 version = "bfa1710b7767f61fa30a34f485cd40641239ce41"
 repo = "saifulapm/kakfeed"
