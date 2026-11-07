@@ -29,6 +29,10 @@ echo "     dimmed at ${dim_at:-never} s, locked at ${lock_at:-never} s, monitors
 check "it dims at 4 s" within "${dim_at:-99}" 3.5 4.9
 check "it locks at 5 s" within "${lock_at:-99}" 4.5 5.9
 check "it asks niri to turn the monitors off at 6 s" within "${off_at:-99}" 5.5 6.9
+# dev/path's fake keyboard light starts at 128.
+kbd() { brightnessctl -d kbd_backlight g; }
+check "the dim turns the keyboard light off ($(kbd))" test "$(kbd)" = 0
+check "and keeps its level to put back" test "$(cat "$DOTS_DEV_DIR/state/dots/kbd-light" 2>/dev/null)" = 128
 
 timeout 0.5 qs ipc call idle times 240 300 360 >/dev/null
 wtype dots-test-pass
@@ -37,6 +41,9 @@ until_ok 3000 bash -c "! timeout 0.5 qs ipc call lock state | jq -e .locked >/de
 check "the test password unlocks" bash -c "! timeout 0.5 qs ipc call lock state | jq -e .locked >/dev/null"
 until_ok 2000 idle_is '.dimmed | not'
 check "input lifts the dim" idle_is '.dimmed | not'
+until_ok 2000 test "$(kbd)" = 128
+check "and puts the keyboard light back ($(kbd))" test "$(kbd)" = 128
+check "the kept level is gone" test ! -e "$DOTS_DEV_DIR/state/dots/kbd-light"
 
 # An agent's lease holds the session unlocked through idle, until the lease's own end.
 niri msg action spawn -- dots-call lock lock

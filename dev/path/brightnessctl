@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Stands in for brightnessctl's keyboard light in a nested session, so a dim never turns the live one off; anything else goes to the next brightnessctl on PATH, which may be a check's own fake.
+case " $* " in
+*" -d kbd_backlight "*)
+  f=${DOTS_DEV_DIR:?}/kbd-light
+  [ -e "$f" ] || echo 128 >"$f"
+  [ $# -ge 2 ] && [ "${*: -2:1}" = set ] && echo "${*: -1}" >"$f"
+  [ "${*: -1}" = g ] && cat "$f"
+  exit 0
+  ;;
+esac
+self=$(cd "$(dirname "$0")" && pwd -P)
+PATH=$(tr : '\n' <<<"$PATH" | while read -r d; do [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$self" ] || printf '%s:' "$d"; done)
+exec brightnessctl "$@"
