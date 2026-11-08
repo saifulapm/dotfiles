@@ -61,13 +61,14 @@ for (const [name, want] of Object.entries(BOARD)) {
     for (const [k, v] of Object.entries(want.syntax)) assert.equal(doc.syntax[k], v, `syntax.${k}`);
   });
 
-  test(`${name} renders tiled windows with no frame and no gap, a solid paper back behind a floating one, no shadow, and its mode`, (t) => {
+  test(`${name} renders tiled windows with no frame and no gap, a little-clear paper back and an accent gradient edge on a floating one, no shadow, and its mode`, (t) => {
     const out = render(t, name);
     const kdl = readFileSync(join(out, 'niri.kdl'), 'utf8').replace(/\s+/g, ' ');
     const paper = want.color.paper;
     assert.ok(kdl.includes('gaps 0 '), kdl);
     assert.ok(kdl.includes('focus-ring { off } border { off }'), kdl);
-    assert.ok(kdl.includes(`match is-floating=true draw-border-with-background true border { on width 1 active-color "${paper}" inactive-color "${paper}" }`), kdl);
+    assert.ok(kdl.includes(`match is-floating=true draw-border-with-background false border { on width 1 active-gradient from="${want.color.accent}"`), kdl);
+    assert.ok(kdl.includes(`draw-behind-window true color "${paper}E0" inactive-color "${paper}E0" }`), kdl);
     assert.ok(kdl.includes('shadow { off }'));
     const foot = readFileSync(join(out, 'foot.ini'), 'utf8');
     assert.match(foot, /^alpha=0\.0$/m);

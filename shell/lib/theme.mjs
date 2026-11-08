@@ -167,15 +167,35 @@ window-rule {
     clip-to-geometry true
 }
 
-// A floating window sits over other windows, so niri paints a solid paper back behind it, which its clear background shows; its 1 px border is the same paper, so no frame shows.
+// A floating window sits over other windows, so a hard shadow drawn behind it backs its clear ground in the paper, a little clear itself; a 1 px gradient of the accent fading into the paper edges it, dimmer when it is not focused.
 window-rule {
     match is-floating=true
-    draw-border-with-background true
+    draw-border-with-background false
     border {
         on
         width 1
-        active-color "${c.paper}"
-        inactive-color "${c.paper}"
+        active-gradient from="${n.edge.from}" to="${n.edge.to}" angle=135
+        inactive-gradient from="${n.edge.dimFrom}" to="${n.edge.dimTo}" angle=135
+    }
+    shadow {
+        on
+        softness 0
+        spread 0
+        offset x=0 y=0
+        draw-behind-window true
+        color "${c.paper}E0"
+        inactive-color "${c.paper}E0"
+    }
+}
+
+// A video is never see-through: its back is solid paper.
+window-rule {
+    match app-id="^mpv$"
+    match app-id="^imv$"
+    match title=r#"Picture.?in.?[Pp]icture"#
+    shadow {
+        color "${c.paper}FF"
+        inactive-color "${c.paper}FF"
     }
 }
 

@@ -43,11 +43,16 @@ function frameOf(c) {
   return share ? mix(c.line, c.ink, share).toUpperCase() : c.line;
 }
 
-// The field, in the scheme's own magenta and blue: one diagonal grade of the two over the paper, which the desk draws and every window shows through its veil.
+// The field, in the scheme's own colours: one diagonal grade from its paper into a soft wash of its accent, which the desk draws and every clear window shows.
 function fieldOf(c, mode) {
-  const up = (h) => h.toUpperCase();
   const share = mode === 'dark' ? 0.2 : 0.14;
-  return { grade: { from: up(mix(c.paper, c.ansi[5], share)), to: up(mix(c.paper, c.ansi[4], share)) } };
+  return { grade: { from: c.paper, to: mix(c.paper, c.accent, share).toUpperCase() } };
+}
+
+// A floating window's edge: the accent fading into the paper, and a dimmer run of the same when it is not focused.
+function edgeOf(c) {
+  const wash = (share) => mix(c.paper, c.accent, share).toUpperCase();
+  return { from: c.accent, to: wash(0.35), dimFrom: wash(0.45), dimTo: wash(0.15) };
 }
 
 // The design system: Artboard's dots, geometry and spring, square, a quiet 1 px line frame on every window and surface, no shadow, Maple Mono in the plain voice.
@@ -60,7 +65,7 @@ export function designOf(s) {
     paper: Object.assign({ spacing: 16, dot: s.color.line }, fieldOf(s.color, s.variant)),
     type: { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 },
     niri: {
-      gaps: 0, border: 1, border_inactive: frameOf(s.color),
+      gaps: 0, border: 1, border_inactive: frameOf(s.color), edge: edgeOf(s.color),
       tab_position: 'top', tab_width: 4, tab_gap: 8, tab_length: 0.3, tab_gaps: 8,
     },
   };

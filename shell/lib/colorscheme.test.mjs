@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { parseToml } from './toml.mjs';
 import { validateColorscheme, designOf } from './colorscheme.mjs';
 import { validateTheme, renderNiri, contrast } from './theme.mjs';
+import { mix } from './notes-look.mjs';
 
 const read = (name) => parseToml(readFileSync(new URL(`../../colorschemes/${name}.toml`, import.meta.url), 'utf8'));
 const artboard = () => read('artboard');
@@ -40,15 +41,21 @@ test('ink on surface under 4.5:1 is refused with contrast in the message', () =>
   assert.throws(() => validateColorscheme(doc), /contrast/);
 });
 
-test('every scheme wears the one design: dots in line on a field of its magenta and blue, square, ink frame, no shadow, Maple Mono, plain, spring', () => {
+test('every scheme wears the one design: dots in line on a field from its paper into a wash of its accent, square, ink frame, no shadow, Maple Mono, plain, spring', () => {
   const t = designOf(validateColorscheme(artboard()));
   assert.deepEqual(t.primitive, { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' });
-  assert.deepEqual(t.paper, { spacing: 16, dot: '#D0D7DE', grade: { from: '#D6D1E8', to: '#CDD2ED' } });
+  assert.deepEqual(t.paper, { spacing: 16, dot: '#D0D7DE', grade: { from: '#E4E6EA', to: '#CDD2ED' } });
   assert.deepEqual(t.type, { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 });
   assert.equal(t.mode, 'light');
   assert.equal(t.name, 'artboard');
   // The shell checks shell.json against the theme check, so the design must pass it as it stands.
   assert.doesNotThrow(() => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } })));
+});
+
+test("each scheme's field is its own: from its paper into a soft wash of its accent", () => {
+  const nord = designOf(validateColorscheme(read('nord')));
+  assert.equal(nord.paper.grade.from, nord.color.paper);
+  assert.equal(nord.paper.grade.to, mix(nord.color.paper, nord.color.accent, 0.2).toUpperCase());
 });
 
 test('niri tiles windows with no frame and no gap, square, with no ring and no shadow', () => {

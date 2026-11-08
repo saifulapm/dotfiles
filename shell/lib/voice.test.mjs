@@ -253,10 +253,10 @@ test("the margins draw the number, goal and mail in the scheme's ink, its tail a
     numberColor: '#15171B', numberWeight: 600, tailColor: '#535B65', goalColor: '#15171B', goalWeight: 500, dot: true, dotColor: '#3249CE', mailColor: '#15171B', mailWeight: 500, dateColor: '#535B65', spacing: 16,
   });
   const g = margin('gruvbox-dark');
-  assert.deepEqual([g.numberColor, g.tailColor, g.goalColor, g.dotColor, g.mailColor, g.dateColor], ['#EBDBB2', '#AC9E8A', '#EBDBB2', '#83A598', '#EBDBB2', '#AC9E8A']);
+  assert.deepEqual([g.numberColor, g.tailColor, g.goalColor, g.dotColor, g.mailColor, g.dateColor], ['#EBDBB2', '#B1A390', '#EBDBB2', '#89AA9D', '#EBDBB2', '#B1A390']);
 });
 
-// The margins sit on the desk, which is the paper under a field of the scheme's two hues.
+// The margins sit on the desk, which is the paper under a field washing into the scheme's accent.
 test("every scheme's margin words read at 4.5:1 on its paper and on both ends of its field", () => {
   for (const n of SCHEMES) {
     const t = schemeTokens(n);

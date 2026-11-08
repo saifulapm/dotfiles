@@ -28,9 +28,9 @@ geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + 20),\(.y + (.hei
 read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
 echo "     paper $geo: $r $g $b"
 near() { (($1 - $2 <= 6 && $2 - $1 <= 6)); }
-# Near the left edge the field is close to its magenta end, #D6D1E8 over Artboard's paper.
-centre_is_paper() { near "${r:-0}" 214 && near "${g:-0}" 209 && near "${b:-0}" 232; }
-check "the output's desk there is Artboard's field near #D6D1E8" centre_is_paper
+# Near the left edge the field has barely left the paper, a sixth of the way into its accent wash #CDD2ED.
+centre_is_paper() { near "${r:-0}" 224 && near "${g:-0}" 227 && near "${b:-0}" 234; }
+check "the output's desk there is Artboard's field near its paper (224 227 234)" centre_is_paper
 
 # A colour the theme check refuses leaves the last good paper on screen, never black.
 tokens=$XDG_STATE_HOME/dots/theme-out/shell.json
@@ -39,7 +39,7 @@ jq '.color.paper = "notacolor"' <<<"$good" >"$tokens"
 sleep 1
 read -r r g b < <(grim -s 1 -t ppm -g "$geo" - | mean_rgb)
 printf '%s\n' "$good" >"$tokens"
-check "a bad colour in shell.json keeps the desk ($r $g $b)" eval 'near "$r" 214 && near "$g" 209 && near "$b" 232'
+check "a bad colour in shell.json keeps the desk ($r $g $b)" eval 'near "$r" 224 && near "$g" 227 && near "$b" 234'
 
 # qs ipc calls made while a shell starts slow it by up to 1.5 s, so qs is asked only once the paper is back.
 new_pid() { local p; p=$(systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"); [ "$p" != 0 ] && [ "$p" != "$pid" ]; }

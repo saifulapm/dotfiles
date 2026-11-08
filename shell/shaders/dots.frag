@@ -1,5 +1,5 @@
 #version 440
-// The field: one continuous diagonal grade from the scheme's one hue to the other over the paper, the whole output long, with Artboard's dot grid faint on it; windows show it through their veil, so the desk and every window are one canvas.
+// The field: one continuous diagonal grade from the scheme's paper into a wash of its accent, the whole output long, with Artboard's dot grid faint on it; windows show it through their veil, so the desk and every window are one canvas.
 layout(location = 0) in vec2 qt_TexCoord0;
 layout(location = 0) out vec4 fragColor;
 layout(std140, binding = 0) uniform buf {

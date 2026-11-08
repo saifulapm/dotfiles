@@ -57,15 +57,23 @@ test('rendered tokens check out, and a bad colour in them is refused by name', (
   assert.throws(() => checkTokens({ ...t, color: { ...t.color, paper: 'notacolor' } }), /color\.paper/);
 });
 
-test('the niri fragment sets the paper as background, tiles windows with no frame and no gap so they are sections of one canvas, backs a floating one in solid paper, square, with no ring or shadow', () => {
+test('the niri fragment sets the paper as background, tiles windows with no frame and no gap so they are sections of one canvas, backs a floating one in a little-clear paper inside a gradient of the accent, square, with no ring or shadow', () => {
   const kdl = renderNiri(artboard);
   assert.match(kdl, /background-color "#E4E6EA"/);
   assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
   assert.match(kdl, /layout \{[^]*?border \{\s*off\s*\}/);
-  assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background true\s*border \{\s*on\s*width 1\s*active-color "#E4E6EA"\s*inactive-color "#E4E6EA"\s*\}\s*\}/);
+  assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background false\s*border \{\s*on\s*width 1\s*active-gradient from="#3D5AFE" to="#AAB5F1" angle=135\s*inactive-gradient from="#99A7F3" to="#CBD1ED" angle=135\s*\}\s*shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=0 y=0\s*draw-behind-window true\s*color "#E4E6EAE0"\s*inactive-color "#E4E6EAE0"\s*\}\s*\}/);
   assert.match(kdl, /shadow \{\s*off\s*\}/);
   assert.match(kdl, /geometry-corner-radius 0/);
+});
+
+// A video is never see-through: mpv, imv and a picture-in-picture float on a solid paper back, after the floating rule so it wins.
+test('a floating video sits on a solid paper back', () => {
+  const kdl = renderNiri(artboard);
+  const video = kdl.indexOf('match app-id="^mpv$"');
+  assert.ok(video > kdl.indexOf('match is-floating=true'), 'the video rule comes after the floating one');
+  assert.match(kdl.slice(video), /^match app-id="\^mpv\$"\s*match app-id="\^imv\$"\s*match title=r#"Picture\.\?in\.\?\[Pp\]icture"#\s*shadow \{\s*color "#E4E6EAFF"\s*inactive-color "#E4E6EAFF"\s*\}/);
 });
 
 // niri dims no window: a terminal's clear ground is foot's own, and focus shows in its cursor and the margin's title.

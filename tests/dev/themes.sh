@@ -50,7 +50,7 @@ switch_ms=$(jq -r .ms "$XDG_STATE_HOME/dots/theme-switch.json")
 check "theme-switch.json records artboard to catppuccin-mocha in ${switch_ms} ms" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.from == "artboard" and .to == "catppuccin-mocha" and .ms <= 300'
 kdl=$XDG_STATE_HOME/dots/theme-out/niri.kdl
 # Mocha's line #313244 shows at only 1.30:1 on its surface, so the frame is floored to #37394B.
-check "niri's fragment backs a floating window in Catppuccin Mocha's paper" grep -q 'active-color "#11111B"' "$kdl"
+check "niri's fragment edges a floating window in Catppuccin Mocha's accent" grep -q 'active-gradient from="#89B4FA"' "$kdl"
 check "every window survives with its id ($before)" test "$(windows)" = "$before"
 
 # A start stamp that is not a time in ms is ignored, never evaluated.
@@ -61,7 +61,7 @@ DOTS_SWITCH_T0=1000000000000 "$repo/bin/dots" colorscheme catppuccin-mocha
 check "a stamp from 2001 is not taken" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "catppuccin-mocha" and .ms >= 0 and .ms <= 300'
 DOTS_SWITCH_T0=9999999999999 "$repo/bin/dots" colorscheme artboard
 check "nor one from 2286" json_has "$XDG_STATE_HOME/dots/theme-switch.json" '.to == "artboard" and .ms >= 0 and .ms <= 300'
-check "after artboard a floating window's back is Artboard's paper" grep -q 'active-color "#E4E6EA"' "$kdl"
+check "after artboard a floating window's edge is Artboard's accent" grep -q 'active-gradient from="#3D5AFE"' "$kdl"
 check "GTK prefers light with artboard ($(gtk_scheme))" test "$(gtk_scheme)" = "'prefer-light'"
 until_ok 1000 foot_is 228 230 234
 check "foot is back on Artboard's paper" foot_is 228 230 234
