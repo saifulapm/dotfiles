@@ -704,6 +704,11 @@ arch = "all"
 why = "Qt's WebP, TIFF and AVIF readers, for images Files previews and the shell shows"
 
 [[package]]
+name = "helix-parsers"
+arch = "all"
+why = "the tree-sitter grammars in $HELIX_RUNTIME/grammars that kak's tree-sitter reads; helix only recommends them"
+
+[[package]]
 name = "libxml2_2.13"
 arch = "all"
 why = "libxml2.so.2, which aqua's hurl links; Fedora 45's libxml2 is .so.16"
