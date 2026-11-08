@@ -167,15 +167,15 @@ const keysOf = (s) => [...s].map((c) => (c === ' ' ? '<space>' : c));
 test('a kak-mail list draws its date, sender and subject in the Mail faces, unread bold, cursor row apart', async (t) => {
   const ui = mailSession(t, 'mail-box Imbox');
   const second = await ui.until(() => ui.row('Second read row'), 'the list');
-  assert.equal(atomOf(second, 'Sender 0002').face.fg, 'rgb:0969da');
+  assert.equal(atomOf(second, 'Sender 0002').face.fg, 'rgb:085aba');
   assert.equal(atomOf(second, 'Second read row').face.fg, 'rgb:1f2328');
   assert.deepEqual(atomOf(second, 'Second read row').face.attributes, []);
   const date = second.find((a) => /\d{4}-\d\d-\d\d|[A-Z][a-z]{2} \d\d/.test(a.contents));
-  assert.equal(date.face.fg, 'rgb:59636e');
+  assert.equal(date.face.fg, 'rgb:555e69');
   assert.ok(atomOf(ui.row('Third unread row'), 'Third unread row').face.attributes.includes('bold'));
   const cursor = atomOf(ui.row('First cursor row'), 'First cursor row').face;
-  assert.equal(cursor.bg, 'rgb:ddeafa');
-  assert.equal(cursor.fg, 'rgb:0b62c8');
+  assert.equal(cursor.bg, 'rgb:c9d6e6');
+  assert.equal(cursor.fg, 'rgb:0957b3');
 });
 
 test('a kak-mail list ends in the key strip, and the cursor row follows the cursor', async (t) => {
@@ -184,7 +184,7 @@ test('a kak-mail list ends in the key strip, and the cursor row follows the curs
   const want = '↵ open · r reply · e archive · s screener · f feed · ? help';
   await ui.until(() => ui.strip().includes(want), 'the strip');
   ui.keys('j', 'j');
-  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:ddeafa', 'the cursor on row 3');
+  await ui.until(() => atomOf(ui.row('Third unread row'), 'Third unread row').face.bg === 'rgb:c9d6e6', 'the cursor on row 3');
   assert.ok(ui.strip().includes(want), ui.strip());
 });
 
@@ -195,7 +195,7 @@ test('a theme switch recolours an open kak-mail list and its strip with no reope
   t.after(() => render('github-light'));
   render('artboard');
   ui.keys(...keysOf(':colorscheme dots'), '<ret>');
-  await ui.until(() => atomOf(ui.row('Second read row') ?? [], 'Sender 0002')?.face.fg === 'rgb:3d5afe', 'the Artboard sender');
+  await ui.until(() => atomOf(ui.row('Second read row') ?? [], 'Sender 0002')?.face.fg === 'rgb:3249ce', 'the Artboard sender');
   await ui.until(() => ui.strip().includes('↵ open · r reply · e archive · s screener · f feed · ? help'), 'the Artboard strip');
 });
 

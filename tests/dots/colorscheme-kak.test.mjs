@@ -45,7 +45,7 @@ test('a running kak draws the new colorscheme\'s keywords without a key press', 
     for (let i = 0; i < 60 && keyword() !== want; i++) await new Promise((r) => setTimeout(r, 50));
     return keyword();
   };
-  assert.equal(await until('rgb:cf222e'), 'rgb:cf222e');
+  assert.equal(await until('rgb:b11d28'), 'rgb:b11d28');
   assert.equal(spawnSync(dots, ['colorscheme', 'catppuccin-mocha'], { env }).status, 0);
   assert.equal(await until('rgb:cba6f7'), 'rgb:cba6f7');
 });

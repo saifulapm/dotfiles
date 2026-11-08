@@ -63,7 +63,7 @@ test('the niri fragment sets the paper as background, tiles windows with no fram
   assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
   assert.match(kdl, /layout \{[^]*?border \{\s*off\s*\}/);
-  assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background false\s*border \{\s*on\s*width 1\s*active-gradient from="#3D5AFE" to="#AAB5F1" angle=135\s*inactive-gradient from="#99A7F3" to="#CBD1ED" angle=135\s*\}\s*shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=0 y=0\s*draw-behind-window true\s*color "#E4E6EAE0"\s*inactive-color "#E4E6EAE0"\s*\}\s*\}/);
+  assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background false\s*border \{\s*on\s*width 1\s*active-gradient from="#3D5AFE" to="#AAB5F1" angle=135\s*inactive-gradient from="#99A7F3" to="#CBD1ED" angle=135\s*\}\s*shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=0 y=0\s*draw-behind-window true\s*color "#E4E6EAF2"\s*inactive-color "#E4E6EAF2"\s*\}\s*\}/);
   assert.match(kdl, /shadow \{\s*off\s*\}/);
   assert.match(kdl, /geometry-corner-radius 0/);
 });
@@ -87,19 +87,28 @@ test('windows sit 56 px down and 32 px in, clear of the margins', () => {
   assert.match(kdl, /^prefer-no-csd$/m);
 });
 
-test('every animation runs on the spring, the window opening on damping 0.72 and stiffness 380', () => {
+// Sections of one canvas never overshoot: a spring that bounces opens a seam between two tiles, or laps one over the other, mid-move.
+test('a window opens in 240 ms and closes in 140, and everything that moves a tile is critically damped', () => {
   const kdl = renderNiri(artboard);
-  assert.match(kdl, /window-open \{\s*spring damping-ratio=0\.72 stiffness=380 epsilon=0\.0001/);
-  assert.match(kdl, /window-close \{\s*duration-ms 160\s*curve "ease-out-quad"/);
-  assert.match(kdl, /workspace-switch \{\s*spring damping-ratio=0\.85 stiffness=600/);
+  assert.match(kdl, /window-open \{\s*duration-ms 240\s*curve "ease-out-cubic"/);
+  assert.match(kdl, /window-close \{\s*duration-ms 140\s*curve "ease-out-quad"/);
+  for (const name of ['workspace-switch', 'horizontal-view-movement', 'window-movement', 'window-resize', 'overview-open-close']) {
+    assert.match(kdl, new RegExp(`${name} \\{\\s*spring damping-ratio=1\\.0 `), name);
+  }
   assert.doesNotMatch(kdl, /slowdown/);
 });
 
-test('windows spring up from 96% and fade in, and shrink, sink and fade out', () => {
+// A window is part of the canvas, so it appears in place, as ink soaking into the paper along the field's diagonal, never growing, rising or sliding in.
+test('a window inks in and out along the diagonal, in place, at its own size', () => {
   const kdl = renderNiri(artboard);
   const shader = (name) => kdl.match(new RegExp(`${name} \\{[^}]*?custom-shader r"([^"]*)"`))?.[1];
-  assert.match(shader('window-open'), /vec4 open_color[\s\S]*0\.96 \+ 0\.04 \* niri_progress[\s\S]*smoothstep\(0\.0, 0\.6, niri_clamped_progress\)/);
-  assert.match(shader('window-close'), /vec4 close_color[\s\S]*1\.0 - 0\.04 \* p[\s\S]*\* \(1\.0 - smoothstep\(0\.0, 1\.0, p\)\)/);
+  for (const name of ['window-open', 'window-close']) {
+    assert.match(shader(name), /float s = \(coords_geo\.x \+ coords_geo\.y\) \* 0\.5;/, name);
+    assert.match(shader(name), /return dots_tex\(coords_geo\) \*/, name);
+    assert.doesNotMatch(shader(name), /0\.96|size_geo\.y/, name);
+  }
+  assert.match(shader('window-open'), /\(1\.0 - smoothstep\(e - 0\.35, e, s\)\)/);
+  assert.match(shader('window-close'), /smoothstep\(e - 0\.35, e, s\)/);
 });
 
 test('every scheme renders the same niri fragment but for its colours', () => {

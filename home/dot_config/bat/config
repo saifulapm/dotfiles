@@ -1,0 +1,3 @@
+# bat takes its colours from the terminal's palette, which every colorscheme sets, so it follows a switch live.
+--theme=ansi
+--style="numbers,changes,header"

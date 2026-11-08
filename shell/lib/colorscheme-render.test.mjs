@@ -17,7 +17,7 @@ const files = (dir) => readdirSync(dir, { recursive: true }).sort();
 test('a colorscheme renders every app\'s output', (t) => {
   const state = scratch(t);
   execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
-  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'helix.toml', 'imv.conf', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
+  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'btop.theme', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'helix.toml', 'imv.conf', 'lazygit.yml', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
 });
 
 test('the shell tokens name the one design and the scheme\'s light or dark', (t) => {
@@ -36,6 +36,16 @@ test('the shell tokens name the one design and the scheme\'s light or dark', (t)
   const config = join(state, 'config.kdl');
   writeFileSync(config, `include "${join(out, 'niri.kdl')}"\n`);
   execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
+});
+
+test("GTK's views and header bars and Chromium's toolbar sit on the paper, not a surface card, so an app is one flat section of the desk", (t) => {
+  const state = scratch(t);
+  execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
+  const out = join(state, 'dots/theme-out');
+  const css = readFileSync(join(out, 'gtk.css'), 'utf8');
+  for (const name of ['window_bg_color', 'view_bg_color', 'headerbar_bg_color', 'theme_base_color']) assert.match(css, new RegExp(`^@define-color ${name} #e4e6ea;$`, 'm'), name);
+  const chromium = JSON.parse(readFileSync(join(out, 'chromium-theme/manifest.json'), 'utf8')).theme.colors;
+  assert.deepEqual([chromium.frame, chromium.toolbar, chromium.omnibox_background], [[228, 230, 234], [228, 230, 234], [228, 230, 234]]);
 });
 
 test('themes.json lists every valid scheme, artboard first, and skips a broken one', (t) => {

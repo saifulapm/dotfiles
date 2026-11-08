@@ -66,7 +66,7 @@ test('niri tiles windows with no frame and no gap, square, with no ring and no s
   assert.match(kdl, /geometry-corner-radius 0\n/);
   assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /background-color "#E4E6EA"/);
-  assert.match(kdl, /spring damping-ratio=0\.72 stiffness=380/);
+  assert.match(kdl, /window-open \{\s*duration-ms 240/);
 });
 
 test('a text colour under 4.5:1 on surface, a comment or ANSI hue under 3:1, or ink under 4.5:1 on line is refused, naming it', () => {

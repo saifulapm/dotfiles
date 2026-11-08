@@ -509,6 +509,40 @@ export function renderPi(t) {
   return JSON.stringify({ $schema: 'https://pi.dev/schemas/theme.schema.json', name: 'dots', appearance: t.mode, vars, colors: PI_COLORS, export: PI_EXPORT }, null, 2) + '\n';
 }
 
+// btop sits clear on the desk like every terminal app: its boxes in the quiet frame, its keys and selection in the accent, its meters graded through the scheme's own green, accent and red.
+export function renderBtop(t) {
+  const c = t.color;
+  const [ink, muted, accent, danger, ok, warn] = [c.ink, c.muted, c.accent, c.danger, c.ok, c.ansi[3]].map(lower);
+  const frame = frameOf(t);
+  const selected = lower(mix(c.surface, c.accent, inkShare(c.ink, c.surface, c.accent, 0.22)));
+  const grade = (name, a, b, d) => [[`${name}_start`, a], [`${name}_mid`, b], [`${name}_end`, d]];
+  const keys = [
+    ['main_bg', ''], ['main_fg', ink], ['title', ink], ['hi_fg', accent], ['selected_bg', selected], ['selected_fg', lower(c.ink)],
+    ['inactive_fg', muted], ['graph_text', muted], ['meter_bg', lower(mix(c.surface, c.ink, 0.12))], ['proc_misc', muted],
+    ['cpu_box', frame], ['mem_box', frame], ['net_box', frame], ['proc_box', frame], ['div_line', frame],
+    ...grade('temp', ok, warn, danger), ...grade('cpu', ok, accent, danger), ...grade('free', accent, accent, accent),
+    ...grade('cached', accent, accent, accent), ...grade('available', ok, ok, ok), ...grade('used', accent, warn, danger),
+    ...grade('download', accent, accent, accent), ...grade('upload', ok, ok, ok), ...grade('process', ok, accent, danger),
+  ];
+  return keys.map(([k, v]) => `theme[${k}]="${v}"`).join('\n') + '\n';
+}
+
+// lazygit's colours, loaded after its own config through LG_CONFIG_FILE: the focused view's border in the accent, its line lit on a tint the ink reads on, everything else the terminal's own.
+export function renderLazygit(t) {
+  const c = t.color;
+  const [ink, muted, accent, danger, ok] = [c.ink, c.muted, c.accent, c.danger, c.ok].map(lower);
+  const tint = (share) => lower(mix(c.surface, c.accent, inkShare(c.ink, c.surface, c.accent, share)));
+  const list = (...v) => `[${v.map((x) => `'${x}'`).join(', ')}]`;
+  const theme = [
+    ['activeBorderColor', list(accent, 'bold')], ['inactiveBorderColor', list(frameOf(t))], ['searchingActiveBorderColor', list(ok, 'bold')],
+    ['optionsTextColor', list(muted)], ['selectedLineBgColor', list(tint(0.22))], ['inactiveViewSelectedLineBgColor', list(tint(0.1))],
+    ['cherryPickedCommitFgColor', list(accent)], ['cherryPickedCommitBgColor', list(tint(0.22))],
+    ['markedBaseCommitFgColor', list(accent)], ['markedBaseCommitBgColor', list(tint(0.22))],
+    ['unstagedChangesColor', list(danger)], ['defaultFgColor', list('default')],
+  ];
+  return 'gui:\n  theme:\n' + theme.map(([k, v]) => `    ${k}: ${v}`).join('\n') + '\n';
+}
+
 // amx's theme is six roles, named for what a row means; it re-reads the file when its mtime moves.
 export function renderAmx(t) {
   const { a, muted, line, accent, danger, ok } = agentColors(t);

@@ -56,17 +56,18 @@ export function contrast(a, b) {
 // The shell's tokens come from shell.json, so they get the same check as the render.
 export const checkTokens = (t) => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } }));
 
-const spring = (d, k) => `spring damping-ratio=${d} stiffness=${k} epsilon=0.0001`;
+// niri reads the damping as a float, so a whole one is written 1.0.
+const spring = (d, k) => `spring damping-ratio=${Number.isInteger(d) ? d.toFixed(1) : d} stiffness=${k} epsilon=0.0001`;
 const eased = (ms, curve) => `duration-ms ${ms}\n        curve "${curve}"`;
-// Every animation's timing on the one spring.
+// Every animation's timing. A window inks in and out on a short ease, the close quicker so it feels instant; whatever moves a tile is critically damped, since a bounce would open a seam between two sections of the canvas.
 const MOTION = {
-  'window-open': spring(0.72, 380),
-  'window-close': eased(160, 'ease-out-quad'),
-  'workspace-switch': spring(0.85, 600),
-  'horizontal-view-movement': spring(0.9, 700),
-  'window-movement': spring(0.8, 600),
-  'window-resize': spring(0.85, 600),
-  'overview-open-close': spring(0.85, 600),
+  'window-open': eased(240, 'ease-out-cubic'),
+  'window-close': eased(140, 'ease-out-quad'),
+  'workspace-switch': spring(1.0, 600),
+  'horizontal-view-movement': spring(1.0, 700),
+  'window-movement': spring(1.0, 600),
+  'window-resize': spring(1.0, 600),
+  'overview-open-close': spring(1.0, 600),
   'screenshot-ui-open': eased(200, 'ease-out-cubic'),
   'config-notification-open-close': spring(0.6, 1000),
   'exit-confirmation-open-close': spring(0.6, 1000),
@@ -79,24 +80,19 @@ const TEX = `vec4 dots_tex(vec3 coords_geo) {
     return texture2D(niri_tex, t.st);
 }`;
 
-// The open and close shaders the Motion board draws.
+// The open and close shaders: a window is part of the canvas, so it inks in and out in place, at its own size, along the field's diagonal from top left to bottom right; s is a pixel's place on that diagonal, e the soft edge's, 0.35 of it wide.
 const SHADERS = {
-    // From 96% around its centre and 8 px low, overshooting with the spring, eased in over the first 60%.
     open: `${TEX}
 vec4 open_color(vec3 coords_geo, vec3 size_geo) {
-    float s = 0.96 + 0.04 * niri_progress;
-    vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
-    c.y -= 8.0 * (1.0 - niri_progress) / size_geo.y;
-    return dots_tex(c) * smoothstep(0.0, 0.6, niri_clamped_progress);
+    float s = (coords_geo.x + coords_geo.y) * 0.5;
+    float e = niri_clamped_progress * 1.35;
+    return dots_tex(coords_geo) * (1.0 - smoothstep(e - 0.35, e, s));
 }`,
-    // Shrinks to 96%, sinks 8 px and eases out.
     close: `${TEX}
 vec4 close_color(vec3 coords_geo, vec3 size_geo) {
-    float p = niri_clamped_progress;
-    float s = 1.0 - 0.04 * p;
-    vec3 c = vec3((coords_geo.xy - vec2(0.5)) / s + vec2(0.5), 1.0);
-    c.y -= 8.0 * p / size_geo.y;
-    return dots_tex(c) * (1.0 - smoothstep(0.0, 1.0, p));
+    float s = (coords_geo.x + coords_geo.y) * 0.5;
+    float e = niri_clamped_progress * 1.35;
+    return dots_tex(coords_geo) * smoothstep(e - 0.35, e, s);
 }`,
 };
 
@@ -167,7 +163,7 @@ window-rule {
     clip-to-geometry true
 }
 
-// A floating window sits over other windows, so a hard shadow drawn behind it backs its clear ground in the paper, a little clear itself; a 1 px gradient of the accent fading into the paper edges it, dimmer when it is not focused.
+// A floating window sits over other windows, so a hard shadow drawn behind it backs its clear ground in the paper, a touch clear itself (95%), so a window under it reads only as a shade; a 1 px gradient of the accent fading into the paper edges it, dimmer when it is not focused.
 window-rule {
     match is-floating=true
     draw-border-with-background false
@@ -183,8 +179,8 @@ window-rule {
         spread 0
         offset x=0 y=0
         draw-behind-window true
-        color "${c.paper}E0"
-        inactive-color "${c.paper}E0"
+        color "${c.paper}F2"
+        inactive-color "${c.paper}F2"
     }
 }
 

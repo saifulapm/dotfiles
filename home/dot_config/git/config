@@ -15,6 +15,14 @@
 	# workflow install writes its hook stubs here, and each one chains into the repo's own hook.
 	hooksPath = ~/.config/git/hooks
 
+# delta draws syntax in the terminal's palette, which every colorscheme sets, and marks a change by its colour alone: a fixed background would sit as a block on the clear terminal.
+[delta]
+	syntax-theme = ansi
+	minus-style = red
+	minus-emph-style = bold red ul
+	plus-style = green
+	plus-emph-style = bold green ul
+
 [init]
 	defaultBranch = main
 [push]

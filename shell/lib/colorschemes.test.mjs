@@ -68,7 +68,7 @@ for (const [name, want] of Object.entries(BOARD)) {
     assert.ok(kdl.includes('gaps 0 '), kdl);
     assert.ok(kdl.includes('focus-ring { off } border { off }'), kdl);
     assert.ok(kdl.includes(`match is-floating=true draw-border-with-background false border { on width 1 active-gradient from="${want.color.accent}"`), kdl);
-    assert.ok(kdl.includes(`draw-behind-window true color "${paper}E0" inactive-color "${paper}E0" }`), kdl);
+    assert.ok(kdl.includes(`draw-behind-window true color "${paper}F2" inactive-color "${paper}F2" }`), kdl);
     assert.ok(kdl.includes('shadow { off }'));
     const foot = readFileSync(join(out, 'foot.ini'), 'utf8');
     assert.match(foot, /^alpha=0\.0$/m);

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
 import { loadScheme, schemeNames } from './colorscheme-file.mjs';
-import { termTheme, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
 const light = loadScheme('github-light');
@@ -434,4 +434,33 @@ test("every scheme's terminal words read on its paper and on both ends of its fi
 
 test("one-light's grey paper darkens its terminal accent until it reads", () => {
   assert.equal(termTheme(loadScheme('one-light')).color.accent, '#214490');
+});
+
+const BTOP_KEYS = ['main_bg', 'main_fg', 'title', 'hi_fg', 'selected_bg', 'selected_fg', 'inactive_fg', 'graph_text', 'meter_bg', 'proc_misc', 'cpu_box', 'mem_box', 'net_box', 'proc_box', 'div_line',
+  ...['temp', 'cpu', 'free', 'cached', 'available', 'used', 'download', 'upload', 'process'].flatMap((g) => [`${g}_start`, `${g}_mid`, `${g}_end`])];
+const btopTheme = (t) => Object.fromEntries([...renderBtop(t).matchAll(/^theme\[([a-z_]+)\]="([^"]*)"$/gm)].map((m) => [m[1], m[2]]));
+
+test('btop sits clear on the desk, its boxes in the quiet frame, its keys and selection in the accent, every key set', () => {
+  const t = termTheme(loadScheme('artboard'));
+  const b = btopTheme(t);
+  assert.deepEqual(Object.keys(b).sort(), [...BTOP_KEYS].sort());
+  assert.equal(b.main_bg, '', 'empty is the terminal\'s own, clear, background');
+  assert.equal(b.main_fg, t.color.ink.toLowerCase());
+  assert.equal(b.hi_fg, t.color.accent.toLowerCase());
+  for (const k of ['cpu_box', 'mem_box', 'net_box', 'proc_box', 'div_line']) assert.equal(b[k], t.niri.border_inactive.toLowerCase(), k);
+  assert.ok(contrast(b.selected_fg.toUpperCase(), b.selected_bg.toUpperCase()) >= 4.5, 'the selected row reads');
+});
+
+test("lazygit's theme borders the focused view in the accent and lights its line on a tint the ink reads on", () => {
+  const t = termTheme(loadScheme('gruvbox-material-dark'));
+  const y = renderLazygit(t);
+  assert.match(y, /^gui:\n  theme:\n/);
+  const get = (k) => y.match(new RegExp(`^    ${k}: \\[(.*)\\]$`, 'm'))?.[1];
+  assert.equal(get('activeBorderColor'), `'${t.color.accent.toLowerCase()}', 'bold'`);
+  assert.equal(get('inactiveBorderColor'), `'${t.niri.border_inactive.toLowerCase()}'`);
+  assert.equal(get('unstagedChangesColor'), `'${t.color.danger.toLowerCase()}'`);
+  assert.equal(get('defaultFgColor'), "'default'");
+  const bg = get('selectedLineBgColor').slice(1, -1);
+  assert.ok(contrast(t.color.ink, bg.toUpperCase()) >= 4.5, `ink on ${bg}`);
+  for (const k of ['searchingActiveBorderColor', 'optionsTextColor', 'inactiveViewSelectedLineBgColor', 'cherryPickedCommitFgColor', 'cherryPickedCommitBgColor', 'markedBaseCommitFgColor', 'markedBaseCommitBgColor']) assert.ok(get(k), k);
 });

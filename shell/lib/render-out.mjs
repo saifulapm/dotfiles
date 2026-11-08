@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
-import { termTheme, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Board hexes for the kak-mail list that no token carries: Artboard's date orange.
 const MAIL_BOARD = { artboard: { date: '#C2410C' } };
@@ -33,7 +33,7 @@ function renderMailKak(t) {
 export function renderOutputs(theme, list, label) {
   // The apps that speak in the shell's voice read the tokens as the shell does.
   const spoken = checkTokens(theme);
-  // foot and everything drawn inside it sit in the paper, so a terminal is part of the desk.
+  // foot and everything drawn inside it, GTK apps and Chromium's frame sit in the paper, so each is part of the desk.
   const term = termTheme(theme);
   // The default state dir is the live desktop's: only the checkout its shell runs from may write there, so a worktree's render cannot rewrite it.
   if (!process.env.XDG_STATE_HOME) {
@@ -58,9 +58,9 @@ export function renderOutputs(theme, list, label) {
     'helix.toml': renderHelix(term),
     'yazi-theme.toml': renderYazi(term),
     'colors.fish': renderFish(term),
-    'gtk.css': renderGtkCss(theme),
+    'gtk.css': renderGtkCss(term),
     'gtk-settings.ini': renderGtkSettings(theme),
-    'chromium-theme/manifest.json': renderChromiumTheme(theme),
+    'chromium-theme/manifest.json': renderChromiumTheme(term),
     'chromium-newtab/manifest.json': renderNewtabManifest(),
     'chromium-newtab/newtab.html': renderNewtabHtml(spoken),
     'chromium-newtab/theme.css': renderNewtabCss(theme),
@@ -76,6 +76,8 @@ export function renderOutputs(theme, list, label) {
     'claude.json': renderClaude(term),
     'pi.json': renderPi(term),
     'amx.toml': renderAmx(term),
+    'btop.theme': renderBtop(term),
+    'lazygit.yml': renderLazygit(term),
     // dots colorscheme writes a failed switch's reason here and keeps the scheme it had; any render clears it.
     notice: '',
     'themes.json': JSON.stringify(list, null, 2) + '\n',
