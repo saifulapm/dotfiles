@@ -19,11 +19,11 @@ ShellRoot {
     readonly property string backend: Quickshell.env("DOTS_DEEN") || "deen"
 
     // The window is clear on the desk like a terminal: its words are moved to read there and its fills are veils.
-    readonly property var desk: L.deskTokens(theme.tokens)
-    readonly property var c: desk ? desk.color : theme.color
+    readonly property var appTokens: L.deskTokens(theme.tokens)
+    readonly property var c: appTokens ? appTokens.color : theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(desk)
-    readonly property var tones: L.plainTones(desk)
+    readonly property var look: L.listLook(appTokens)
+    readonly property var tones: L.plainTones(appTokens)
     readonly property string arabic: D.arabicFamily(Qt.fontFamilies())
     readonly property string bengali: D.bengaliFamily
 

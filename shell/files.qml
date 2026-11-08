@@ -120,9 +120,11 @@ ShellRoot {
         at: status.at
     } : dragging ? F.dragText(dragRows) : status
 
-    readonly property var c: theme.color
+    // The window floats clear on niri's paper back like every app on the desk: its words are moved to read there and its fills are veils.
+    readonly property var appTokens: L.deskTokens(theme.tokens)
+    readonly property var c: appTokens ? appTokens.color : theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(theme.tokens)
+    readonly property var look: L.listLook(appTokens)
     readonly property var head: F.headText(home, folder)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
@@ -769,7 +771,7 @@ ShellRoot {
         title: app.head.folder
         implicitWidth: 1200
         implicitHeight: 716
-        color: c.surface ?? "white"
+        color: "transparent"
 
         Connections {
             target: win.contentItem.Window.window
@@ -1230,7 +1232,7 @@ ShellRoot {
                                     Rectangle {
                                         anchors.fill: parent
                                         radius: 9
-                                        color: rowItem.isCurrent || rowItem.isMarked ? c.surface ?? "white" : look.tile.fill
+                                        color: rowItem.isCurrent || rowItem.isMarked ? look.label.fill : look.tile.fill
                                     }
                                     FilesIcon {
                                         id: rowIcon

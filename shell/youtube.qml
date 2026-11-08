@@ -76,10 +76,10 @@ ShellRoot {
     readonly property string getter: Quickshell.shellDir + "/bin/dots-youtube-get"
 
     // The window floats clear on niri's paper back like every app on the desk: its words are moved to read there and its fills are veils.
-    readonly property var desk: V.deskTokens(theme.tokens)
-    readonly property var c: desk ? desk.color : theme.color
+    readonly property var appTokens: V.deskTokens(theme.tokens)
+    readonly property var c: appTokens ? appTokens.color : theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: Y.youtubeLook(desk)
+    readonly property var look: Y.youtubeLook(appTokens)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {

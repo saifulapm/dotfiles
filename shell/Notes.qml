@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Shapes
 import "lib/notes.mjs" as N
 import "lib/notes-look.mjs" as L
+import "lib/voice.mjs" as V
 import "." as Root
 
 // A real window, never a layer surface, so other apps keep their keyboard and clipboard; a niri rule docks it right.
@@ -30,9 +31,11 @@ FloatingWindow {
     // Set once niri has focused this window, so losing focus can hide it.
     property bool hadFocus: false
 
-    readonly property var c: theme.color
+    // The window floats clear on niri's paper back like every app on the desk, its words moved to read there.
+    readonly property var appTokens: V.deskTokens(theme.tokens)
+    readonly property var c: appTokens ? appTokens.color : theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: theme.tokens ? L.notesLook(theme.tokens) : null
+    readonly property var look: appTokens ? L.notesLook(appTokens) : null
     readonly property var store: notes.store
     readonly property string query: search.text
     readonly property bool onShelf: store.activeSection === N.SHELF
@@ -54,8 +57,8 @@ FloatingWindow {
     visible: shown
     implicitWidth: 420
     implicitHeight: 810
-    // niri draws the border and corner.
-    color: c.surface ?? "white"
+    // niri draws the paper back and the accent edge every floating window wears.
+    color: "transparent"
 
     // Mod+N: hidden → shown, shown → focused, focused → hidden with focus back where it was.
     function toggle() {

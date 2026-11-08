@@ -35,7 +35,7 @@ wtype -k Return
 until_ok 2000 notes_is '.count == 1'
 wtype -k Tab
 until_ok 2000 notes_is '.selectedRect != null'
-check "the selected card is outlined in the accent #3D5AFE" is_accent '#3D5AFE'
+check "the selected card is outlined in the accent moved to read on the desk, #3249CE" is_accent '#3249CE'
 check "the sections hint reads plain ($(notes_state | jq -c .keyHint))" notes_is '.keyHint == "⌃K"'
 
 exit $((fails > 0))

@@ -50,8 +50,8 @@ until_ok 1000 files_is '.marked == ["IMG_2039.jpg"] and .cursor == "IMG_2040.jpg
 marked=$(files_call row IMG_2039.jpg)
 plain_row=$(files_call row invoice-0912.pdf)
 folder_row=$(files_call row screenshots)
-check "a marked row draws ● filled #3d5afe ($(jq -c '{mark, markFill}' <<<"$marked"))" \
-  json_is '.mark == "●" and .markFill == "#3d5afe"' <<<"$marked"
+check "a marked row draws ● filled in the accent moved to read on the desk, #3249ce ($(jq -c '{mark, markFill}' <<<"$marked"))" \
+  json_is '.mark == "●" and .markFill == "#3249ce"' <<<"$marked"
 check "the marked row's ● reads #3D5AFE on screen" on_screen 61 90 254 12
 check "an unmarked row draws ○ ($(jq -c '{mark, markFill}' <<<"$plain_row"))" json_is '.mark == "○"' <<<"$plain_row"
 check "a folder row draws the board's folder and a file row its page ($(jq -c .icon <<<"$folder_row") $(jq -c .icon <<<"$plain_row"))" \
@@ -61,11 +61,11 @@ check "Modified draws in Maple Mono, upright, 12 px ($(jq -c .dateFont <<<"$plai
 check "the key strip starts 'j/k move', the key at weight 500 ($(files_state | jq -c .strip))" \
   files_is '.strip.key == "j/k" and .strip.word == "move" and .strip.keyWeight == 500'
 check "the path line is the folder icon, a muted ~/ and Downloads at weight 500 ($(files_state | jq -c .pathParts))" \
-  files_is --arg i "$folder" '.pathParts == {"icon": $i, "lead": "~/", "leadColor": "#57606a", "name": "Downloads", "nameWeight": 500}'
+  files_is --arg i "$folder" '.pathParts == {"icon": $i, "lead": "~/", "leadColor": "#535b65", "name": "Downloads", "nameWeight": 500}'
 place_here=$(files_call place Downloads)
 place_off=$(files_call place Home)
-check "the current place is filled #eef1ff, another place is not ($place_here $(jq -c .fill <<<"$place_off"))" \
-  bash -c 'jq -e ".fill == \"#eef1ff\"" <<<"$1" >/dev/null && jq -e ".fill == \"#00000000\"" <<<"$2" >/dev/null' _ "$place_here" "$place_off"
+check "the current place is filled in the accent veil #243249ce, another place is not ($place_here $(jq -c .fill <<<"$place_off"))" \
+  bash -c 'jq -e ".fill == \"#243249ce\"" <<<"$1" >/dev/null && jq -e ".fill == \"#00000000\"" <<<"$2" >/dev/null' _ "$place_here" "$place_off"
 
 check "the current place's #EEF1FF fill reads on screen" on_screen 238 241 255 2
 

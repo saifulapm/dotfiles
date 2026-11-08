@@ -40,11 +40,11 @@ ShellRoot {
     readonly property string playBin: Quickshell.shellDir + "/bin/dots-dekho-play"
 
     // The window is clear on the desk like a terminal: its words are moved to read there and its fills are veils.
-    readonly property var desk: L.deskTokens(theme.tokens)
-    readonly property var c: desk ? desk.color : theme.color
-    readonly property var tones: L.plainTones(desk)
+    readonly property var appTokens: L.deskTokens(theme.tokens)
+    readonly property var c: appTokens ? appTokens.color : theme.color
+    readonly property var tones: L.plainTones(appTokens)
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(desk)
+    readonly property var look: L.listLook(appTokens)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
