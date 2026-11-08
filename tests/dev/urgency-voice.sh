@@ -20,7 +20,7 @@ accent_px() {
     const b = require("fs").readFileSync(0);
     const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
     let n = 0;
-    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - 61) <= 40 && Math.abs(px[i * 3 + 1] - 90) <= 40 && Math.abs(px[i * 3 + 2] - 254) <= 40) n++;
+    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - 50) <= 40 && Math.abs(px[i * 3 + 1] - 73) <= 40 && Math.abs(px[i * 3 + 2] - 206) <= 40) n++;
     console.log(n);
   '
 }
@@ -40,7 +40,7 @@ touch "$bells/ws5" "$bells/ws7"
 until_ok 3000 marks_are "• 05  • 07"
 echo "     drawn: $(margins | jq -c .drawn)"
 check "the marks read • 05  • 07" marks_are "• 05  • 07"
-check "accent dots before ink numbers" colors_are '["#3d5afe","#15171b"]'
+check "accent dots, moved to read on the desk, before ink numbers" colors_are '["#3249ce","#15171b"]'
 check "the two dots draw in the accent ($(accent_px) px)" test "$(accent_px)" -ge 4
 
 touch "$bells/ws2" "$bells/ws3"

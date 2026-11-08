@@ -59,7 +59,7 @@ for n in 2 3 5 7; do ring "ws$n"; done
 until_ok 3000 marks_are "• 02  • 03  • 05  +1"
 echo "     drawn: $(margins | jq -c .drawn)"
 check "urgent windows on workspaces 2, 3, 5 and 7 mark • 02  • 03  • 05  +1" marks_are "• 02  • 03  • 05  +1"
-check "the marks are accent dots before ink numbers" eval 'margins | jq -e ".drawn.markColors | unique == [\"#15171b\", \"#3d5afe\"]" >/dev/null'
+check "the marks are accent dots, moved to read on the desk, before ink numbers" eval 'margins | jq -e ".drawn.markColors | unique == [\"#15171b\", \"#3249ce\"]" >/dev/null'
 
 # An agent's lease brings the screen back with the marks still drawn.
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
