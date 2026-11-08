@@ -25,3 +25,6 @@
 # v2's bt-agent, which dots-bt-agent replaced.
 .config/systemd/user/bt-agent.service
 .config/systemd/user/bluetooth.target.wants/bt-agent.service
+# This device's Remote Control server, which Saiful dropped (2026-11-09); sessions started with --remote-control still connect.
+.config/systemd/user/claude-rc@.service
+.config/systemd/user/default.target.wants/claude-rc@remote.service

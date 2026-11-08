@@ -51,26 +51,13 @@ function apply({ manager = 'running', env, switchFails = false } = {}) {
   return { r, calls, home };
 }
 
-test('with a user manager, the apply starts pxy, the local hub and Remote Control', () => {
-  const { r, calls } = apply();
+test('with a user manager, the apply starts pxy and the local hub, and no Remote Control', () => {
+  const { r, calls, home } = apply();
   assert.equal(r.status, 0, r.stderr);
   assert.ok(calls.includes('systemctl --user daemon-reload'), calls.join('\n'));
-  assert.ok(calls.some((c) => /^systemctl --user start .*\bpxy\.service\b/.test(c) && /\bhub-local\.service\b/.test(c) && /\bclaude-rc@remote\.service\b/.test(c)), calls.join('\n'));
-});
-
-// Remote Control's worktree mode needs a git repository, and a worktree needs a commit to branch from.
-test('the apply makes ~/Codes/remote a git repo with a first commit, with or without a user manager, and leaves one there alone', () => {
-  for (const manager of ['running', 'offline']) {
-    const { r, home } = apply({ manager });
-    assert.equal(r.status, 0, r.stderr);
-    const git = (...args) => spawnSync('git', ['-C', join(home, 'Codes/remote'), ...args], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home } }).stdout.trim();
-    assert.equal(git('log', '--format=%s'), 'Start the Remote Control folder', manager);
-    const head = git('rev-parse', 'HEAD');
-    const vars = { PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home };
-    const rendered = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env: vars });
-    assert.equal(spawnSync('bash', ['-c', rendered.stdout], { encoding: 'utf8', env: vars }).status, 0);
-    assert.equal(git('rev-parse', 'HEAD'), head, manager);
-  }
+  assert.ok(calls.includes('systemctl --user start pxy.service hub-local.service'), calls.join('\n'));
+  assert.ok(!calls.some((c) => /claude-rc/.test(c)), calls.join('\n'));
+  assert.equal(existsSync(join(home, 'Codes/remote')), false, 'no Remote Control folder is made');
 });
 
 // An install's container and a first boot's tty have no user manager to start anything in.
@@ -94,17 +81,12 @@ test('a machine already in the store, or without local.env, runs no workflow swi
   }
 });
 
-// Each device serves Remote Control for one folder, ~/Codes/remote, never per project.
-test('claude-rc@ runs in ~/Codes/<folder>, skips a missing folder, and the dotfiles enable only claude-rc@remote', () => {
+// Saiful dropped the device's Remote Control server (2026-11-09): no unit serves it, and a machine that had claude-rc@remote loses it at the next apply.
+test('no claude-rc unit ships, and the apply removes the old one and its enable link', () => {
   const units = join(repo, 'home/dot_config/systemd/user');
-  const unit = readFileSync(join(units, 'claude-rc@.service'), 'utf8');
-  assert.match(unit, /^ConditionPathIsDirectory=%h\/Codes\/%i$/m);
-  assert.match(unit, /^WorkingDirectory=%h\/Codes\/%i$/m);
-  assert.match(unit, /^ExecStart=%h\/\.local\/libexec\/dots\/claude remote-control --spawn worktree --permission-mode bypassPermissions --no-create-session-in-dir$/m);
-  assert.match(unit, /^WantedBy=default\.target$/m);
-  const linked = readdirSync(units, { recursive: true }).filter((f) => /claude-rc@/.test(f) && f !== 'claude-rc@.service');
-  assert.deepEqual(linked, ['default.target.wants/symlink_claude-rc@remote.service']);
-  assert.equal(readFileSync(join(units, linked[0]), 'utf8').trim(), '../claude-rc@.service');
+  assert.deepEqual(readdirSync(units, { recursive: true }).filter((f) => /claude-rc/.test(f)), []);
+  const remove = readFileSync(join(repo, 'home/.chezmoiremove'), 'utf8').split('\n');
+  for (const f of ['.config/systemd/user/claude-rc@.service', '.config/systemd/user/default.target.wants/claude-rc@remote.service']) assert.ok(remove.includes(f), f);
 });
 
 // run_onchange records a script that exits 0, so a join that failed has to fail the script to be tried on the next apply.

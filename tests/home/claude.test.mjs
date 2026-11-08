@@ -46,7 +46,7 @@ test('a machine with claude in ~/.local/bin runs the installer 0 times', () => {
 });
 
 // The wrapper picks the active Claude account and its cloud environment, so every launcher of a session runs it, never ~/.local/bin/claude itself.
-test('amx, workflow\'s cloud starts, Remote Control and cx all run the account wrapper', (t) => {
+test('amx, workflow\'s cloud starts and cx all run the account wrapper', (t) => {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-claude-')));
   t.after(() => rmSync(home, { recursive: true, force: true }));
   const wrapper = `${home}/.local/libexec/dots/claude`;
@@ -57,6 +57,5 @@ test('amx, workflow\'s cloud starts, Remote Control and cx all run the account w
   assert.match(amx.stdout, new RegExp(`^agent = "${wrapper}"$`, 'm'));
   const fish = spawnSync('fish', ['--no-config', '-c', `source ${join(repo, 'home/dot_config/fish/config.fish')}; echo $WORKFLOW_CLAUDE`], { encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home, XDG_STATE_HOME: join(home, 'state') } });
   assert.equal(fish.stdout.trim(), wrapper);
-  assert.match(readFileSync(join(repo, 'home/dot_config/systemd/user/claude-rc@.service'), 'utf8'), /^ExecStart=%h\/\.local\/libexec\/dots\/claude /m);
   assert.match(readFileSync(join(repo, 'home/dot_config/fish/functions/cx.fish'), 'utf8'), /^\s+~\/\.local\/libexec\/dots\/claude /m);
 });
