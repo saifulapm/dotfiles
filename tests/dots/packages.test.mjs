@@ -45,9 +45,9 @@ test('the everyday CLI tools are declared for every arch, and eza is not', () =>
   assert.equal(byName.has('tealdeer'), false);
 });
 
-// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them: pipewire-utils' pw-dump and pw-link for Control's audio and the HomePod, bluez's bluetoothd behind Control's Bluetooth, and qt6-qtimageformats for Files' WebP, TIFF and AVIF previews.
+// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them: pipewire-utils' pw-dump and pw-link for Control's audio and the HomePod, bluez's bluetoothd behind Control's Bluetooth, qt6-qtimageformats for Files' WebP, TIFF and AVIF previews, and libxml2_2.13's libxml2.so.2, which aqua's hurl links (Fedora 45's libxml2 is .so.16).
 test('what the shell and Chromium call is declared, not left to the base image', () => {
-  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli', 'pipewire-utils', 'bluez', 'qt6-qtimageformats']) {
+  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli', 'pipewire-utils', 'bluez', 'qt6-qtimageformats', 'libxml2_2.13']) {
     assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
     assert.match(byName.get(name).why, /\w/, `${name} why`);
   }

@@ -334,3 +334,9 @@ test('a failing cargo stops the wl-uinput-proxy pin, naming it, and installs not
   assert.match(r.stderr, /pin wl-uinput-proxy: cargo build failed/);
   assert.equal(existsSync(join(root, '.local/bin/wl-uinput-proxy')), false);
 });
+
+// Pins built from source link the release's libraries (scrcpy and wlvncc took Fedora 44's libavcodec.so.62), so a release upgrade must change every pin script, which makes chezmoi run it again.
+test('a pin script names the Fedora release it was rendered on', () => {
+  const release = spawnSync('sh', ['-c', '. /etc/os-release && echo "$VERSION_ID"'], { encoding: 'utf8' }).stdout.trim();
+  assert.match(renderOnly(source(sha('hello pin\n')), SCRIPT), new RegExp(`^pin_fedora="${release}"$`, 'm'));
+});

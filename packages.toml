@@ -704,6 +704,11 @@ arch = "all"
 why = "Qt's WebP, TIFF and AVIF readers, for images Files previews and the shell shows"
 
 [[package]]
+name = "libxml2_2.13"
+arch = "all"
+why = "libxml2.so.2, which aqua's hurl links; Fedora 45's libxml2 is .so.16"
+
+[[package]]
 name = "pipewire-utils"
 arch = "all"
 why = "pw-dump, pw-metadata, pw-link and pw-record, which Control's audio and the HomePod link use"

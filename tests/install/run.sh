@@ -106,7 +106,7 @@ check "\$HOME/.config/quickshell links to $home/Codes/dotfiles/shell (got '$targ
   test "$target" = "$home/Codes/dotfiles/shell"
 
 theme=$(podman exec "$name" cat "$home/.local/state/dots/theme" 2>/dev/null)
-check "\$HOME/.local/state/dots/theme contains paper (got '$theme')" test "$theme" = paper
+check "\$HOME/.local/state/dots/theme contains artboard (got '$theme')" test "$theme" = artboard
 mode=$(podman exec "$name" stat -c %a "$home/.local/state/dots")
 check "\$HOME/.local/state/dots is private to the user (got $mode)" test "$mode" = 700
 
