@@ -211,7 +211,7 @@ FocusScope {
                 width: Math.min(571, parent.width - 40)
                 visible: page.status === "card"
                 radius: 14
-                color: (page.revealed ? c.surface : look.tile.fill) ?? "white"
+                color: (page.revealed ? deen.tones.card : look.tile.fill) ?? "white"
                 border.width: page.revealed ? 1.5 : 0
                 border.color: c.accent ?? "gray"
 

@@ -39,10 +39,12 @@ ShellRoot {
     property var playTail: null
     readonly property string playBin: Quickshell.shellDir + "/bin/dots-dekho-play"
 
-    readonly property var c: theme.color
-    readonly property var tones: L.plainTones(theme.tokens)
+    // The window is clear on the desk like a terminal: its words are moved to read there and its fills are veils.
+    readonly property var desk: L.deskTokens(theme.tokens)
+    readonly property var c: desk ? desk.color : theme.color
+    readonly property var tones: L.plainTones(desk)
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(theme.tokens)
+    readonly property var look: L.listLook(desk)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {
@@ -368,7 +370,7 @@ ShellRoot {
         title: "Dekho"
         implicitWidth: 1200
         implicitHeight: 716
-        color: app.c.surface ?? "white"
+        color: "transparent"
 
         Connections {
             target: win.contentItem.Window.window

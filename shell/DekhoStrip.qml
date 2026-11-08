@@ -137,7 +137,7 @@ ColumnLayout {
         }
 
         implicitHeight: body.implicitHeight + 20
-        color: focused ? page.c.surface ?? "white" : page.tones.field
+        color: focused ? page.tones.tint : page.tones.field
         border.width: focused ? 1.5 : 0
         border.color: page.c.accent ?? "black"
 

@@ -10,8 +10,9 @@ test('no Dekho surface names an Artboard board colour; each reads the theme\'s t
   for (const n of files) assert.doesNotMatch(read(n), ARTBOARD, `${n}.qml`);
 });
 
-test('the app root draws the table from the theme\'s tokens', () => {
-  assert.match(read('dekho'), /tones: L\.plainTones\(theme\.tokens\)/);
+test('the app root draws the table from the theme\'s tokens, as veils on the desk', () => {
+  assert.match(read('dekho'), /desk: L\.deskTokens\(theme\.tokens\)/);
+  assert.match(read('dekho'), /tones: L\.plainTones\(desk\)/);
 });
 
 test('no plain branch fills with a literal white', () => {

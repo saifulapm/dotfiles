@@ -14,8 +14,9 @@ test('Deen and Tailscale name none of Artboard\'s board colours', () => {
   }
 });
 
-test('the app root hands its pages the plain tones of the current theme', () => {
-  assert.match(read('deen.qml'), /tones: L\.plainTones\(theme\.tokens\)/);
+test('the app root hands its pages the plain tones of the current theme, as veils on the desk', () => {
+  assert.match(read('deen.qml'), /desk: L\.deskTokens\(theme\.tokens\)/);
+  assert.match(read('deen.qml'), /tones: L\.plainTones\(desk\)/);
 });
 
 test('Tailscale\'s plain tiles draw the theme\'s card, not a literal white', () => {
