@@ -15,7 +15,7 @@ deno = "latest"
 "npm:@shopify/cli" = "latest"
 # The dev tunnel client that home/private_dot_cloudflared configures.
 "aqua:cloudflare/cloudflared" = "latest"
-# Fedora 44 packages none of these five, so they come as aqua's prebuilt binaries: sd, tv, hurl, sg and usql.
+# Fedora 45 packages none of these five, so they come as aqua's prebuilt binaries: sd, tv, hurl, sg and usql.
 "aqua:chmln/sd" = "latest"
 "aqua:alexpasmantier/television" = "latest"
 "aqua:Orange-OpenSource/hurl" = "latest"

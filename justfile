@@ -37,7 +37,7 @@ bench:
 soak:
     bin/dots-soak
 
-# dots install twice in a fresh fedora:44 container
+# dots install twice in a fresh fedora:45 container
 test-install:
     tests/install/run.sh
 

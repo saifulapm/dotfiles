@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs `dots install` twice in a fresh fedora:44 container against this checkout's committed branch.
+# Runs `dots install` twice in a fresh fedora:45 container against this checkout's committed branch.
 set -uo pipefail
 # bash reads a script as it runs it, so the whole body sits in one block it parses before the first command; an edit mid-run cannot reach it.
 {
@@ -70,7 +70,7 @@ podman run -d --rm --name "$name" --userns=keep-id --security-opt label=disable 
   --passwd-entry "saiful:*:1000:1000::$home:/bin/bash" \
   -v "$snap/src.git:/src.git:ro" -v dots-install-dnf-cache:/var/cache/libdnf5 -v dots-install-cargo-cache:$home/.cargo:U -v dots-install-rustup-cache:$home/.rustup:U \
   -v dots-install-android-sdk:$home/Android:U -v dots-install-swiftly:$home/.local/share/swiftly:U \
-  docker.io/library/fedora:44 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
+  docker.io/library/fedora:45 sleep infinity >/dev/null || { echo "FAIL: container did not start"; exit 1; }
 
 as_root "
   set -e
