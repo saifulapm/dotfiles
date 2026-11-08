@@ -186,7 +186,7 @@ test('no path under home/ mentions kitty, and the links point at theme-out', () 
   assert.deepEqual(files.filter((f) => /kitty/i.test(f)), []);
   const links = files.filter((f) => /\/symlink_(dots\.kak|theme\.toml|gtk\.css|settings\.ini)/.test(f));
   assert.equal(links.length, 6);
-  for (const l of links) assert.match(readFileSync(l, 'utf8'), /\.local\/state\/dots\/theme-out\/(dots\.kak|yazi-theme\.toml|gtk\.css|gtk-settings\.ini)\s*$/, l);
+  for (const l of links) assert.match(readFileSync(l, 'utf8'), /\.local\/state\/dots\/theme-out\/(dots\.kak|yazi-theme\.toml|gtk\.css|gtk4\.css|gtk-settings\.ini|btop\.theme)\s*$/, l);
 });
 
 test('a running fish takes the new colours at its next prompt', (t) => {

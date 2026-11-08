@@ -5,6 +5,7 @@ import QtQuick
 import "services" as Services
 import "lib/status.mjs" as Status
 import "lib/youtube-look.mjs" as Y
+import "lib/voice.mjs" as V
 import "lib/youtube.mjs" as YT
 import "lib/youtube-find.mjs" as F
 import "lib/youtube-queue.mjs" as Q
@@ -74,9 +75,11 @@ ShellRoot {
     property string indexPath: ""
     readonly property string getter: Quickshell.shellDir + "/bin/dots-youtube-get"
 
-    readonly property var c: theme.color
+    // The window floats clear on niri's paper back like every app on the desk: its words are moved to read there and its fills are veils.
+    readonly property var desk: V.deskTokens(theme.tokens)
+    readonly property var c: desk ? desk.color : theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: Y.youtubeLook(theme.tokens)
+    readonly property var look: Y.youtubeLook(desk)
 
     // qs has no quit, so a child ends its parent: the process must not outlive the window.
     function quit() {

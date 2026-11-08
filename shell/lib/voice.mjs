@@ -70,8 +70,50 @@ function derived(c, mode) {
   };
 }
 
-// The board colours of a scheme: Artboard's own, before the tokens load too, else mixed from the scheme's.
-export const plainTones = (tokens) => (!tokens || tokens.name === 'artboard' ? ARTBOARD : derived(tokens.color, tokens.mode));
+// QML reads a colour with alpha as #AARRGGBB; the alpha it keeps is a whole 255th, which the contrast walks use too.
+const alphaOf = (a) => Math.round(a * 255) / 255;
+const veil = (hex, a) => `#${Math.round(a * 255).toString(16).padStart(2, '0')}${hex.slice(1)}`.toUpperCase();
+
+// An app window is clear on the desk like a terminal: its tokens take the paper as surface and the scheme's words as onDesk moves them, and plainTones gives it veils.
+export function deskTokens(tokens) {
+  if (!tokens) return tokens;
+  const c = tokens.color;
+  const lift = (k) => onDesk(tokens, c[k]);
+  // Ink sits on tiles too, a veil of itself, so it moves on until it reads on its own tile over the paper and the field; a step or two settles it.
+  const grounds = [c.paper].concat(tokens.paper?.grade ? [tokens.paper.grade.from, tokens.paper.grade.to] : []);
+  const toward = tokens.mode === 'dark' ? '#FFFFFF' : '#000000';
+  let ink = lift('ink');
+  for (let i = 0; i < 4; i++) {
+    const next = grounds.reduce((f, g) => readable(f, mix(g, ink, alphaOf(0.06)).toUpperCase(), toward), ink);
+    if (next === ink) break;
+    ink = next;
+  }
+  return Object.assign({}, tokens, { desk: true, color: Object.assign({}, c, { surface: c.paper, ink, muted: lift('muted'), accent: lift('accent'), danger: lift('danger'), ok: lift('ok') }) });
+}
+
+// An app's fills are veils QML draws over whatever lies under them: the ink's for tiles, fields and cards, the accent's for the lit row. A word on a veil moves until it reads over the paper and both ends of the field; tintSolid is the lit row over the paper, for the contrast walks that need a solid colour.
+function deskDerived(tokens) {
+  const c = tokens.color;
+  const base = derived(c, tokens.mode);
+  const grounds = [c.paper].concat(tokens.paper?.grade ? [tokens.paper.grade.from, tokens.paper.grade.to] : []);
+  const toward = tokens.mode === 'dark' ? '#FFFFFF' : '#000000';
+  const readOn = (fg, x, a) => grounds.reduce((f, g) => readable(f, mix(g, x, alphaOf(a)).toUpperCase(), toward), fg);
+  return Object.assign({}, base, {
+    tint: veil(c.accent, 0.14),
+    tintSolid: base.tint,
+    onTint: (fg) => readOn(fg, c.accent, 0.14),
+    deep: readOn(c.accent, c.accent, 0.14),
+    tile: veil(c.ink, 0.06),
+    field: veil(c.ink, 0.04),
+    thumb: veil(c.ink, 0.09),
+    rule: veil(c.ink, 0.12),
+    card: veil(c.ink, 0.04),
+    warnChip: veil(c.danger, 0.1),
+  });
+}
+
+// The board colours of a scheme: an app's veils on the desk, Artboard's own, before the tokens load too, else mixed from the scheme's.
+export const plainTones = (tokens) => (tokens?.desk ? deskDerived(tokens) : !tokens || tokens.name === 'artboard' ? ARTBOARD : derived(tokens.color, tokens.mode));
 
 // An open can come before the theme's tokens load; until then the shell draws the plain look in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '' } };
@@ -91,7 +133,7 @@ export function launcherLook(tokens) {
   const t = (tokens || UNTHEMED).type;
   // The pill word and the lit row's detail sit on the tint, so each moves toward the ink until it reads there.
   const tones = plainTones(tokens);
-  const onTint = (fg) => (tokens ? readable(fg, tones.tint, tintInk(c, tokens.mode, tones.tint)) : fg);
+  const onTint = tones.onTint ?? ((fg) => (tokens ? readable(fg, tones.tint, tintInk(c, tokens.mode, tones.tint)) : fg));
   const legend = (mode) => ({
     keys: (mode === 'apps' ? PREFIXES : MODE_KEYS[mode] ?? []).map(([key, word]) => ({ key, word })),
     tail: 'j/k · ↵ · esc',

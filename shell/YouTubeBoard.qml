@@ -223,9 +223,8 @@ Rectangle {
         };
     }
 
-    // The window is rounded as niri rounds its geometry.
-    radius: 14
-    color: c.surface ?? "white"
+    // The board is clear and square: it floats on niri's paper back, inside the accent edge every floating window wears.
+    color: "transparent"
     clip: true
 
     Item {
@@ -576,7 +575,7 @@ Rectangle {
                                     implicitWidth: 28
                                     implicitHeight: 28
                                     radius: 9
-                                    color: place.chosen ? c.surface ?? "white" : look.tint.tile
+                                    color: place.chosen ? look.tint.tint : look.tint.tile
 
                                     FilesIcon {
                                         anchors.centerIn: parent
@@ -839,7 +838,7 @@ Rectangle {
                                         implicitWidth: chipText.implicitWidth + 24
                                         implicitHeight: chipText.implicitHeight + 8
                                         radius: 8
-                                        color: !chosen ? "transparent" : c.surface ?? "white"
+                                        color: !chosen ? "transparent" : look.tint.tint
 
                                         Text {
                                             id: chipText

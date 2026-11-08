@@ -23,6 +23,13 @@ window-rule {
     default-column-width { proportion 0.5; }
     default-window-height { proportion 0.55; }
 }
+// YouTube floats over the desk at 60% by 75%, centred.
+window-rule {
+    match app-id="^youtube$"
+    open-floating true
+    default-column-width { proportion 0.6; }
+    default-window-height { proportion 0.75; }
+}
 // Files floats at the size it asks for.
 window-rule {
     match app-id="^files$"

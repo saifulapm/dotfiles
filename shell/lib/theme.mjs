@@ -168,7 +168,7 @@ window-rule {
     draw-border-with-background false
 }
 
-// A floating window sits over other windows, so a hard shadow drawn behind it backs its clear ground in the paper, a touch clear itself (95%), so a window under it reads only as a shade; a 1 px gradient of the accent fading into the paper edges it, dimmer when it is not focused.
+// A floating window sits over other windows, so a hard shadow drawn behind it backs its clear ground in the paper, a touch clear itself (97%), so a window under it reads only as a shade; a 1 px gradient of the accent fading into the paper edges it, dimmer when it is not focused.
 window-rule {
     match is-floating=true
     draw-border-with-background false
@@ -184,8 +184,8 @@ window-rule {
         spread 0
         offset x=0 y=0
         draw-behind-window true
-        color "${c.paper}F2"
-        inactive-color "${c.paper}F2"
+        color "${c.paper}F7"
+        inactive-color "${c.paper}F7"
     }
 }
 
