@@ -69,6 +69,11 @@ test('the niri fragment sets the paper as background, tiles windows with no fram
   assert.match(kdl, /geometry-corner-radius 0/);
 });
 
+// A client that draws its own decorations, as GTK does, would get the border painted as a solid block behind it, which a clear window shows; so no window gets one.
+test('niri paints no border colour behind any window', () => {
+  assert.match(renderNiri(artboard), /window-rule \{\s*geometry-corner-radius 0\s*clip-to-geometry true\s*draw-border-with-background false\s*\}/);
+});
+
 // A video is never see-through: mpv, imv and a picture-in-picture float on a solid paper back, after the floating rule so it wins.
 test('a floating video sits on a solid paper back', () => {
   const kdl = renderNiri(artboard);

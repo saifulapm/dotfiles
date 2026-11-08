@@ -17,7 +17,7 @@ const files = (dir) => readdirSync(dir, { recursive: true }).sort();
 test('a colorscheme renders every app\'s output', (t) => {
   const state = scratch(t);
   execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
-  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'btop.theme', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'helix.toml', 'imv.conf', 'lazygit.yml', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
+  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'btop.theme', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'gtk4.css', 'helix.toml', 'imv.conf', 'lazygit.yml', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
 });
 
 test('the shell tokens name the one design and the scheme\'s light or dark', (t) => {

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
 import { loadScheme, schemeNames } from './colorscheme-file.mjs';
-import { termTheme, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
 const light = loadScheme('github-light');
@@ -463,4 +463,25 @@ test("lazygit's theme borders the focused view in the accent and lights its line
   const bg = get('selectedLineBgColor').slice(1, -1);
   assert.ok(contrast(t.color.ink, bg.toUpperCase()) >= 4.5, `ink on ${bg}`);
   for (const k of ['searchingActiveBorderColor', 'optionsTextColor', 'inactiveViewSelectedLineBgColor', 'cherryPickedCommitFgColor', 'cherryPickedCommitBgColor', 'markedBaseCommitFgColor', 'markedBaseCommitBgColor']) assert.ok(get(k), k);
+});
+
+const cssVars = (css) => Object.fromEntries([...css.matchAll(/^  --([a-z-]+): (#[0-9a-f]{6,8});$/gm)].map((m) => [m[1], m[2]]));
+
+test("GTK 4's window, views, header bar and sidebar are clear on the desk, its popovers and dialogs solid paper, in libadwaita's variables", () => {
+  const t = termTheme(loadScheme('artboard'));
+  const css = renderGtk4Css(t);
+  const v = cssVars(css);
+  const paper = t.color.paper.toLowerCase();
+  for (const k of ['window-bg-color', 'view-bg-color', 'headerbar-bg-color', 'sidebar-bg-color']) assert.equal(v[k], `${paper}00`, k);
+  for (const k of ['popover-bg-color', 'dialog-bg-color']) assert.equal(v[k], paper, k);
+  for (const k of ['window-fg-color', 'view-fg-color', 'headerbar-fg-color', 'popover-fg-color']) assert.equal(v[k], t.color.ink.toLowerCase(), k);
+  assert.deepEqual([v['accent-bg-color'], v['accent-color'], v['destructive-bg-color']], [t.color.accent, t.color.accent, t.color.danger].map((x) => x.toLowerCase()));
+  assert.ok(contrast(t.color.paper, t.color.accent) >= 4.5, 'a suggested button\'s words read on the accent');
+});
+
+test('plain GTK 4, whose own theme reads no variable, is cleared and coloured through selectors that use them', () => {
+  const css = renderGtk4Css(termTheme(loadScheme('gruvbox-material-dark')));
+  assert.match(css, /window\.background, headerbar,[^{]*\.view,[^{]*\{\n  background-color: transparent;/);
+  assert.match(css, /popover > contents,[^{]*\{\n  background-color: var\(--popover-bg-color\);/);
+  assert.match(css, /button\.suggested-action \{ background-color: var\(--accent-bg-color\); color: var\(--accent-fg-color\); \}/);
 });

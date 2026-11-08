@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
-import { termTheme, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Board hexes for the kak-mail list that no token carries: Artboard's date orange.
 const MAIL_BOARD = { artboard: { date: '#C2410C' } };
@@ -59,6 +59,7 @@ export function renderOutputs(theme, list, label) {
     'yazi-theme.toml': renderYazi(term),
     'colors.fish': renderFish(term),
     'gtk.css': renderGtkCss(term),
+    'gtk4.css': renderGtk4Css(term),
     'gtk-settings.ini': renderGtkSettings(theme),
     'chromium-theme/manifest.json': renderChromiumTheme(term),
     'chromium-newtab/manifest.json': renderNewtabManifest(),

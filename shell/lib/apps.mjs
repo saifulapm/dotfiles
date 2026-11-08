@@ -281,6 +281,52 @@ export function renderGtkCss(t) {
   return defs.map(([n, v]) => `@define-color ${n} ${lower(v)};`).join('\n') + '\n';
 }
 
+// GTK 4 and libadwaita read colours as CSS variables. A window is clear on the desk like a terminal: its window, views, header bar and sidebar take the paper with no alpha, while popovers, menus and dialogs, which float over other windows, are solid paper; plain GTK 4, whose own theme reads no variable, takes them through the selectors after.
+export function renderGtk4Css(t) {
+  const c = t.color;
+  const [paper, ink, line, accent, danger, ok, warn] = [c.paper, c.ink, c.line, c.accent, c.danger, c.ok, c.ansi[3]].map(lower);
+  const clear = `${paper}00`;
+  const vars = [
+    ['window-bg-color', clear], ['window-fg-color', ink], ['view-bg-color', clear], ['view-fg-color', ink],
+    ['headerbar-bg-color', clear], ['headerbar-fg-color', ink], ['headerbar-backdrop-color', clear], ['headerbar-border-color', ink], ['headerbar-shade-color', clear],
+    ['sidebar-bg-color', clear], ['sidebar-fg-color', ink], ['sidebar-backdrop-color', clear], ['sidebar-shade-color', clear], ['sidebar-border-color', clear],
+    ['card-bg-color', `${ink}0d`], ['card-fg-color', ink], ['card-shade-color', `${ink}1a`],
+    ['popover-bg-color', paper], ['popover-fg-color', ink], ['dialog-bg-color', paper], ['dialog-fg-color', ink],
+    ['accent-bg-color', accent], ['accent-fg-color', paper], ['accent-color', accent],
+    ['destructive-bg-color', danger], ['destructive-fg-color', paper], ['destructive-color', danger],
+    ['success-bg-color', ok], ['success-fg-color', paper], ['success-color', ok],
+    ['warning-bg-color', warn], ['warning-fg-color', paper], ['warning-color', warn],
+    ['error-bg-color', danger], ['error-fg-color', paper], ['error-color', danger],
+    ['border-color', line],
+  ];
+  return `:root {
+${vars.map(([k, v]) => `  --${k}: ${v};`).join('\n')}
+}
+window.background, headerbar, .titlebar, .view, textview > text, list, listview, columnview, scrolledwindow, viewport, notebook > header, notebook > stack, .sidebar, .navigation-sidebar, stacksidebar, searchbar > revealer > box, actionbar > revealer > box {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+window.background, headerbar, .view, textview > text, list, listview, label, notebook > header tab {
+  color: var(--window-fg-color);
+}
+headerbar, .titlebar, notebook > header, searchbar > revealer > box, actionbar > revealer > box {
+  border-color: var(--border-color);
+}
+popover > contents, popover > arrow, .menu, menu, dialog.background, messagedialog.background, tooltip.background {
+  background-color: var(--popover-bg-color);
+  color: var(--popover-fg-color);
+}
+row:selected, .view:selected, list > row:selected, notebook > header tab:checked {
+  background-color: color-mix(in srgb, var(--accent-bg-color) 22%, transparent);
+  color: var(--window-fg-color);
+}
+button.suggested-action { background-color: var(--accent-bg-color); color: var(--accent-fg-color); }
+button.destructive-action { background-color: var(--destructive-bg-color); color: var(--destructive-fg-color); }
+entry, button:not(.flat):not(.suggested-action):not(.destructive-action) { background-color: var(--card-bg-color); color: var(--window-fg-color); }
+`;
+}
+
 export function renderGtkSettings(t) {
   return `[Settings]\ngtk-application-prefer-dark-theme=${t.mode === 'dark'}\ngtk-font-name=${t.type.ui} 11\n`;
 }
