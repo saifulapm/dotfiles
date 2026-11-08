@@ -4,6 +4,7 @@ import QtQuick
 import "." as Root
 import "lib/click.mjs" as ClickLib
 import "lib/launcher.mjs" as Lib
+import "lib/voice.mjs" as V
 
 // The one Overlay window every surface draws in; it stays mapped, since a remap costs 20 to 30 ms.
 PanelWindow {
@@ -11,6 +12,17 @@ PanelWindow {
 
     required property var theme
     required property var themeList
+    // Every panel floats over the desk as a floating window does, so it reads the theme as the desk's apps do: its words moved to read there, its fills veils, its card the paper inside the accent edge.
+    readonly property QtObject panelTheme: QtObject {
+        readonly property var tokens: V.deskTokens(host.theme.tokens)
+        readonly property var color: tokens ? tokens.color : host.theme.color
+        readonly property string dir: host.theme.dir
+        readonly property string name: host.theme.name
+        // A panel's notice reaches the island through the real theme, which carries the signal.
+        function notice(text) {
+            host.theme.notice(text);
+        }
+    }
     // The desktop entries with their icons, scanned by the shell after its first frame.
     required property var apps
     required property var notifs
@@ -232,7 +244,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Launcher {
-            theme: host.theme
+            theme: panelTheme
             apps: host.apps
             schemes: host.themeList
             reminders: host.reminders
@@ -249,7 +261,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Notifications {
-            theme: host.theme
+            theme: panelTheme
             notifs: host.notifs
         }
     }
@@ -259,7 +271,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.CheatSheet {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -268,7 +280,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Control {
-            theme: host.theme
+            theme: panelTheme
             notifs: host.notifs
             sync: host.sync
         }
@@ -279,7 +291,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Recorder {
-            theme: host.theme
+            theme: panelTheme
             screen: host.screen
         }
     }
@@ -289,7 +301,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.PolkitPrompt {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -299,7 +311,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.PinentryPrompt {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -314,7 +326,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Pass {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -338,7 +350,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Tailscale {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -353,7 +365,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Accounts {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -368,7 +380,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Dns {
-            theme: host.theme
+            theme: panelTheme
         }
     }
 
@@ -383,7 +395,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.FilePicker {
-            theme: host.theme
+            theme: panelTheme
             apps: host.apps
         }
     }
@@ -399,7 +411,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Goals {
-            theme: host.theme
+            theme: panelTheme
             goals: host.goals
         }
     }

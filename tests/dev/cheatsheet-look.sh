@@ -25,9 +25,9 @@ open_sheet
 check "the legend reads in lower-case chips ($(sheet_state | jq -c .legend))" state_is '.legend | contains("j/k move")'
 check "the legend is not tracked ($(sheet_state | jq -c .legendSpacing))" state_is '.legendSpacing <= 1'
 check "the heading is the pill reading Keys ($(sheet_state | jq -c .heading))" state_is '.heading == "Keys"'
-# No rule runs under the heading: its 1 px slot reads the card's white across a whole 300 px strip.
-solid=$(near "$(sheet_state | jq -r '.ruleBox | "\(.x + 40 | floor),\(.y | floor) 300x1"')" 255 255 255 3)
-check "no rule runs under the heading ($solid of 300 px read the card's white)" test "$solid" -ge 290
+# No rule runs under the heading: its 1 px slot reads the card's paper across a whole 300 px strip.
+solid=$(near "$(sheet_state | jq -r '.ruleBox | "\(.x + 40 | floor),\(.y | floor) 300x1"')" 228 230 234 4)
+check "no rule runs under the heading ($solid of 300 px read the card's paper)" test "$solid" -ge 290
 close_sheet
 
 exit $((fails > 0))

@@ -75,7 +75,7 @@ long=$(printf 'chrome-%0193d' 0)
 ask preview "$(request open "$look/shots")"
 shown
 cursor_to Photo.jpg
-check "the cursor row's #EEF1FF tint reads on screen" on_screen 238 241 255 2
+check "the cursor row's accent veil reads on screen over the card's paper" on_screen 203 208 230 4
 check "a 640 x 480 JPEG draws 640 × 480 px ($(until_ok 3000 state_is '.previewDims != ""'; preview_of))" state_is '.previewDims == "640 × 480 px" and .previewName == "Photo.jpg"'
 cursor_to Report.pdf
 check "a PDF draws no dimensions line and no picture ($(until_ok 2000 state_is '.previewName == "Report.pdf"'; preview_of))" until_ok 2000 state_is '.previewName == "Report.pdf" and .preview == false and .previewDims == "" and .previewLines[0:1] == ["184 KB"] and (.previewLines | length) == 2'

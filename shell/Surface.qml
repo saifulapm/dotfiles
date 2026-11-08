@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import QtQuick.Shapes
 import "." as Root
 import "lib/surface.mjs" as S
 import "lib/switch.mjs" as W
@@ -49,7 +50,7 @@ Item {
         id: fillRect
         anchors.fill: parent
         color: surface.style.fill
-        border.width: surface.style.frame.width
+        border.width: surface.style.frame.gradient ? 0 : surface.style.frame.width
         border.color: surface.style.frame.color
 
         // A colorscheme switch crossfades the fill and frame with the paper, on Qt's nearest curve to the paper's.
@@ -63,6 +64,41 @@ Item {
             ColorAnimation {
                 duration: W.SWITCH.ms * Root.State.slowdown
                 easing.type: Easing.InOutSine
+            }
+        }
+    }
+
+    // A panel on the desk wears the floating windows' edge: a 1 px ring of the accent fading into the paper, corner to corner.
+    Shape {
+        id: edge
+        anchors.fill: parent
+        visible: !!surface.style.frame.gradient
+        ShapePath {
+            strokeColor: "transparent"
+            fillRule: ShapePath.OddEvenFill
+            fillGradient: LinearGradient {
+                x1: 0
+                y1: 0
+                x2: surface.width
+                y2: surface.height
+                GradientStop {
+                    position: 0
+                    color: surface.style.frame.gradient ? surface.style.frame.gradient.from : "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: surface.style.frame.gradient ? surface.style.frame.gradient.to : "transparent"
+                }
+            }
+            PathRectangle {
+                width: surface.width
+                height: surface.height
+            }
+            PathRectangle {
+                x: surface.style.frame.width
+                y: surface.style.frame.width
+                width: surface.width - 2 * surface.style.frame.width
+                height: surface.height - 2 * surface.style.frame.width
             }
         }
     }

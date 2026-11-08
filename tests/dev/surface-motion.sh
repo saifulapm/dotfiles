@@ -20,6 +20,8 @@ cy=$((oy + 168))
 
 rgb() { grim -s 1 -t ppm -g "$1,$2 ${3:-1}x${4:-1}" - | mean_rgb; }
 near() { local r g b t=${tol:-24}; read -r r g b < <(rgb "$1" "$2"); ((r - $3 <= t && $3 - r <= t && g - $4 <= t && $4 - g <= t && b - $5 <= t && $5 - b <= t)); }
+# A panel's edge near its top left: Artboard's accent #3D5AFE, before it fades toward the paper; the card's paper and the wash are too alike to tell apart.
+edge() { tol=40 near "$1" "$2" 61 90 254; }
 
 until_ok 5000 shell_status >/dev/null
 
@@ -28,9 +30,9 @@ press
 wait_until 300
 check "300 ms into a 20x open the drawn card is scaled to 0.98 or less ($(launcher_state | jq -c '.cardBox.w / 640'))" state_is '.cardBox.w / 640 <= 0.98'
 check "and it is drawn below its rest, rising to it ($(launcher_state | jq -c '.cardBox.y'))" state_is '.cardBox.y > 168'
-# The card's white is still below and inside its rest edge, so the rest top row shows only the wash.
-no_white_edge() { ! near $((cx + 100)) $((cy + 3)) 255 255 255; }
-check "its rest top edge shows no white card yet" no_white_edge
+# The card is still below and inside its rest place, so its accent edge is not yet on the rest top row.
+no_rest_edge() { ! edge $((cx + 100)) "$cy"; }
+check "its rest top row shows no card edge yet" no_rest_edge
 # The keyboard is the surface's from the first frame, so typing mid-spring reaches the query.
 until_ok 3000 state_is '.keyboard'
 wtype fo
@@ -39,7 +41,7 @@ check "typing during the spring reaches the query whole" state_is '.query == "fo
 until_ok 9000 state_is .settled
 check "the launcher reports a spring that settled in about 20 times 362 ms ($(launcher_state | jq -c '[.motion, .settleMs]'))" state_is '.motion == "spring" and .settleMs >= 7000 and .settleMs <= 8200'
 check "at rest the drawn card is where it rests, at full size" state_is '.cardBox.y == 168 and .cardBox.w == 640'
-check "at rest the card's top edge is white" near $((cx + 100)) $((cy + 3)) 255 255 255
+check "at rest the card's accent edge runs along its top" edge $((cx + 100)) "$cy"
 
 # Esc gives the keyboard back as the close starts, long before the 2.4 s close is drawn.
 t0=$(now_ms)

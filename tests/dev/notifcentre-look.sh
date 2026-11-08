@@ -44,11 +44,11 @@ send_fresh fresh
 open_centre
 check "the fresh row's time column reads now and the oldest 3h ($(notifs | jq -c .ages))" state_is '.ages[0] == "now" and .ages[-1] == "3h"'
 check "the heading is the pill reading Notifications ($(notifs | jq -c .heading))" state_is '.heading == "Notifications"'
-check "the cursor row's fill is #EEF1FF ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
-tint=$(near "$(box_geo cursorBox 300 2 8 4)" 238 241 255 3)
-check "inside the cursor row reads the tint ($tint of 32 px)" test "$tint" -eq 32
-corner=$(near "$(box_geo cursorBox 0 0 2 2)" 255 255 255 3)
-check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+check "the cursor row's fill is the accent's veil #243249ce ($(notifs | jq -c .cursorFill))" state_is '.cursorFill == "#243249ce"'
+tint=$(near "$(box_geo cursorBox 300 2 8 4)" 203 208 230 4)
+check "inside the cursor row reads the veil over the card's paper ($tint of 32 px)" test "$tint" -eq 32
+corner=$(near "$(box_geo cursorBox 0 0 2 2)" 228 230 234 4)
+check "the cursor row's corner reads the card's paper, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
 check "the legend keys are lower-case ($(notifs | jq -c .legendKeys))" state_is '.legendKeys == ["j/k", "↵", "d", "⇧D", "m", "i", "s", "1-3", "/", "esc"]'
 check "the legend reads j/k move first ($(notifs | jq -c .legend))" state_is '.legend | startswith("j/k move  ↵ open  d dismiss  ⇧D clear all")'
 check "the rule sits under the heading" state_is '.ruleBox.y > .headingBox.y'

@@ -23,6 +23,8 @@ light() { local r g b; read -r r g b < <(rgb "$1" "$2"); ((r > 150 && g > 150 &&
 ink() { near "$1" "$2" 21 23 27 "${3:-1}" "${4:-1}"; }
 # Artboard's line #D0D7DE, close enough that the paper #E4E6EA is not it.
 line() { tol=8 near "$1" "$2" 208 215 222 "${3:-1}" "${4:-1}"; }
+# A panel's edge near its top left: Artboard's accent #3D5AFE, before it fades toward the paper.
+edge() { tol=40 near "$1" "$2" 61 90 254 "${3:-1}" "${4:-1}"; }
 # The first and last x on the island's middle row within 40 per channel of a colour, as "left right".
 span() {
   grim -s 1 -t ppm -g "$((mid - 200)),$((oy + 27)) 400x1" - | node -e '
@@ -39,10 +41,10 @@ until_ok 5000 shell_status >/dev/null
 niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 launcher_open
 check "the launcher reports its card at rest, 640 px wide at y 168 ($(launcher_state | jq -c .cardBox))" launcher_is ".cardBox.x == $((cx - ox)) and .cardBox.y == 168 and .cardBox.w == 640"
-# The frame runs down the left edge to the corner itself, so the corner is square; inside it the card is white, and 2 px outside it the wash shows no shadow.
-card() { line "$cx" "$cy" && line "$cx" $((cy + 40)) 1 10 && near $((cx + 100)) $((cy + 3)) 255 255 255 && ! ink $((cx + 640 + 2)) $((cy + 60)) && ! ink $((cx - 2)) $((cy + 40)); }
+# The accent edge runs down the left side to the corner itself, so the corner is square; inside it the card is the paper, and 2 px outside it the wash shows no shadow.
+card() { edge "$cx" "$cy" && edge "$cx" $((cy + 40)) 1 10 && tol=6 near $((cx + 100)) $((cy + 3)) 228 230 234 && ! ink $((cx + 640 + 2)) $((cy + 60)) && ! ink $((cx - 2)) $((cy + 40)); }
 until_ok 2000 card
-check "the card is white in a square 1 px line frame, with no shadow past it" card
+check "the card is the paper in a square 1 px accent edge, with no shadow past it" card
 wtype -k Escape
 until_ok 2000 launcher_closed
 

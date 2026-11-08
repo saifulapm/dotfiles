@@ -37,3 +37,17 @@ test('a restyle swaps the fill, text and frame it names and keeps the rest (m21 
   assert.deepEqual(restyled(style, { fill: '#B4380B' }), Object.assign({}, style, { fill: '#B4380B' }));
   assert.deepEqual(restyled(style, { frame: { width: 2, color: '#3D5AFE' } }).frame, { width: 2, color: '#3D5AFE' });
 });
+
+// A panel floats over the desk as a floating window does: on the paper, 97% so a window under it reads only as a shade, inside a 1 px edge of the accent fading into the paper.
+test('a card on the desk tokens is 97% paper inside the accent edge every floating window wears', async () => {
+  const { deskTokens } = await import('./voice.mjs');
+  for (const t of [artboard, mocha]) {
+    const s = surfaceStyle(deskTokens(t), 'card');
+    assert.equal(s.fill, `#F7${t.color.paper.slice(1).toUpperCase()}`);
+    assert.deepEqual(s.frame, { width: 1, color: t.niri.edge.from, gradient: { from: t.niri.edge.from, to: t.niri.edge.to } });
+    assert.equal(s.text, deskTokens(t).color.ink);
+    assert.equal(s.wash, 0.72);
+  }
+  assert.deepEqual(surfaceStyle(artboard, 'card').frame, { width: 1, color: artboard.niri.border_inactive }, 'a card off the desk keeps its quiet frame');
+  assert.equal(surfaceStyle(deskTokens(artboard), 'island').frame.gradient, undefined, 'an island is no card');
+});

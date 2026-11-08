@@ -27,21 +27,21 @@ box_geo() {
 until_ok 5000 shell_status >/dev/null
 
 open_control
-check "the current tab is the #EEF1FF pill reading Audio ($(control_state | jq -c '[.tabFill, .tabText]'))" state_is '.tabFill == "#eef1ff" and .tabText == "Audio"'
+check "the current tab is the accent's veil #243249ce reading Audio ($(control_state | jq -c '[.tabFill, .tabText]'))" state_is '.tabFill == "#243249ce" and .tabText == "Audio"'
 check "the section hint reads as written ($(control_state | jq -c .hint))" state_is '.hint == "h/l volume · ↵ default or move · m mute · p profile · r port"'
-pill=$(near "$(box_geo tabBox 2 6 6 8)" 238 241 255 3)
-check "the current tab draws the tint ($pill of 48 px)" test "$pill" -eq 48
-pill_corner=$(near "$(box_geo tabBox 0 0 2 2)" 255 255 255 3)
-check "the tab pill's corner reads the card's white, so it is rounded ($pill_corner of 4 px)" test "$pill_corner" -ge 3
-check "the cursor row's fill is #EEF1FF ($(control_state | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
-tint=$(near "$(box_geo cursorBox -70 4 8 8)" 238 241 255 3)
-check "inside the cursor row reads the tint ($tint of 64 px)" test "$tint" -eq 64
-corner=$(near "$(box_geo cursorBox 0 0 2 2)" 255 255 255 3)
-check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+pill=$(near "$(box_geo tabBox 2 6 6 8)" 203 208 230 4)
+check "the current tab draws the veil over the card's paper ($pill of 48 px)" test "$pill" -eq 48
+pill_corner=$(near "$(box_geo tabBox 0 0 2 2)" 228 230 234 4)
+check "the tab pill's corner reads the card's paper, so it is rounded ($pill_corner of 4 px)" test "$pill_corner" -ge 3
+check "the cursor row's fill is the accent's veil #243249ce ($(control_state | jq -c .cursorFill))" state_is '.cursorFill == "#243249ce"'
+tint=$(near "$(box_geo cursorBox -70 4 8 8)" 203 208 230 4)
+check "inside the cursor row reads the veil over the card's paper ($tint of 64 px)" test "$tint" -eq 64
+corner=$(near "$(box_geo cursorBox 0 0 2 2)" 228 230 234 4)
+check "the cursor row's corner reads the card's paper, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
 check "the legend keys are lower-case chips ($(control_state | jq -c .legend))" state_is '.legend == "tab section  j/k move  esc close" and .legendDrawn == .legend'
-# No rule runs under the heading: its 1 px slot reads the card's white across a whole 300 px strip.
-rule=$(near "$(box_geo ruleBox 20 0 300 1)" 255 255 255 3)
-check "no rule runs under the heading ($rule of 300 px read the card's white)" test "$rule" -ge 290
+# No rule runs under the heading: its 1 px slot reads the card's paper across a whole 300 px strip.
+rule=$(near "$(box_geo ruleBox 20 0 300 1)" 228 230 234 4)
+check "no rule runs under the heading ($rule of 300 px read the card's paper)" test "$rule" -ge 290
 close_control
 
 exit $((fails > 0))

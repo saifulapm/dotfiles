@@ -37,11 +37,11 @@ until_ok 5000 shell_status >/dev/null
 open_launcher
 wtype fo
 until_ok 3000 state_is '.query == "fo" and .results[0] == "Foot" and .cursorBox != null'
-check "the cursor row's fill is #EEF1FF ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#eef1ff"'
-tint=$(near "$(cursor_geo -70 4 8 8)" 238 241 255 3)
-check "inside the cursor row reads the tint ($tint of 64 px)" test "$tint" -eq 64
-corner=$(near "$(cursor_geo 0 0 2 2)" 255 255 255 3)
-check "the cursor row's corner reads the card's white, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+check "the cursor row's fill is the accent's veil #243249ce ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#243249ce"'
+tint=$(near "$(cursor_geo -70 4 8 8)" 203 208 230 4)
+check "inside the cursor row reads the veil over the card's paper ($tint of 64 px)" test "$tint" -eq 64
+corner=$(near "$(cursor_geo 0 0 2 2)" 228 230 234 4)
+check "the cursor row's corner reads the card's paper, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
 check "Foot's row draws its icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
 # foot's icon is a dark terminal, so its tile holds dark pixels that the tint never has.
 dark=$(near "$(cursor_geo 12 12 32 32)" 30 30 30 40)
@@ -53,8 +53,9 @@ open_launcher
 wtype "zz iconless"
 until_ok 5000 state_is '.results[0] == "Zz Iconless" and .cursorBox != null'
 check "an entry whose icon is missing gets the fallback tile ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "tile"'
-tile=$(near "$(cursor_geo 20 20 16 16)" 242 243 246 2)
-check "the fallback tile is #F2F3F6 ($tile of 256 px)" test "$tile" -gt 240
+# The tile sits in the lit row, so its ink veil lies over the accent's veil over the card.
+tile=$(near "$(cursor_geo 20 20 16 16)" 192 197 218 4)
+check "the fallback tile is the ink's veil over the lit row ($tile of 256 px)" test "$tile" -gt 240
 close_launcher
 
 open_launcher
@@ -106,17 +107,17 @@ until_ok 3000 state_is '.query == "fo"'
 "$repo/bin/dots" colorscheme catppuccin-mocha >/dev/null
 until_ok 3000 eval 'shell_status | jq -e ".theme == \"catppuccin-mocha\" and .transition == \"\"" >/dev/null'
 check "a switch while open keeps the query and the keyboard" state_is '.open and .query == "fo" and .keyboard'
-fill=$(near "$(fill_geo)" 30 30 46 3)
-check "the card is filled with Mocha's surface #1E1E2E ($fill of 64 px)" test "$fill" -eq 64
+fill=$(near "$(fill_geo)" 17 17 27 4)
+check "the card is filled with Mocha's paper #11111B ($fill of 64 px)" test "$fill" -eq 64
 close_launcher
 
 # A dark scheme's lit row is its own tint, mixed from its surface and accent, never Artboard's light #EEF1FF (m80 walk 0JG8TBA8).
 open_launcher
 wtype fo
 until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
-check "mocha: the cursor row's fill is its tint #2D334B ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#2d334b"'
-tint=$(near "$(cursor_geo -70 4 8 8)" 45 51 75 3)
-check "mocha: inside the cursor row reads #2D334B on screen ($tint of 64 px)" test "$tint" -eq 64
+check "mocha: the cursor row's fill is its accent's veil #2489B4FA ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#2489b4fa"'
+tint=$(near "$(cursor_geo -70 4 8 8)" 34 40 58 4)
+check "mocha: inside the cursor row reads its veil over the paper on screen ($tint of 64 px)" test "$tint" -eq 64
 light=$(near "$(cursor_geo 0 0 400 20)" 238 241 255 6)
 check "mocha: no pixel of the cursor row is Artboard's #EEF1FF ($light px)" test "$light" -eq 0
 close_launcher

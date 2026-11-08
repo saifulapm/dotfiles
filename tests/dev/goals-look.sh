@@ -58,14 +58,14 @@ close_goals
 open_goals
 until_ok 2000 state_is '.due != null'
 echo "     due: $(goals_state | jq -c .due)"
-check "the selected goal's due date is danger #cf222e with no dot ($(goals_state | jq -c '[.due.text, .due.color, .due.dot]'))" state_is '.due.color == "#cf222e" and .due.dot == null'
+check "the selected goal's due date is danger, moved to read on the desk, #b11d28 with no dot ($(goals_state | jq -c '[.due.text, .due.color, .due.dot]'))" state_is '.due.color == "#b11d28" and .due.dot == null'
 red=$(near "$(geo .due.box)" 207 34 46 40)
 check "the due date draws danger pixels ($red px)" test "$red" -gt 4
 read -r ratio fill < <(drawn_contrast "$(geo .due.box)")
 check "the due date reads at 4.5:1 or more against the fill drawn behind it ($ratio on $fill)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 wtype d
 until_ok 2000 state_is '.confirm and .confirmLabel != null'
-check "delete? y is danger with no dot ($(goals_state | jq -c .confirmLabel))" state_is '.confirmLabel.text == "delete? y" and .confirmLabel.color == "#cf222e" and .confirmLabel.dot == null'
+check "delete? y is danger with no dot ($(goals_state | jq -c .confirmLabel))" state_is '.confirmLabel.text == "delete? y" and .confirmLabel.color == "#b11d28" and .confirmLabel.dot == null'
 red=$(near "$(geo .confirmLabel.box)" 207 34 46 40)
 check "the confirm label draws danger pixels ($red px)" test "$red" -gt 4
 wtype n
