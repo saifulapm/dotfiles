@@ -23,10 +23,13 @@ check "foot opens below the margins" is_desk "$strip" "$desk_strip"
 # The margins are text alone: no rule runs under them at y=40, where the ink one was.
 rule=$(grim -s 1 -t ppm -g "200,39 10x3" - | mean_rgb)
 check "no rule runs under the margins ($rule)" is_desk "$rule" "$desk_rule"
-# niri animates a window open, so the edge is polled until the window has settled. A tiled window wears no frame, so foot's own grey 36 36 36 starts right at x=32, the left strut.
-edge_is_foot() { local r g b; edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); read -r r g b <<<"$edge"; ((r >= 30 && r <= 42 && g >= 30 && g <= 42 && b >= 30 && b <= 42)); }
-until_ok 1000 edge_is_foot
-check "niri draws no frame on the focused foot: its own grey starts at x=32 ($edge)" edge_is_foot
+# niri animates a window open, so the edge is polled until the window has settled. The focused window's only frame is a 1 px edge in the dots' line #D0D7DE at x=32, the left strut, with foot's own grey 36 36 36 right after.
+edge_is_line() { local r g b; edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); read -r r g b <<<"$edge"; ((r >= 200 && r <= 216 && g >= 207 && g <= 223 && b >= 214 && b <= 230)); }
+inside_is_foot() { local r g b; inside=$(grim -s 1 -t ppm -g "33,300 1x10" - | mean_rgb); read -r r g b <<<"$inside"; ((r >= 30 && r <= 42 && g >= 30 && g <= 42 && b >= 30 && b <= 42)); }
+until_ok 1000 edge_is_line
+check "niri edges the focused foot in the dots' line at x=32 ($edge)" edge_is_line
+until_ok 1000 inside_is_foot
+check "and foot's own grey starts right inside it ($inside)" inside_is_foot
 
 # Maximized to edges, foot fills the whole output and the margins and the island hide, as for a fullscreen window.
 niri msg action maximize-window-to-edges

@@ -62,7 +62,8 @@ test('the niri fragment sets the paper as background, tiles windows with no fram
   assert.match(kdl, /background-color "#E4E6EA"/);
   assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, /layout \{[^]*?border \{\s*off\s*\}/);
+  // Only the focused window shows an edge, a 1 px line in the dots' own colour, so its size reads while the rest stay one canvas.
+  assert.match(kdl, /layout \{[^]*?border \{\s*on\s*width 1\s*active-color "#D0D7DE"\s*inactive-color "#00000000"\s*\}/);
   assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background false\s*border \{\s*on\s*width 1\s*active-gradient from="#3D5AFE" to="#AAB5F1" angle=135\s*inactive-gradient from="#99A7F3" to="#CBD1ED" angle=135\s*\}\s*shadow \{\s*on\s*softness 0\s*spread 0\s*offset x=0 y=0\s*draw-behind-window true\s*color "#E4E6EAF2"\s*inactive-color "#E4E6EAF2"\s*\}\s*\}/);
   assert.match(kdl, /shadow \{\s*off\s*\}/);
   assert.match(kdl, /geometry-corner-radius 0/);

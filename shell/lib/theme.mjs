@@ -116,6 +116,7 @@ export function renderNiri(t) {
     return glsl ? `\n        custom-shader r"\n${indent(glsl, '            ')}\n        "` : '';
   };
   const animations = Object.entries(MOTION).map(([name, timing]) => `    ${name} {\n        ${timing}${shader(name)}\n    }`).join('\n');
+  // Only the focused window shows an edge, a 1 px line in the dots' own colour, so its size reads as it resizes; the rest stay frameless, one canvas.
   return `layout {
     gaps ${t.niri.gaps}
     background-color "${c.paper}"
@@ -123,7 +124,10 @@ export function renderNiri(t) {
         off
     }
     border {
-        off
+        on
+        width 1
+        active-color "${t.paper?.dot ?? c.line}"
+        inactive-color "#00000000"
     }
     shadow {
         off

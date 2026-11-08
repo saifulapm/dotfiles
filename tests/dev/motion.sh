@@ -86,12 +86,12 @@ artboard() {
   check "a resting magenta window is found" calibrate
   [ -n "$box" ] || return
   read -r x y w h <<<"$box"
-  # The window is square with no frame: the pixel left and right of its magenta is not Artboard's line #D0D7DE but the desk, and its top corners are magenta, no desk showing round a radius.
+  # The focused window is square in its 1 px edge: the pixel left and right of its magenta is Artboard's line #D0D7DE, the dots' colour, and its top corners are magenta, no desk showing round a radius.
   local corner='
     const line = (c) => near(c, [208, 215, 222], 8);
     let x0 = w, y0 = h, x1 = -1;
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (magenta(at(x, y))) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); }
-    return x1 >= 0 && !line(at(x0 - 1, y0 + 20)) && !line(at(x1 + 1, y0 + 20)) && magenta(at(x0, y0)) && magenta(at(x1, y0));'
+    return x1 >= 0 && line(at(x0 - 1, y0 + 20)) && line(at(x1 + 1, y0 + 20)) && magenta(at(x0, y0)) && magenta(at(x1, y0));'
   open_magenta
   wait_until 1000
   t=$(($(now_ms) - t0))
@@ -100,7 +100,7 @@ artboard() {
     grab_test "$x,$y ${w}x$h" "
       return magenta(at(4, 4)) && !magenta(at(w - 5, h - 5));"
   sleep 4
-  check "at rest: square corners and no frame" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
+  check "at rest: square corners in the focused 1 px edge" grab_test "$((x - 40)),$((y - 40)) $((w + 80))x$((h / 2))" "$corner"
   close_window
   until_ok 8000 has_windows 0
 }

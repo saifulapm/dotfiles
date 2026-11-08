@@ -58,9 +58,9 @@ test("each scheme's field is its own: from its paper into a soft wash of its acc
   assert.equal(nord.paper.grade.to, mix(nord.color.paper, nord.color.accent, 0.2).toUpperCase());
 });
 
-test('niri tiles windows with no frame and no gap, square, with no ring and no shadow', () => {
+test('niri tiles windows with no gap, framing only the focused one in the dots\' colour, square, with no ring and no shadow', () => {
   const kdl = renderNiri(designOf(validateColorscheme(artboard())));
-  assert.match(kdl, /layout \{[^]*?border \{\n\s+off\n\s+\}/);
+  assert.match(kdl, /layout \{[^]*?border \{\n\s+on\n\s+width 1\n\s+active-color "#D0D7DE"\n\s+inactive-color "#00000000"\n\s+\}/);
   assert.match(kdl, /focus-ring \{\n\s+off\n\s+\}/);
   assert.match(kdl, /shadow \{\n\s+off\n\s+\}/);
   assert.match(kdl, /geometry-corner-radius 0\n/);
