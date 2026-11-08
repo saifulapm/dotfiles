@@ -63,3 +63,14 @@ test('a machine without the yt-dlp rpm removes no yt-dlp', () => {
   assert.equal(r.status, 0, r.stderr);
   assert.deepEqual(dnf.filter((l) => /yt-dlp/.test(l)), []);
 });
+
+// A listed package dnf first pulled in for another (v1's browserpass brought pass) stays marked as a dependency, so removing that other took it too.
+test('after the install batch every listed package that is installed is marked as asked for', () => {
+  const { r, dnf } = apply({});
+  assert.equal(r.status, 0, r.stderr);
+  const mark = dnf.findIndex((l) => /\bmark user\b/.test(l));
+  assert.ok(mark > dnf.findIndex((l) => /^-y install /.test(l)), dnf.join('\n'));
+  const names = dnf[mark].split(' ').slice(dnf[mark].split(' ').indexOf('user') + 1);
+  for (const n of ['niri', 'quickshell', 'pass', 'pass-otp', 'ffmpeg']) assert.ok(names.includes(n), n);
+  assert.ok(!names.includes('mpv-mpris'), 'a package still missing is not marked');
+});

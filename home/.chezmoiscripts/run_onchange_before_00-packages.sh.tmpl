@@ -66,3 +66,8 @@ for entry in "${from_fusion[@]}"; do
   # Fedora's dnf skips a repo it cannot reach, so with RPM Fusion down this installs ffmpeg-free and exits 0; rpm -q is the check.
   root dnf -y -q install --allowerasing "$name" && rpm -q --quiet "$name" || log "could not install $name from RPM Fusion $fusion"
 done
+
+# dnf leaves a listed package it first pulled in for another (v1's browserpass brought pass) marked as a dependency, so removing that other would take it too; every listed package that is installed is marked as asked for.
+listed=()
+while read -r name _; do rpm -q --quiet "$name" && listed+=("$name"); done <<<"$entries"
+root dnf -y -q mark user "${listed[@]}" >/dev/null || die "could not mark the listed packages as installed on purpose"

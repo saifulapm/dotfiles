@@ -614,6 +614,11 @@ arch = "all"
 why = "renders Markdown in the terminal"
 
 [[package]]
+name = "tealdeer"
+arch = "all"
+why = "tldr, which kak's :tldr opens"
+
+[[package]]
 name = "gum"
 arch = "all"
 why = "prompts and spinners for shell scripts"
@@ -677,6 +682,11 @@ why = "an external monitor's brightness, from Control's Display section"
 name = "pipewire-pulseaudio"
 arch = "all"
 why = "the PulseAudio API Chromium plays sound through"
+
+[[package]]
+name = "pipewire-utils"
+arch = "all"
+why = "pw-dump, pw-metadata, pw-link and pw-record, which Control's audio and the HomePod link use"
 
 [[package]]
 name = "pandoc-cli"

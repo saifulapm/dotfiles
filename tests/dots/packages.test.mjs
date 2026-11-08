@@ -43,9 +43,9 @@ test('the everyday CLI tools are declared for every arch, and eza is not', () =>
   assert.equal(byName.has('bluez-tools'), false);
 });
 
-// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them.
+// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them: pipewire-utils' pw-dump and pw-link for Control's audio and the HomePod, tealdeer's tldr for kak's :tldr.
 test('what the shell and Chromium call is declared, not left to the base image', () => {
-  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli']) {
+  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli', 'pipewire-utils', 'tealdeer']) {
     assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
     assert.match(byName.get(name).why, /\w/, `${name} why`);
   }
