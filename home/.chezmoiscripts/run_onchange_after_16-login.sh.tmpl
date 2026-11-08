@@ -8,4 +8,9 @@ if [[ $(cat "$conf" 2>/dev/null) != "$want" ]]; then
   echo "$want" | root install -D -m 0644 /dev/stdin "$conf" || die "could not write $conf"
   root systemctl daemon-reload 2>/dev/null || true
 fi
+# Fedora 45's preset makes kmscon the console, which conflicts with getty@tty1 and so skips the autologin above; getty takes autovt@ back at the next boot.
+if systemctl -q is-enabled kmsconvt@.service 2>/dev/null; then
+  root systemctl disable kmsconvt@.service >/dev/null 2>&1 || die "could not turn kmscon off"
+  root systemctl enable getty@.service >/dev/null 2>&1 || die "could not give tty1 back to getty"
+fi
 [[ $(getent passwd "$user" | cut -d: -f7) == /usr/bin/fish ]] || root usermod -s /usr/bin/fish "$user" || die "could not make fish the login shell"
