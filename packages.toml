@@ -619,6 +619,21 @@ arch = "all"
 why = "tldr, which kak's :tldr opens"
 
 [[package]]
+name = "NetworkManager-tui"
+arch = "all"
+why = "nmtui, for Wi-Fi from a text console when the desktop is down"
+
+[[package]]
+name = "git-lfs"
+arch = "all"
+why = "clones repos that keep large files in Git LFS"
+
+[[package]]
+name = "podman-compose"
+arch = "all"
+why = "runs a project's compose file on podman"
+
+[[package]]
 name = "gum"
 arch = "all"
 why = "prompts and spinners for shell scripts"
