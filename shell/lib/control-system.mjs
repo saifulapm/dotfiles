@@ -26,6 +26,23 @@ export function routeOf(text) {
   return m ? m[1] : '';
 }
 
+// busctl prints ChargeThresholdSupported, ChargeThresholdEnabled and ChargeEndThreshold a line each ("b true", "u 80"): the limit's end while on, 0 while off, -1 where the battery has none.
+export function chargeLimit(text) {
+  const [supported, enabled, end] = text.trim().split('\n').map((l) => l.trim().split(' ')[1]);
+  if (supported !== 'true') return -1;
+  if (enabled !== 'true') return 0;
+  const n = parseInt(end);
+  return isNaN(n) ? -1 : n;
+}
+
+// UPower owns the limit and keeps it across boots, and polkit lets the active session turn it on or off with no password; its battery is named from the power supply that has a threshold, as UPower names it (macsmc-battery is battery_macsmc_battery). With no argument the command only reads.
+const CHARGE = `for f in /sys/class/power_supply/*/charge_control_end_threshold; do [ -e "$f" ] || exit 0; n=\${f%/*}; break; done
+dev=/org/freedesktop/UPower/devices/battery_$(basename "$n" | tr - _)
+[ -z "$1" ] || busctl --system call org.freedesktop.UPower "$dev" org.freedesktop.UPower.Device EnableChargeThreshold b "$1" || exit 1
+busctl --system get-property org.freedesktop.UPower "$dev" org.freedesktop.UPower.Device ChargeThresholdSupported ChargeThresholdEnabled ChargeEndThreshold`;
+
+export const chargeCommand = (enable) => ['sh', '-c', CHARGE, 'sh', enable === undefined ? '' : String(enable)];
+
 export const ACTIONS = [
   { id: 'lock', title: 'Lock', confirm: false },
   { id: 'logout', title: 'Log out', confirm: true },

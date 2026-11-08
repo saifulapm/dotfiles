@@ -1,6 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncFailing, syncRows } from './control-system.mjs';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncFailing, syncRows, chargeLimit, chargeCommand } from './control-system.mjs';
 
 test('brightnessctl -m -l lines become backlights with their percent', () => {
   const text = 'apple-panel-bl,backlight,36,7%,509\n228600000.dsi.0,backlight,0,0%,255\n';
@@ -71,4 +75,49 @@ test('a forged sync.json reads as units Route can draw, never a TypeError', () =
   assert.equal(syncFailing(units), true);
   assert.deepEqual(syncRows(units).map((r) => r.detail), ['2 failing', 'no error recorded', 'no error recorded']);
   assert.deepEqual(syncRows(parseSync('{"notes":{"ok":true,"lastOk":"x"}}')), [{ title: 'Sync', detail: 'ok' }]);
+});
+
+test("UPower's three properties become the limit while on, 0 while off, -1 where there is none", () => {
+  assert.equal(chargeLimit('b true\nb true\nu 80\n'), 80);
+  assert.equal(chargeLimit('b true\nb false\nu 80\n'), 0);
+  assert.equal(chargeLimit('b false\nb false\nu 100\n'), -1);
+  assert.equal(chargeLimit(''), -1);
+  assert.equal(chargeLimit('b true\nb true\nu x\n'), -1);
+});
+
+test('the charge command reads with no argument, and turns the limit on or off with one', () => {
+  const read = chargeCommand();
+  assert.deepEqual(read.slice(0, 2), ['sh', '-c']);
+  assert.equal(read[3], 'sh');
+  assert.equal(read[4], '');
+  assert.equal(chargeCommand(true)[4], 'true');
+  assert.equal(chargeCommand(false)[4], 'false');
+  assert.match(read[2], /EnableChargeThreshold b "\$1"/);
+  assert.match(read[2], /get-property org\.freedesktop\.UPower "\$dev" org\.freedesktop\.UPower\.Device ChargeThresholdSupported ChargeThresholdEnabled ChargeEndThreshold/);
+});
+
+test('the charge command finds the battery from its threshold file and names it as UPower does', () => {
+  const root = mkdtempSync(join(tmpdir(), 'charge-'));
+  const stubs = join(root, 'stubs');
+  mkdirSync(stubs);
+  writeFileSync(join(stubs, 'busctl'), `#!/bin/sh\necho "$*" >> ${join(root, 'log')}\n[ "$2" = get-property ] && printf 'b true\\nb true\\nu 80\\n'\nexit 0\n`);
+  chmodSync(join(stubs, 'busctl'), 0o755);
+  const supply = join(root, 'macsmc-battery');
+  mkdirSync(supply);
+  writeFileSync(join(supply, 'charge_control_end_threshold'), '80\n');
+  const [cmd, flag, script, name, arg] = chargeCommand(false);
+  const r = spawnSync(cmd, [flag, script.replaceAll('/sys/class/power_supply', root), name, arg], { encoding: 'utf8', env: { PATH: stubs + ':' + process.env.PATH } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(chargeLimit(r.stdout), 80);
+  const log = readFileSync(join(root, 'log'), 'utf8').trim().split('\n');
+  assert.equal(log[0], '--system call org.freedesktop.UPower /org/freedesktop/UPower/devices/battery_macsmc_battery org.freedesktop.UPower.Device EnableChargeThreshold b false');
+  assert.match(log[1], /^--system get-property org\.freedesktop\.UPower \/org\/freedesktop\/UPower\/devices\/battery_macsmc_battery /);
+});
+
+test('with no threshold file the charge command prints nothing and runs no busctl', () => {
+  const root = mkdtempSync(join(tmpdir(), 'charge-'));
+  const [cmd, flag, script, name, arg] = chargeCommand(true);
+  const r = spawnSync(cmd, [flag, script.replaceAll('/sys/class/power_supply', root), name, arg], { encoding: 'utf8', env: { PATH: '/nonexistent:/usr/bin:/bin' } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '');
 });

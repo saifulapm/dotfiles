@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Stands in for busctl's calls to UPower in a nested session, so Control's charge limit never turns the live battery's on or off; the fake starts on at 80, and anything else goes to the next busctl on PATH.
+case " $* " in
+*" org.freedesktop.UPower "*)
+  f=${DOTS_DEV_DIR:?}/charge-limit
+  [ -e "$f" ] || echo true >"$f"
+  case " $* " in *" EnableChargeThreshold b "*) echo "${*: -1}" >"$f" ;; esac
+  case " $* " in *" get-property "*) printf 'b true\nb %s\nu 80\n' "$(cat "$f")" ;; esac
+  exit 0
+  ;;
+esac
+self=$(cd "$(dirname "$0")" && pwd -P)
+PATH=$(tr : '\n' <<<"$PATH" | while read -r d; do [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$self" ] || printf '%s:' "$d"; done)
+exec busctl "$@"

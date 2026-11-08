@@ -16,7 +16,7 @@ Item {
     readonly property var look: V.listLook(theme.tokens)
     // The action waiting for its y, or "".
     property string confirming: ""
-    // The battery's end-of-charge threshold, or -1 where the hardware has none.
+    // The battery's charge limit while it is on, 0 while off, -1 where the hardware has none.
     property int chargeLimit: -1
     // Read once, when Control first opens, not when the warm-up makes it.
     property bool probe: true
@@ -35,7 +35,7 @@ Item {
             }]).concat(chargeLimit >= 0 ? [{
                     id: "limit",
                     title: "Charge limit",
-                    detail: chargeLimit + "%"
+                    detail: chargeLimit > 0 ? chargeLimit + "%" : "off"
                 }] : []).concat([{
                 id: "awake",
                 title: "Stay awake",
@@ -68,6 +68,14 @@ Item {
             PowerProfiles.profile = profiles[(i + (event.key === Qt.Key_H ? profiles.length - 1 : 1)) % profiles.length];
             return true;
         }
+        // Each press turns the limit off or on; one still on its way is not doubled.
+        if (item.id === "limit" && (event.key === Qt.Key_H || event.key === Qt.Key_L || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
+            if (!charge.running) {
+                charge.command = Lib.chargeCommand(chargeLimit === 0);
+                charge.running = true;
+            }
+            return true;
+        }
         // Each press steps off, 30 min, 1 h, 2 h, off.
         if (item.id === "awake" && (event.key === Qt.Key_H || event.key === Qt.Key_L || event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
             Root.State.awakeUntil = Idle.nextAwake(Date.now(), Root.State.awakeUntil);
@@ -98,14 +106,15 @@ Item {
     onVisibleChanged: confirming = ""
     implicitHeight: hint.implicitHeight
 
-    // The threshold changes only by root's hand, so it is read once.
+    // Read when Control first opens, and again after each turn on or off; a turn that fails prints nothing, so the row keeps what it showed.
     Process {
+        id: charge
         running: power.probe
-        command: ["sh", "-c", "cat /sys/class/power_supply/*/charge_control_end_threshold 2>/dev/null | head -1"]
+        command: Lib.chargeCommand()
         stdout: StdioCollector {
             onStreamFinished: {
-                const v = parseInt(text);
-                power.chargeLimit = isNaN(v) ? -1 : v;
+                if (text.trim() !== "")
+                    power.chargeLimit = Lib.chargeLimit(text);
             }
         }
     }

@@ -60,6 +60,22 @@ wtype n
 until_ok 2000 state_is '.confirming == ""'
 check "any other key cancels the confirm" state_is '.confirming == ""'
 
+# The charge limit goes through dev/path's fake UPower, which starts on at 80; only a machine with a threshold has the row.
+if compgen -G '/sys/class/power_supply/*/charge_control_end_threshold' >/dev/null; then
+  live_limit() { cat /sys/class/power_supply/*/charge_control_end_threshold | head -1; }
+  live_before=$(live_limit)
+  select_row "Charge limit"
+  check "Charge limit reads 80% from UPower" state_is '.chargeLimit == 80'
+  wtype -k Return
+  until_ok 2000 state_is '.chargeLimit == 0'
+  check "Enter turns it off" state_is '.chargeLimit == 0'
+  check "through UPower's EnableChargeThreshold" test "$(cat "$DOTS_DEV_DIR/charge-limit")" = false
+  wtype -k Return
+  until_ok 2000 state_is '.chargeLimit == 80'
+  check "and Enter again turns it back on" state_is '.chargeLimit == 80'
+  check "the live battery's limit is untouched ($(live_limit))" test "$(live_limit)" = "$live_before"
+fi
+
 # Stay awake steps off, 30 min, 1 h, 2 h, off, and the idle steps read the same hold.
 awake_in() { state_is --argjson m "$1" '.awakeUntil > 0 and ((.awakeUntil - now * 1000) / 60000 | ceil) == $m'; }
 select_row "Stay awake"
