@@ -1,7 +1,7 @@
 // dots update against a scratch clone, with sudo, dnf, rpm and chezmoi replaced by stubs that log to one file.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
@@ -22,7 +22,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.mise: fail to make mise up exit 1; the stub keeps the real mise out of every run. opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri.
+// opts.mise: fail to make mise up exit 1; the stub keeps the real mise out of every run. opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri; opts.fs: the root's filesystem type, ext4 unless named; opts.snapFail: btrfs fails to snapshot.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -46,7 +46,7 @@ function scratch(opts = {}) {
   stub(
     stubs,
     'dnf',
-    `echo "dnf $* pulled=$(test -f ${repo}/upstream.txt && echo yes || echo no)" >> ${log}\n${opts.upgrade ? `if [ "$1" = upgrade ]; then touch ${state}; fi` : ''}${opts.hang ? `\necho $$ > ${join(root, 'dnf.pid')}\nexec sleep 60` : ''}`,
+    `echo "dnf $* pulled=$(test -f ${repo}/upstream.txt && echo yes || echo no)" >> ${log}\nif [ "$1" = check-upgrade ]; then exit ${opts.upgrade ? 100 : 0}; fi\n${opts.upgrade ? `if [ "$1" = upgrade ]; then touch ${state}; fi` : ''}${opts.hang ? `\necho $$ > ${join(root, 'dnf.pid')}\nexec sleep 60` : ''}`,
   );
   stub(stubs, 'rpm', `if [ -e ${state} ]; then cat ${join(root, 'after')}; else cat ${join(root, 'before')}; fi`);
   stub(stubs, 'chezmoi', `echo "chezmoi $*" >> ${log}\ncat ${join(root, 'chezmoi.out')}`);
@@ -57,11 +57,18 @@ function scratch(opts = {}) {
   stub(stubs, 'claude', `case "$1" in\n--version) echo "$(cat ${version}) (Claude Code)" ;;\nupdate) echo "claude update" >> ${log}; ${claude.fail ? 'exit 1' : `echo ${claude.to} > ${version}`} ;;\nesac`);
   const kernels = opts.kernels ?? ['7.1.13-402.asahi.fc44.aarch64+16k'];
   const modules = join(root, 'modules');
+  const snapshots = join(root, 'snapshots');
+  stub(stubs, 'findmnt', `echo ${opts.fs ?? 'ext4'}`);
+  stub(
+    stubs,
+    'btrfs',
+    `echo "btrfs $*" >> ${log}\ncase "$3" in\nsnapshot) ${opts.snapFail ? 'exit 1' : 'mkdir "$6"'} ;;\ndelete) rmdir "$4" ;;\nesac`,
+  );
   for (const k of kernels) mkdirSync(join(modules, k), { recursive: true });
   stub(stubs, 'uname', `case "$1" in -r) echo ${kernels[0]} ;; -m) echo aarch64 ;; *) exec /usr/bin/uname "$@" ;; esac`);
   stub(stubs, 'pgrep', `[ "$*" = "-x niri" ] && printf '%s\\n' ${(opts.niri ?? []).join(' ')}; exit 0`);
 
-  return { root, repo, log, sudoLog, stubs, modules };
+  return { root, repo, log, sudoLog, stubs, modules, snapshots };
 }
 
 // A second clone pushes a commit upstream, which the scratch repo can fast-forward to.
@@ -74,7 +81,7 @@ const push = (s, name) => {
 const run = (s) =>
   spawnSync(join(s.repo, 'bin/dots'), ['update'], {
     encoding: 'utf8',
-    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_MODULES_DIR: s.modules },
+    env: { PATH: s.stubs + delimiter + process.env.PATH, HOME: s.root, TMPDIR: tmpdir(), DOTS_MODULES_DIR: s.modules, DOTS_SNAPSHOT_DIR: s.snapshots },
   });
 
 const lines = (path) => readFileSync(path, 'utf8').trim().split('\n');
@@ -247,4 +254,49 @@ test('a skills clone that cannot fast-forward is named in the summary, and the u
   const r = run(s);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · skills: pull failed');
+});
+
+// The Fedora 45 upgrade had a way back only because a snapshot was taken by hand.
+test('on btrfs with something to upgrade, a read-only snapshot of / comes before dnf upgrade and the summary names it', () => {
+  const s = scratch({ upgrade: true, fs: 'btrfs' });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  const [snap] = readdirSync(s.snapshots);
+  assert.match(snap, /^dots-\d{8}-\d{6}$/);
+  assert.equal(r.stdout.trim().split('\n').at(-1), `dnf: 2 upgraded · snapshot: ${snap} · pins: 0 changed`);
+  const log = lines(s.log);
+  assert.deepEqual(log.slice(0, 3), ['dnf check-upgrade -q pulled=no', `btrfs -q subvolume snapshot -r / ${join(s.snapshots, snap)}`, 'dnf upgrade -y pulled=no']);
+  for (const c of lines(s.sudoLog).slice(1)) assert.ok(c.startsWith('-n ') || c === '-k', c);
+});
+
+test('on btrfs with nothing to upgrade, no snapshot is taken', () => {
+  const s = scratch({ fs: 'btrfs' });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed');
+  assert.ok(!lines(s.log).some((l) => l.startsWith('btrfs')), 'btrfs never runs');
+});
+
+test('off btrfs, dnf is not asked first and no snapshot is taken', () => {
+  const s = scratch({ upgrade: true });
+  assert.equal(run(s).status, 0);
+  assert.ok(!lines(s.log).some((l) => l.startsWith('btrfs') || l.startsWith('dnf check-upgrade')));
+});
+
+test('the newest three dots snapshots are kept, and one not named dots- is left alone', () => {
+  const s = scratch({ upgrade: true, fs: 'btrfs' });
+  for (const n of ['dots-20261101-090000', 'dots-20261102-090000', 'dots-20261103-090000', 'pre-f45']) mkdirSync(join(s.snapshots, n), { recursive: true });
+  assert.equal(run(s).status, 0);
+  const left = readdirSync(s.snapshots).sort();
+  assert.equal(left.length, 4);
+  assert.deepEqual(left.slice(0, 2), ['dots-20261102-090000', 'dots-20261103-090000']);
+  assert.ok(left.includes('pre-f45'));
+});
+
+test('a failed snapshot stops the update before dnf upgrade', () => {
+  const s = scratch({ upgrade: true, fs: 'btrfs', snapFail: true });
+  const r = run(s);
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /dots: the snapshot failed, so nothing was upgraded/);
+  assert.ok(!lines(s.log).includes('dnf upgrade -y pulled=no'));
 });

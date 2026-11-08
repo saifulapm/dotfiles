@@ -27,8 +27,23 @@ reboot_needed() {
   return 1
 }
 
+# A read-only snapshot of / before dnf changes it, printed by name; only on btrfs and only when dnf has something to upgrade, so an update with nothing to do never pushes out one worth keeping. The newest three dots- snapshots stay, and only tests move their dir.
+snapshot() {
+  local dir=${DOTS_SNAPSHOT_DIR:-/.snapshots} name rc=0 snaps i
+  [[ $(findmnt -no FSTYPE /) == btrfs ]] || return 0
+  sudo -n dnf check-upgrade -q >/dev/null || rc=$?
+  ((rc == 100)) || return 0
+  name=dots-$(date +%Y%m%d-%H%M%S)
+  sudo -n mkdir -p "$dir" && sudo -n btrfs -q subvolume snapshot -r / "$dir/$name" >/dev/null || return 1
+  snaps=("$dir"/dots-*)
+  for ((i = 0; i < ${#snaps[@]} - 3; i++)); do
+    sudo -n btrfs -q subvolume delete "${snaps[i]}" >/dev/null || return 1
+  done
+  echo "$name"
+}
+
 main() {
-  local repo tmp
+  local repo tmp snap
   repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
   tmp=$(mktemp -d -t dots-update-XXXX)
 
@@ -42,6 +57,7 @@ main() {
   trap "kill $! 2>/dev/null; sudo -k; rm -rf '$tmp'" EXIT
 
   installed >"$tmp/before" || die "rpm query failed"
+  snap=$(snapshot) || die "the snapshot failed, so nothing was upgraded"
   sudo -n dnf upgrade -y || die "dnf upgrade failed"
   installed >"$tmp/after" || die "rpm query failed"
 
@@ -72,7 +88,7 @@ main() {
   local upgraded pins
   upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
   pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
-  echo "dnf: $upgraded upgraded · pins: $pins changed$skills$mise$claude$(reboot_needed && echo ' · reboot: needed')"
+  echo "dnf: $upgraded upgraded${snap:+ · snapshot: $snap} · pins: $pins changed$skills$mise$claude$(reboot_needed && echo ' · reboot: needed')"
 }
 
 # git pull can rewrite this file while bash reads it, so main runs and exits on one line.
