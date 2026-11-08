@@ -9,24 +9,25 @@ import { join } from 'node:path';
 const repo = new URL('../../', import.meta.url).pathname;
 const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_before_00-packages.sh.tmpl'), 'utf8');
 
-// remi-release answers with $REMI and yt-dlp with $YTDLP; mpv-mpris is the one package missing, so the install batch runs; everything else is installed.
+// remi-release answers with $REMI, yt-dlp with $YTDLP and ffmpeg with $FFMPEG; mpv-mpris is the one package missing, so the install batch runs; everything else is installed.
 const RPM = `#!/bin/sh
 [ "$1" = -E ] && { echo 44; exit 0; }
 for a; do last=$a; done
 [ "$last" = remi-release ] && exit "$REMI"
 [ "$last" = yt-dlp ] && exit "$YTDLP"
 [ "$last" = mpv-mpris ] && exit 1
+[ "$last" = ffmpeg ] && exit "$FFMPEG"
 exit 0
 `;
 
-function apply({ remi = false, ytdlp = false }) {
+function apply({ remi = false, ytdlp = false, ffmpeg = true }) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-packages-')));
   mkdirSync(join(home, 'stubs'));
   writeFileSync(join(home, 'stubs/rpm'), RPM, { mode: 0o755 });
   writeFileSync(join(home, 'stubs/dnf'), '#!/bin/sh\necho "$*" >> "$HOME/dnf.log"\n', { mode: 0o755 });
   writeFileSync(join(home, 'stubs/sudo'), '#!/bin/sh\n[ "$1" = -n ] && shift\nexec "$@"\n', { mode: 0o755 });
   const env = {
-    PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home, REMI: remi ? '0' : '1', YTDLP: ytdlp ? '0' : '1',
+    PATH: `${home}/stubs:/usr/bin:/bin`, HOME: home, REMI: remi ? '0' : '1', YTDLP: ytdlp ? '0' : '1', FFMPEG: ffmpeg ? '0' : '1',
     XDG_CONFIG_HOME: join(home, '.config'), XDG_DATA_HOME: join(home, '.local/share'), XDG_CACHE_HOME: join(home, '.cache'),
   };
   const rendered = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', repo, 'execute-template'], { input: script, encoding: 'utf8', env });
@@ -73,4 +74,12 @@ test('after the install batch every listed package that is installed is marked a
   const names = dnf[mark].split(' ').slice(dnf[mark].split(' ').indexOf('user') + 1);
   for (const n of ['niri', 'quickshell', 'pass', 'pass-otp', 'ffmpeg']) assert.ok(names.includes(n), n);
   assert.ok(!names.includes('mpv-mpris'), 'a package still missing is not marked');
+});
+
+// Fedora 45's rpmfusion-free-release puts its repo files in /usr/share/dnf5/repos.d, so a check for /etc/yum.repos.d/rpmfusion-free.repo skipped ffmpeg on every fresh machine.
+test("with RPM Fusion's release package installed, a missing ffmpeg is installed from it, wherever the release keeps its repo files", () => {
+  const { r, dnf } = apply({ ffmpeg: false });
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(dnf.includes('-y -q install --allowerasing ffmpeg'), dnf.join('\n'));
+  assert.ok(!dnf.some((l) => l.includes('rpmfusion-free-release')), 'the release is installed, so it is not installed again');
 });

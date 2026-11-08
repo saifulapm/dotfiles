@@ -21,7 +21,8 @@ from_fusion=()
 while read -r name copr rpm fusion; do
   # Fedora's ffmpeg-free also answers to "ffmpeg", so an RPM Fusion package stays out of the batch, where dnf would quietly pick the Fedora one.
   if [[ $fusion != - ]]; then
-    if [[ ! -e /etc/yum.repos.d/rpmfusion-$fusion.repo ]]; then
+    # The release package is the check: Fedora 45's keeps its repo files in /usr/share/dnf5/repos.d, not /etc/yum.repos.d.
+    if ! rpm -q --quiet "rpmfusion-$fusion-release"; then
       log "enabling RPM Fusion $fusion"
       # download1 is RPM Fusion's own server; mirrors.rpmfusion.org can redirect to a mirror that times out.
       root dnf -y -q install "https://download1.rpmfusion.org/$fusion/fedora/rpmfusion-$fusion-release-$(rpm -E %fedora).noarch.rpm" ||
@@ -61,7 +62,7 @@ fi
 # --allowerasing replaces the -free libraries mpv and wf-recorder pulled in, as dnf swap would, and works whether or not they are there.
 for entry in "${from_fusion[@]}"; do
   read -r name fusion <<<"$entry"
-  [[ -e /etc/yum.repos.d/rpmfusion-$fusion.repo ]] || continue
+  rpm -q --quiet "rpmfusion-$fusion-release" || continue
   log "installing $name from RPM Fusion $fusion"
   # Fedora's dnf skips a repo it cannot reach, so with RPM Fusion down this installs ffmpeg-free and exits 0; rpm -q is the check.
   root dnf -y -q install --allowerasing "$name" && rpm -q --quiet "$name" || log "could not install $name from RPM Fusion $fusion"
