@@ -45,3 +45,25 @@ test('power_save=0 is installed only where snd_hda_intel is loaded, and never in
   assert.ok(script.indexOf('systemd-detect-virt -q --container') < install, 'a container stops before the option');
   assert.match(script, /printf 0 \| root tee \/sys\/module\/snd_hda_intel\/parameters\/power_save/);
 });
+
+// The template rendered as chezmoi would on the named machine.
+function render(file, machine) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'audio-render-')));
+  const config = join(root, 'chezmoi.toml');
+  writeFileSync(config, `[data]\n    machine = "${machine}"\n`);
+  const r = spawnSync('chezmoi', ['--config', config, '--source', repo, 'execute-template'], { input: read(file), encoding: 'utf8', env: { PATH: process.env.PATH, HOME: root } });
+  assert.equal(r.status, 0, r.stderr);
+  return r.stdout;
+}
+
+test("the Macs name asahi-audio's speakers, microphone, headphones and headset microphone plainly, and the NUC gets no file", () => {
+  const file = 'home/dot_config/pipewire/pipewire.conf.d/asahi-device-names.conf.tmpl';
+  for (const machine of ['macbook-m2', 'mac-mini-m2']) {
+    const conf = render(file, machine);
+    assert.match(conf, /node\.name = "~\^audio_effect\\\\\.j\[0-9\]\+-convolver\$" \} \]\n\s+actions = \{ update-props = \{ node\.description = "MacBook Speakers" \} \}/, machine);
+    assert.match(conf, /effect_output\\\\\.j\[0-9\]\+-mic\$" \} \]\n\s+actions = \{ update-props = \{ node\.description = "MacBook Microphone" \} \}/, machine);
+    assert.match(conf, /HiFi__Headphones__sink" \} \]\n\s+actions = \{ update-props = \{ node\.description = "Headphones" \} \}/, machine);
+    assert.match(conf, /HiFi__Headset__source" \} \]\n\s+actions = \{ update-props = \{ node\.description = "Headset Microphone" \} \}/, machine);
+  }
+  assert.equal(render(file, 'nuc').trim(), '');
+});

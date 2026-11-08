@@ -1,0 +1,22 @@
+{{- /* Only the Macs have asahi-audio's devices, so the NUC renders an empty file, which chezmoi leaves out. */ -}}
+{{- if hasPrefix "mac" (get . "machine") -}}
+## Control and the island name the built-in audio as macOS does, not by asahi-audio's board code ("MacBook Pro J493 Speakers"); WirePlumber loads the DSP graphs whole, so only the daemon's node.rules reach their nodes.
+node.rules = [
+  {
+    matches = [ { node.name = "~^audio_effect\\.j[0-9]+-convolver$" } ]
+    actions = { update-props = { node.description = "MacBook Speakers" } }
+  }
+  {
+    matches = [ { node.name = "~^effect_output\\.j[0-9]+-mic$" } ]
+    actions = { update-props = { node.description = "MacBook Microphone" } }
+  }
+  {
+    matches = [ { node.name = "alsa_output.platform-sound.HiFi__Headphones__sink" } ]
+    actions = { update-props = { node.description = "Headphones" } }
+  }
+  {
+    matches = [ { node.name = "alsa_input.platform-sound.HiFi__Headset__source" } ]
+    actions = { update-props = { node.description = "Headset Microphone" } }
+  }
+]
+{{ end -}}
