@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, outputWorkspaces, columnPosition, edgeToEdge, configNotifies, reconnected } from './niri.mjs';
+import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, outputWorkspaces, columnPosition, edgeToEdge, covered, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -247,4 +247,14 @@ test('a window focused long enough takes its new focus timestamp', () => {
   const state = reduce(initial, { WindowsChanged: { windows: [{ id: 1, pid: 300, focus_timestamp: { secs: 1, nanos: 0 } }, { id: 2, pid: 300, focus_timestamp: null }] } });
   const after = reduce(state, { WindowFocusTimestampChanged: { id: 2, focus_timestamp: { secs: 9, nanos: 5 } } });
   assert.deepEqual(after.windows.map((w) => w.focus_timestamp), [{ secs: 1, nanos: 0 }, { secs: 9, nanos: 5 }]);
+});
+
+test("an output is covered while its shown workspace holds a window, tiled or floating, and bare once it holds none", () => {
+  const ws = (id, output, active) => ({ id, idx: id, output, is_active: active, is_focused: false, is_urgent: false, active_window_id: null });
+  const win = (id, workspace_id) => ({ id, workspace_id, app_id: 'foot', title: '', layout: { pos_in_scrolling_layout: null, tile_size: [800, 600] } });
+  const state = { workspaces: [ws(1, 'DP-1', true), ws(2, 'DP-1', false), ws(3, 'HDMI-A-1', true)], windows: [win(10, 2)], overview: false, casts: [], configFailed: false };
+  assert.equal(covered(state, 'DP-1'), false, 'the window sits on a workspace not shown');
+  assert.equal(covered(Object.assign({}, state, { windows: [win(10, 1)] }), 'DP-1'), true);
+  assert.equal(covered(Object.assign({}, state, { windows: [win(10, 1)] }), 'HDMI-A-1'), false);
+  assert.equal(covered(initial, 'DP-1'), false, 'before niri has said anything');
 });

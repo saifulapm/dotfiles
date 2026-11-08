@@ -36,11 +36,18 @@ export function validateColorscheme(doc) {
   return Object.assign({}, meta, { color: Object.assign({}, color, { ansi: [...color.ansi] }), syntax: Object.assign({}, syntax) });
 }
 
-// The frame: the line, moved toward ink until it shows at 1.4:1 on the surface, so no scheme's windows and cards go frameless.
+// The frame: the line, moved toward ink until it shows at 1.4:1 on the surface, so no scheme's floating windows and cards go frameless.
 function frameOf(c) {
   let share = 0;
   while (share < 1 && contrast(mix(c.line, c.ink, share), c.surface) < 1.4) share = Math.round((share + 0.02) * 100) / 100;
   return share ? mix(c.line, c.ink, share).toUpperCase() : c.line;
+}
+
+// The field, in the scheme's own magenta and blue: one diagonal grade of the two over the paper, which the desk draws and every window shows through its veil.
+function fieldOf(c, mode) {
+  const up = (h) => h.toUpperCase();
+  const share = mode === 'dark' ? 0.2 : 0.14;
+  return { grade: { from: up(mix(c.paper, c.ansi[5], share)), to: up(mix(c.paper, c.ansi[4], share)) } };
 }
 
 // The design system: Artboard's dots, geometry and spring, square, a quiet 1 px line frame on every window and surface, no shadow, Maple Mono in the plain voice.
@@ -50,10 +57,10 @@ export function designOf(s) {
     color: s.color,
     syntax: s.syntax,
     primitive: { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' },
-    paper: { spacing: 16, dot: s.color.line },
+    paper: Object.assign({ spacing: 16, dot: s.color.line }, fieldOf(s.color, s.variant)),
     type: { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 },
     niri: {
-      gaps: 28, border: 1, border_inactive: frameOf(s.color),
+      gaps: 0, border: 1, border_inactive: frameOf(s.color),
       tab_position: 'top', tab_width: 4, tab_gap: 8, tab_length: 0.3, tab_gaps: 8,
     },
   };

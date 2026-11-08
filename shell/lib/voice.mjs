@@ -19,13 +19,21 @@ const ARTBOARD = {
   tint: '#EEF1FF', deep: '#2638C9', tile: '#F2F3F6', field: '#F6F7F9', thumb: '#E9ECF1', rule: '#E3E6EB', bar: '#6C83FF', online: '#1E8E5A', outline: '#8A909B', warn: '#B4380B', warnChip: '#FFF1E8', strong: '#2B2F36', card: '#FFFFFF', island: { head: '#A3A9B4', body: '#C9CED6', summary: '#FFFFFF', tile: '#2B2F36' },
 };
 
-// A colour moved toward another, a step at a time, until it reads at 4.5:1 on its ground; a scheme's ink always does on its surface, so the walk ends.
-export function readable(fg, bg, toward) {
+// A colour moved toward another, a step at a time, until it reads at min (4.5:1 unless told) on its ground; a scheme's ink always does on its surface, so the walk ends.
+export function readable(fg, bg, toward, min = 4.5) {
   for (let share = 0; share <= 1; share = Math.round((share + 0.05) * 100) / 100) {
     const c = share ? mix(fg, toward, share).toUpperCase() : fg;
-    if (contrast(c, bg) >= 4.5) return c;
+    if (contrast(c, bg) >= min) return c;
   }
   return toward;
+}
+
+// A word on the desk sits on the paper or anywhere on its field, so it moves toward white on a dark scheme, black on a light one, until it reads at min on all three; each step away only adds contrast on every ground, so one pass per ground holds for all. Before the theme loads it is left as it is.
+export function onDesk(tokens, hex, min = 4.5) {
+  if (!tokens) return hex;
+  const grounds = [tokens.color.paper].concat(tokens.paper?.grade ? [tokens.paper.grade.from, tokens.paper.grade.to] : []);
+  const toward = tokens.mode === 'dark' ? '#FFFFFF' : '#000000';
+  return grounds.reduce((x, g) => readable(x, g, toward, min), hex);
 }
 
 // What words on the tint walk toward: the ink where it reads there at 4.5:1, else the ink moved on toward black or white until it does.
@@ -321,7 +329,9 @@ export function listLook(tokens) {
 
 // How the margins read under a token set: Page 03, the app and title, an accent dot before the goal, and the date.
 export function marginLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
+  // The margins sit on the desk, so each word reads on its paper and its field.
+  const raw = (tokens || UNTHEMED).color;
+  const c = Object.assign({}, raw, { ink: onDesk(tokens, raw.ink), muted: onDesk(tokens, raw.muted), accent: onDesk(tokens, raw.accent) });
   // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
   const words = (s) => line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
   const look = {

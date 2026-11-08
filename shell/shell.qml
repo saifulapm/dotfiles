@@ -116,6 +116,7 @@ ShellRoot {
             screen: modelData
             theme: themeService
             passage: root.passage
+            covered: root.desk?.niri.covered(modelData.name) ?? false
             onFirstFrame: {
                 if (root.firstFrameMs !== null)
                     return;

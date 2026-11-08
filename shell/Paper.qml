@@ -12,6 +12,8 @@ PanelWindow {
     required property var theme
     // The day's passage, which shell.qml makes after the first frame; each sheet draws it.
     property var passage: null
+    // Whether this output's shown workspace holds a window, which hides the passage.
+    property bool covered: false
     property bool swapped: false
 
     // The back sheet takes each new theme, so the sheet on screen never rebuilds its shader.
@@ -168,6 +170,7 @@ PanelWindow {
         Loader {
             id: passageLoader
             anchors.fill: parent
+            visible: !paper.covered
             active: sheet.tokens !== null && paper.passage !== null && paper.passage.text !== null
 
             sourceComponent: PaperPassage {

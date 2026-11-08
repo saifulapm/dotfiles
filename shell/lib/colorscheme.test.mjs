@@ -40,10 +40,10 @@ test('ink on surface under 4.5:1 is refused with contrast in the message', () =>
   assert.throws(() => validateColorscheme(doc), /contrast/);
 });
 
-test('every scheme wears the one design: dots in line, square, ink frame, no shadow, Maple Mono, plain, spring', () => {
+test('every scheme wears the one design: dots in line on a field of its magenta and blue, square, ink frame, no shadow, Maple Mono, plain, spring', () => {
   const t = designOf(validateColorscheme(artboard()));
   assert.deepEqual(t.primitive, { paper: 'dots', frame: 'line', shadow: 'none', corner: 'square', motion: 'spring' });
-  assert.deepEqual(t.paper, { spacing: 16, dot: '#D0D7DE' });
+  assert.deepEqual(t.paper, { spacing: 16, dot: '#D0D7DE', grade: { from: '#D6D1E8', to: '#CDD2ED' } });
   assert.deepEqual(t.type, { display: 'Maple Mono', ui: 'Maple Mono', mono: 'Maple Mono', voice: 'plain', scale: 1 });
   assert.equal(t.mode, 'light');
   assert.equal(t.name, 'artboard');
@@ -51,13 +51,13 @@ test('every scheme wears the one design: dots in line, square, ink frame, no sha
   assert.doesNotThrow(() => validateTheme(Object.assign({}, t, { meta: { name: t.name, mode: t.mode } })));
 });
 
-test('niri frames every window in line, focused or not, 1 px, square, with no ring and no shadow', () => {
+test('niri tiles windows with no frame and no gap, square, with no ring and no shadow', () => {
   const kdl = renderNiri(designOf(validateColorscheme(artboard())));
-  assert.match(kdl, /border \{\n\s+on\n\s+width 1\n\s+active-color "#D0D7DE"\n\s+inactive-color "#D0D7DE"\n\s+\}/);
+  assert.match(kdl, /layout \{[^]*?border \{\n\s+off\n\s+\}/);
   assert.match(kdl, /focus-ring \{\n\s+off\n\s+\}/);
   assert.match(kdl, /shadow \{\n\s+off\n\s+\}/);
   assert.match(kdl, /geometry-corner-radius 0\n/);
-  assert.match(kdl, /gaps 28\n/);
+  assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /background-color "#E4E6EA"/);
   assert.match(kdl, /spring damping-ratio=0\.72 stiffness=380/);
 });

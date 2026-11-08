@@ -187,17 +187,17 @@ test('the kind label reads in sentence case over the reference as written', () =
   assert.deepEqual(P.voiced('quote', 'Walt Disney'), { label: 'Quote', ref: 'Walt Disney' });
 });
 
-const tokens = { name: 'artboard', color: { ink: '#111', muted: '#555', line: '#ccc', accent: '#a00', danger: '#fb4', paper: '#eee', surface: '#fff' }, type: { display: 'Maple Mono', ui: 'Maple Mono' } };
+const tokens = { name: 'artboard', mode: 'light', color: { ink: '#111111', muted: '#555555', line: '#CCCCCC', accent: '#AA0000', danger: '#FFBB44', paper: '#EEEEEE', surface: '#FFFFFF' }, type: { display: 'Maple Mono', ui: 'Maple Mono' } };
 
 test('the passage draws on the bare paper: its label, right-aligned Arabic, mono English and a muted reference, its Bangla in Noto Sans Bengali', () => {
   const l = P.look(tokens);
   assert.deepEqual([l.width, l.pad, l.gap], [992, [64, 77, 51], 29]);
-  assert.deepEqual(l.label, { font: 'Maple Mono', size: 18, color: '#a00' });
+  assert.deepEqual(l.label, { font: 'Maple Mono', size: 18, color: '#AA0000' });
   assert.deepEqual(l.ar, { size: 74 });
   assert.deepEqual(l.en, { font: 'Maple Mono', size: 29, height: 1.55 });
   assert.equal(l.rule, undefined);
-  assert.deepEqual(l.ref, { font: 'Maple Mono', size: 19, color: '#555' });
-  assert.deepEqual(l.pron, { font: 'Noto Sans Bengali', size: 24, height: 1.6, color: '#555' });
+  assert.deepEqual(l.ref, { font: 'Maple Mono', size: 19, color: '#555555' });
+  assert.deepEqual(l.pron, { font: 'Noto Sans Bengali', size: 24, height: 1.6, color: '#555555' });
   assert.deepEqual(l.bn, { font: 'Noto Sans Bengali', size: 30, height: 1.6 });
   assert.deepEqual(l.bnRef, { font: 'Noto Sans Bengali', size: 21 });
 });

@@ -119,6 +119,12 @@ export function edgeToEdge(state, output, width) {
   return !!win && win.layout.tile_size[0] >= width - 1;
 }
 
+// Whether the output's shown workspace holds a window: the desk's passage hides then, since a terminal's clear ground would show it under the words.
+export function covered(state, output) {
+  const ws = state.workspaces.find((w) => w.output === output && w.is_active);
+  return !!ws && state.windows.some((w) => w.workspace_id === ws.id);
+}
+
 export function focusedOutput(state) {
   return state.workspaces.find((w) => w.is_focused)?.output ?? null;
 }

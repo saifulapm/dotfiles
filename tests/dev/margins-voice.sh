@@ -39,7 +39,7 @@ mean_at() { grim -s 1 -t ppm -g "$1" - | mean_rgb; }
 dot_geo() { margins | jq -r '.drawn.dotBox | "\(.x + 2 | round),\(.y + 2 | round) 2x2"'; }
 until_ok 3000 eval 'margins | jq -e ".drawn.right | startswith(\"Ship v2 · 3d \")" >/dev/null 2>&1'
 check "the goal reads Ship v2 · 3d in ink #15171B ($(margins | jq -c '[.drawn.right, .drawn.goalColor]'))" state_is '(.drawn.right | startswith("Ship v2 · 3d ")) and .drawn.goalColor == "#15171b"'
-check "the goal's dot is the accent #3D5AFE ($(mean_at "$(dot_geo)"))" near "$(mean_at "$(dot_geo)")" "61 90 254" 8
+check "the goal's dot is the accent, moved to read on the desk, #3249CE ($(mean_at "$(dot_geo)"))" near "$(mean_at "$(dot_geo)")" "50 73 206" 8
 
 # A title and a goal can be any length; each elides 8 px short of the island.
 node --input-type=module - "$repo/shell/lib/goals.mjs" >"$store.tmp" <<'JS'

@@ -27,6 +27,10 @@ Scope {
         return N.edgeToEdge(state, output, width);
     }
 
+    function covered(output) {
+        return N.covered(state, output);
+    }
+
     function shares(ownPid) {
         return N.shares(state, ownPid);
     }

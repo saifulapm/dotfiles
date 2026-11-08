@@ -31,7 +31,8 @@ test('the shell tokens name the one design and the scheme\'s light or dark', (t)
   assert.equal(shell.type.voice, 'plain');
   assert.equal(shell.color.paper, '#E4E6EA');
   assert.equal(shell.color.surface, '#FFFFFF');
-  assert.match(readFileSync(join(out, 'foot.ini'), 'utf8'), /^background=FFFFFF$/m);
+  // The terminal sits in the paper, not on a surface card.
+  assert.match(readFileSync(join(out, 'foot.ini'), 'utf8'), /^background=E4E6EA$/m);
   const config = join(state, 'config.kdl');
   writeFileSync(config, `include "${join(out, 'niri.kdl')}"\n`);
   execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });

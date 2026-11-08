@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
 import { loadScheme, schemeNames } from './colorscheme-file.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
 const light = loadScheme('github-light');
@@ -404,4 +404,34 @@ test("the coding agents' borders, helix's split and yazi's frame are the quiet f
     assert.match(renderHelix(t), new RegExp(`^"ui.window" = "${frame}"$`, 'm'), `${name} helix`);
     assert.match(renderYazi(t), new RegExp(`^border_style = \\{ fg = "${frame}" \\}$`, 'm'), `${name} yazi`);
   }
+});
+
+test("a terminal's theme takes the paper as its ground and leaves the theme itself alone", () => {
+  const t = loadScheme('gruvbox-dark');
+  assert.equal(termTheme(t).color.surface, t.color.paper);
+  assert.equal(t.color.surface, '#282828');
+});
+
+test('a word that already reads on the paper and the field stays its own colour', () => {
+  assert.equal(termTheme(loadScheme('gruvbox-dark')).color.ink, '#EBDBB2');
+  assert.equal(termTheme(loadScheme('catppuccin-mocha')).syntax.keyword, '#CBA6F7');
+});
+
+// A terminal is clear, so its words sit on the paper or anywhere on the field; each must read on all three.
+test("every scheme's terminal words read on its paper and on both ends of its field: text at 4.5:1, a comment and the ANSI hues at 3:1", () => {
+  for (const n of schemeNames()) {
+    const t = loadScheme(n);
+    const term = termTheme(t);
+    const c = term.color;
+    for (const ground of [t.color.paper, t.paper.grade.from, t.paper.grade.to]) {
+      const floor = (what, hex, min) => assert.ok(contrast(hex, ground) >= min, `${n} ${what} ${hex} on ${ground}: ${contrast(hex, ground).toFixed(2)}`);
+      for (const k of ['ink', 'muted', 'accent', 'danger', 'ok']) floor(k, c[k], 4.5);
+      for (const [k, v] of Object.entries(term.syntax)) floor(`syntax.${k}`, v, k === 'comment' ? 3 : 4.5);
+      c.ansi.forEach((v, i) => { if (![0, 7, 15].includes(i)) floor(`ansi ${i}`, v, 3); });
+    }
+  }
+});
+
+test("one-light's grey paper darkens its terminal accent until it reads", () => {
+  assert.equal(termTheme(loadScheme('one-light')).color.accent, '#214490');
 });

@@ -57,18 +57,25 @@ test('rendered tokens check out, and a bad colour in them is refused by name', (
   assert.throws(() => checkTokens({ ...t, color: { ...t.color, paper: 'notacolor' } }), /color\.paper/);
 });
 
-test('the niri fragment sets the paper as background, frames every window 1 px in the line colour, focused or not, square, with no ring or shadow', () => {
+test('the niri fragment sets the paper as background, tiles windows with no frame and no gap so they are sections of one canvas, backs a floating one in solid paper, square, with no ring or shadow', () => {
   const kdl = renderNiri(artboard);
   assert.match(kdl, /background-color "#E4E6EA"/);
+  assert.match(kdl, /gaps 0\n/);
   assert.match(kdl, /focus-ring \{\s*off\s*\}/);
-  assert.match(kdl, new RegExp(`border \\{\\s*on\\s*width 1\\s*active-color "${artboard.color.line}"\\s*inactive-color "${artboard.color.line}"`));
+  assert.match(kdl, /layout \{[^]*?border \{\s*off\s*\}/);
+  assert.match(kdl, /window-rule \{\s*match is-floating=true\s*draw-border-with-background true\s*border \{\s*on\s*width 1\s*active-color "#E4E6EA"\s*inactive-color "#E4E6EA"\s*\}\s*\}/);
   assert.match(kdl, /shadow \{\s*off\s*\}/);
   assert.match(kdl, /geometry-corner-radius 0/);
 });
 
-test('windows sit 56 px down and 32 px in, clear of the margins, with niri drawing their frames', () => {
+// niri dims no window: a terminal's clear ground is foot's own, and focus shows in its cursor and the margin's title.
+test('no window fades: an unfocused one draws as the focused one does', () => {
+  assert.doesNotMatch(renderNiri(artboard), /opacity/);
+});
+
+test('windows sit 56 px down and 32 px in, clear of the margins', () => {
   const kdl = renderNiri(artboard);
-  assert.match(kdl, /struts \{\s*top 28\s*bottom 0\s*left 4\s*right 4\s*\}/);
+  assert.match(kdl, /struts \{\s*top 56\s*bottom 28\s*left 32\s*right 32\s*\}/);
   assert.match(kdl, /^prefer-no-csd$/m);
 });
 
@@ -144,6 +151,11 @@ test('foot\'s own chrome takes the scheme too: cursor, selection, URLs, labels, 
   assert.match(ini, /^selection-background=83A598$/m);
   assert.match(ini, /^urls=83A598$/m);
   assert.match(ini, /^regular1=FA5547$/m);
+});
+
+test("a terminal is clear, so its words sit on the desk, and an app's cells in the ground colour clear too", () => {
+  const ini = renderFoot(artboard);
+  assert.match(ini, /^\[colors-light\]\nbackground=FFFFFF\nalpha=0\.0\nalpha-mode=matching$/m);
 });
 
 test('the footclient overrides say what the fragment says, one per line', () => {

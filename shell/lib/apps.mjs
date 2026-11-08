@@ -1,7 +1,7 @@
 // Renders the per-app fragments (tmux, kak, helix, yazi, fish, GTK, Chromium, mpv, zathura, imv, and the claude, pi and amx TUIs) from a validated theme; pure, no object spread.
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
-import { plainTones, readable } from './voice.mjs';
+import { onDesk, plainTones, readable } from './voice.mjs';
 
 const lower = (s) => s.toLowerCase();
 const rgb = (s) => `rgb:${lower(s).slice(1)}`;
@@ -14,6 +14,16 @@ const inkShare = (ink, surface, x, share) => {
   return Math.max(0, s);
 };
 
+// The theme as a terminal and the apps inside it draw it: the ground is the paper and the terminal is clear, so each word sits on the desk and reads there as onDesk moves it (4.5:1; a comment and the ANSI hues 3:1).
+export function termTheme(t) {
+  const c = t.color;
+  const lift = (hex, min) => onDesk(t, hex, min);
+  const color = Object.assign({}, c, { surface: c.paper, ansi: c.ansi.map((v, i) => ([0, 7, 15].includes(i) ? v : lift(v, 3))) });
+  for (const k of ['ink', 'muted', 'accent', 'danger', 'ok']) color[k] = lift(c[k], 4.5);
+  const syntax = {};
+  for (const [k, v] of Object.entries(t.syntax)) syntax[k] = lift(v, k === 'comment' ? 3 : 4.5);
+  return Object.assign({}, t, { color, syntax });
+}
 
 // The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: an accent dot before the current window.
 export function renderTmux(t) {

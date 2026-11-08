@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
+import { contrast } from './theme.mjs';
 import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
@@ -247,12 +248,25 @@ test('the top-right margin reads Ship v2 · 3d Wi-Fi 82% Sun 18 Oct, a sync fail
   assert.deepEqual([a.goal({ title: 'Read', left: null }), a.goal(null), a.mail(3), a.mail(0)], ['Read', '', 'mail 3', '']);
 });
 
-test("the margins draw the number, goal and mail in the scheme's ink, its tail and date muted and its dot in the accent, all of nothing else", () => {
+test("the margins draw the number, goal and mail in the scheme's ink, its tail and date muted and its dot in the accent, each moved until it reads on the desk, all of nothing else", () => {
   assert.deepEqual(data(margin('artboard')), {
-    numberColor: '#15171B', numberWeight: 600, tailColor: '#57606A', goalColor: '#15171B', goalWeight: 500, dot: true, dotColor: '#3D5AFE', mailColor: '#15171B', mailWeight: 500, dateColor: '#57606A', spacing: 16,
+    numberColor: '#15171B', numberWeight: 600, tailColor: '#535B65', goalColor: '#15171B', goalWeight: 500, dot: true, dotColor: '#3249CE', mailColor: '#15171B', mailWeight: 500, dateColor: '#535B65', spacing: 16,
   });
   const g = margin('gruvbox-dark');
-  assert.deepEqual([g.numberColor, g.tailColor, g.goalColor, g.dotColor, g.mailColor, g.dateColor], ['#EBDBB2', '#A89984', '#EBDBB2', '#83A598', '#EBDBB2', '#A89984']);
+  assert.deepEqual([g.numberColor, g.tailColor, g.goalColor, g.dotColor, g.mailColor, g.dateColor], ['#EBDBB2', '#AC9E8A', '#EBDBB2', '#83A598', '#EBDBB2', '#AC9E8A']);
+});
+
+// The margins sit on the desk, which is the paper under a field of the scheme's two hues.
+test("every scheme's margin words read at 4.5:1 on its paper and on both ends of its field", () => {
+  for (const n of SCHEMES) {
+    const t = schemeTokens(n);
+    const m = margin(n);
+    for (const ground of [t.color.paper, t.paper.grade.from, t.paper.grade.to]) {
+      for (const k of ['numberColor', 'tailColor', 'goalColor', 'dotColor', 'mailColor', 'dateColor']) {
+        assert.ok(contrast(m[k], ground) >= 4.5, `${n} ${k} ${m[k]} on ${ground}: ${contrast(m[k], ground).toFixed(2)}`);
+      }
+    }
+  }
 });
 
 // A window's title is its file's name, which anyone who sends a file controls: a newline stacked a second line under the margin rule, and ESC or BEL drew tofu.
@@ -273,9 +287,9 @@ test('the focused column reads 2 / 3 after the workspace number, and a lone colu
 test('the urgency marks are accent dots before ink numbers, at most three, then a count of the rest, set off from the title', () => {
   const a = margin('artboard');
   assert.deepEqual(a.marks([5, 7]), [
-    { text: '   •', color: '#3D5AFE' },
+    { text: '   •', color: '#3249CE' },
     { text: ' 05', color: '#15171B' },
-    { text: '  •', color: '#3D5AFE' },
+    { text: '  •', color: '#3249CE' },
     { text: ' 07', color: '#15171B' },
   ]);
   assert.equal(a.marks([2, 3, 5, 7, 9]).map((s) => s.text).join(''), '   • 02  • 03  • 05  +2');

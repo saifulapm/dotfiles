@@ -105,9 +105,6 @@ const indent = (text, pad) => text.split('\n').map((l) => (l ? pad + l : l)).joi
 export function renderNiri(t) {
   const c = t.color;
   const n = t.niri;
-  // The focused window wears the same quiet frame as the rest.
-  const frame = n.border_inactive ?? c.muted;
-  const border = `border {\n        on\n        width ${n.border}\n        active-color "${frame}"\n        inactive-color "${frame}"\n    }`;
   // Tabs take the focus colour and the inactive frame's colour.
   const tabs = n.tab_position
     ? [
@@ -129,7 +126,9 @@ export function renderNiri(t) {
     focus-ring {
         off
     }
-    ${border}
+    border {
+        off
+    }
     shadow {
         off
     }
@@ -168,6 +167,18 @@ window-rule {
     clip-to-geometry true
 }
 
+// A floating window sits over other windows, so niri paints a solid paper back behind it, which its clear background shows; its 1 px border is the same paper, so no frame shows.
+window-rule {
+    match is-floating=true
+    draw-border-with-background true
+    border {
+        on
+        width 1
+        active-color "${c.paper}"
+        inactive-color "${c.paper}"
+    }
+}
+
 animations {
 ${animations}
 }
@@ -180,7 +191,8 @@ function footEntries(t) {
   const pair = (fg, bg) => `${hex(fg)} ${hex(bg)}`;
   const c = t.color;
   const s = `colors-${t.mode}`;
-  const entries = [['main', 'initial-color-theme', t.mode], [s, 'background', hex(c.surface)], [s, 'foreground', hex(c.ink)]];
+  // The terminal's ground is clear, so its words sit on the desk's field and side-by-side terminals read as one canvas; matching clears an app's cells painted in the ground too.
+  const entries = [['main', 'initial-color-theme', t.mode], [s, 'background', hex(c.surface)], [s, 'alpha', '0.0'], [s, 'alpha-mode', 'matching'], [s, 'foreground', hex(c.ink)]];
   c.ansi.forEach((v, i) => entries.push([s, `${i < 8 ? 'regular' : 'bright'}${i % 8}`, hex(v)]));
   entries.push(
     [s, 'cursor', pair(c.surface, c.accent)],

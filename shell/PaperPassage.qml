@@ -81,7 +81,7 @@ Item {
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.ar
-                color: words.tokens.color.ink
+                color: words.look.ink
                 font.family: words.arabic
                 font.pixelSize: words.look.ar.size
                 lineHeight: 1.5
@@ -111,7 +111,7 @@ Item {
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.bn
-                color: words.tokens.color.ink
+                color: words.look.ink
                 font.family: words.look.bn.font
                 font.pixelSize: words.look.bn.size
                 lineHeightMode: Text.FixedHeight
@@ -126,7 +126,7 @@ Item {
                 wrapMode: Text.WordWrap
                 textFormat: Text.PlainText
                 text: words.text.en
-                color: words.tokens.color.ink
+                color: words.look.ink
                 font.family: words.look.en.font
                 font.pixelSize: words.look.en.size
                 // A fixed pitch, as the boards' CSS line-height, so a glyph from a fallback face such as ﷺ opens no line wider.

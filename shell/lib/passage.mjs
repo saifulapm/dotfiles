@@ -2,6 +2,7 @@
 import { answer, bengaliFamily, oneLine } from './deen.mjs';
 import { bnDigits, reference } from './deen-hadith.mjs';
 import { pad2 } from './margins.mjs';
+import { onDesk } from './voice.mjs';
 
 export const KINDS = ['ayah', 'hadith', 'dua', 'quote'];
 
@@ -117,9 +118,11 @@ export const voiced = (kind, ref) => ({ label: kind.charAt(0).toUpperCase() + ki
 
 // The passage as a selected card, in logical pixels on a 2048 px wide output; a day in Bangla draws its pronunciation, meaning and reference in the Bengali face, unspaced.
 export function look(tokens) {
-  const c = tokens.color;
+  // The passage sits on the desk, so each word reads on its paper and its field.
+  const c = { ink: onDesk(tokens, tokens.color.ink), muted: onDesk(tokens, tokens.color.muted), accent: onDesk(tokens, tokens.color.accent) };
   const t = tokens.type;
   return {
+    ink: c.ink,
     width: 992,
     pad: [64, 77, 51],
     gap: 29,

@@ -48,6 +48,8 @@ Item {
             property color base: fill.tokens.color.paper
             property color dotColor: fill.tokens.paper.dot ?? "transparent"
             property real spacing: (fill.tokens.paper.spacing ?? 16) * fill.period
+            property color gradeFrom: fill.tokens.paper.grade?.from ?? "transparent"
+            property color gradeTo: fill.tokens.paper.grade?.to ?? "transparent"
         }
     }
 }

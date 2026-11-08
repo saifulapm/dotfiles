@@ -7,23 +7,26 @@ until_ok 5000 shell_status >/dev/null
 margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 
+# The desk where the strip and the old rule were, before any window opens; it is the field, so each later read is held to it.
+desk_strip=$(grim -s 1 -t ppm -g "40,44 10x10" - | mean_rgb)
+desk_rule=$(grim -s 1 -t ppm -g "200,39 10x3" - | mean_rgb)
 niri msg action spawn -- foot -c /dev/null
 foot_focused() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot" and .is_focused)' >/dev/null; }
 until_ok 5000 foot_focused
 check "foot is focused" foot_focused
-# Artboard's paper #E4E6EA, as a 10 px square's mean reads it through the dot grid: within 3 per channel.
-is_paper() { local r g b; read -r r g b <<<"$1"; ((r >= 225 && r <= 231 && g >= 227 && g <= 233 && b >= 231 && b <= 237)); }
-# Between the margins' text and the window top at y=56 there is only paper.
+# The same spot's desk as read before foot opened: within 3 per channel.
+is_desk() { local r g b R G B; read -r r g b <<<"$1"; read -r R G B <<<"$2"; ((r - R <= 3 && R - r <= 3 && g - G <= 3 && G - g <= 3 && b - B <= 3 && B - b <= 3)); }
+# Between the margins' text and the window top at y=56 there is only the desk.
 strip=$(grim -s 1 -t ppm -g "40,44 10x10" - | mean_rgb)
 echo "     margin strip with foot open: $strip"
-check "foot opens below the margins" is_paper "$strip"
+check "foot opens below the margins" is_desk "$strip" "$desk_strip"
 # The margins are text alone: no rule runs under them at y=40, where the ink one was.
 rule=$(grim -s 1 -t ppm -g "200,39 10x3" - | mean_rgb)
-check "no rule runs under the margins ($rule)" is_paper "$rule"
-# niri animates a window open, so the frame is polled until the window has settled. The focused window wears the quiet line #D0D7DE as the rest do, so the frame reads as line when it is that light and that blue; foot's grey 36 36 36 beside it and ink #15171B are neither.
-edge_is_line() { local r g b; edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); read -r r g b <<<"$edge"; ((r >= 196 && r <= 222 && b - r >= 8)); }
-until_ok 1000 edge_is_line
-check "niri draws focused foot's frame in line at x=32 ($edge)" edge_is_line
+check "no rule runs under the margins ($rule)" is_desk "$rule" "$desk_rule"
+# niri animates a window open, so the edge is polled until the window has settled. A tiled window wears no frame, so foot's own grey 36 36 36 starts right at x=32, the left strut.
+edge_is_foot() { local r g b; edge=$(grim -s 1 -t ppm -g "32,300 1x10" - | mean_rgb); read -r r g b <<<"$edge"; ((r >= 30 && r <= 42 && g >= 30 && g <= 42 && b >= 30 && b <= 42)); }
+until_ok 1000 edge_is_foot
+check "niri draws no frame on the focused foot: its own grey starts at x=32 ($edge)" edge_is_foot
 
 # Maximized to edges, foot fills the whole output and the margins and the island hide, as for a fullscreen window.
 niri msg action maximize-window-to-edges

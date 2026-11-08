@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
-import { renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Board hexes for the kak-mail list that no token carries: Artboard's date orange.
 const MAIL_BOARD = { artboard: { date: '#C2410C' } };
@@ -33,6 +33,8 @@ function renderMailKak(t) {
 export function renderOutputs(theme, list, label) {
   // The apps that speak in the shell's voice read the tokens as the shell does.
   const spoken = checkTokens(theme);
+  // foot and everything drawn inside it sit in the paper, so a terminal is part of the desk.
+  const term = termTheme(theme);
   // The default state dir is the live desktop's: only the checkout its shell runs from may write there, so a worktree's render cannot rewrite it.
   if (!process.env.XDG_STATE_HOME) {
     const link = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'quickshell');
@@ -48,14 +50,14 @@ export function renderOutputs(theme, list, label) {
   const files = {
     'shell.json': JSON.stringify(qtTokens(theme), null, 2) + '\n',
     'niri.kdl': renderNiri(theme),
-    'foot.ini': renderFoot(theme),
-    'foot.args': renderFootArgs(theme),
-    'foot.osc': renderFootOsc(theme),
-    'tmux.conf': renderTmux(spoken),
-    'dots.kak': renderKak(theme) + renderMailKak(spoken),
-    'helix.toml': renderHelix(theme),
-    'yazi-theme.toml': renderYazi(theme),
-    'colors.fish': renderFish(theme),
+    'foot.ini': renderFoot(term),
+    'foot.args': renderFootArgs(term),
+    'foot.osc': renderFootOsc(term),
+    'tmux.conf': renderTmux(termTheme(spoken)),
+    'dots.kak': renderKak(term) + renderMailKak(termTheme(spoken)),
+    'helix.toml': renderHelix(term),
+    'yazi-theme.toml': renderYazi(term),
+    'colors.fish': renderFish(term),
     'gtk.css': renderGtkCss(theme),
     'gtk-settings.ini': renderGtkSettings(theme),
     'chromium-theme/manifest.json': renderChromiumTheme(theme),
@@ -71,9 +73,9 @@ export function renderOutputs(theme, list, label) {
     zathura: renderZathura(theme),
     'imv.conf': renderImv(theme),
     'wl-kbptr': renderKbptr(theme),
-    'claude.json': renderClaude(theme),
-    'pi.json': renderPi(theme),
-    'amx.toml': renderAmx(theme),
+    'claude.json': renderClaude(term),
+    'pi.json': renderPi(term),
+    'amx.toml': renderAmx(term),
     // dots colorscheme writes a failed switch's reason here and keeps the scheme it had; any render clears it.
     notice: '',
     'themes.json': JSON.stringify(list, null, 2) + '\n',

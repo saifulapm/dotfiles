@@ -61,12 +61,17 @@ for (const [name, want] of Object.entries(BOARD)) {
     for (const [k, v] of Object.entries(want.syntax)) assert.equal(doc.syntax[k], v, `syntax.${k}`);
   });
 
-  test(`${name} renders a 1px line frame on every window, no shadow, and its mode`, (t) => {
+  test(`${name} renders tiled windows with no frame and no gap, a solid paper back behind a floating one, no shadow, and its mode`, (t) => {
     const out = render(t, name);
     const kdl = readFileSync(join(out, 'niri.kdl'), 'utf8').replace(/\s+/g, ' ');
-    const frame = want.frame ?? want.color.line;
-    assert.ok(kdl.includes(`border { on width 1 active-color "${frame}" inactive-color "${frame}" }`), kdl);
+    const paper = want.color.paper;
+    assert.ok(kdl.includes('gaps 0 '), kdl);
+    assert.ok(kdl.includes('focus-ring { off } border { off }'), kdl);
+    assert.ok(kdl.includes(`match is-floating=true draw-border-with-background true border { on width 1 active-color "${paper}" inactive-color "${paper}" }`), kdl);
     assert.ok(kdl.includes('shadow { off }'));
+    const foot = readFileSync(join(out, 'foot.ini'), 'utf8');
+    assert.match(foot, /^alpha=0\.0$/m);
+    assert.match(foot, /^alpha-mode=matching$/m);
     assert.equal(JSON.parse(readFileSync(join(out, 'shell.json'), 'utf8')).mode, want.variant);
   });
 }
@@ -74,7 +79,8 @@ for (const [name, want] of Object.entries(BOARD)) {
 test('catppuccin-mocha reaches the terminal, the shell tokens and kakoune', (t) => {
   const out = render(t, 'catppuccin-mocha');
   const foot = readFileSync(join(out, 'foot.ini'), 'utf8');
-  assert.match(foot, /\[colors-dark\][^[]*^background=1E1E2E$/m);
+  // The terminal sits in the paper; the shell's cards keep the surface.
+  assert.match(foot, /\[colors-dark\][^[]*^background=11111B$/m);
   assert.match(foot, /\[colors-dark\][^[]*^foreground=CDD6F4$/m);
   const shell = JSON.parse(readFileSync(join(out, 'shell.json'), 'utf8'));
   assert.equal(shell.color.paper, '#11111B');
@@ -82,9 +88,9 @@ test('catppuccin-mocha reaches the terminal, the shell tokens and kakoune', (t) 
   assert.match(readFileSync(join(out, 'dots.kak'), 'utf8'), /^face global keyword rgb:cba6f7\+b$/m);
 });
 
-test('github-light colours the kakoune keyword', (t) => {
+test('github-light colours the kakoune keyword, a shade deeper so it reads on the paper and the field', (t) => {
   const out = render(t, 'github-light');
-  assert.match(readFileSync(join(out, 'dots.kak'), 'utf8'), /^face global keyword rgb:cf222e\+b$/m);
+  assert.match(readFileSync(join(out, 'dots.kak'), 'utf8'), /^face global keyword rgb:b11d28\+b$/m);
 });
 
 test('the licence file names each upstream project and its licence', () => {
