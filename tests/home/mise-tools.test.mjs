@@ -16,9 +16,9 @@ test('mise declares pnpm, the shopify cli, cloudflared and goimapnotify', () => 
   assert.match(config, /^"go:gitlab\.com\/shackra\/goimapnotify\/cmd\/goimapnotify" = "2\.5\.8"/m);
 });
 
-// Fedora 45 packages none of these five, so they come as prebuilt binaries from the aqua registry.
-test('mise declares sd, television, hurl, ast-grep and usql from aqua, and bun', () => {
-  for (const tool of ['chmln/sd', 'alexpasmantier/television', 'Orange-OpenSource/hurl', 'ast-grep/ast-grep', 'xo/usql']) {
+// Fedora 45 packages none of these six, so they come as prebuilt binaries from the aqua registry.
+test('mise declares sd, television, hurl, ast-grep, usql and tealdeer from aqua, and bun', () => {
+  for (const tool of ['chmln/sd', 'alexpasmantier/television', 'Orange-OpenSource/hurl', 'ast-grep/ast-grep', 'xo/usql', 'tealdeer-rs/tealdeer']) {
     assert.match(config, new RegExp(`^"aqua:${tool}" = "latest"$`, 'm'), tool);
   }
   assert.match(config, /^bun = "latest"$/m);

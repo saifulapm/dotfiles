@@ -614,11 +614,6 @@ arch = "all"
 why = "renders Markdown in the terminal"
 
 [[package]]
-name = "tealdeer"
-arch = "all"
-why = "tldr, which kak's :tldr opens"
-
-[[package]]
 name = "NetworkManager-tui"
 arch = "all"
 why = "nmtui, for Wi-Fi from a text console when the desktop is down"
