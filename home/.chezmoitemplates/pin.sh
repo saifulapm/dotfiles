@@ -13,7 +13,7 @@ pin_version={{ $pin.version | quote }}
 pin_url={{ $url | replace "{version}" $pin.version | quote }}
 pin_sha256={{ $sha | quote }}
 # A Fedora release upgrade changes this line, so chezmoi runs every pin again and one built against the old release's libraries is rebuilt.
-pin_fedora={{ .chezmoi.osRelease.versionID | quote }}
+pin_fedora={{ dig "osRelease" "versionID" "" .chezmoi | quote }}
 # On disk, not in /tmp: /tmp is a small tmpfs on the Macs and a source build may not fit.
 mkdir -p "$HOME/.cache"
 pin_tmp=$(mktemp -d -p "$HOME/.cache" dots-pin-XXXXXX)
