@@ -19,20 +19,23 @@ function render(machine) {
 }
 const opts = (text) => text.split('\n').filter((l) => l && !l.startsWith('#'));
 
-test('every machine plays on gpu-next with display-resample and interpolation, and saves its place on quit', () => {
+test('every machine plays with display-resample and interpolation, and saves its place on quit', () => {
   for (const m of ['macbook-m2', 'mac-mini-m2', 'nuc']) {
     const o = opts(render(m).text);
-    for (const l of ['save-position-on-quit=yes', 'vo=gpu-next', 'video-sync=display-resample', 'interpolation=yes', 'tscale=oversample', 'include=~/.local/state/dots/theme-out/mpv.conf']) assert.ok(o.includes(l), `${m}: ${l}`);
+    for (const l of ['save-position-on-quit=yes', 'video-sync=display-resample', 'interpolation=yes', 'tscale=oversample', 'include=~/.local/state/dots/theme-out/mpv.conf']) assert.ok(o.includes(l), `${m}: ${l}`);
   }
 });
 
-// Zero-copy vaapi draws corrupt frames on the Macs' decoder, and vaapi-copy only pays for HEVC there.
-test('the Macs decode only HEVC in hardware, through vaapi-copy; the NUC decodes through vaapi', () => {
+// Zero-copy vaapi draws corrupt frames on the Macs' decoder, and the frames vaapi-copy hands back cost half the CPU to upload on OpenGL that they do on gpu-next.
+test('the Macs draw on OpenGL and decode H.264, HEVC and VP9 through vaapi-copy; the NUC draws on gpu-next and decodes through vaapi', () => {
   for (const m of ['macbook-m2', 'mac-mini-m2']) {
     const o = opts(render(m).text);
-    assert.deepEqual(o.filter((l) => l.startsWith('hwdec')), ['hwdec=vaapi-copy', 'hwdec-codecs=hevc'], m);
+    assert.deepEqual(o.filter((l) => /^(vo|gpu-api)=/.test(l)), ['vo=gpu', 'gpu-api=opengl'], m);
+    assert.deepEqual(o.filter((l) => l.startsWith('hwdec')), ['hwdec=vaapi-copy', 'hwdec-codecs=h264,hevc,vp9'], m);
   }
-  assert.deepEqual(opts(render('nuc').text).filter((l) => l.startsWith('hwdec')), ['hwdec=vaapi']);
+  const nuc = opts(render('nuc').text);
+  assert.deepEqual(nuc.filter((l) => /^(vo|gpu-api)=/.test(l)), ['vo=gpu-next']);
+  assert.deepEqual(nuc.filter((l) => l.startsWith('hwdec')), ['hwdec=vaapi']);
 });
 
 // The NUC's Intel UHD cannot upscale 1080p to its 4K panel with lanczos and interpolate to 60 Hz in one refresh: about 7 frames a second dropped, none with bilinear.

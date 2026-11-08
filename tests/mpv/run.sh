@@ -47,7 +47,7 @@ if [ "${1:-}" = --play ]; then
       --script="$conf/probe.lua" --script-opts="probe-out=$scratch/$name.json" "$@" >"$scratch/$name.log" 2>&1
   }
   get() { jq -r ".$2 // \"none\"" "$scratch/$1.json" 2>/dev/null || echo none; }
-  expect_hwdec() { if [[ $machine == mac* ]]; then [ "$1" = hevc10.mp4 ] && echo vaapi-copy || echo no; else echo vaapi; fi; }
+  expect_hwdec() { if [[ $machine == mac* ]]; then [ "$1" = av1.mkv ] && echo no || echo vaapi-copy; else echo vaapi; fi; }
 
   for f in h264.mp4 hevc10.mp4 vp9.webm av1.mkv; do
     play "$f" --fullscreen --length=60 "$samples/$f"

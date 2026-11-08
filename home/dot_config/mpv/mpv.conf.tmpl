@@ -1,14 +1,16 @@
 # Each file starts where it last stopped.
 save-position-on-quit=yes
-vo=gpu-next
 video-sync=display-resample
 interpolation=yes
 tscale=oversample
 {{ if hasPrefix "mac" .machine -}}
-# Zero-copy vaapi draws corrupt frames on the Macs' decoder, and vaapi-copy saves CPU only on HEVC; the rest decode in software.
+# Zero-copy vaapi draws corrupt frames on the Macs' decoder, so frames come back by vaapi-copy; OpenGL uploads them for about half the CPU gpu-next needs, which made software decoding cheaper than vaapi-copy there for all but HEVC (10 s of 4K on the M2: H.264 18.4 s of CPU in software on gpu-next, 9.3 s by vaapi-copy on OpenGL).
+vo=gpu
+gpu-api=opengl
 hwdec=vaapi-copy
-hwdec-codecs=hevc
+hwdec-codecs=h264,hevc,vp9
 {{ else -}}
+vo=gpu-next
 hwdec=vaapi
 {{ end -}}
 {{ if eq .machine "nuc" -}}
