@@ -332,7 +332,7 @@ Item {
                             id: keyText
                             textFormat: Text.PlainText
                             text: keyPair.modelData.key
-                            color: share.c.ink ?? "black"
+                            color: share.c.muted ?? "gray"
                             font.family: share.fonts.mono ?? ""
                             font.pixelSize: 11
                             font.weight: Font.Medium

@@ -89,11 +89,11 @@ test("every scheme's island note, lease, toast and media controls read at 4.5:1 
 });
 
 // Muted words are the scheme's own token, which only ink is held to 4.5:1 against, so they are not checked here.
-test("every scheme's lit row reads its text and detail at 4.5:1, its mode pill its word, and its key chips their keys", () => {
+test("every scheme's lit row reads its text and detail at 4.5:1, its mode pill its word, and its key hints their keys on the surface", () => {
   for (const n of SCHEMES) {
     const t = schemeTokens(n);
     const l = launcherLook(t);
-    const pairs = { text: [l.cursor.text, l.cursor.fill], detail: [l.cursor.detail, l.cursor.fill], pill: [l.label.color, l.label.fill], chipKey: [l.chip.key, l.chip.fill], tileName: [t.color.ink, plainTones(t).field] };
+    const pairs = { text: [l.cursor.text, l.cursor.fill], detail: [l.cursor.detail, l.cursor.fill], pill: [l.label.color, l.label.fill], chipKey: [l.chip.key, t.color.surface], tileName: [t.color.ink, plainTones(t).field] };
     for (const [what, [fg, bg]] of Object.entries(pairs)) {
       const ratio = contrast(solid(fg), solid(bg));
       assert.ok(ratio >= 4.5, `${n} ${what} ${fg} on ${bg}: ${ratio.toFixed(2)}`);

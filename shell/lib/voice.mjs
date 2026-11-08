@@ -109,7 +109,7 @@ export function launcherLook(tokens) {
     cursor: { fill: tones.tint, text: tones.deep, detail: onTint(c.muted), radius: 10, weight: 600, badge: '↵' },
     small: { font: t.ui, size: 11, spacing: 0, color: c.muted },
     tile: { size: 32, radius: 9, fill: plainTones(tokens).tile },
-    chip: { fill: plainTones(tokens).tile, key: c.ink },
+    chip: { fill: 'transparent', key: c.muted },
     keyChip: { fill: plainTones(tokens).tile, text: c.muted, border: 0, borderColor: 'transparent', cursorFill: c.surface, cursorText: plainTones(tokens).deep, cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0 },
   };
 }

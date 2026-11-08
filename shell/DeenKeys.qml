@@ -50,7 +50,7 @@ ColumnLayout {
                 implicitWidth: keyPair.implicitWidth + 14
                 implicitHeight: keyPair.implicitHeight + 6
                 radius: 6
-                color: strip.deen.look.tile.fill
+                color: "transparent"
 
                 Row {
                     id: keyPair
@@ -61,7 +61,7 @@ ColumnLayout {
                         id: keyName
                         textFormat: Text.PlainText
                         text: modelData.key
-                        color: strip.c.ink ?? "black"
+                        color: strip.c.muted ?? "gray"
                         font.family: strip.bodyFont
                         font.pixelSize: 11
                         font.weight: Font.Medium

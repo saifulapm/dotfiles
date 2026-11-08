@@ -354,7 +354,7 @@ Item {
                             id: keyText
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: root.c.ink ?? "black"
+                            color: root.c.muted ?? "gray"
                             font.family: root.fonts.mono ?? ""
                             font.pixelSize: 11
                             font.weight: Font.Medium

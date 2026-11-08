@@ -20,7 +20,7 @@ test("the launcher draws Artboard's board: a search glyph, an Apps pill, icon ti
     cursor: { fill: '#EEF1FF', text: '#2638C9', detail: '#57606A', radius: 10, weight: 600, badge: '↵' },
     small: { font: 'Maple Mono', size: 11, spacing: 0, color: '#57606A' },
     tile: { size: 32, radius: 9, fill: '#F2F3F6' },
-    chip: { fill: '#F2F3F6', key: '#15171B' },
+    chip: { fill: 'transparent', key: '#57606A' },
     keyChip: { fill: '#F2F3F6', text: '#57606A', border: 0, borderColor: 'transparent', cursorFill: '#FFFFFF', cursorText: '#2638C9', cursorBorder: 'transparent', radius: 6, size: 11, spacing: 0 },
   });
 });
@@ -28,7 +28,7 @@ test("the launcher draws Artboard's board: a search glyph, an Apps pill, icon ti
 test("a dark scheme's lit row and pill draw in its own tint, its words moved toward the ink until they read, and its keys its own tokens", () => {
   const g = look('gruvbox-dark');
   assert.deepEqual([g.label.color, g.cursor.detail, g.cursor.fill, g.cursor.text], ['#8DAA9B', '#AFA089', '#353A38', '#8DAA9B']);
-  assert.deepEqual([g.name.color, g.detail.color, g.chip.key, g.keyChip.cursorFill], ['#EBDBB2', '#A89984', '#EBDBB2', '#282828']);
+  assert.deepEqual([g.name.color, g.detail.color, g.chip.key, g.keyChip.cursorFill], ['#EBDBB2', '#A89984', '#A89984', '#282828']);
   const r = look('rose-pine-dawn');
   assert.deepEqual([r.label.color, r.cursor.detail, r.keyChip.cursorFill], ['#6C5E88', '#656183', '#FAF4ED']);
 });
@@ -75,7 +75,7 @@ test('reminder mode heads its pending rows with their count', () => {
 test('before the theme loads the launcher draws the plain look in black and white', () => {
   const u = launcherLook(null);
   assert.equal(u.label.text('apps'), 'Apps');
-  assert.deepEqual([u.prompt.color, u.name.color, u.label.color, u.cursor.detail, u.chip.key, u.keyChip.cursorFill], ['gray', 'white', 'white', 'gray', 'white', 'black']);
+  assert.deepEqual([u.prompt.color, u.name.color, u.label.color, u.cursor.detail, u.chip.key, u.keyChip.cursorFill], ['gray', 'white', 'white', 'gray', 'gray', 'black']);
   assert.deepEqual([u.query.size, u.cursor.radius, u.cursor.badge, u.legend('apps').tail], [20, 10, '↵', 'j/k · ↵ · esc']);
 });
 

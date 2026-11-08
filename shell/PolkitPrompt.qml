@@ -224,7 +224,7 @@ Item {
                 font.letterSpacing: 1.2
             }
 
-            // The key hint as the launcher's legend draws it, each pair in a chip.
+            // The key hint as the launcher's legend draws it, each pair as plain dim text.
             Row {
                 visible: !prompt.seen?.supplementaryMessage
                 Layout.leftMargin: 20
@@ -266,7 +266,7 @@ Item {
                                 font.family: prompt.fonts.mono
                                 font.pixelSize: prompt.look.small.size
                                 font.letterSpacing: prompt.look.small.spacing
-                                font.bold: true
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: wordText

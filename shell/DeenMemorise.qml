@@ -351,7 +351,7 @@ FocusScope {
                         implicitWidth: hintRow.implicitWidth + 14
                         implicitHeight: hintRow.implicitHeight + 6
                         radius: 6
-                        color: look.tile.fill
+                        color: "transparent"
 
                         Row {
                             id: hintRow
@@ -362,7 +362,7 @@ FocusScope {
                                 id: hintKey
                                 textFormat: Text.PlainText
                                 text: page.words.hintKey
-                                color: c.ink ?? "black"
+                                color: c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
                                 font.weight: Font.Medium
@@ -371,7 +371,7 @@ FocusScope {
                                 id: hintWord
                                 textFormat: Text.PlainText
                                 text: page.words.hintWord
-                                color: c.ink ?? "black"
+                                color: c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: 12
                             }

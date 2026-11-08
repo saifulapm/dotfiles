@@ -721,7 +721,7 @@ Item {
 
             Rule {}
 
-            // The key strip as Pass draws it, each pair in a chip.
+            // The key strip as Pass draws it, each pair as plain dim text.
             RowLayout {
                 Layout.fillWidth: true
                 Layout.leftMargin: 14
@@ -761,7 +761,7 @@ Item {
                                     font.family: fonts.mono
                                     font.pixelSize: look.small.size
                                     font.letterSpacing: look.small.spacing
-                                    font.bold: true
+                                    font.weight: Font.Medium
                                 }
                                 Text {
                                     id: wordText

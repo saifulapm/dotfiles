@@ -676,7 +676,7 @@ FocusScope {
                     implicitWidth: keyPair.implicitWidth + 14
                     implicitHeight: keyPair.implicitHeight + 6
                     radius: 6
-                    color: page.look.tile.fill
+                    color: "transparent"
 
                     Row {
                         id: keyPair
@@ -686,7 +686,7 @@ FocusScope {
                         Text {
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: page.c.ink ?? "black"
+                            color: page.c.muted ?? "gray"
                             font.family: page.bodyFont
                             font.pixelSize: 11
                             font.weight: Font.Medium

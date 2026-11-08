@@ -212,7 +212,7 @@ Item {
                                 font.family: recorder.fonts.mono
                                 font.pixelSize: recorder.look.small.size
                                 font.letterSpacing: recorder.look.small.spacing
-                                font.bold: true
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: wordText

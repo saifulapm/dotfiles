@@ -101,7 +101,7 @@ Item {
                 implicitWidth: keyPair.implicitWidth + 14
                 implicitHeight: keyPair.implicitHeight + 6
                 radius: 6
-                color: bar.look.tile.fill
+                color: "transparent"
 
                 // A click on the key stops the film as the key does.
                 Click {
@@ -117,7 +117,7 @@ Item {
                         id: keyName
                         textFormat: Text.PlainText
                         text: modelData.key
-                        color: bar.c.ink ?? "black"
+                        color: bar.c.muted ?? "gray"
                         font.family: bar.bodyFont
                         font.pixelSize: 11
                         font.weight: Font.Medium

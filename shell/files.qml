@@ -1640,7 +1640,7 @@ ShellRoot {
                         implicitWidth: pair.implicitWidth + 14
                         implicitHeight: pair.implicitHeight + 6
                         radius: look.keyChip.radius
-                        color: look.keyChip.fill
+                        color: "transparent"
 
                         Row {
                             id: pair
@@ -1651,7 +1651,7 @@ ShellRoot {
                                 id: keyText
                                 textFormat: Text.PlainText
                                 text: modelData.key
-                                color: c.ink ?? "black"
+                                color: c.muted ?? "gray"
                                 font.family: fonts.mono ?? ""
                                 font.pixelSize: 11
                                 font.weight: 500

@@ -226,7 +226,7 @@ Item {
                 font.letterSpacing: prompt.look.small.spacing
             }
 
-            // The key strip as the launcher's legend draws it, each pair in a chip.
+            // The key strip as the launcher's legend draws it, each pair as plain dim text.
             Row {
                 Layout.leftMargin: 20
                 Layout.rightMargin: 20
@@ -267,7 +267,7 @@ Item {
                                 font.family: prompt.fonts.mono
                                 font.pixelSize: prompt.look.small.size
                                 font.letterSpacing: prompt.look.small.spacing
-                                font.bold: true
+                                font.weight: Font.Medium
                             }
                             Text {
                                 id: wordText

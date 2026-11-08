@@ -490,6 +490,9 @@ Item {
                                                 objectName: "click:notif-chip:" + modelData.key
                                                 keyColor: look.cursor.text
                                                 wordColor: look.cursor.detail
+                                                keyWeight: Font.Bold
+                                                // An action is a button, so it keeps its tile.
+                                                color: look.tile.fill
                                             }
                                         }
                                     }
@@ -594,12 +597,13 @@ Item {
         }
     }
 
-    // A key and its word as the legend draws them, a chip in Artboard.
+    // A key and its word as the legend draws them, plain dim text.
     component KeyChip: Rectangle {
         required property var modelData
         readonly property string drawn: modelData.key + " " + modelData.word
         property color keyColor: look.chip.key
         property color wordColor: c.muted
+        property int keyWeight: Font.Medium
         width: pair.implicitWidth + 14
         height: pair.implicitHeight + 6
         radius: 6
@@ -617,7 +621,7 @@ Item {
                 font.family: fonts.mono
                 font.pixelSize: look.small.size
                 font.letterSpacing: look.small.spacing
-                font.bold: true
+                font.weight: keyWeight
             }
             Text {
                 textFormat: Text.PlainText

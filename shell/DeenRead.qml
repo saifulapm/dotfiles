@@ -350,7 +350,7 @@ FocusScope {
                         implicitWidth: hintPair.implicitWidth + 14
                         implicitHeight: hintPair.implicitHeight + 6
                         radius: 6
-                        color: page.look.tile.fill
+                        color: "transparent"
                         border.width: 0
 
                         Row {
@@ -362,7 +362,7 @@ FocusScope {
                                 id: hintKey
                                 textFormat: Text.PlainText
                                 text: modelData.key
-                                color: page.c.ink ?? "black"
+                                color: page.c.muted ?? "gray"
                                 font.family: page.bodyFont
                                 font.pixelSize: 11
                                 font.weight: Font.Medium

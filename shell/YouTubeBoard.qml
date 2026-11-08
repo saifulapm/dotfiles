@@ -793,7 +793,7 @@ Rectangle {
                             implicitWidth: hintText.implicitWidth + 14
                             implicitHeight: hintText.implicitHeight + 4
                             radius: 6
-                            color: c.surface ?? "white"
+                            color: "transparent"
 
                             Text {
                                 id: hintText
@@ -1299,7 +1299,7 @@ Rectangle {
                     implicitWidth: keyPair.implicitWidth + 14
                     implicitHeight: keyPair.implicitHeight + 6
                     radius: 6
-                    color: look.tint.tile
+                    color: "transparent"
 
                     Row {
                         id: keyPair
@@ -1310,7 +1310,7 @@ Rectangle {
                             id: keyName
                             textFormat: Text.PlainText
                             text: modelData.key
-                            color: c.ink ?? "black"
+                            color: c.muted ?? "gray"
                             font.family: board.bodyFont
                             font.pixelSize: 11
                             font.weight: Font.Medium
