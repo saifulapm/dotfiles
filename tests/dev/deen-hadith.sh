@@ -81,8 +81,8 @@ wtype -M shift -k Tab -k Tab -m shift
 until_ok 1000 deen_is '.tab == "hadith"'
 check "state 2 says where it stopped ($(hadith '.download | [.title, .fail, .savedIn]'))" \
   hadith_is '.download.title == "The download did not finish" and .download.fail == "The connection dropped at 38 of 124 MB." and .download.noData == "" and (.download.savedIn | startswith("~/"))'
-check "state 2's box is rounded 14 and grey, its title in #B4380B ($(hadith '.download.look'))" \
-  hadith_is '.download.look.radius == 14 and .download.look.fill == "#f6f7f9" and .download.look.titleColor == "#b4380b" and .download.label == "2 · if it fails" and .download.keyLine == "r retry esc leave"'
+check "state 2's box is rounded 14 in the ink's field veil, its title in the danger moved to read on the desk, #B11D28 ($(hadith '.download.look'))" \
+  hadith_is '.download.look.radius == 14 and .download.look.fill == "#0a15171b" and .download.look.titleColor == "#b11d28" and .download.label == "2 · if it fails" and .download.keyLine == "r retry esc leave"'
 
 rm "$DOTS_DEV_DIR/deen-hadith-cut"
 wtype r
@@ -178,8 +178,8 @@ wtype -k Down jjj
 until_ok 1000 hadith_is '.cursor == 3'
 check "its pane draws the English under English with its grade and the Bangla reference ($(hadith '.pane | [.meaningLabel, .meaning[0:30], .grade, .reference, .meaningFamily]'))" \
   hadith_is '.focus == "list" and .pane.meaningLabel == "English" and (.pane.meaning | startswith("It was narrated")) and .pane.grade == "Sahih" and .pane.reference == "সুনান নাসাঈ ৭৫" and (.pane.meaningFamily | test("Bengali") | not)'
-check "the field rounds 14 in a 1.5 px outline, the cursor row fills #EEF1FF ($(hadith '[.look.fieldRadius, .look.fieldBorder, .rows[3].fill]'))" \
-  hadith_is '.look.fieldRadius == 14 and .look.fieldBorder == 1.5 and .rows[3].fill == "#eef1ff"'
+check "the field rounds 14 in a 1.5 px outline, the cursor row fills the accent's veil #243249CE ($(hadith '[.look.fieldRadius, .look.fieldBorder, .rows[3].fill]'))" \
+  hadith_is '.look.fieldRadius == 14 and .look.fieldBorder == 1.5 and .rows[3].fill == "#243249ce"'
 
 wtype /
 until_ok 1000 hadith_is '.focus == "field" and .search.text == ""'
