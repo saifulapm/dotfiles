@@ -1,0 +1,17 @@
+[Unit]
+Description=hub device tunnel: device.on-rexa.com to this machine's local hub, for cloud device calls
+# A connector of the device-hub Cloudflare tunnel. Access lets a call in
+# only with the workflow device service token, and hub local checks the
+# token Access signed before it runs anything. The tunnel token comes from
+# pass through run_after_39-hub-local.sh; without it the unit is skipped.
+ConditionPathExists=%h/.config/hub/device-tunnel.token
+After=network-online.target hub-local.service
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=%h/.local/bin/cloudflared tunnel --no-autoupdate run --token-file %h/.config/hub/device-tunnel.token
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

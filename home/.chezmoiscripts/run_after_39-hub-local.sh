@@ -46,7 +46,12 @@ chmod 600 "$new"
   v=$(pass show workflow/cloud-next-access-id 2>/dev/null) && printf 'HUB_STORE_ACCESS_ID=%s\n' "$v"
   v=$(pass show workflow/cloud-next-access-secret 2>/dev/null) &&
     printf 'HUB_STORE_ACCESS_SECRET=%s\n' "$v"
-  [ -f "$env" ] && grep -Ev '^(HUB_PEER_TOKEN|SLACK_BOT_TOKEN|SLACK_APP_TOKEN|SLACK_USER_ID|HUB_CLOUD_TOKEN|HUB_STORE_ACCESS_ID|HUB_STORE_ACCESS_SECRET)=' "$env"
+  # The "workflow device" Access app in front of device.on-rexa.com: its
+  # signed token lets a cloud session's device call in (workflow m2-device).
+  # Its audience tag and the team, neither of them a secret.
+  printf 'HUB_DEVICE_ACCESS_AUD=%s\n' eb8bc32242890cf431192a69faff951f4e82b8e3a3d7f98e9ae586ff184b0b68
+  printf 'HUB_DEVICE_ACCESS_TEAM=%s\n' https://saifulapm.cloudflareaccess.com
+  [ -f "$env" ] && grep -Ev '^(HUB_PEER_TOKEN|SLACK_BOT_TOKEN|SLACK_APP_TOKEN|SLACK_USER_ID|HUB_CLOUD_TOKEN|HUB_STORE_ACCESS_ID|HUB_STORE_ACCESS_SECRET|HUB_DEVICE_ACCESS_AUD|HUB_DEVICE_ACCESS_TEAM)=' "$env"
 } >"$new"
 
 changed=
@@ -62,4 +67,22 @@ if [ -n "$changed" ]; then
   systemctl --user restart hub-local.service
 else
   systemctl --user start hub-local.service
+fi
+
+# The device tunnel: one connector per machine for device.on-rexa.com, so a
+# cloud session's device call reaches whichever hub is up, which sends it on
+# to the machine the route names. Its token is the tunnel's, from pass.
+tunnel=$HOME/.config/hub/device-tunnel.token
+if v=$(pass show workflow/device-tunnel-token 2>/dev/null) && [ -n "$v" ]; then
+  new=$(mktemp "$tunnel.XXXXXX")
+  chmod 600 "$new"
+  printf '%s' "$v" >"$new"
+  if cmp -s "$new" "$tunnel"; then
+    rm -f "$new"
+    systemctl --user enable --now hub-device-tunnel.service >/dev/null 2>&1 || true
+  else
+    mv -f "$new" "$tunnel"
+    systemctl --user enable hub-device-tunnel.service >/dev/null 2>&1 || true
+    systemctl --user restart hub-device-tunnel.service
+  fi
 fi
