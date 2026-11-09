@@ -27,6 +27,8 @@ test('zswap compresses with zstd from boot, and swap adds up to 16 G', () => {
   const script = read('home/.chezmoiscripts/run_onchange_after_41-memory.sh.tmpl');
   assert.match(script, /\(\(have >= 16\)\) && exit 0/);
   assert.match(script, /swapon --fixpgsz/);
+  // A swap file inside the root subvolume stops btrfs from snapshotting /, which dots update does before it upgrades.
+  assert.match(script, /root btrfs subvolume create \/var\/swap/);
 });
 
 test('systemd-oomd runs on every machine, a container included, and swap is left as it is', () => {

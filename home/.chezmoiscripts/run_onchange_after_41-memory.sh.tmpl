@@ -20,7 +20,14 @@ have=$(awk 'NR > 1 && $1 !~ /zram/ { kb += $3 } END { print int(kb / 1048576 + 0
 ((have >= 16)) && exit 0
 file=/var/swap/dots-swapfile
 size=$((16 - have))
-root mkdir -p /var/swap
+# On btrfs the swap files get their own subvolume: a swap file in the root subvolume stops btrfs from snapshotting /, which dots update does before it upgrades.
+if [[ ! -e /var/swap ]]; then
+  if [[ $(stat -f -c %T /var) == btrfs ]]; then
+    root btrfs subvolume create /var/swap >/dev/null || die "could not make the /var/swap subvolume"
+  else
+    root mkdir -p /var/swap
+  fi
+fi
 if [[ ! -e $file ]]; then
   if [[ $(stat -f -c %T /var/swap) == btrfs ]]; then
     root btrfs filesystem mkswapfile --size "${size}g" "$file" >/dev/null || die "could not make a ${size} G swap file"
