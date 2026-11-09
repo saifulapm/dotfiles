@@ -130,6 +130,29 @@ reload_imv() {
   done
 }
 
+# The open tmux takes the new theme, and its agent panes the new colours.
+reload_tmux() {
+  tmux has-session 2>/dev/null || return 0
+  tmux source-file "$1/tmux.conf" || return 1
+  restyle_tmux "$1"
+}
+
+# amx sets each agent session's window-style to the colours of the terminal its view last ran on, which a detached pane answers colour queries from: a switch leaves them on the old scheme, and a view over ssh on a phone's terminal gives them the phone's. So every styled window, and amx's remembered colours, take the terminal's ink and paper from the render in $1; tmux's attach hook runs this as dots tmux-style.
+restyle_tmux() {
+  tmux has-session 2>/dev/null || return 0
+  local ink paper style w
+  ink=$(sed -n 's/^foreground=//p' "$1/foot.ini")
+  paper=$(sed -n 's/^background=//p' "$1/foot.ini")
+  [[ $ink =~ ^[0-9A-Fa-f]{6}$ && $paper =~ ^[0-9A-Fa-f]{6}$ ]] || return 1
+  style="fg=#${ink,,},bg=#${paper,,}"
+  for w in $(tmux list-windows -a -F '#{window_id}'); do
+    [[ -n $(tmux show-options -wv -t "$w" window-style 2>/dev/null) ]] && { tmux set-option -w -t "$w" window-style "$style" || return 1; }
+  done
+  local amx=${AMX_STATE_DIR:-$HOME/.local/state/amx}
+  [[ -d $amx ]] && { (umask 077 && printf '%s\n' "$style" >"$amx/background.tmp") && mv "$amx/background.tmp" "$amx/background" || return 1; }
+  return 0
+}
+
 # Each coding agent's config names the theme file below, and an agent not installed gets no file; cp writes in place, so a watcher on the file itself sees the change.
 reload_agents() {
   local home=${DOTS_AGENT_HOME:-$HOME} src dst
@@ -179,7 +202,7 @@ colorscheme() {
   local failed
   failed=$(mktemp)
   reload_foot "$out" &
-  { tmux has-session 2>/dev/null && { tmux source-file "$out/tmux.conf" || echo tmux >>"$failed"; }; } &
+  { reload_tmux "$out" || echo tmux >>"$failed"; } &
   { command -v kak >/dev/null && reload_kak; } &
   reload_helix &
   { reload_mpv "$out" || echo mpv >>"$failed"; } &
@@ -202,6 +225,7 @@ main() {
   case ${1:-} in
     install) install ;;
     colorscheme) colorscheme "${2:-}" ;;
+    tmux-style) restyle_tmux "${XDG_STATE_HOME:-$HOME/.local/state}/dots/theme-out" ;;
     theme) die "the theme command is gone; use dots colorscheme <name>" ;;
     # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
     awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;

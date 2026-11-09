@@ -30,3 +30,14 @@ test('the tmux bar sits at the top, as the page\'s running head', (t) => {
   tmux('-f', conf, 'new-session', '-d', '-x', '80', '-y', '24');
   assert.equal(tmux('show', '-gv', 'status-position'), 'top');
 });
+
+// amx gives each agent pane the colours of whatever terminal its view last ran on, an iPhone over ssh among them, so every attach puts the scheme's back.
+test('attaching a client runs dots tmux-style in the background', (t) => {
+  const sock = `dots-tmux-hook-${process.pid}`;
+  const env = { ...process.env };
+  delete env.TMUX;
+  const tmux = (...a) => execFileSync('tmux', ['-L', sock, ...a], { env, encoding: 'utf8' }).trim();
+  t.after(() => { try { tmux('kill-server'); } catch {} });
+  tmux('-f', conf, 'new-session', '-d', '-x', '80', '-y', '24');
+  assert.match(tmux('show-hooks', '-g', 'client-attached'), /run-shell -b "dots tmux-style"/);
+});
