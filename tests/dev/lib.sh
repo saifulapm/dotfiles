@@ -124,6 +124,8 @@ if ! grep -q DOTS_DEV_UNIT "$dev_out"; then
 fi
 # shellcheck disable=SC1090
 source "$dev_out"
+# A check run from inside tmux inherits TMUX, which points every tmux call, dots colorscheme's reload among them, at the live server over the nested TMUX_TMPDIR; a check that switched to rose-pine-dawn left the live tmux in it.
+unset TMUX
 # Every qs ipc call below must reach the worktree shell, never the live one.
 : "${QS_CONFIG_PATH:?}" "${DOTS_DEV_DIR:?}" "${DOTS_DEV_UNIT:?}"
 
