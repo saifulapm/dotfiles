@@ -144,8 +144,8 @@ until_ok 8000 bash -c "! timeout 0.5 qs ipc call island state | jq -e '.mode == 
 left=$(($(now_ms) - dropped))
 check "the toast leaves about 5 s after the drop (${left} ms)" test "$left" -gt 4000 -a "$left" -lt 6500
 
-# The chip draws on the toast and on the cursor row in the one design's fills.
-for t in artboard:#2B2F36:#FFFFFF; do
+# The chip draws on the toast and on the cursor row in the one design's fills; a panel reads the desk tokens, so the row's chip is the paper.
+for t in artboard:#2B2F36:#E4E6EA; do
   IFS=: read -r name toast row <<<"$t"
   send_files "$heic"
   toast_for "Taildrop · 1 file"

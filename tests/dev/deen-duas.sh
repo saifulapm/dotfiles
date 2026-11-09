@@ -173,8 +173,8 @@ wtype '/sleeping'
 until_ok 2000 duas_is '.rows | length == 1'
 wtype -k Return nnnnnn
 until_ok 2000 duas_is '.pane.head == "dua 7 of 13"'
-check "a filled pill field, a 20 px bold title ($(duas .look))" duas_is '.look.fieldRadius == 12 and .look.fieldFill == "#f6f7f9" and .look.fieldBorder == 0 and .look.titleSize == 20'
-check "the cursor row is a tinted rounded pill ($(duas '.rows[] | select(.current)'))" duas_is '.rows[] | select(.current) | .radius == 10 and .fill == "#eef1ff"'
+check "a pill field in the ink's veil, a 20 px bold title ($(duas .look))" duas_is '.look.fieldRadius == 12 and .look.fieldFill == "#0a15171b" and .look.fieldBorder == 0 and .look.titleSize == 20'
+check "the cursor row is a rounded pill in the accent's veil ($(duas '.rows[] | select(.current)'))" duas_is '.rows[] | select(.current) | .radius == 10 and .fill == "#243249ce"'
 
 wtype -k Escape
 until_ok 3000 deen_gone

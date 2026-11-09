@@ -73,10 +73,10 @@ check "the bar reads the boxed word's pronunciation, Bangla meaning, place and r
   read_is '.bar.word == "بِسْمِ" and .bar.pron == "বিসমি" and .bar.bn == "নামে" and .bar.line == "ayah 1, word 1 · root س م و" and .bar.hint == "↵ hear this word"'
 check "the heading's hints and the key strip name Read's keys in lower case ($(read_show '[.hints, (.keys | map(.[0]))]'))" \
   read_is '.hints == ["s surah", "p play surah"] and (.keys | map(.[0])) == ["h/l", "j/k", "↵", "p", "s", "/", "m", "tab", "esc"]'
-check "the box is a 1.5 px accent line on its tint at radius 10, its meaning in deep blue ($(read_show .box))" \
-  read_is '.box.border == 1.5 and .box.borderColor == "#3d5afe" and .box.fill == "#eef1ff" and .box.radius == 10 and .box.bnColor == "#2638c9"'
-check "the bar is filled grey at radius 12 with no rule, the ayat ruled solid ($(read_show '[.bar.fill, .bar.radius, .bar.border, .ayah.ruleColor]'))" \
-  read_is '.bar.fill == "#f6f7f9" and .bar.radius == 12 and .bar.border == 0 and .ayah.ruleColor == "#e3e6eb"'
+check "the box is a 1.5 px accent line on the accent's veil at radius 10, its meaning in deep blue ($(read_show .box))" \
+  read_is '.box.border == 1.5 and .box.borderColor == "#3249ce" and .box.fill == "#243249ce" and .box.radius == 10 and .box.bnColor == "#2b3eaf"'
+check "the bar is filled in the ink's veil at radius 12 with no rule, the ayat ruled in a stronger veil ($(read_show '[.bar.fill, .bar.radius, .bar.border, .ayah.ruleColor]'))" \
+  read_is '.bar.fill == "#0a15171b" and .bar.radius == 12 and .bar.border == 0 and .ayah.ruleColor == "#1f15171b"'
 check "the tab reads Read ($(deen_state | jq -c '.tabs[0].text'))" deen_is '.tabs[0].text == "Read"'
 
 wtype -k Shift_L
@@ -126,7 +126,7 @@ check "s opens the surah picker with the field focused, listing all 114 ($(read_
 wtype 36
 until_ok 2000 read_is '.picker.text == "36"'
 check "typing 36 puts Ya-Sin first by its Bangla name, cursored ($(read_show '.picker.rows'))" \
-  read_is '.picker.rows[0].n == "36" and .picker.rows[0].name == "সূরা ইয়াসীন" and .picker.rows[0].current and .picker.rows[0].fill == "#eef1ff"'
+  read_is '.picker.rows[0].n == "36" and .picker.rows[0].name == "সূরা ইয়াসীন" and .picker.rows[0].current and .picker.rows[0].fill == "#243249ce"'
 wtype -k Return
 until_ok 3000 read_is '.ayat == 83'
 check "Enter opens Ya-Sin with its 83 ayat ($(read_show '[.heading, .ayat, .picker.open]'))" \

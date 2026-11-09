@@ -71,8 +71,8 @@ check "the Memorise card draws the heading, the pronunciation and the meaning in
   mem_is '.memorise.card | [.headingFamily, .pronFamily, .meaningFamily] == ["Noto Sans Bengali", "Noto Sans Bengali", "Noto Sans Bengali"]'
 check "the four ratings read the card's next ($(mem '.card.ratings | map([.key, .word, .next])'))" \
   mem_is '.memorise.card.ratings | map([.key, .word, .next]) == [["1","again","10 min"],["2","hard","1 day"],["3","good","1 day"],["4","easy","1 day"]]'
-check "a rounded white card with an accent outline, tinted badge and rounded tiles ($(mem '.card | [.radius, .border, .fill, .borderColor, .badgeFill, .badge, .ask]'))" \
-  mem_is '.memorise.card | .radius == 14 and .border == 1.5 and .fill == "#ffffff" and .borderColor == "#3d5afe" and .badgeFill == "#eef1ff" and .badge == "2 · revealed" and .ask == "How did it go · next review" and (.ratings | all(.radius == 12))'
+check "a rounded card in the ink's veil with an accent outline, the accent's veil for its badge and rounded tiles ($(mem '.card | [.radius, .border, .fill, .borderColor, .badgeFill, .badge, .ask]'))" \
+  mem_is '.memorise.card | .radius == 14 and .border == 1.5 and .fill == "#0a15171b" and .borderColor == "#3249ce" and .badgeFill == "#243249ce" and .badge == "2 · revealed" and .ask == "How did it go · next review" and (.ratings | all(.radius == 12))'
 
 wtype 3
 until_ok 2000 mem_is '.memorise.count == "6 due today"'

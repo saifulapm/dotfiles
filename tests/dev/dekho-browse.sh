@@ -190,8 +190,8 @@ check "esc on Browse goes back to the Title page it came from ($(dekho_state | j
 # The board's own detail, on Browse from The Long Tide.
 wtype f
 until_ok 3000 dekho_is '.page == "browse" and (.browse.chips | length) == 3 and (.browse.rows | length) > 0'
-check "chips are rounded 13 px on #EEF1FF and kind tabs 10 px ($(dekho_state | jq -c '.browse.look'))" \
-  dekho_is '.browse.look.chipRadius == 13 and (.browse.look.chipFill | ascii_downcase) == "#eef1ff" and .browse.look.kindRadius == 10 and .browse.prefilled == "prefilled from The Long Tide" and .browse.kinds[2].text == "Series"'
+check "chips are rounded 13 px on the accent's veil #243249CE and kind tabs 10 px ($(dekho_state | jq -c '.browse.look'))" \
+  dekho_is '.browse.look.chipRadius == 13 and (.browse.look.chipFill | ascii_downcase) == "#243249ce" and .browse.look.kindRadius == 10 and .browse.prefilled == "prefilled from The Long Tide" and .browse.kinds[2].text == "Series"'
 until_ok 3000 dekho_is '[.browse.rows[] | select(.poster.shown)] | length == 7'
 check "the poster is masked to its grey tile's 6 px corners, and a null or gone one keeps the tile ($(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown) | .poster | [.radius, .width, .height]] | unique'), unshown $(dekho_state | jq -c '[.browse.rows[] | select(.poster.shown | not) | .title]'))" \
   dekho_is '([.browse.rows[] | select(.poster.shown) | .poster] | all(.radius == 6 and .width == 24 and .height == 34)) and ([.browse.rows[] | select(.poster.shown | not) | .title] | sort) == ["Salt Road", "The Weather House"]'

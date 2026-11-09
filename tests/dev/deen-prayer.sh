@@ -47,7 +47,7 @@ check "Tab four times reaches Prayer" deen_is '.tab == "prayer" and .heading == 
 check "the five rows read the day's times ($(prayer '.rows | map(.name + " " + .time)'))" \
   prayer_is '.rows | map(.name + " " + .time) == ["Fajr 04:43","Dhuhr 11:43","Asr 15:50","Maghrib 17:26","Isha 18:42"]'
 check "Fajr and Dhuhr draw dimmed and the rest do not ($(prayer '.rows | map(.nameColor)'))" \
-  prayer_is '.rows | map(.nameColor) == ["#57606a","#57606a","#ffffff","#15171b","#15171b"] and .[0].timeColor == "#57606a" and .[4].timeColor == "#15171b"'
+  prayer_is '.rows | map(.nameColor) == ["#535b65","#535b65","#e4e6ea","#15171b","#15171b"] and .[0].timeColor == "#535b65" and .[4].timeColor == "#15171b"'
 check "Asr is the next row, tagged next and Hanafi, and no other row is ($(prayer '.rows | map(.tag)'))" \
   prayer_is '.rows | map(.tag) == ["","","next · Hanafi","",""] and (map(.next) == [false,false,true,false,false])'
 check "the countdown reads $(prayer .headline) and $(prayer .at)" \
@@ -96,10 +96,10 @@ wtype -k t
 until_ok 3000 prayer_is '.failed == "" and (.rows | length) == 5'
 
 # The board detail, with the 23rd at 14:32 shown.
-check "the next row is a dark 14 px card with a white 8 px tag ($(prayer '.rows[2]'))" \
-  prayer_is '.rows[2].fill == "#15171b" and .rows[2].radius == 14 and .rows[2].tagFill == "#ffffff" and .rows[2].tagRadius == 8 and .rows[2].nameColor == "#ffffff"'
-check "the other rows are grey cards, the past ones dimmed ($(prayer '.rows[0], .rows[3]'))" \
-  prayer_is '.rows[3].fill == "#f6f7f9" and .rows[3].radius == 14 and .rows[3].border == 0 and .rows[0].nameColor == "#57606a" and .rows[3].nameColor == "#15171b"'
+check "the next row is a dark 14 px card with a paper 8 px tag ($(prayer '.rows[2]'))" \
+  prayer_is '.rows[2].fill == "#15171b" and .rows[2].radius == 14 and .rows[2].tagFill == "#e4e6ea" and .rows[2].tagRadius == 8 and .rows[2].nameColor == "#e4e6ea"'
+check "the other rows are cards in the ink's veil, the past ones dimmed ($(prayer '.rows[0], .rows[3]'))" \
+  prayer_is '.rows[3].fill == "#0a15171b" and .rows[3].radius == 14 and .rows[3].border == 0 and .rows[0].nameColor == "#535b65" and .rows[3].nameColor == "#15171b"'
 
 close_deen
 check "Esc closes the window" deen_gone
@@ -113,7 +113,7 @@ until_ok 3000 prayer_is '.headline != ""'
 check "at 19:10 the page asks for 24 October ($(asked '--date 2026-10-24') calls, $before before)" test "$(asked '--date 2026-10-24')" -gt "$before"
 check "and counts down to its Fajr ($(prayer '[.headline, .at]'))" prayer_is '.label == "Next prayer" and .headline == "Fajr in 9 h 34 min" and .at == "04:44 · now 19:10"'
 check "every row of the day is dimmed and none is next ($(prayer '.rows | map(.nameColor)'))" \
-  prayer_is '(.rows | map(.nameColor) | unique == ["#57606a"]) and (.rows | map(.next) | any | not)'
+  prayer_is '(.rows | map(.nameColor) | unique == ["#535b65"]) and (.rows | map(.next) | any | not)'
 close_deen
 check "Esc closes the window and no deen qs is left" no_deen_process
 
