@@ -45,9 +45,9 @@ test('the everyday CLI tools are declared for every arch, and eza is not', () =>
   assert.equal(byName.has('tealdeer'), false);
 });
 
-// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them: pipewire-utils' pw-dump and pw-link for Control's audio and the HomePod, bluez's bluetoothd behind Control's Bluetooth, qt6-qtimageformats for Files' WebP, TIFF and AVIF previews, libxml2_2.13's libxml2.so.2, which aqua's hurl links (Fedora 45's libxml2 is .so.16), and helix-parsers' grammars, which kak's tree-sitter reads from $HELIX_RUNTIME (only a weak dependency of helix).
+// The shell, Chromium and the clipboard endpoint use these, and a minimal Fedora need not have them: pipewire-utils' pw-dump and pw-link for Control's audio and the HomePod, bluez's bluetoothd behind Control's Bluetooth, qt6-qtimageformats for Files' WebP, TIFF and AVIF previews, libxml2_2.13's libxml2.so.2, which aqua's hurl links (Fedora 45's libxml2 is .so.16), helix-parsers' grammars, which kak's tree-sitter reads from $HELIX_RUNTIME (only a weak dependency of helix), libnotify's notify-send, which dots-taildrop calls, and xdg-desktop-portal-gnome, the screencast and screenshot portal niri-portals.conf names first (only a weak dependency of niri).
 test('what the shell and Chromium call is declared, not left to the base image', () => {
-  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli', 'pipewire-utils', 'bluez', 'qt6-qtimageformats', 'libxml2_2.13', 'helix-parsers']) {
+  for (const name of ['upower', 'power-profiles-daemon', 'ddcutil', 'pipewire-pulseaudio', 'pandoc-cli', 'pipewire-utils', 'bluez', 'qt6-qtimageformats', 'libxml2_2.13', 'helix-parsers', 'libnotify', 'xdg-desktop-portal-gnome']) {
     assert.equal(byName.get(name)?.arch, 'all', `${name} arch`);
     assert.match(byName.get(name).why, /\w/, `${name} why`);
   }
@@ -58,13 +58,14 @@ test('ffmpeg comes from RPM Fusion free', () => {
   assert.equal(byName.get('ffmpeg')?.rpmfusion, 'free');
 });
 
-// The NUC's Intel wifi and video decode; Fedora's libva-intel-media-driver leaves out codecs RPM Fusion's build has.
-test('the NUC\'s wifi firmware, VA driver and vainfo are declared for x86_64 only', () => {
+// The NUC's Intel wifi, video decode and Vulkan; Fedora's libva-intel-media-driver leaves out codecs RPM Fusion's build has, and mpv's gpu-next draws on Vulkan there.
+test('the NUC\'s wifi firmware, VA driver, vainfo and Vulkan driver are declared for x86_64 only', () => {
   assert.equal(byName.get('iwlwifi-mvm-firmware')?.arch, 'x86_64');
   assert.equal(byName.get('intel-media-driver')?.arch, 'x86_64');
   assert.equal(byName.get('intel-media-driver').rpmfusion, 'nonfree');
   assert.equal(byName.get('libva-utils')?.arch, 'x86_64');
-  for (const name of ['iwlwifi-mvm-firmware', 'intel-media-driver', 'libva-utils']) assert.match(byName.get(name).why, /\w/, `${name} why`);
+  assert.equal(byName.get('mesa-vulkan-drivers')?.arch, 'x86_64');
+  for (const name of ['iwlwifi-mvm-firmware', 'intel-media-driver', 'libva-utils', 'mesa-vulkan-drivers']) assert.match(byName.get(name).why, /\w/, `${name} why`);
 });
 
 // Google's adb, aapt2 and NDK hosts are x86_64 only, so the Macs take adb from Fedora and build scrcpy against RPM Fusion's ffmpeg.

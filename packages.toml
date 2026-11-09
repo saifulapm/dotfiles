@@ -584,9 +584,24 @@ arch = "x86_64"
 why = "vainfo, which shows the NUC's VA driver loads"
 
 [[package]]
+name = "mesa-vulkan-drivers"
+arch = "x86_64"
+why = "Vulkan on the NUC's Intel GPU, which mpv's gpu-next draws with"
+
+[[package]]
 name = "xdg-desktop-portal-gtk"
 arch = "all"
 why = "answers open and save dialogs when the shell's picker cannot"
+
+[[package]]
+name = "xdg-desktop-portal-gnome"
+arch = "all"
+why = "screencasts and screenshots for niri, the first portal its niri-portals.conf names; niri only recommends it"
+
+[[package]]
+name = "libnotify"
+arch = "all"
+why = "notify-send, which dots-taildrop and dots-taildrop-send call"
 
 [[package]]
 name = "git-delta"
