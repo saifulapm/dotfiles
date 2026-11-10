@@ -59,3 +59,13 @@ test('amx, workflow\'s cloud starts and cx all run the account wrapper', (t) => 
   assert.equal(fish.stdout.trim(), wrapper);
   assert.match(readFileSync(join(repo, 'home/dot_config/fish/functions/cx.fish'), 'utf8'), /^\s+~\/\.local\/libexec\/dots\/claude /m);
 });
+
+// ~/.claude/CLAUDE.md, the global rules every Claude Code session reads, links into the checkout as v1's did, so an edit there is an edit to the repo; pi's AGENTS.md links to it in turn. The rules live outside home/ since CLAUDE.md is on the global ignore list.
+test('~/.claude/CLAUDE.md links to the rules in the checkout', () => {
+  const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-claude-md-')));
+  const link = readFileSync(join(repo, 'home/dot_claude/symlink_CLAUDE.md.tmpl'), 'utf8');
+  const r = spawnSync('chezmoi', ['--config', join(home, 'none.toml'), '--source', join(repo, 'home'), 'execute-template'], { input: link, encoding: 'utf8', env: { PATH: process.env.PATH, HOME: home } });
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), join(repo.replace(/\/$/, ''), 'claude/rules.md'));
+  assert.match(readFileSync(join(repo, 'claude/rules.md'), 'utf8'), /^# Saiful — global rules/);
+});
