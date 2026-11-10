@@ -131,6 +131,14 @@ test('git has one excludes file under ~/.config/git and both accounts rewrite', 
   ]) assert.ok(urls.includes(line), line);
 });
 
+// The workflow's README names every agent and tool file a product repo never tracks; the excludes file keeps each one out of git status.
+test('the excludes file names every agent file the workflow keeps out of a repo', () => {
+  const lines = readFileSync(join(repo, 'home/dot_config/git/ignore'), 'utf8').split('\n');
+  for (const name of ['.claude/', 'CLAUDE.md', 'CLAUDE.local.md', 'AGENTS.md', '.agents/', '.cursor/', '.scratch/', '.e2e/', '.amx/', '.mcp.json', 'opencode.json', 'opencode.jsonc', 'skills-lock.json', '.playwright-cli/']) {
+    assert.ok(lines.includes(name), name);
+  }
+});
+
 // workflow install writes its hook stubs there, and they chain into each repo's own hooks.
 test('every repo runs the hooks in ~/.config/git/hooks', () => {
   const r = run('git', ['config', '--type=path', '--get-all', 'core.hooksPath']);
