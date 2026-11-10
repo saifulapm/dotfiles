@@ -1,0 +1,15 @@
+[Unit]
+Description=hub device tunnel: device.on-rexa.com to this machine's local hub, for cloud device calls
+# A connector of the device-hub Cloudflare tunnel. Access lets a call in only with the workflow device service token, and hub local checks the token Access signed before it runs anything. dots secrets writes the tunnel token from pass; a machine without it skips the unit instead of failing it.
+ConditionPathExists=%h/.config/hub/device-tunnel.token
+After=network-online.target hub-local.service
+StartLimitIntervalSec=0
+
+[Service]
+# The shim, since mise installs cloudflared and the unit's PATH has no mise.
+ExecStart=%h/.local/share/mise/shims/cloudflared tunnel --no-autoupdate run --token-file %h/.config/hub/device-tunnel.token
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

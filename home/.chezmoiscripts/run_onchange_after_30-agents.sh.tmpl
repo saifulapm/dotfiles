@@ -8,7 +8,7 @@ case $(systemctl --user is-system-running 2>/dev/null) in
   *) exit 0 ;;
 esac
 systemctl --user daemon-reload
-systemctl --user start pxy.service hub-local.service || log "pxy or the local hub did not start: systemctl --user status pxy hub-local"
+systemctl --user start pxy.service hub-local.service hub-device-tunnel.service || log "pxy, the local hub or its device tunnel did not start: systemctl --user status pxy hub-local hub-device-tunnel"
 # The first apply after dots secrets joins the machine to the mem store; workflow switch writes HUB_STORE_TOKEN into local.env, so it runs once.
 env=$HOME/.config/hub/local.env
 if [[ -f $env ]] && ! grep -q '^HUB_STORE_TOKEN=' "$env"; then

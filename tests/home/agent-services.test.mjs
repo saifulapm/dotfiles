@@ -51,11 +51,11 @@ function apply({ manager = 'running', env, switchFails = false } = {}) {
   return { r, calls, home };
 }
 
-test('with a user manager, the apply starts pxy and the local hub, and no Remote Control', () => {
+test('with a user manager, the apply starts pxy, the local hub and its device tunnel, and no Remote Control', () => {
   const { r, calls, home } = apply();
   assert.equal(r.status, 0, r.stderr);
   assert.ok(calls.includes('systemctl --user daemon-reload'), calls.join('\n'));
-  assert.ok(calls.includes('systemctl --user start pxy.service hub-local.service'), calls.join('\n'));
+  assert.ok(calls.includes('systemctl --user start pxy.service hub-local.service hub-device-tunnel.service'), calls.join('\n'));
   assert.ok(!calls.some((c) => /claude-rc/.test(c)), calls.join('\n'));
   assert.equal(existsSync(join(home, 'Codes/remote')), false, 'no Remote Control folder is made');
 });
