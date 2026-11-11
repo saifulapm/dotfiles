@@ -558,6 +558,11 @@ arch = "aarch64"
 why = "builds the asahi-va-driver pin on the Macs"
 
 [[package]]
+name = "asahi-fix27"
+arch = "aarch64"
+why = "sets a macOS 27 volume's bootable flag again from Linux, for when macOS will not boot"
+
+[[package]]
 name = "binutils"
 arch = "aarch64"
 why = "nm, which the AVD firmware build reads symbols with"

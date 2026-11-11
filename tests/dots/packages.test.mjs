@@ -32,6 +32,12 @@ test('the AVD firmware and VA driver build tools are declared for the Macs only'
   }
 });
 
+// Asahi's fix for a macOS 27 volume that lost its bootable flag, run by hand from Linux when macOS will not boot; nothing depends on it, so a cleanup's autoremove took it from both Macs.
+test('asahi-fix27 is declared for the Macs only', () => {
+  assert.equal(byName.get('asahi-fix27')?.arch, 'aarch64');
+  assert.match(byName.get('asahi-fix27').why, /\w/);
+});
+
 // The tools Saiful and his agents reach for (v2.2): delta and difft for diffs, gm, shellcheck, dig and docker for the agents.
 test('the everyday CLI tools are declared for every arch, and eza is not', () => {
   for (const name of ['git-delta', 'difftastic', 'tree', 'yq', 'glow', 'gum', 'tokei', 'trash-cli', 'uv', 'ShellCheck', 'GraphicsMagick', 'bind-utils', 'podman-docker', 'NetworkManager-tui', 'git-lfs', 'podman-compose']) {
