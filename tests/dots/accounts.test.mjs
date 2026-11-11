@@ -15,9 +15,20 @@ const REFRESH = 'sk-ant-ort01-REFRESH-test-token';
 const HOUR = 3600e3;
 const FORGED = ['Fa\nke', 'Fake\u202Eevil', 'Fake\u001b[31m', '', 'x'.repeat(200), '\n'];
 
-// The balance bodies as the providers' docs give them: DeepSeek's amounts are strings, OpenRouter's credits bought and used.
+// DeepSeek's balance as its docs give it, the amounts strings.
 const DEEPSEEK = { is_available: true, balance_infos: [{ currency: 'USD', total_balance: '12.34', granted_balance: '0.00', topped_up_balance: '12.34' }] };
-const OPENROUTER = { data: { total_credits: 25, total_usage: 7.5 } };
+// OpenRouter's activity as its docs give it, one item per day and model: two this UTC month, one on the last day of the month before.
+const utcMonth = (offset) => {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + offset, 1));
+};
+const ACTIVITY = {
+  data: [
+    { date: utcMonth(0).toISOString().slice(0, 10), model: 'openai/gpt-4o-mini', usage: 1.25, requests: 3 },
+    { date: utcMonth(0).toISOString().slice(0, 10), model: 'deepseek/deepseek-v4', usage: 0.5, requests: 1 },
+    { date: new Date(utcMonth(0) - 86400e3).toISOString().slice(0, 10), model: 'openai/gpt-4o-mini', usage: 100, requests: 9 },
+  ],
+};
 
 // Executables on the collector's PATH, each a node script that records its argv and env in the ctl dir and answers from files there.
 const STUBS = {
@@ -70,11 +81,11 @@ async function stub(t) {
       const status = eleven ? s.eleven : s.fal;
       return send(status, status === 200 ? JSON.stringify(eleven ? ELEVEN : FAL) : '{"error":{"type":"x","message":"forged"}}');
     }
-    if (req.url === '/user/balance' || req.url === '/api/v1/credits') {
+    if (req.url === '/user/balance' || req.url === '/api/v1/activity') {
       s.other.push({ url: req.url, method: req.method, headers: req.headers });
       const deepseek = req.url === '/user/balance';
       const status = deepseek ? s.deepseek : s.openrouter;
-      const body = (deepseek ? s.deepseekBody : s.openrouterBody) || (deepseek ? DEEPSEEK : OPENROUTER);
+      const body = (deepseek ? s.deepseekBody : s.openrouterBody) || (deepseek ? DEEPSEEK : ACTIVITY);
       return setTimeout(() => send(status, status === 200 ? JSON.stringify(body) : '{"error":{"message":"forged","code":401}}'), s.balanceDelay);
     }
     if (req.url.startsWith('/api/v2/usage')) {
@@ -357,10 +368,8 @@ test('no token reaches the output or the cache', async (t) => {
 });
 
 const R = (provider, label, metric, kind, value, limit, unit, resets_at, state = 'ok', reason = null) => ({ provider, label, account: null, metric, kind, value, limit, unit, resets_at, state, reason });
-const MONEY = [
-  R('deepseek-ai', 'DeepSeek', 'balance', 'money', 12.34, null, 'USD', null),
-  R('openrouter', 'OpenRouter', 'balance', 'money', 17.5, 25, 'USD', null),
-];
+const DEEPSEEK_ROW = R('deepseek-ai', 'DeepSeek', 'balance', 'money', 12.34, null, 'USD', null);
+const OPENROUTER_ROW = R('openrouter', 'OpenRouter', 'this month', 'spend', 1.75, null, 'USD', null);
 const ELEVEN_ROW = R('elevenlabs', 'ElevenLabs', 'characters', 'count', 11500, 32000, 'characters', '2026-10-26T07:33:20Z');
 const FAL_ROW = R('fal', 'fal', 'balance', 'money', 24.5, null, 'USD', null);
 const JINA_ROW = R('jina', 'Jina', 'balance', 'tokens', 953604107, null, 'tokens', null);
@@ -375,7 +384,7 @@ const ymd = (days) => new Date(Date.now() + days * 86400e3).toISOString().slice(
 const BALANCE_KEYS = new Set(['deepseek-ai', 'openrouter']);
 const balanceRows = (out) => out.filter((row) => BALANCE_KEYS.has(row.provider));
 // A placeholder keeps its source's kind, so the card knows which group it draws in.
-const KIND = { elevenlabs: 'count', jina: 'tokens', context7: 'count' };
+const KIND = { elevenlabs: 'count', jina: 'tokens', context7: 'count', openrouter: 'spend' };
 const placeholder = (provider, label, state, reason) => R(provider, label, null, KIND[provider] || 'money', null, null, null, null, state, reason);
 const ctlLog = (ctx, name) => (existsSync(join(ctx.ctl, name)) ? readFileSync(join(ctx.ctl, name), 'utf8').trim().split('\n').map((l) => JSON.parse(l)) : []);
 const OPTS = '--pinentry-mode error';
@@ -386,7 +395,7 @@ test('every stub answering gives the money, token and spend rows and the usage r
   const start = Date.now();
   const { out, r } = await everything(ctx);
   const wall = Date.now() - start;
-  assert.deepEqual(strip(out), [...limits('main'), ...MONEY, ELEVEN_ROW, FAL_ROW, ...SPEND_ROWS(), JINA_ROW, ...CONTEXT7_ROWS]);
+  assert.deepEqual(strip(out), [...limits('main'), DEEPSEEK_ROW, OPENROUTER_ROW, ELEVEN_ROW, FAL_ROW, ...SPEND_ROWS(), JINA_ROW, ...CONTEXT7_ROWS]);
   assert.ok(wall < 2000, `took ${wall} ms`);
   for (const row of out) assert.equal(typeof row.as_of, 'string');
   const eleven = s.other.find((q) => q.url === '/v1/user/subscription');
@@ -394,7 +403,7 @@ test('every stub answering gives the money, token and spend rows and the usage r
   assert.equal(eleven.headers['xi-api-key'], 'FAKEKEY-AI-elevenlabs-main');
   assert.equal(fal.headers.authorization, 'Key FAKEKEY-AI-fal-billing');
   assert.equal(s.other.find((q) => q.url === '/user/balance').headers.authorization, 'Bearer FAKEKEY-AI-deepseek-main');
-  assert.equal(s.other.find((q) => q.url === '/api/v1/credits').headers.authorization, 'Bearer FAKEKEY-AI-openrouter-main');
+  assert.equal(s.other.find((q) => q.url === '/api/v1/activity').headers.authorization, 'Bearer FAKEKEY-AI-openrouter-manage');
   const c7 = s.other.filter((q) => q.url.startsWith('/api/v2/usage'));
   assert.deepEqual(c7.map((q) => q.headers.authorization).sort(), ['Bearer FAKEKEY-AI-context7-alt', 'Bearer FAKEKEY-AI-context7-clt', 'Bearer FAKEKEY-AI-context7-main']);
   assert.equal(s.other.find((q) => q.url.startsWith('/api/v1/api_key/user')).url, '/api/v1/api_key/user?api_key=FAKEKEY-AI-jina-reader-main');
@@ -405,7 +414,7 @@ test('every stub answering gives the money, token and spend rows and the usage r
     assert.equal(q.headers['anthropic-version'], '2023-06-01');
   }
   const pass = ctlLog(ctx, 'pass.log');
-  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/context7/alt'], ['show', 'AI/context7/clt'], ['show', 'AI/context7/main'], ['show', 'AI/deepseek/main'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main'], ['show', 'AI/openrouter/main']]);
+  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/context7/alt'], ['show', 'AI/context7/clt'], ['show', 'AI/context7/main'], ['show', 'AI/deepseek/main'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main'], ['show', 'AI/openrouter/manage']]);
   for (const l of pass) assert.equal(l.opts, OPTS);
   for (const text of [...['pass.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
     assert.ok(!text.includes('FAKEKEY'), text);
@@ -422,10 +431,10 @@ test('a locked store makes DeepSeek and OpenRouter auth rows and sends them no r
     strip(balanceRows(out)),
     [['deepseek-ai', 'DeepSeek'], ['openrouter', 'OpenRouter']].map(([p, l]) => placeholder(p, l, 'auth', 'locked')),
   );
-  assert.ok(!s.other.some((q) => q.url === '/user/balance' || q.url === '/api/v1/credits'));
+  assert.ok(!s.other.some((q) => q.url === '/user/balance' || q.url === '/api/v1/activity'));
 });
 
-test('a balance timing out after a good run keeps OpenRouter at its cached value, as of before the run', async (t) => {
+test('a balance timing out after a good run keeps OpenRouter at its cached spend, as of before the run', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
   await everything(ctx);
@@ -434,7 +443,7 @@ test('a balance timing out after a good run keeps OpenRouter at its cached value
   const start = Date.now();
   const { out } = await everything(ctx);
   const openrouter = out.find((row) => row.provider === 'openrouter');
-  assert.deepEqual([openrouter.value, openrouter.limit, openrouter.state, openrouter.reason], [17.5, 25, 'stale', 'timeout']);
+  assert.deepEqual([openrouter.value, openrouter.limit, openrouter.state, openrouter.reason], [1.75, null, 'stale', 'timeout']);
   assert.ok(Date.parse(openrouter.as_of) < start, openrouter.as_of);
   assert.equal(balanceRows(out).filter((row) => row.state !== 'stale').length, 0);
 });
@@ -445,20 +454,20 @@ test('a locked store after a good run serves the cached balances as stale', asyn
   await everything(ctx);
   writeFileSync(join(ctx.ctl, 'pass-locked'), '');
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(balanceRows(out)), MONEY.map((row) => ({ ...row, state: 'stale', reason: 'locked' })));
+  assert.deepEqual(strip(balanceRows(out)), [DEEPSEEK_ROW, OPENROUTER_ROW].map((row) => ({ ...row, state: 'stale', reason: 'locked' })));
   for (const name of ['deepseek', 'openrouter']) assert.equal(JSON.parse(readFileSync(join(ctx.cache, name + '.json'), 'utf8'))[0].state, 'ok');
 });
 
-test('a balance body of an unknown shape is one shape row and the other balance stays', async (t) => {
+test('a body of an unknown shape is one shape row and the other row stays', async (t) => {
   const s = await stub(t);
   s.openrouterBody = { surprise: 'sk-ant-forged' };
   const ctx = scratch(t, s.url, ['main']);
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(balanceRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
+  assert.deepEqual(strip(balanceRows(out)), [DEEPSEEK_ROW, placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
 });
 
-// OpenRouter answers a dead key with 401, and its credits call with 403 for a key that is not a management key.
-test('a balance answering 401 is a no-key row and 403 a forbidden one', async (t) => {
+// OpenRouter answers a dead key with 401, and its activity call with 403 for a key that is not a management key.
+test('a provider answering 401 is a no-key row and 403 a forbidden one', async (t) => {
   const s = await stub(t);
   s.deepseek = 403;
   s.openrouter = 401;

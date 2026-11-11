@@ -260,14 +260,19 @@ async function deepseek(signal) {
   return rows;
 }
 
-// OpenRouter gives the credits bought and used, so what is left is shown against what was bought.
+// OpenRouter's API counts only purchased credits, so a grant never shows as a balance; the row is this UTC month's spend from the management key's activity, which covers finished days, so today's spend arrives tomorrow.
 async function openrouter(signal) {
-  const body = await fetchJSON(OPENROUTER + '/api/v1/credits', { authorization: 'Bearer ' + (await key('AI/openrouter/main', signal)) }, signal, 'no-key');
-  const d = body && body.data;
-  const bought = num(d && d.total_credits);
-  const used = num(d && d.total_usage);
-  if (bought === null || used === null) throw new Failure('shape');
-  return [money(own('openrouter', 'OpenRouter'), num(bought - used), bought, 'USD')];
+  const body = await fetchJSON(OPENROUTER + '/api/v1/activity', { authorization: 'Bearer ' + (await key('AI/openrouter/manage', signal)) }, signal, 'no-key');
+  const items = body && body.data;
+  if (!Array.isArray(items)) throw new Failure('shape');
+  const month = new Date().toISOString().slice(0, 7);
+  let spent = 0;
+  for (const item of items) {
+    const usage = num(item && item.usage);
+    if (usage === null || typeof item.date !== 'string') throw new Failure('shape');
+    if (item.date.startsWith(month)) spent += usage;
+  }
+  return [{ ...own('openrouter', 'OpenRouter', 'spend'), metric: 'this month', kind: 'spend', value: num(spent), limit: null, unit: 'USD', resets_at: null }];
 }
 
 function sources() {
@@ -275,7 +280,7 @@ function sources() {
   return [
     ...claudes,
     { name: 'deepseek', names: own('deepseek-ai', 'DeepSeek'), run: deepseek },
-    { name: 'openrouter', names: own('openrouter', 'OpenRouter'), run: openrouter },
+    { name: 'openrouter', names: own('openrouter', 'OpenRouter', 'spend'), run: openrouter },
     { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs', 'count'), run: elevenlabs },
     { name: 'fal', names: own('fal', 'fal'), run: fal },
     ...['main', 'alt'].map((org) => ({ name: 'anthropic-' + org, names: own('anthropic', 'Anthropic ' + org), run: (signal) => anthropic(org, signal) })),
