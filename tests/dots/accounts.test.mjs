@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -13,18 +13,11 @@ const usage = readFileSync(new URL('./fixtures/claude-usage.json', import.meta.u
 const TOKEN = { main: 'sk-ant-oat01-MAIN-test-token', work: 'sk-ant-oat01-WORK-test-token' };
 const REFRESH = 'sk-ant-ort01-REFRESH-test-token';
 const HOUR = 3600e3;
-const fixture = (name) => new URL('./fixtures/' + name, import.meta.url).pathname;
 const FORGED = ['Fa\nke', 'Fake\u202Eevil', 'Fake\u001b[31m', '', 'x'.repeat(200), '\n'];
 
-// What pxy prints with the store open, one body per parser: DeepSeek (string amounts), OpenRouter, and providers no row is made for.
-const PXY_OK = {
-  remote: {
-    'deepseek-ai': { summary: 'x', data: { is_available: true, balance_infos: [{ currency: 'USD', total_balance: '12.34', granted_balance: '0.00' }] } },
-    openrouter: { summary: 'x', data: { data: { total_credits: 25, total_usage: 7.5 } } },
-    zenmux: { summary: 'x', data: { success: true, data: { currency: 'usd', total_credits: 482.74, top_up_credits: 35, bonus_credits: 447.74 } } },
-    'tokenharbor#pass': { summary: 'x', data: { usedPct: 0 } },
-  },
-};
+// The balance bodies as the providers' docs give them: DeepSeek's amounts are strings, OpenRouter's credits bought and used.
+const DEEPSEEK = { is_available: true, balance_infos: [{ currency: 'USD', total_balance: '12.34', granted_balance: '0.00', topped_up_balance: '12.34' }] };
+const OPENROUTER = { data: { total_credits: 25, total_usage: 7.5 } };
 
 // Executables on the collector's PATH, each a node script that records its argv and env in the ctl dir and answers from files there.
 const STUBS = {
@@ -43,13 +36,6 @@ if (fs.existsSync(ctl + '/missing-' + process.argv[3].replace(/\\//g, '-'))) {
 const entry = ctl + '/entry-' + process.argv[3].replace(/\\//g, '-');
 if (fs.existsSync(entry)) process.stdout.write('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\n' + fs.readFileSync(entry, 'utf8'));
 else console.log('FAKEKEY-' + process.argv[3].replace(/\\//g, '-') + '\\nsecond line');
-`,
-  pxy: `
-const fs = require('fs');
-const ctl = process.env.STUB_CTL;
-fs.appendFileSync(ctl + '/pxy.log', JSON.stringify({ argv: process.argv.slice(2), opts: process.env.PASSWORD_STORE_GPG_OPTS }) + '\\n');
-const delay = fs.existsSync(ctl + '/pxy-delay') ? Number(fs.readFileSync(ctl + '/pxy-delay', 'utf8')) : 0;
-setTimeout(() => process.stdout.write(fs.readFileSync(ctl + '/pxy.json')), delay);
 `,
 };
 
@@ -72,7 +58,7 @@ const COST = {
 
 // The stub answers with whatever `mode` holds at the time and records every request. `claude` is the usage endpoint's mode, `eleven` and `fal` the others' status.
 async function stub(t) {
-  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200, cost: 200, jina: 200, context7: 200 };
+  const s = { seen: [], other: [], mode: 'ok', eleven: 200, fal: 200, cost: 200, jina: 200, context7: 200, deepseek: 200, openrouter: 200, balanceDelay: 0 };
   const server = createServer((req, res) => {
     const send = (status, body) => {
       res.writeHead(status, { 'content-type': 'application/json' });
@@ -83,6 +69,13 @@ async function stub(t) {
       const eleven = req.url.startsWith('/v1/user');
       const status = eleven ? s.eleven : s.fal;
       return send(status, status === 200 ? JSON.stringify(eleven ? ELEVEN : FAL) : '{"error":{"type":"x","message":"forged"}}');
+    }
+    if (req.url === '/user/balance' || req.url === '/api/v1/credits') {
+      s.other.push({ url: req.url, method: req.method, headers: req.headers });
+      const deepseek = req.url === '/user/balance';
+      const status = deepseek ? s.deepseek : s.openrouter;
+      const body = (deepseek ? s.deepseekBody : s.openrouterBody) || (deepseek ? DEEPSEEK : OPENROUTER);
+      return setTimeout(() => send(status, status === 200 ? JSON.stringify(body) : '{"error":{"message":"forged","code":401}}'), s.balanceDelay);
     }
     if (req.url.startsWith('/api/v2/usage')) {
       s.other.push({ url: req.url, method: req.method, headers: req.headers });
@@ -145,7 +138,6 @@ function scratch(t, url, ids = ['main', 'work'], homeless = []) {
   mkdirSync(ctl);
   symlinkSync(process.execPath, join(stubBin, 'node'));
   for (const [name, code] of Object.entries(STUBS)) writeFileSync(join(stubBin, name), `#!${process.execPath}\n${code}`, { mode: 0o755 });
-  writeFileSync(join(ctl, 'pxy.json'), JSON.stringify(PXY_OK));
   const env = {
     HOME: home,
     XDG_CONFIG_HOME: join(root, 'config'),
@@ -159,6 +151,8 @@ function scratch(t, url, ids = ['main', 'work'], homeless = []) {
     DOTS_ACCOUNTS_FAL_URL: url,
     DOTS_ACCOUNTS_JINA_URL: url,
     DOTS_ACCOUNTS_CONTEXT7_URL: url,
+    DOTS_ACCOUNTS_DEEPSEEK_URL: url,
+    DOTS_ACCOUNTS_OPENROUTER_URL: url,
     PATH: stubBin,
     STUB_CTL: ctl,
   };
@@ -378,8 +372,8 @@ const monthStart = () => {
 };
 const SPEND_ROWS = () => ['main', 'alt'].map((org) => R('anthropic', 'Anthropic ' + org, 'this month', 'spend', 87.617075, null, 'USD', null));
 const ymd = (days) => new Date(Date.now() + days * 86400e3).toISOString().slice(0, 10);
-const PXY_KEYS = new Set(['deepseek-ai', 'openrouter']);
-const pxyRows = (out) => out.filter((row) => PXY_KEYS.has(row.provider));
+const BALANCE_KEYS = new Set(['deepseek-ai', 'openrouter']);
+const balanceRows = (out) => out.filter((row) => BALANCE_KEYS.has(row.provider));
 // A placeholder keeps its source's kind, so the card knows which group it draws in.
 const KIND = { elevenlabs: 'count', jina: 'tokens', context7: 'count' };
 const placeholder = (provider, label, state, reason) => R(provider, label, null, KIND[provider] || 'money', null, null, null, null, state, reason);
@@ -399,6 +393,8 @@ test('every stub answering gives the money, token and spend rows and the usage r
   const fal = s.other.find((q) => q.url === '/v1/account/billing?expand=credits');
   assert.equal(eleven.headers['xi-api-key'], 'FAKEKEY-AI-elevenlabs-main');
   assert.equal(fal.headers.authorization, 'Key FAKEKEY-AI-fal-billing');
+  assert.equal(s.other.find((q) => q.url === '/user/balance').headers.authorization, 'Bearer FAKEKEY-AI-deepseek-main');
+  assert.equal(s.other.find((q) => q.url === '/api/v1/credits').headers.authorization, 'Bearer FAKEKEY-AI-openrouter-main');
   const c7 = s.other.filter((q) => q.url.startsWith('/api/v2/usage'));
   assert.deepEqual(c7.map((q) => q.headers.authorization).sort(), ['Bearer FAKEKEY-AI-context7-alt', 'Bearer FAKEKEY-AI-context7-clt', 'Bearer FAKEKEY-AI-context7-main']);
   assert.equal(s.other.find((q) => q.url.startsWith('/api/v1/api_key/user')).url, '/api/v1/api_key/user?api_key=FAKEKEY-AI-jina-reader-main');
@@ -409,68 +405,67 @@ test('every stub answering gives the money, token and spend rows and the usage r
     assert.equal(q.headers['anthropic-version'], '2023-06-01');
   }
   const pass = ctlLog(ctx, 'pass.log');
-  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/context7/alt'], ['show', 'AI/context7/clt'], ['show', 'AI/context7/main'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main']]);
+  assert.deepEqual(pass.map((l) => l.argv).sort(), [['show', 'AI/anthropic/alt-admin'], ['show', 'AI/anthropic/main-admin'], ['show', 'AI/context7/alt'], ['show', 'AI/context7/clt'], ['show', 'AI/context7/main'], ['show', 'AI/deepseek/main'], ['show', 'AI/elevenlabs/main'], ['show', 'AI/fal/billing'], ['show', 'AI/jina-reader/main'], ['show', 'AI/openrouter/main']]);
   for (const l of pass) assert.equal(l.opts, OPTS);
-  assert.deepEqual(ctlLog(ctx, 'pxy.log'), [{ argv: ['status', '--remote', '--json'], opts: OPTS }]);
-  for (const text of [...['pass.log', 'pxy.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
+  for (const text of [...['pass.log'].map((f) => readFileSync(join(ctx.ctl, f), 'utf8')), r.stdout, ...readdirSync(ctx.cache).map((f) => readFileSync(join(ctx.cache, f), 'utf8'))]) {
     assert.ok(!text.includes('FAKEKEY'), text);
   }
-  assert.deepEqual(readdirSync(ctx.cache).sort(), ['anthropic-alt-days.json', 'anthropic-alt.json', 'anthropic-main-days.json', 'anthropic-main.json', 'claude-main.json', 'context7-alt.json', 'context7-clt.json', 'context7-main.json', 'elevenlabs.json', 'fal.json', 'jina.json', 'pxy.json']);
+  assert.deepEqual(readdirSync(ctx.cache).sort(), ['anthropic-alt-days.json', 'anthropic-alt.json', 'anthropic-main-days.json', 'anthropic-main.json', 'claude-main.json', 'context7-alt.json', 'context7-clt.json', 'context7-main.json', 'deepseek.json', 'elevenlabs.json', 'fal.json', 'jina.json', 'openrouter.json']);
 });
 
-test('pxy with the store locked: every pxy row is locked, and pxy ran without a pinentry', async (t) => {
+test('a locked store makes DeepSeek and OpenRouter auth rows and sends them no request', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
-  copyFileSync(fixture('pxy-locked.json'), join(ctx.ctl, 'pxy.json'));
+  writeFileSync(join(ctx.ctl, 'pass-locked'), '');
   const { out } = await everything(ctx);
   assert.deepEqual(
-    strip(pxyRows(out)),
+    strip(balanceRows(out)),
     [['deepseek-ai', 'DeepSeek'], ['openrouter', 'OpenRouter']].map(([p, l]) => placeholder(p, l, 'auth', 'locked')),
   );
-  assert.deepEqual(ctlLog(ctx, 'pxy.log').map((l) => l.opts), [OPTS]);
-  assert.ok(!JSON.stringify(out).includes('pinentry'), 'no text from the summary reaches a row');
+  assert.ok(!s.other.some((q) => q.url === '/user/balance' || q.url === '/api/v1/credits'));
 });
 
-test('pxy timing out after a good run keeps OpenRouter at its cached value, as of before the run', async (t) => {
+test('a balance timing out after a good run keeps OpenRouter at its cached value, as of before the run', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
   await everything(ctx);
   ctx.env.DOTS_ACCOUNTS_LIMIT_MS = '800';
-  writeFileSync(join(ctx.ctl, 'pxy-delay'), '5000');
+  s.balanceDelay = 5000;
   const start = Date.now();
   const { out } = await everything(ctx);
   const openrouter = out.find((row) => row.provider === 'openrouter');
   assert.deepEqual([openrouter.value, openrouter.limit, openrouter.state, openrouter.reason], [17.5, 25, 'stale', 'timeout']);
   assert.ok(Date.parse(openrouter.as_of) < start, openrouter.as_of);
-  assert.equal(pxyRows(out).filter((row) => row.state !== 'stale').length, 0);
+  assert.equal(balanceRows(out).filter((row) => row.state !== 'stale').length, 0);
 });
 
-test('pxy locked after a good run serves the cached rows as stale', async (t) => {
+test('a locked store after a good run serves the cached balances as stale', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
   await everything(ctx);
-  copyFileSync(fixture('pxy-locked.json'), join(ctx.ctl, 'pxy.json'));
+  writeFileSync(join(ctx.ctl, 'pass-locked'), '');
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(pxyRows(out)), MONEY.map((row) => ({ ...row, state: 'stale', reason: 'locked' })));
-  const cached = JSON.parse(readFileSync(join(ctx.cache, 'pxy.json'), 'utf8'));
-  assert.deepEqual(cached.map((row) => [row.provider, row.state]), MONEY.map((row) => [row.provider, 'ok']));
+  assert.deepEqual(strip(balanceRows(out)), MONEY.map((row) => ({ ...row, state: 'stale', reason: 'locked' })));
+  for (const name of ['deepseek', 'openrouter']) assert.equal(JSON.parse(readFileSync(join(ctx.cache, name + '.json'), 'utf8'))[0].state, 'ok');
 });
 
-test('a pxy provider with an unknown body shape is one shape row and the others stay', async (t) => {
+test('a balance body of an unknown shape is one shape row and the other balance stays', async (t) => {
   const s = await stub(t);
+  s.openrouterBody = { surprise: 'sk-ant-forged' };
   const ctx = scratch(t, s.url, ['main']);
-  writeFileSync(join(ctx.ctl, 'pxy.json'), JSON.stringify({ remote: { ...PXY_OK.remote, openrouter: { summary: 'x', data: { surprise: 'sk-ant-forged' } } } }));
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(pxyRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
+  assert.deepEqual(strip(balanceRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
 });
 
-// pxy passes on the provider's status as its summary: OpenRouter answers a dead key's balance call with HTTP 401.
-test('a provider pxy got HTTP 401 from is a no-key row and HTTP 403 a forbidden one, not no network', async (t) => {
+// OpenRouter answers a dead key with 401, and its credits call with 403 for a key that is not a management key.
+test('a balance answering 401 is a no-key row and 403 a forbidden one', async (t) => {
   const s = await stub(t);
+  s.deepseek = 403;
+  s.openrouter = 401;
   const ctx = scratch(t, s.url, ['main']);
-  writeFileSync(join(ctx.ctl, 'pxy.json'), JSON.stringify({ remote: { 'deepseek-ai': { summary: 'HTTP 403', data: null }, openrouter: { summary: 'HTTP 401', data: null } } }));
   const { out } = await everything(ctx);
-  assert.deepEqual(strip(pxyRows(out)), [placeholder('deepseek-ai', 'DeepSeek', 'auth', 'forbidden'), placeholder('openrouter', 'OpenRouter', 'auth', 'no-key')]);
+  assert.deepEqual(strip(balanceRows(out)), [placeholder('deepseek-ai', 'DeepSeek', 'auth', 'forbidden'), placeholder('openrouter', 'OpenRouter', 'auth', 'no-key')]);
+  assert.ok(!JSON.stringify(out).includes('forged'));
 });
 
 test('a locked pass store makes elevenlabs and fal auth rows and sends no request', async (t) => {

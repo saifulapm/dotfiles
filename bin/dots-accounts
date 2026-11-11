@@ -14,6 +14,8 @@ const ELEVENLABS = env.DOTS_ACCOUNTS_ELEVENLABS_URL || 'https://api.elevenlabs.i
 const FAL = env.DOTS_ACCOUNTS_FAL_URL || 'https://api.fal.ai';
 const JINA = env.DOTS_ACCOUNTS_JINA_URL || 'https://embeddings-dashboard-api.jina.ai';
 const CONTEXT7 = env.DOTS_ACCOUNTS_CONTEXT7_URL || 'https://context7.com';
+const DEEPSEEK = env.DOTS_ACCOUNTS_DEEPSEEK_URL || 'https://api.deepseek.com';
+const OPENROUTER = env.DOTS_ACCOUNTS_OPENROUTER_URL || 'https://openrouter.ai';
 const AUTH = new Set(['expired', 'forbidden', 'locked', 'no-key']);
 
 // A source's failure carries only a reason from the fixed list, never text from a response.
@@ -246,55 +248,34 @@ async function anthropic(org, signal) {
   return [{ ...names, metric: 'this month', kind: 'spend', value: num(cents / 100), limit: null, unit: 'USD', resets_at: null }];
 }
 
-// pxy names its providers; only these have a balance body read here, under the label the card shows.
-const PXY = { 'deepseek-ai': 'DeepSeek', openrouter: 'OpenRouter' };
-
-// The shapes pxy's own parsers know for those providers, tried in its order. A shape none of them knows returns null.
-function balances(data, names) {
-  const d = data.data;
-  if (d && num(d.total_credits) !== null && num(d.total_usage) !== null) return [money(names, num(d.total_credits - d.total_usage), num(d.total_credits), 'USD')];
-  if (Array.isArray(data.balance_infos) && data.balance_infos.length) {
-    const rows = data.balance_infos.map((b) => (amount(b && b.total_balance) === null ? null : money(names, amount(b.total_balance), null, currency(b.currency))));
-    return rows.includes(null) ? null : rows;
-  }
-  return null;
-}
-
 const failed = (names, reason) => ({ ...names, metric: null, kind: names.kind || null, value: null, limit: null, unit: null, resets_at: null, reason });
 
-// A provider pxy could not read says why in a summary; the summary only picks one of the fixed reasons.
-function pxyReason(summary) {
-  if (typeof summary !== 'string') return 'network';
-  if (summary.includes('No pinentry')) return 'locked';
-  // pxy passes on a refused key as the provider's status, as fetchJSON reads one from a pass key.
-  if (/^HTTP 401\b/.test(summary)) return 'no-key';
-  if (/^HTTP 403\b/.test(summary)) return 'forbidden';
-  return /^(credential|balance_key) error/.test(summary) ? 'no-key' : 'network';
+// DeepSeek gives one balance per currency, each amount a string.
+async function deepseek(signal) {
+  const body = await fetchJSON(DEEPSEEK + '/user/balance', { authorization: 'Bearer ' + (await key('AI/deepseek/main', signal)) }, signal, 'no-key');
+  const infos = body && body.balance_infos;
+  const names = own('deepseek-ai', 'DeepSeek');
+  const rows = Array.isArray(infos) ? infos.map((b) => (amount(b && b.total_balance) === null ? null : money(names, amount(b.total_balance), null, currency(b.currency)))) : [];
+  if (!rows.length || rows.includes(null)) throw new Failure('shape');
+  return rows;
 }
 
-// One source, many rows: a provider that failed is a row with its own reason, and the frame turns it into stale or a placeholder.
-async function pxy(signal) {
-  const r = await exec('pxy', ['status', '--remote', '--json'], signal);
-  let remote;
-  try {
-    remote = JSON.parse(r.stdout).remote;
-  } catch {}
-  if (!remote || typeof remote !== 'object') throw new Failure(r.code === 0 ? 'shape' : 'network');
-  return Object.keys(PXY)
-    .filter((k) => remote[k])
-    .flatMap((k) => {
-      const names = own(k, PXY[k]);
-      const entry = remote[k];
-      if (!entry.data || typeof entry.data !== 'object') return [failed(names, pxyReason(entry.summary))];
-      return balances(entry.data, names) || [failed(names, 'shape')];
-    });
+// OpenRouter gives the credits bought and used, so what is left is shown against what was bought.
+async function openrouter(signal) {
+  const body = await fetchJSON(OPENROUTER + '/api/v1/credits', { authorization: 'Bearer ' + (await key('AI/openrouter/main', signal)) }, signal, 'no-key');
+  const d = body && body.data;
+  const bought = num(d && d.total_credits);
+  const used = num(d && d.total_usage);
+  if (bought === null || used === null) throw new Failure('shape');
+  return [money(own('openrouter', 'OpenRouter'), num(bought - used), bought, 'USD')];
 }
 
 function sources() {
   const claudes = registry().map((a) => ({ name: 'claude-' + a.id, names: names(a), run: (signal) => claude(a, signal) }));
   return [
     ...claudes,
-    { name: 'pxy', names: own('pxy', 'pxy'), run: pxy },
+    { name: 'deepseek', names: own('deepseek-ai', 'DeepSeek'), run: deepseek },
+    { name: 'openrouter', names: own('openrouter', 'OpenRouter'), run: openrouter },
     { name: 'elevenlabs', names: own('elevenlabs', 'ElevenLabs', 'count'), run: elevenlabs },
     { name: 'fal', names: own('fal', 'fal'), run: fal },
     ...['main', 'alt'].map((org) => ({ name: 'anthropic-' + org, names: own('anthropic', 'Anthropic ' + org), run: (signal) => anthropic(org, signal) })),
@@ -308,37 +289,23 @@ const cached = (name) => {
   return Array.isArray(rows) ? rows : null;
 };
 
-// What a failure shows: the cached rows as stale, or one placeholder row. `only` limits the cached rows to one provider's, for a source with many.
-function fallback(source, reason, now, names = source.names, only) {
-  const old = (cached(source.name) || []).filter((r) => !only || r.provider === only);
-  if (old.length) return { shown: old.map((r) => ({ ...r, state: 'stale', reason })), kept: old };
-  const state = AUTH.has(reason) ? 'auth' : 'error';
-  return { shown: [{ ...failed(names, reason), as_of: now, state }], kept: [] };
+// What a failure shows: the cached rows as stale, or one placeholder row.
+function fallback(source, reason, now) {
+  const old = cached(source.name) || [];
+  if (old.length) return old.map((r) => ({ ...r, state: 'stale', reason }));
+  return [{ ...failed(source.names, reason), as_of: now, state: AUTH.has(reason) ? 'auth' : 'error' }];
 }
 
-// Runs one source within the limit. A source that throws shows its fallback; a row that carries its own reason shows that provider's fallback beside the rows that were read. The cache keeps the good rows and the old rows of providers that failed.
+// Runs one source within the limit. A source that throws shows its fallback; the cache keeps a source's last good rows.
 async function settle(source) {
   const now = iso(Date.now());
   const signal = AbortSignal.timeout(LIMIT_MS);
   const late = new Promise((_, reject) => signal.addEventListener('abort', () => reject(new Failure('timeout')), { once: true }));
   try {
-    const rows = await Promise.race([source.run(signal), late]);
-    const shown = [];
-    const kept = [];
-    for (const r of rows) {
-      if (r.reason) {
-        const f = fallback(source, r.reason, now, r, r.provider);
-        shown.push(...f.shown);
-        kept.push(...f.kept);
-      } else {
-        const ok = { ...r, as_of: now, state: 'ok', reason: null };
-        shown.push(ok);
-        kept.push(ok);
-      }
-    }
-    return { fresh: shown.some((r) => r.state === 'ok'), rows: shown, kept };
+    const rows = (await Promise.race([source.run(signal), late])).map((r) => ({ ...r, as_of: now, state: 'ok', reason: null }));
+    return { fresh: rows.length > 0, rows };
   } catch (e) {
-    return { rows: fallback(source, e instanceof Failure ? e.reason : 'shape', now).shown };
+    return { rows: fallback(source, e instanceof Failure ? e.reason : 'shape', now) };
   }
 }
 
@@ -382,7 +349,7 @@ async function main() {
     out = list.flatMap((s) => cached(s.name) || []);
   } else {
     const results = await Promise.all(list.map(settle));
-    await locked(() => results.forEach((r, i) => r.fresh && save(list[i].name, r.kept)));
+    await locked(() => results.forEach((r, i) => r.fresh && save(list[i].name, r.rows)));
     out = results.flatMap((r) => r.rows);
   }
   // Exits at once so a source still running past its limit cannot hold the process.
