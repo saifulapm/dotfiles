@@ -266,6 +266,9 @@ const failed = (names, reason) => ({ ...names, metric: null, kind: names.kind ||
 function pxyReason(summary) {
   if (typeof summary !== 'string') return 'network';
   if (summary.includes('No pinentry')) return 'locked';
+  // pxy passes on a refused key as the provider's status, as fetchJSON reads one from a pass key.
+  if (/^HTTP 401\b/.test(summary)) return 'no-key';
+  if (/^HTTP 403\b/.test(summary)) return 'forbidden';
   return /^(credential|balance_key) error/.test(summary) ? 'no-key' : 'network';
 }
 

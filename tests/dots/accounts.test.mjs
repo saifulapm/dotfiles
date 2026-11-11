@@ -464,6 +464,15 @@ test('a pxy provider with an unknown body shape is one shape row and the others 
   assert.deepEqual(strip(pxyRows(out)), [MONEY[0], placeholder('openrouter', 'OpenRouter', 'error', 'shape')]);
 });
 
+// pxy passes on the provider's status as its summary: OpenRouter answers a dead key's balance call with HTTP 401.
+test('a provider pxy got HTTP 401 from is a no-key row and HTTP 403 a forbidden one, not no network', async (t) => {
+  const s = await stub(t);
+  const ctx = scratch(t, s.url, ['main']);
+  writeFileSync(join(ctx.ctl, 'pxy.json'), JSON.stringify({ remote: { 'deepseek-ai': { summary: 'HTTP 403', data: null }, openrouter: { summary: 'HTTP 401', data: null } } }));
+  const { out } = await everything(ctx);
+  assert.deepEqual(strip(pxyRows(out)), [placeholder('deepseek-ai', 'DeepSeek', 'auth', 'forbidden'), placeholder('openrouter', 'OpenRouter', 'auth', 'no-key')]);
+});
+
 test('a locked pass store makes elevenlabs and fal auth rows and sends no request', async (t) => {
   const s = await stub(t);
   const ctx = scratch(t, s.url, ['main']);
