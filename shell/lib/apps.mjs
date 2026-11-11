@@ -25,14 +25,17 @@ export function termTheme(t) {
   return Object.assign({}, t, { color, syntax });
 }
 
-// The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: an accent dot before the current window.
+// tmux has no case modifier, so the bar's names are capitalised letter by letter.
+const CAPS = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => `s/${l}/${l.toUpperCase()}/`).join(';');
+
+// The bar sits at the top and reads as the page's running head, in the margins' voice, with no filled block: every name in capitals, an accent dot before the current window.
 export function renderTmux(t) {
   const c = t.color;
   const [ink, muted, line, surface, paper, accent, danger] = [c.ink, c.muted, c.line, c.surface, c.paper, c.accent, c.danger].map(lower);
   const frame = frameOf(t);
   // A message sits on the paper, where a scheme's ink may read less well than on its surface.
   const onPaper = (x) => lower(readable(x, c.paper, t.mode === 'dark' ? '#FFFFFF' : '#000000'));
-  const say = (mods, name) => `#{${mods}:${name}}`;
+  const say = (mods, name) => `#{${[mods, CAPS].filter((m) => m).join(';')}:${name}}`;
   const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
   const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
   const current = `#[fg=${accent}]● #[fg=${ink}]${number} ${name}#[default]`;

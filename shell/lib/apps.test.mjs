@@ -16,6 +16,7 @@ const dark = loadScheme('gruvbox-dark');
 const artboard = loadScheme('artboard');
 
 // The tmux bar reads as the page's running head, in the margins' words, with an accent dot before the current window.
+const CAPS = 'abcdefghijklmnopqrstuvwxyz'.split('').map((l) => `s/${l}/${l.toUpperCase()}/`).join(';');
 const tmuxOpt = (t, name) => renderTmux(t).match(new RegExp(`^set -g ${name} "(.*)"$`, 'm'))[1];
 
 test('the tmux bar draws no filled block in any theme, only text in the margin colours', () => {
@@ -32,7 +33,8 @@ test('tmux windows read like the margin number: an accent dot before the current
     assert.ok(tmuxOpt(t, 'window-status-current-format').startsWith(`#[fg=${c.accent.toLowerCase()}]● #[fg=${c.ink.toLowerCase()}]#{?#{e|<:#{window_index},10},0,}#{window_index} `), t.name);
     assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /bold/, t.name);
     assert.ok(tmuxOpt(t, 'window-status-format').startsWith(`#[fg=${c.muted.toLowerCase()}]`), t.name);
-    assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /s\/a\/A\//, t.name);
+    // tmux has no case modifier, so every name on the bar is capitalised letter by letter.
+    for (const o of ['status-left', 'status-right', 'window-status-format', 'window-status-current-format']) assert.ok(tmuxOpt(t, o).includes(CAPS), `${t.name} ${o}`);
     assert.equal(tmuxOpt(t, 'window-status-separator'), `#[fg=${c.muted.toLowerCase()}]    `, t.name);
     // tmux 3.8 underlines the current window by default.
     assert.equal(tmuxOpt(t, 'window-status-current-style'), 'default', t.name);
@@ -40,7 +42,7 @@ test('tmux windows read like the margin number: an accent dot before the current
 });
 
 test('the tmux session drops amx\'s prefix, turns the accent while the prefix key is held, and agents speak in the margins\' words', () => {
-  assert.equal(tmuxOpt(dark, 'status-left'), ' #[fg=#{?client_prefix,#83a598,#a89984}]#{s/^amx-//;=/24/…:session_name}#[default] ');
+  assert.equal(tmuxOpt(dark, 'status-left'), ` #[fg=#{?client_prefix,#83a598,#a89984}]#{s/^amx-//;=/24/…;${CAPS}:session_name}#[default] `);
   assert.match(tmuxOpt(artboard, 'status-right'), /^#\(dots-agents 57606a 3d5afe 15171b\)/);
   assert.match(tmuxOpt(dark, 'status-right'), /^#\(dots-agents a89984 83a598 ebdbb2\)/);
 });
@@ -66,9 +68,8 @@ test('a throwaway tmux server accepts each theme\'s fragment', (t) => {
     writeFileSync(join(dir, 'tmux.conf'), renderTmux(theme));
     tmux('source-file', join(dir, 'tmux.conf'));
     assert.match(tmux('show', '-g', 'status-style'), new RegExp(`fg=${theme.color.muted.toLowerCase()},bg=default`));
-    // Without the prefix held, the session reads in the muted colour, without amx's prefix and in the theme's case.
-    const name = theme.type.voice === 'plain' ? 'dots' : 'DOTS';
-    assert.equal(tmux('display', '-p', '#{T:status-left}'), ` #[fg=${theme.color.muted.toLowerCase()}]${name}#[default] \n`);
+    // Without the prefix held, the session reads in the muted colour, without amx's prefix, in capitals.
+    assert.equal(tmux('display', '-p', '#{T:status-left}'), ` #[fg=${theme.color.muted.toLowerCase()}]DOTS#[default] \n`);
   }
 });
 

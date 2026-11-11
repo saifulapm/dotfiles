@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots-agents <muted> <alert> <ink>, colours as hex without # since tmux runs it with sh, where # starts a comment: amx statusline's ✽N working and ⚠N waiting as the tmux bar's words, then the margin's separator; nothing when no agent needs mentioning.
+# dots-agents <muted> <alert> <ink>, colours as hex without # since tmux runs it with sh, where # starts a comment: amx statusline's ✽N working and ⚠N waiting as the tmux bar's words, in its capitals, then the margin's separator; nothing when no agent needs mentioning.
 set -uo pipefail
 {
 muted=#$1 alert=#$2 ink=#$3
@@ -12,7 +12,7 @@ for part in $(amx statusline 2>/dev/null); do
   esac
 done
 [[ -n $working || -n $waiting ]] || exit 0
-work="working" wait="#[fg=$alert]● #[fg=$ink]$waiting waiting" sep='   ' end='   '
+work="WORKING" wait="#[fg=$alert]● #[fg=$ink]$waiting WAITING" sep='   ' end='   '
 line=''
 [[ -n $working ]] && line="#[fg=$muted]$working $work"
 [[ -n $waiting ]] && line="${line:+$line$sep}$wait"

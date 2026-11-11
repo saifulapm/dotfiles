@@ -18,9 +18,9 @@ function say(t, amxSays) {
   return r.stdout;
 }
 
-test('working reads quietly and waiting after an accent dot, then the margin gap', (t) => {
-  assert.equal(say(t, '⚠3\n'), '#[fg=#c8381e]● #[fg=#1c1915]3 waiting#[fg=#575653]   ');
-  assert.equal(say(t, '✽2 ⚠1\n'), '#[fg=#575653]2 working   #[fg=#c8381e]● #[fg=#1c1915]1 waiting#[fg=#575653]   ');
+test('working reads quietly and waiting after an accent dot, both in capitals, then the margin gap', (t) => {
+  assert.equal(say(t, '⚠3\n'), '#[fg=#c8381e]● #[fg=#1c1915]3 WAITING#[fg=#575653]   ');
+  assert.equal(say(t, '✽2 ⚠1\n'), '#[fg=#575653]2 WORKING   #[fg=#c8381e]● #[fg=#1c1915]1 WAITING#[fg=#575653]   ');
 });
 
 test('no agent to mention, or no amx at all, prints nothing', (t) => {
