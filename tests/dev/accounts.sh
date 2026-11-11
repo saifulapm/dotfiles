@@ -100,11 +100,13 @@ check "and ACTIVE stays on main ($(c7))" state_is '[.rows[] | select(.name | sta
 check "and the island says nothing of Context7 ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Context7\")' >/dev/null"
 check "and the live ctx7 login keeps its bytes" test "$(sha256sum <"$creds" 2>/dev/null || true)" = "$creds_sum"
 
-# A new cx session runs claude in work's home: a stub claude first on PATH prints the CLAUDE_CONFIG_DIR it was given.
-mkdir -p "$DOTS_DEV_DIR/stub"
-printf '#!/bin/sh\nprintf "%%s\\n" "$CLAUDE_CONFIG_DIR"\n' >"$DOTS_DEV_DIR/stub/claude"
-chmod +x "$DOTS_DEV_DIR/stub/claude"
-cx_dir=$(PATH=$DOTS_DEV_DIR/stub:$PATH fish --no-config -c "source $repo/home/dot_config/fish/functions/cx.fish; cx")
+# A new cx session runs claude in work's home: cx runs the account wrapper at ~/.local/libexec/dots/claude, which runs ~/.local/bin/claude, so a scratch HOME holds this tree's wrapper and a stub claude that prints the CLAUDE_CONFIG_DIR it was given.
+stub_home=$DOTS_DEV_DIR/stub-home
+mkdir -p "$stub_home/.local/libexec/dots" "$stub_home/.local/bin"
+cp "$repo/home/dot_local/libexec/dots/executable_claude" "$stub_home/.local/libexec/dots/claude"
+printf '#!/bin/sh\nprintf "%%s\\n" "$CLAUDE_CONFIG_DIR"\n' >"$stub_home/.local/bin/claude"
+chmod +x "$stub_home/.local/bin/claude"
+cx_dir=$(HOME=$stub_home fish --no-config -c "source $repo/home/dot_config/fish/functions/cx.fish; cx")
 check "a new cx session runs in work's home ($cx_dir)" test "$cx_dir" = "$XDG_STATE_HOME/dots/claude-accounts/work"
 
 wtype r
