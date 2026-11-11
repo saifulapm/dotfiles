@@ -19,7 +19,9 @@ for unit in "${replaced[@]}"; do
   # A static unit answers is-enabled with 0 too, so only the word enabled counts; a v1 sync caught mid-run is activating, which is-active --quiet calls stopped.
   state=$(systemctl --user is-active "$unit" 2>/dev/null)
   [[ $(systemctl --user is-enabled "$unit" 2>/dev/null) == enabled || ! $state =~ ^(inactive|failed|unknown|)$ ]] || continue
-  systemctl --user disable --now "$unit" >/dev/null 2>&1 || { echo "dots: could not stop $unit" >&2; exit 1; }
+  systemctl --user stop "$unit" >/dev/null 2>&1 || { echo "dots: could not stop $unit" >&2; exit 1; }
+  # On systemd 262 a disable fails for a unit whose own link is gone while a wants link still enables it; that wants link goes with v1's other links below.
+  systemctl --user disable "$unit" >/dev/null 2>&1
   ((stopped++))
 done
 
@@ -35,9 +37,11 @@ fi
 links=("$HOME/.gitconfig" "$units/imapnotify@icloud.service")
 for unit in "${replaced[@]}"; do links+=("$units/$unit"); done
 while IFS= read -r -d '' link; do links+=("$link"); done < <(find "$config/fish" "$data/applications" -type l -print0 2>/dev/null)
-# A unit v2 took over keeps v1's wants link, which names v1's file and starts it at the next login.
+# A unit v2 took over keeps v1's wants link, which names v1's file and starts it at the next login, and so does a unit v2 replaces whose disable failed.
 for link in "$units"/*.wants/*; do
-  [[ -e $units/${link##*/} ]] && ! v1_link "$units/${link##*/}" && links+=("$link")
+  name=${link##*/}
+  if [[ -e $units/$name ]] && ! v1_link "$units/$name"; then links+=("$link"); fi
+  if [[ " ${replaced[*]} " == *" $name "* ]]; then links+=("$link"); fi
 done
 reload=0
 for link in "${links[@]}"; do

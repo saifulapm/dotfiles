@@ -78,7 +78,8 @@ echo "$*" >> ${log}
 case $2 in
   is-enabled) if [ -e ${units}/$3.enabled ]; then echo enabled; else echo static; fi ;;
   is-active) if [ -e ${units}/$3.active ]; then s=$(cat ${units}/$3.active); echo \${s:-active}; [ "\${s:-active}" = active ]; else echo inactive; exit 3; fi ;;
-  disable) rm -f ${units}/$4.enabled ${units}/$4.active ;;
+  # As systemd 262 does, a disable fails for a unit enabled by a wants link whose own file is gone.
+  disable) if [ ! -e ${home}/.config/systemd/user/$3 ] && ls ${home}/.config/systemd/user/*.wants/$3 >/dev/null 2>&1; then echo "Failed to disable unit: Unit $3 does not exist" >&2; exit 1; fi; rm -f ${units}/$3.enabled ;;
   stop) rm -f ${units}/$3.active ;;
   daemon-reload) ;;
   *) exit 1 ;;
@@ -145,7 +146,9 @@ test('cutover imports v1 notes, goals and history, stops the units v2 replaces, 
 test('only the v1 units v2 replaces are stopped, and only the v1 links that outrank v2 are removed', () => {
   const s = scratch();
   assert.equal(run(s).status, 0);
-  assert.deepEqual(calls(s).filter((c) => c.includes('disable')), ['--user disable --now qshell.service', '--user disable --now qshell-sync.service', '--user disable --now update-all.timer', '--user disable --now taildrop-receive.service', '--user disable --now homepod-sink.service', '--user disable --now havit-guard.service', '--user disable --now clipboard-sync.service', '--user disable --now clipboard-serve.socket', '--user disable --now bt-agent.service']);
+  // Each stops before it is disabled, since a disable can fail on systemd 262.
+  const replaced = ['qshell.service', 'qshell-sync.service', 'update-all.timer', 'taildrop-receive.service', 'homepod-sink.service', 'havit-guard.service', 'clipboard-sync.service', 'clipboard-serve.socket', 'bt-agent.service'];
+  assert.deepEqual(calls(s).filter((c) => /^--user (stop|disable) /.test(c) && !c.includes('imapnotify')), replaced.flatMap((u) => [`--user stop ${u}`, `--user disable ${u}`]));
   // v1's mail watcher only stops: disabling it would drop the wants link v2's instance of the same name starts from.
   assert.deepEqual(calls(s).filter((c) => /imapnotify|daemon-reload/.test(c)), ['--user stop imapnotify@icloud.service', '--user daemon-reload']);
   assert.deepEqual(readdirSync(s.units).sort(), ['hub-local.service.active', 'hub-local.service.enabled', 'imapnotify@icloud.service.enabled']);
@@ -155,6 +158,19 @@ test('only the v1 units v2 replaces are stopped, and only the v1 links that outr
   assert.ok(existsSync(join(s.home, '.local/share/applications/kak.desktop')), 'a desktop entry from the v2 repo stays');
   assert.deepEqual(v1Links(s.home), ['.config/systemd/user/mempressure.service']);
   assert.ok(existsSync(join(s.home, '.dotfiles/home/dot_gitconfig')), '~/.dotfiles stays in place');
+});
+
+test('a v1 unit that still runs after its own link went is stopped, and its v1 wants link goes', () => {
+  const s = scratch();
+  const wants = join(s.home, '.config/systemd/user/graphical-session.target.wants');
+  mkdirSync(wants);
+  writeFileSync(join(s.home, '.dotfiles/home/qshell-dshift.service'), '');
+  symlinkSync(join(s.home, '.dotfiles/home/qshell-dshift.service'), join(wants, 'qshell-dshift.service'));
+  for (const f of ['qshell-dshift.service.enabled', 'qshell-dshift.service.active']) writeFileSync(join(s.units, f), '');
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(existsSync(join(s.units, 'qshell-dshift.service.active')), false);
+  assert.equal(existsSync(join(wants, 'qshell-dshift.service')), false);
 });
 
 test('a ~/.gitconfig that is not v1s link is left alone', () => {
