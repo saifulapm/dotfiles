@@ -12,7 +12,8 @@ runtime=${XDG_RUNTIME_DIR:-/tmp}/dekho
 sessions=$work/sessions
 trailer_unit=$DOTS_DEKHO_UNIT-trailer
 cleanup() {
-  systemctl --user stop "$DOTS_DEKHO_UNIT.service" "$trailer_unit.service" 2>/dev/null
+  # systemd 262 stops none of the units named when one is not loaded, so each stops alone.
+  for u in "$DOTS_DEKHO_UNIT" "$trailer_unit"; do systemctl --user stop "$u.service" 2>/dev/null; done
   [ -f "$sessions" ] && xargs -r rm -f <"$sessions"
   rm -f "$runtime/$DOTS_DEKHO_UNIT.log" "$runtime/$DOTS_DEKHO_UNIT.session" "$runtime/$DOTS_DEKHO_UNIT.show" "$runtime/$trailer_unit.log" "$runtime/$trailer_unit.session" "$runtime/$trailer_unit.show" "$DOTS_DEV_DIR/dekho-trailer-fails"
   rm -rf "$work"

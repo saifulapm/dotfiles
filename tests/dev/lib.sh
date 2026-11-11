@@ -110,6 +110,11 @@ dev_exit() {
   fi
   cleanup
   dev_stop
+  # A shell left running once its niri is gone answers the next check's qs ipc calls in place of that check's own shell.
+  if [ -n "${DOTS_DEV_UNIT:-}" ] && systemctl --user -q is-active "$DOTS_DEV_UNIT"; then
+    echo "FAIL dots-dev stopped its shell unit $DOTS_DEV_UNIT"
+    rc=1
+  fi
   rm -f "$dev_out" "$dev_log" "$started"
   exit "$rc"
 }
