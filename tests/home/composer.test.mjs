@@ -9,8 +9,9 @@ import { join } from 'node:path';
 const repo = new URL('../../', import.meta.url).pathname;
 const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_19-composer.sh.tmpl'), 'utf8');
 
-// The stub composer logs its argv and the COMPOSER_HOME it sees, then exits with the code it is given.
+// The stub composer logs its argv and the COMPOSER_HOME it sees, then exits with the code it is given; as the real one does, it first runs sudo -K unless COMPOSER_ALLOW_SUPERUSER is set.
 const composer = (code) => `#!/bin/sh
+[ -n "$COMPOSER_ALLOW_SUPERUSER" ] || sudo -K
 echo "$* HOME=$COMPOSER_HOME" >> "$HOME/composer.log"
 exit ${code}
 `;
@@ -19,6 +20,7 @@ function apply({ code }) {
   const home = realpathSync(mkdtempSync(join(tmpdir(), 'dots-composer-')));
   mkdirSync(join(home, 'stubs'));
   writeFileSync(join(home, 'stubs/composer'), composer(code), { mode: 0o755 });
+  writeFileSync(join(home, 'stubs/sudo'), '#!/bin/sh\necho "$*" >> "$HOME/sudo.log"\n', { mode: 0o755 });
   const env = {
     PATH: `${home}/stubs:/usr/bin:/bin`,
     HOME: home,
@@ -31,7 +33,8 @@ function apply({ code }) {
   assert.equal(rendered.status, 0, rendered.stderr);
   const r = spawnSync('bash', ['-c', rendered.stdout], { encoding: 'utf8', env });
   const calls = existsSync(join(home, 'composer.log')) ? readFileSync(join(home, 'composer.log'), 'utf8').trim().split('\n') : [];
-  return { r, calls, home };
+  const sudo = existsSync(join(home, 'sudo.log')) ? readFileSync(join(home, 'sudo.log'), 'utf8').trim().split('\n') : [];
+  return { r, calls, sudo, home };
 }
 
 test('the step requires the installer and Pint once, in the config composer home', () => {
@@ -44,4 +47,10 @@ test('a failing composer fails the step and names it', () => {
   const { r } = apply({ code: 1 });
   assert.notEqual(r.status, 0);
   assert.match(r.stderr, /composer/);
+});
+
+test("composer leaves the install's sudo cache alone, so the root steps after it never prompt", () => {
+  const { r, sudo } = apply({ code: 0 });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(sudo, []);
 });
