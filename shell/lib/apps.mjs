@@ -35,7 +35,7 @@ export function renderTmux(t) {
   const say = (mods, name) => `#{${mods}:${name}}`;
   const number = '#{?#{e|<:#{window_index},10},0,}#{window_index}';
   const name = `${say('', 'window_name')}#{?window_zoomed_flag, \u{f0293},}`;
-  const current = `#[fg=${accent}]● #[fg=${ink},bold]${number}#[nobold] ${name}#[default]`;
+  const current = `#[fg=${accent}]● #[fg=${ink}]${number} ${name}#[default]`;
   const other = `#[fg=${muted}]${number} ${name}#[default]`;
   const folder = `#{?#{==:#{pane_current_path},#{HOME}},~,${say('b;=/-24/…', 'pane_current_path')}}`;
   return [

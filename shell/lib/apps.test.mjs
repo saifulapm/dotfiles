@@ -29,7 +29,8 @@ test('the tmux bar draws no filled block in any theme, only text in the margin c
 test('tmux windows read like the margin number: an accent dot before the current window in ink, the rest muted', () => {
   for (const t of [light, dark, artboard]) {
     const c = t.color;
-    assert.ok(tmuxOpt(t, 'window-status-current-format').startsWith(`#[fg=${c.accent.toLowerCase()}]● #[fg=${c.ink.toLowerCase()},bold]#{?#{e|<:#{window_index},10},0,}#{window_index}#[nobold] `), t.name);
+    assert.ok(tmuxOpt(t, 'window-status-current-format').startsWith(`#[fg=${c.accent.toLowerCase()}]● #[fg=${c.ink.toLowerCase()}]#{?#{e|<:#{window_index},10},0,}#{window_index} `), t.name);
+    assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /bold/, t.name);
     assert.ok(tmuxOpt(t, 'window-status-format').startsWith(`#[fg=${c.muted.toLowerCase()}]`), t.name);
     assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /s\/a\/A\//, t.name);
     assert.equal(tmuxOpt(t, 'window-status-separator'), `#[fg=${c.muted.toLowerCase()}]    `, t.name);
