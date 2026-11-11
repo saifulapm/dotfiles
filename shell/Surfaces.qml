@@ -10,6 +10,15 @@ import "lib/voice.mjs" as V
 PanelWindow {
     id: host
 
+    // niri closes a layer surface made while it has no output, and Quickshell never makes another, so a monitor that drops and comes back (the mini's, on unlock) left every panel drawing nowhere; hiding and showing the window on any change of screens makes a new surface.
+    Connections {
+        target: Quickshell
+        function onScreensChanged() {
+            host.visible = false;
+            Qt.callLater(() => host.visible = true);
+        }
+    }
+
     required property var theme
     required property var themeList
     // Every panel floats over the desk as a floating window does, so it reads the theme as the desk's apps do: its words moved to read there, its fills veils, its card the paper inside the accent edge.
