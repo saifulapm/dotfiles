@@ -9,7 +9,7 @@ die() {
 
 install() {
   local repo=${DOTS_REPO:-https://github.com/saifulapm/dotfiles.git}
-  local branch=${DOTS_BRANCH:-v2}
+  local branch=${DOTS_BRANCH:-main}
   local dir=$HOME/Codes/dotfiles
 
   # The only sudo that may prompt; every later root command uses sudo -n.
