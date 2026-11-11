@@ -21,6 +21,9 @@ PanelWindow {
     required property var goals
     required property var sync
     required property real islandWidth
+    // The output these margins are for.
+    required property var modelData
+    screen: modelData
     readonly property var view: niri.view(screen.name) ?? { idx: 0, app: null, title: null }
     // The Imbox unread count kak-mail writes; 0 hides the item.
     property int mail: 0
@@ -35,7 +38,8 @@ PanelWindow {
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
     // The margins hide while the shown window runs edge to edge, so they need no zone and a Mod+M window fills the output.
     exclusionMode: ExclusionMode.Ignore
-    visible: !niri.edgeToEdge(screen.name, screen.width)
+    // Read off the output the Variants hands in, not the window's own screen, which Quickshell sets again while visible makes the window, and qs logged that as a binding loop.
+    visible: !niri.edgeToEdge(modelData.name, modelData.width)
     anchors {
         top: true
         left: true

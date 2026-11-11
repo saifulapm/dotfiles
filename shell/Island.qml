@@ -871,9 +871,11 @@ PanelWindow {
     readonly property string questionId: question?.id ?? ""
     onQuestionIdChanged: release()
 
-    screen: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
+    // The output the island follows; visible reads it, not the window's own screen, which Quickshell sets again while visible makes the window, and qs logged that as a binding loop.
+    readonly property var output: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
+    screen: output
     // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it.
-    visible: !niri.edgeToEdge(niri.focusedOutput, screen.width)
+    visible: !niri.edgeToEdge(niri.focusedOutput, output.width)
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.namespace: "dots-island"
     WlrLayershell.keyboardFocus: focused && !attaching ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

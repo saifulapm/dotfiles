@@ -167,8 +167,6 @@ Scope {
         model: Quickshell.screens
 
         Root.Margins {
-            required property var modelData
-            screen: modelData
             theme: desk.theme
             niri: niriService
             clock: clockService
