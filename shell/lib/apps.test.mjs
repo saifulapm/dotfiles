@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
+import { mix } from './notes-look.mjs';
 import { loadScheme, schemeNames } from './colorscheme-file.mjs';
 import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
@@ -108,18 +109,19 @@ test('gtk settings prefer dark exactly for dark mode', () => {
   assert.match(renderGtkSettings(light), /^gtk-font-name=Maple Mono 11$/m);
 });
 
-// A colour policy would block the theme extension, so the manifest alone carries the exact colours, from Chromium's next start.
-test('the chromium theme extension frames the window in paper and draws the toolbar on surface', () => {
+// The manifest alone carries the colours, as a colour policy would block it; Chromium draws the active tab in the toolbar's colour and the others in background_tab's, so on the desk, where surface is the paper, the active tab is lifted by the 6% ink tint kak's and helix's menus use.
+test('the chromium theme sits the frame and the other tabs on the paper and lifts the active tab and the toolbar by an ink tint', () => {
   const rgbOf = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  for (const t of [light, dark, artboard]) {
+  for (const raw of [light, dark, artboard]) {
+    const t = termTheme(raw);
     const m = JSON.parse(renderChromiumTheme(t));
     assert.equal(m.manifest_version, 3);
-    assert.deepEqual(m.theme.colors.frame, rgbOf(t.color.paper), t.name);
-    assert.deepEqual(m.theme.colors.toolbar, rgbOf(t.color.surface), t.name);
+    for (const k of ['frame', 'frame_inactive', 'background_tab', 'ntp_background']) assert.deepEqual(m.theme.colors[k], rgbOf(t.color.paper), `${t.name} ${k}`);
+    assert.deepEqual(m.theme.colors.toolbar, rgbOf(mix(t.color.paper, t.color.ink, 0.06)), t.name);
+    assert.notDeepEqual(m.theme.colors.toolbar, m.theme.colors.background_tab, t.name);
     assert.deepEqual(m.theme.colors.toolbar_text, rgbOf(t.color.ink), t.name);
-    assert.deepEqual(m.theme.colors.ntp_background, rgbOf(t.color.paper), t.name);
   }
-  assert.deepEqual(JSON.parse(renderChromiumTheme(dark)).theme.colors.frame, [29, 32, 33]);
+  assert.deepEqual(JSON.parse(renderChromiumTheme(termTheme(dark))).theme.colors.frame, [29, 32, 33]);
 });
 
 // Chromium ignores a new-tab override inside a theme, so the page is its own extension; its key fixes the id whatever folder it loads from.

@@ -339,9 +339,11 @@ export function renderGtkSettings(t) {
 export function renderChromiumTheme(t) {
   const c = t.color;
   const rgb3 = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  const [ink, muted, paper, surface, accent] = [c.ink, c.muted, c.paper, c.surface, c.accent].map(rgb3);
+  const [ink, muted, paper, accent] = [c.ink, c.muted, c.paper, c.accent].map(rgb3);
+  // The active tab takes the toolbar's colour; on the desk the surface is the paper, so a 6% ink tint, as kak's and helix's menus, sets it apart from the other tabs.
+  const lifted = rgb3(mix(c.paper, c.ink, 0.06));
   const colors = {
-    frame: paper, frame_inactive: paper, background_tab: paper, toolbar: surface, toolbar_text: ink, toolbar_button_icon: ink,
+    frame: paper, frame_inactive: paper, background_tab: paper, toolbar: lifted, toolbar_text: ink, toolbar_button_icon: ink,
     tab_text: ink, tab_background_text: muted, bookmark_text: ink, omnibox_background: paper, omnibox_text: ink,
     ntp_background: paper, ntp_text: ink, ntp_link: accent,
   };

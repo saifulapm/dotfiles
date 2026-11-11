@@ -4,6 +4,9 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, writeFileSync, rmSync, cpSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { mix } from './notes-look.mjs';
+import { termTheme } from './apps.mjs';
+import { loadScheme } from './colorscheme-file.mjs';
 
 const repo = new URL('../..', import.meta.url).pathname;
 const cli = new URL('./colorscheme-render.mjs', import.meta.url).pathname;
@@ -38,14 +41,17 @@ test('the shell tokens name the one design and the scheme\'s light or dark', (t)
   execFileSync('niri', ['validate', '-c', config], { stdio: 'pipe' });
 });
 
-test("GTK's views and header bars and Chromium's toolbar sit on the paper, not a surface card, so an app is one flat section of the desk", (t) => {
+test("GTK's views and header bars and Chromium's frame sit on the paper, not a surface card, so an app is one flat section of the desk, with Chromium's active tab and toolbar on an ink tint", (t) => {
   const state = scratch(t);
   execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
   const out = join(state, 'dots/theme-out');
   const css = readFileSync(join(out, 'gtk.css'), 'utf8');
   for (const name of ['window_bg_color', 'view_bg_color', 'headerbar_bg_color', 'theme_base_color']) assert.match(css, new RegExp(`^@define-color ${name} #e4e6ea;$`, 'm'), name);
   const chromium = JSON.parse(readFileSync(join(out, 'chromium-theme/manifest.json'), 'utf8')).theme.colors;
-  assert.deepEqual([chromium.frame, chromium.toolbar, chromium.omnibox_background], [[228, 230, 234], [228, 230, 234], [228, 230, 234]]);
+  assert.deepEqual([chromium.frame, chromium.background_tab, chromium.omnibox_background], [[228, 230, 234], [228, 230, 234], [228, 230, 234]]);
+  const desk = termTheme(loadScheme('artboard')).color;
+  const lifted = mix(desk.paper, desk.ink, 0.06);
+  assert.deepEqual(chromium.toolbar, [1, 3, 5].map((i) => parseInt(lifted.slice(i, i + 2), 16)));
 });
 
 test('themes.json lists every valid scheme, artboard first, and skips a broken one', (t) => {
