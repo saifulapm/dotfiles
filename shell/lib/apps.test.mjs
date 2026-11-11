@@ -33,6 +33,8 @@ test('tmux windows read like the margin number: an accent dot before the current
     assert.ok(tmuxOpt(t, 'window-status-format').startsWith(`#[fg=${c.muted.toLowerCase()}]`), t.name);
     assert.doesNotMatch(tmuxOpt(t, 'window-status-current-format'), /s\/a\/A\//, t.name);
     assert.equal(tmuxOpt(t, 'window-status-separator'), `#[fg=${c.muted.toLowerCase()}]    `, t.name);
+    // tmux 3.8 underlines the current window by default.
+    assert.equal(tmuxOpt(t, 'window-status-current-style'), 'default', t.name);
   }
 });
 

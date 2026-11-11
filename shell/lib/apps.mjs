@@ -44,6 +44,7 @@ export function renderTmux(t) {
     `set -g status-right "#(dots-agents ${[muted, accent, ink].map((x) => x.slice(1)).join(' ')})#[fg=${muted}]${folder} "`,
     `set -g window-status-format "${other}"`,
     `set -g window-status-current-format "${current}"`,
+    'set -g window-status-current-style "default"',
     `set -g window-status-separator "#[fg=${muted}]    "`,
     'set -g pane-border-lines single',
     `set -g pane-border-style "fg=${frame}"`,

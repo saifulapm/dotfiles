@@ -21,7 +21,8 @@ test('a new tmux pane runs fish, whatever shell started the server', (t) => {
   assert.equal(commands, 'fish\nfish');
 });
 
-test('the tmux bar sits at the top, as the page\'s running head', (t) => {
+// centre would centre the windows between the session and the folder, so a long session name pushes them right.
+test('the tmux bar sits at the top, as the page\'s running head, its windows centred on the whole bar', (t) => {
   const sock = `dots-tmux-top-${process.pid}`;
   const env = { ...process.env };
   delete env.TMUX;
@@ -29,6 +30,7 @@ test('the tmux bar sits at the top, as the page\'s running head', (t) => {
   t.after(() => { try { tmux('kill-server'); } catch {} });
   tmux('-f', conf, 'new-session', '-d', '-x', '80', '-y', '24');
   assert.equal(tmux('show', '-gv', 'status-position'), 'top');
+  assert.equal(tmux('show', '-gv', 'status-justify'), 'absolute-centre');
 });
 
 // amx gives each agent pane the colours of whatever terminal its view last ran on, an iPhone over ssh among them, so every attach puts the scheme's back.
