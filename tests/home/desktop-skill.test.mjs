@@ -647,7 +647,7 @@ function png(w, h) {
 }
 const pngSize = (b) => [b.readUInt32BE(16), b.readUInt32BE(20)];
 
-const KEY = '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';
+const KEY = 'stand-in-held-by-pass-q3x8w1z5';
 // The unlocked stubs, plus a grim that writes a w x h shot, a pass that holds KEY, and a curl that keeps its argv, its stdin and the body it was given, then answers `reply` with `status`; the workspace check needs a niri (tests/dev/desk-jev-guards.sh), so `run` passes --any.
 function jevStubs({ w = 1280, h = 800, answers = {}, status = 200, reply, lock = unlocked, polkit = closed } = {}) {
   const s = stubs(lock, 0, { polkit });
