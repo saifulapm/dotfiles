@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # dots context7 use <id> | apply: the ctx7 CLI logs in with the key in ~/.config/context7/credentials.json. use makes AI/context7/<id> this device's key and writes the file; apply writes it from the key this device uses, main until use picks another, so dots secrets never puts main back over a choice. The choice sits in the state dir, which no sync carries to another machine.
 set -euo pipefail
+{
 die() {
   echo "dots context7: $*" >&2
   exit 1
@@ -45,3 +46,5 @@ apply)
   ;;
 *) die "usage: dots context7 use <id> | apply" ;;
 esac
+exit
+}

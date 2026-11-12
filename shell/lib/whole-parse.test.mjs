@@ -21,6 +21,14 @@ const isWhole = (lines) => {
   return /^exit/.test(body[body.length - 2]) && body[body.length - 2] !== '{';
 };
 
+test('a script whose commands sit outside a group, or a group with no exit, does not parse whole', () => {
+  const head = ['#!/usr/bin/env bash', '# does a thing', 'set -euo pipefail'];
+  assert.equal(isWhole([...head, 'echo hi', 'echo bye', '']), false);
+  assert.equal(isWhole([...head, '{', 'echo hi', '}', '']), false);
+  assert.equal(isWhole([...head, 'x=1', '{', 'echo hi', 'exit', '}', '']), false);
+  assert.equal(isWhole([...head, '{', 'echo hi', 'exit', '}', '']), true);
+});
+
 test('every bash script under bin/ and tests/ parses whole before it runs', () => {
   const found = [];
   for (const f of files) {

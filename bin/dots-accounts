@@ -123,8 +123,7 @@ const killGroup = (child) => {
   } catch {}
 };
 
-// pass runs with no passphrase prompt: a locked store fails at once and says so on stderr.
-// An entry's lines, the key first.
+// An entry's lines, the key first; pass runs with no passphrase prompt, so a locked store fails at once and says so on stderr.
 async function entry(name, signal) {
   const r = await exec('pass', ['show', name], signal);
   if (r.code !== 0) throw new Failure(/pinentry|decryption failed/.test(r.stderr) ? 'locked' : 'no-key');
