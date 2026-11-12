@@ -69,13 +69,13 @@ sha256 = "6bb0efd51198f61b696e5d073ef3f05d6f6113051896853e1ea000cdf087e8d9"
 
 [[pin]]
 name = "workflow"
-version = "95837d1c4bc30f8c308c33d4a01b951bf171826b"
+version = "2a6e32338a351ef5bf8182d80b9ab874d9158184"
 repo = "saifulapm/workflow"
 track = "commit"
 install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
 runs = "mem --version && workflow --version && hub --version"
 url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
-sha256 = "d39660a9fe3d4ceb6464f42dde942017ccf1a03add0f3f23731f9b919bab868a"
+sha256 = "49d683f715f514fe9c5f82b7df8e1ea34759b820023ee8a79206549d0efe2a0b"
 
 [[pin]]
 name = "pxy"
