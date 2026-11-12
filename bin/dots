@@ -229,10 +229,11 @@ main() {
     theme) die "the theme command is gone; use dots colorscheme <name>" ;;
     # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
     awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;
+    forget) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-sync-fish" forget "${@:2}" ;;
     dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
     sync | update | bump | secrets | cutover | claude-account | context7 | dns | clean) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-$1" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots update | dots bump | dots secrets | dots colorscheme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots context7 use <id> | apply | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
+      echo "usage: dots install | dots update | dots bump | dots secrets | dots colorscheme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots context7 use <id> | apply | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots forget <text> | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
       exit 2
       ;;
   esac

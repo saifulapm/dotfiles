@@ -66,6 +66,9 @@ export function checked(env) {
 
 export const sync = (m, args = []) => run(m, dots, ['sync'].concat(args));
 
+// dots forget, run as machine m.
+export const forget = (m, args) => run(m, dots, ['forget'].concat(args));
+
 // The names in a tarball, listed as machine m.
 export const tarList = (m, path) => run(m, 'tar', ['tzf', path]);
 
