@@ -78,8 +78,11 @@ systemd-run --user --collect --quiet --unit "$unit" \
   "${pass[@]}" \
   -p "StandardOutput=truncate:$session" -p "StandardError=append:$log" \
   -- "${DOTS_DEKHO:-dekho}" "$verb" --json "$@" || failed
-# A dekho that is missing or dies at once leaves its unit gone with nothing written.
-sleep 0.3
+# A dekho that is missing or dies at once leaves its unit gone with nothing written; one that has written its first event has started, so the wait ends there.
+for _ in 1 2 3 4 5 6; do
+  [ -s "$session" ] && break
+  sleep 0.05
+done
 active || [ -s "$session" ] || failed
 exit
 }
