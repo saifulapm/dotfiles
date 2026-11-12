@@ -171,6 +171,23 @@ test('an App save that lands just before the merge puts its result in place is k
   assert.deepEqual([ids(store(a), 'saved'), ids(store(a), 'focus')], [['early000000', 'late0000000'], ['v1000000000', 'v2000000000', 'v3000000000', 'from-b00000']]);
 });
 
+test('three App saves caught one after another all land beside the pulled items', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(storePath(b), P.add(focus(), 'focus', video('from-b00000'), T + 1));
+  await ok(b, ['--only', 'youtube']);
+  const early = P.add(P.emptyStore(), 'saved', video('early000000'), T);
+  write(storePath(a), early);
+  // The hook stands in for the App, which saves its whole store: its nth run copies late<n>.json, holding one more video each time, and after three it does nothing.
+  for (let i = 1, s = early; i <= 3; i++) writeFileSync(join(w.root, `late${i}.json`), P.serialize((s = P.add(s, 'saved', video('late' + i + '000000'), T + 1 + i))));
+  const hook = join(w.root, 'save-late');
+  writeFileSync(hook, `#!/bin/sh\nn=$(( $(cat ${hook}.n 2>/dev/null || echo 0) + 1 ))\necho $n > ${hook}.n\n[ -e ${w.root}/late$n.json ] || exit 0\ncp ${w.root}/late$n.json ${storePath(a)}\n`);
+  chmodSync(hook, 0o755);
+  a.env.DOTS_MERGE_BEFORE_SWAP = hook;
+  await ok(a, ['--only', 'youtube']);
+  assert.deepEqual([ids(store(a), 'saved'), ids(store(a), 'focus')], [['early000000', 'late1000000', 'late2000000', 'late3000000'], ['v1000000000', 'v2000000000', 'v3000000000', 'from-b00000']]);
+});
+
 // A Playlist made while a's clock ran ahead carries that time as when it was made, which also stands for when it was named.
 test('a Playlist made while the clock ran ahead is re-stamped whole, so a later rename and add on b win on both and both rounds settle', async () => {
   const w = world();

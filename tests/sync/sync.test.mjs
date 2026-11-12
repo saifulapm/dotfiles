@@ -235,6 +235,78 @@ test('a shell save that lands just before the merge puts its result in place is 
   assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title).sort(), ['Early', 'From b', 'Late save']);
 });
 
+// The hook stands in for the shell: its nth run copies saves[n - 1] over the store, and once saves runs out it does nothing.
+function saveHook(w, path, saves) {
+  saves.forEach((text, i) => writeFileSync(join(w.root, `save${i + 1}.json`), text));
+  const hook = join(w.root, 'save-late');
+  const n = hook + '.n';
+  writeFileSync(hook, `#!/bin/sh\nn=$(( $(cat ${n} 2>/dev/null || echo 0) + 1 ))\necho $n > ${n}\n[ -e ${w.root}/save$n.json ] || exit 0\ncp ${w.root}/save$n.json ${path}\n`);
+  chmodSync(hook, 0o755);
+  return hook;
+}
+
+// The shell saves its whole store, so each save holds the one before it and one more goal.
+const lateGoals = (early, count) => {
+  const out = [];
+  for (let i = 1, s = early; i <= count; i++) out.push(JSON.stringify((s = G.addGoal(s, 'Late ' + i, null, T + i, 'gl' + i))));
+  return out;
+};
+
+test('three shell saves caught one after another all land beside the pulled goals', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'From b', null, T, 'gb'));
+  await ok(b);
+  const early = G.addGoal(G.emptyStore(), 'Early', null, T, 'ga');
+  write(goalsPath(a), early);
+  a.env.DOTS_MERGE_BEFORE_SWAP = saveHook(w, goalsPath(a), lateGoals(early, 3));
+  await ok(a, ['--only', 'goals']);
+  assert.deepEqual(G.activeGoals(goals(a)).map((g) => g.title).sort(), ['Early', 'From b', 'Late 1', 'Late 2', 'Late 3']);
+});
+
+test('three shell saves caught one after another all land beside the pulled notes', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(notesPath(b), N.compose(N.emptyStore(), 'From b', T, 'nb'));
+  await ok(b);
+  const early = withN1('Early');
+  write(notesPath(a), early);
+  const saves = [];
+  for (let i = 1, s = early; i <= 3; i++) saves.push(JSON.stringify((s = N.compose(s, 'Late ' + i, T + i, 'nl' + i))));
+  a.env.DOTS_MERGE_BEFORE_SWAP = saveHook(w, notesPath(a), saves);
+  await ok(a, ['--only', 'notes']);
+  assert.deepEqual(N.sectionNotes(notes(a), 'inbox').map((n) => n.text).sort(), ['Early', 'From b', 'Late 1', 'Late 2', 'Late 3']);
+});
+
+test('a round the shell never stops saving over gives up and leaves the last save in place', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'From b', null, T, 'gb'));
+  await ok(b);
+  const early = G.addGoal(G.emptyStore(), 'Early', null, T, 'ga');
+  write(goalsPath(a), early);
+  const saves = lateGoals(early, 10);
+  a.env.DOTS_MERGE_BEFORE_SWAP = saveHook(w, goalsPath(a), saves);
+  const r = await sync(a, ['--only', 'goals']);
+  assert.notEqual(r.code, 0);
+  assert.match(r.stderr, /the local store kept changing, so this round left it alone/);
+  assert.equal(readFileSync(goalsPath(a), 'utf8'), saves[4]);
+  assert.deepEqual(readdirSync(dirname(goalsPath(a))), ['a.json']);
+});
+
+test('a caught shell save that does not parse is put back and the round says the store is broken', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  write(goalsPath(b), G.addGoal(G.emptyStore(), 'From b', null, T, 'gb'));
+  await ok(b);
+  write(goalsPath(a), G.addGoal(G.emptyStore(), 'Early', null, T, 'ga'));
+  a.env.DOTS_MERGE_BEFORE_SWAP = saveHook(w, goalsPath(a), ['{"goals":']);
+  const r = await sync(a, ['--only', 'goals']);
+  assert.notEqual(r.code, 0);
+  assert.match(r.stderr, /a\.json: the local store is broken, so it is left as it is/);
+  assert.equal(readFileSync(goalsPath(a), 'utf8'), '{"goals":');
+});
+
 test('a notes file from another machine that does not parse still lets attachments travel, and names its unit once', async () => {
   const w = world();
   const a = machine(w, 'a');

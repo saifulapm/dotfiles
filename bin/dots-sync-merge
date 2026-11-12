@@ -23,7 +23,7 @@ function machine() {
 let restamped = 0;
 
 // Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
-function round(unit, path, others) {
+function round(unit, path, others, last) {
   const model = { notes, goals, youtube }[unit];
   const text = existsSync(path) ? readFileSync(path, 'utf8') : null;
   const local = text === null ? model.emptyStore() : model.parseStore(text);
@@ -47,12 +47,27 @@ function round(unit, path, others) {
   // The swap is one step, so a shell save cannot land between a check and a rename; whatever it swapped out is kept to compare.
   if (!place(() => execFileSync('mv', ['--exchange', tmp, path], { stdio: 'ignore' }), tmp)) return false;
   const out = readFileSync(tmp, 'utf8');
+  const late = out === text ? null : model.parseStore(out);
+  if (out === text || (late && !last)) {
+    unlinkSync(tmp);
+    // The shell saved after this round read the store: its file merges into the result in the next round.
+    if (late) others.push(late);
+    return out === text;
+  }
+  putBack(tmp, path, JSON.stringify(merged), out);
+  if (!late) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
+  fail(`${unit}: the local store kept changing, so this round left it alone`, 1);
+}
+
+// A round that gives up swaps the shell's save back in; when the swap brings out a newer save instead of the file it put there, that one goes back too.
+function putBack(tmp, path, placed, save) {
+  for (let i = 0; i < 5; i++) {
+    execFileSync('mv', ['--exchange', tmp, path], { stdio: 'ignore' });
+    const out = readFileSync(tmp, 'utf8');
+    if (out === placed) break;
+    [placed, save] = [save, out];
+  }
   unlinkSync(tmp);
-  if (out === text) return true;
-  // The shell saved after this round read the store: its file merges into the result in the next round.
-  const late = model.parseStore(out);
-  if (late) others.push(late);
-  return false;
 }
 
 // Runs the step that puts the result in place; when the store changed under it (made, or removed), the temp file goes and the round starts again.
@@ -125,8 +140,8 @@ function merge(unit, path, files) {
     const what = odd === 1 ? 'record from ' + basename(f) + ', which is not a video' : 'records from ' + basename(f) + ', which are not videos';
     if (odd) skipped.push(`${unit}: left out ${odd} ${what}`);
   }
-  for (let i = 0; i < 3; i++) {
-    if (!round(unit, path, others)) continue;
+  for (let i = 0; i < 5; i++) {
+    if (!round(unit, path, others, i === 4)) continue;
     if (restamped) process.stderr.write(`${unit}: re-stamped ${restamped} record${restamped === 1 ? '' : 's'} stamped more than a day ahead\n`);
     if (skipped.length) fail(skipped.join('\n'), 5);
     return;
