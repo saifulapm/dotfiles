@@ -6,6 +6,7 @@ import { captureText } from './island.mjs';
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
 import { slabText } from './surface.mjs';
+import { BIDI, CONTROL as ANY_CONTROL, C0, C0_BUT_LINES, DEL, C1, klass } from './clean.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder', 'colorschemes'];
 
@@ -118,10 +119,8 @@ export const plainTones = (tokens) => (tokens?.desk ? deskDerived(tokens) : !tok
 // An open can come before the theme's tokens load; until then the shell draws the plain look in black and white.
 const UNTHEMED = { color: { ink: 'white', muted: 'gray', line: 'gray', surface: 'black', accent: 'white' }, type: { display: '', ui: '', mono: '' } };
 
-// Bidi marks, embeddings, overrides and isolates, which let an app's name redraw itself in another order.
-const BIDI = /[‎‏؜‪-‮⁦-⁩]/g;
-// Control characters other than tab, newline and return, which a font draws as tofu; they go, as the chip's do.
-const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+// Control characters other than tab, newline and return, which a font draws as tofu; they go, as the chip's do, and so do the bidi marks.
+const CONTROL = klass(C0_BUT_LINES + DEL + C1, 'g');
 const same = (s) => (s || '').replace(BIDI, '').replace(CONTROL, '');
 // Text a sender wrote, drawn in the order it is spelt; its lines stay.
 export const inOrder = same;
@@ -271,7 +270,7 @@ export function downloadingLook(tokens) {
 }
 
 // C0 controls and DEL, which a file name from another machine may carry.
-const CONTROLS = /[\u0000-\u001f\u007f]/g;
+const CONTROLS = klass(C0 + DEL, 'g');
 
 // How a file notification's chip draws in the toast, a centre row and the cursor row, its empty slot and the drag image.
 export function chipLook(tokens) {
@@ -375,7 +374,7 @@ export function marginLook(tokens) {
   const raw = (tokens || UNTHEMED).color;
   const c = Object.assign({}, raw, { ink: onDesk(tokens, raw.ink), muted: onDesk(tokens, raw.muted), accent: onDesk(tokens, raw.accent) });
   // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
-  const words = (s) => line((s ?? '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
+  const words = (s) => line((s ?? '').replace(ANY_CONTROL, ' '));
   const look = {
     number: (idx) => `Page ${pad2(idx)}`,
     numberColor: c.ink,

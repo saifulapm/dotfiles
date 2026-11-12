@@ -69,6 +69,7 @@ export function renderOutputs(theme, list, label) {
     'chromium-newtab/newtab.js': readFileSync(new URL('../newtab/newtab.js', import.meta.url), 'utf8'),
     'chromium-newtab/bg.js': readFileSync(new URL('../newtab/bg.js', import.meta.url), 'utf8'),
     'chromium-newtab/words.mjs': readFileSync(new URL('./newtab.mjs', import.meta.url), 'utf8'),
+    'chromium-newtab/clean.mjs': readFileSync(new URL('./clean.mjs', import.meta.url), 'utf8'),
     'mpv.conf': renderMpv(theme),
     'mpv.ipc': renderMpvIpc(theme),
     zathura: renderZathura(theme),

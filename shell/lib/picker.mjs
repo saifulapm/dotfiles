@@ -1,12 +1,10 @@
 // What bin/dots-portal and the shell's file picker say to each other, one JSON line each way, and how the picker writes its rows.
 import { line } from './voice.mjs';
 import { pad2 } from './margins.mjs';
+import { CONTROL, MARK, CONTROL_SET, BIDI_SET, klass } from './clean.mjs';
 
 const MODES = ['open', 'save', 'folder'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-// C0, DEL and C1 controls draw as tofu or end a line, and these marks reorder what follows; line() drops the bidi embeddings.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const MARK = /[‎‏؜]/g;
 
 const str = (v) => (typeof v === 'string' ? v : '');
 
@@ -35,7 +33,7 @@ export function parseRequest(text) {
 // 0 chosen, 1 cancelled, 2 a request the shell could not read.
 export const answerLine = (response, paths) => JSON.stringify({ response: response, paths: paths }) + '\n';
 
-// A file name, an app id or a title, as one line of plain text.
+// A file name, an app id or a title, as one line of plain text. C0, DEL and C1 controls draw as tofu or end a line, and the marks reorder what follows; line() drops the bidi embeddings.
 export const oneLine = (s) => line(str(s).replace(CONTROL, ' ').replace(MARK, ''));
 
 // The app by its desktop entry, found as the launcher finds a window's, else its id.
@@ -106,8 +104,9 @@ export function saveNotice(tag, name) {
   return { say: SAY[tag] || '', keys: keys.map(([k, w]) => ({ key: k, word: w })) };
 }
 
+const TYPED_DROP = klass(CONTROL_SET + BIDI_SET, 'g');
 // A name as typed into the save field: controls and bidi marks dropped, spaces kept, so "notes " can grow into "notes 2".
-export const nameText = (s) => str(s).replace(/[\u0000-\u001f\u007f-\u009f\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, '');
+export const nameText = (s) => str(s).replace(TYPED_DROP, '');
 
 // ~/.config/gtk-3.0/bookmarks: one "file:///percent/encoded Optional Label" a line; other schemes are not folders here.
 export function parseBookmarks(text) {

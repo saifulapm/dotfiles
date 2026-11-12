@@ -1,4 +1,5 @@
 // Pure pieces of agent questions from the local hub's $XDG_RUNTIME_DIR/hub-questions.json, kept here so node can test them.
+import { BIDI } from './clean.mjs';
 
 // The hub names machines by MagicDNS host, perhaps with a port; an address stays whole.
 const shortMachine = (host) => (/^[0-9.:]+$/.test(host) ? host : host.split('.')[0].split(':')[0]);
@@ -41,7 +42,7 @@ export const answerArgv = (id, text, files = []) => ['mem', 'answer', '--by', 'p
 export const baseName = (path) => path.split('/').pop();
 
 // The asker's bidi controls, dropped from what the card draws so its words keep their order; an answer still sends the option as asked.
-export const unbidi = (s) => s.replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g, '');
+export const unbidi = (s) => s.replace(BIDI, '');
 
 // The closed card's last line: how many options, and the one the agent recommends.
 export function summary(question) {

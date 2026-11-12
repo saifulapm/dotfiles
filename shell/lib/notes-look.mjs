@@ -1,6 +1,7 @@
 // How the Notes window draws under a token set, from its primitives and type, as the three Notes designs do.
 
 import { SHELF, displayText } from './notes.mjs';
+import { CONTROL_SET } from './clean.mjs';
 
 const TAG_ANSI = { red: 1, orange: 3, yellow: 11, green: 2, blue: 4, purple: 5 };
 
@@ -15,7 +16,8 @@ export const COMPOSER_KEYS = [['↵', 'save'], ['⇧↵', 'line'], ['# name', 's
 export const SHELF_PLACEHOLDER = '⌃V paste · drop files or images here · ↵ save text';
 
 // A section name is typed text that syncs in: one line, bidi marks shown, before it is drawn.
-const oneLine = (name) => displayText(name).replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ').trim();
+const CONTROL_RUN = new RegExp(`[${CONTROL_SET}]+`, 'g');
+const oneLine = (name) => displayText(name).replace(CONTROL_RUN, ' ').trim();
 
 // The tab row: the sections in the picker's order, Shelf pinned (drawn with a pin, not a #), the current one marked.
 export function tabLabels(look, names, current) {

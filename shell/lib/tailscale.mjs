@@ -1,8 +1,9 @@
 // Tailscale's rows from `tailscale status --json`: this device, the machines with online state, and the backend state the surface draws instead of an empty list.
 import { line, plainTones } from './voice.mjs';
+import { CONTROL } from './clean.mjs';
 
 // A machine's name, address and the rest come from the tailnet, so a name is one line with no control characters.
-const clean = (s) => line(String(s || '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' '));
+const clean = (s) => line(String(s || '').replace(CONTROL, ' '));
 // The MagicDNS label, since the iPhone reports its host name as localhost.
 const nameOf = (node) => clean(String(node.DNSName || '').split('.')[0] || node.HostName);
 const ipv4 = (node) => (node.TailscaleIPs || []).find((ip) => String(ip).includes('.')) || '';

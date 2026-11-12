@@ -1,8 +1,8 @@
 // Accounts' card from bin/dots-accounts' rows and the Claude account registry: one group of accounts with their limits, then balances, then usage, in the words the boards use.
 import { line, plainTones } from './voice.mjs';
+import { CONTROL } from './clean.mjs';
 
 // Labels come from a registry file and from provider names, so each is one line with no control characters, and elided.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const clean = (s) => {
   const t = line(String(s == null ? '' : s).replace(CONTROL, ' '));
   return t.length > 40 ? t.slice(0, 39) + '…' : t;

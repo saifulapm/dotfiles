@@ -1,11 +1,10 @@
-// The words of Chromium's new-tab page; dots colorscheme copies this file into the page's extension, so it imports nothing.
+// The words of Chromium's new-tab page; dots colorscheme copies this file into the page's extension beside clean.mjs, so it imports nothing else.
+import { CONTROL, BIDI } from './clean.mjs';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 // Page titles are whatever a site's author wrote, so controls become spaces and bidi marks go.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const BIDI = /[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g;
 const clean = (s) => String(s || '').replace(CONTROL, ' ').replace(BIDI, '').replace(/\s+/g, ' ').trim();
 
 export const dateLines = (d) => ({ day: DAYS[d.getDay()], date: `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` });

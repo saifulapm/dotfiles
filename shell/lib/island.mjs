@@ -2,6 +2,7 @@
 
 import { clockText } from './margins.mjs';
 import { connectText } from './bluetooth.mjs';
+import { CONTROL, BIDI } from './clean.mjs';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -25,8 +26,8 @@ const joined = (parts) => parts.filter((p) => p).join(' · ');
 // C0 and C1 controls draw as tofu (U+0085 ends a line), and the bidi marks reorder what follows.
 const oneLine = (s) =>
   String(s)
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ')
-    .replace(/[\u200E\u200F\u061C\u202A-\u202E\u2066-\u2069]/g, '')
+    .replace(CONTROL, ' ')
+    .replace(BIDI, '')
     .replace(/\s+/g, ' ')
     .trim();
 export const filesText = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;

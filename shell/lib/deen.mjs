@@ -1,5 +1,6 @@
 // What every Deen page shares: its tabs, the backend's answers read safely, and outside text made fit to draw.
 import { oneLine as pickerLine } from './picker.mjs';
+import { EMBEDS, ISOLATES, klass } from './clean.mjs';
 
 export const TABS = ['read', 'memorise', 'duas', 'hadith', 'prayer'];
 
@@ -21,8 +22,9 @@ export function answer(text) {
   return a && typeof a === 'object' && !Array.isArray(a) ? a : null;
 }
 
+const OVERRIDES = klass(EMBEDS + ISOLATES, 'g');
 // A query, a dua or a hadith is whatever its source holds, so where it draws as one line the controls and the bidi overrides and isolates go; Arabic's own letters and harakat stay.
-export const oneLine = (s) => pickerLine(String(s ?? '').replace(/[‪-‮⁦-⁩]/g, ''));
+export const oneLine = (s) => pickerLine(String(s ?? '').replace(OVERRIDES, ''));
 
 // Amiri is the boards' face; until a machine has it, Noto Naskh Arabic, which every machine has, draws the Arabic.
 export const arabicFamily = (families) => (families.indexOf('Amiri') >= 0 ? 'Amiri' : 'Noto Naskh Arabic');

@@ -1,6 +1,7 @@
 // The Title page's words and choices: which episode is next up, how a date and the watched count read, which crew to name.
 import { stars } from './dekho.mjs';
 import { resumeLine } from './dekho-home.mjs';
+import { CONTROL_SET, ZERO_WIDTH, LRM_RLM, EMBEDS, ISOLATES, BOM } from './clean.mjs';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 // Dates stay YYYY-MM-DD strings, compared as text: a Date parsed from one is UTC midnight, a day off west of Greenwich. Only a date after today holds an episode back, so an undated one opens.
@@ -81,11 +82,12 @@ export function buttons(seen, trailer) {
 // The line under the meta line; the page cleans its text for drawing, this only picks it.
 export const tagline = (title) => (typeof title.tagline === 'string' ? title.tagline.trim() : '');
 
+const HOMEPAGE = new RegExp(`^https?:\\/\\/[^\\s${CONTROL_SET}${ZERO_WIDTH}${LRM_RLM}${EMBEDS}${ISOLATES}${BOM}]+$`);
 // The title's links in the order drawn. The imdb id lands in a URL and the homepage is opened as given, so each is checked: an id as tt and digits, a homepage as http(s) with no space, control or bidi character.
 export function links(title) {
   const out = [{ id: 'tmdb', text: 'TMDB', url: `https://www.themoviedb.org/${title.kind === 'tv' ? 'tv' : 'movie'}/${title.id}` }];
   if (typeof title.imdb_id === 'string' && /^tt[0-9]+$/.test(title.imdb_id)) out.push({ id: 'imdb', text: 'IMDb', url: `https://www.imdb.com/title/${title.imdb_id}` });
-  if (typeof title.homepage === 'string' && /^https?:\/\/[^\s\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+$/.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
+  if (typeof title.homepage === 'string' && HOMEPAGE.test(title.homepage)) out.push({ id: 'homepage', text: 'Homepage', url: title.homepage });
   return out;
 }
 

@@ -1,8 +1,8 @@
 // DNS Shield's card from `dots-dns state`: carried and router devices in two groups, KID, OPEN or open for a while, the pane for the cursor device, and the router's leases to add one from.
 import { line, listLook } from './voice.mjs';
+import { CONTROL } from './clean.mjs';
 
 // Names come from the uBlockDNS API, the router's reservations and its DHCP leases, which anyone on the network can set, so each is one line with no control characters; the card elides it.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const clean = (s) => line(String(s == null ? '' : s).replace(CONTROL, ' '));
 
 const CATEGORIES = [['youtube', 'YouTube'], ['youtube_kids', 'YouTube Kids'], ['social', 'Social'], ['adult', 'Adult'], ['gambling', 'Gambling']];

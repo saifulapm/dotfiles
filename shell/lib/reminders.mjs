@@ -1,5 +1,6 @@
 // The launcher's `r ` mode: a time then the words to be reminded of, stored as {id, text, due, created} in ~/.local/state/dots/reminders.json and rung by the minute tick. Times are the local clock's.
 import { line } from './voice.mjs';
+import { CONTROL, MARK } from './clean.mjs';
 
 export const MAX_PENDING = 50;
 // What the preview row says while the file does not parse; nothing is set over it.
@@ -8,9 +9,6 @@ export const BROKEN = 'reminders.json does not parse; fix or remove it first';
 const MIN = 60000;
 const DAY = 86400000;
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-// C0, DEL and C1 controls, and the marks that reorder what follows; a reminder's text is anyone's paste.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const MARK = /[‎‏؜]/g;
 
 const pad = (n) => String(n).padStart(2, '0');
 const clock = (ms) => {
@@ -38,6 +36,7 @@ export function whenText(due, now) {
   return `${WEEKDAYS[new Date(due).getDay()]} ${clock(due)}`;
 }
 
+// C0, DEL and C1 controls, and the marks that reorder what follows; a reminder's text is anyone's paste.
 const oneLine = (s) => line(s.replace(CONTROL, ' ').replace(MARK, ''));
 // A time a Date can hold; past about 8.64e15 ms it is Invalid Date, which draws as NaN:NaN.
 const isTime = (ms) => typeof ms === 'number' && !Number.isNaN(new Date(ms).getTime());

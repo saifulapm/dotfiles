@@ -1,12 +1,11 @@
 // Pure pieces of a Bluetooth pairing request from bin/dots-bt-agent, which the island asks as a question, kept here so node can test them.
 import { line } from './voice.mjs';
+import { CONTROL, BIDI } from './clean.mjs';
 
 const KINDS = ['confirm', 'display', 'pin', 'passkey', 'authorize'];
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const MARK = /[‎‏؜‪-‮⁦-⁩]/g;
 const str = (v) => (typeof v === 'string' ? v : '');
 // A device sends its own name, so it is drawn as one line of plain text.
-const oneLine = (s) => line(str(s).replace(CONTROL, ' ').replace(MARK, ''));
+const oneLine = (s) => line(str(s).replace(CONTROL, ' ').replace(BIDI, ''));
 
 // BlueZ's codes are six digits, a confirm's may be empty (RequestAuthorization) and a service is a 128-bit UUID, so a line that breaks this did not come from the agent.
 const SIX = /^[0-9]{6}$/;

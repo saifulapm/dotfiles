@@ -1,7 +1,7 @@
 // Control's Bluetooth and Wi-Fi row order and text; an order is a list of indices, so the section maps rows back to its devices.
 import { line } from './voice.mjs';
+import { CONTROL } from './clean.mjs';
 
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
 const btRank = (d) => (d.connected ? 0 : d.paired ? 1 : 2);
 const wifiRank = (n) => (n.connected ? 0 : n.known ? 1 : 2);
 

@@ -1,4 +1,5 @@
 // The notes store and its rules, shared by the Notes window and, later, the sync merge; kept pure so node can test them.
+import { BIDI } from './clean.mjs';
 
 export const CAPTURE_MAX = 10000;
 
@@ -210,4 +211,4 @@ export const addText = (store, text, now, id) => (text.trim() ? addNote(store, t
 export const firstImage = (note) => note.attachments.find((a) => a.mime.indexOf('image/') === 0) ?? null;
 
 // Bidi marks, overrides and isolates would draw a card in another order than y copies it, so they show as marks.
-export const displayText = (text) => text.replace(/[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, (ch) => `⟨U+${ch.charCodeAt(0).toString(16).toUpperCase()}⟩`);
+export const displayText = (text) => text.replace(BIDI, (ch) => `⟨U+${ch.charCodeAt(0).toString(16).toUpperCase()}⟩`);

@@ -2,6 +2,7 @@
 import { calc, format } from './calc.mjs';
 import { convert } from './worldclock.mjs';
 import { checkTokens } from './theme.mjs';
+import { C0, DEL, klass } from './clean.mjs';
 import { line } from './voice.mjs';
 
 // Lower is better: exact name, name prefix, word prefix, substring, then a keyword match.
@@ -32,9 +33,10 @@ export function parseQuery(text) {
   return mode ? { mode, q: text.slice(2) } : { mode: 'apps', q: text };
 }
 
+const UNPRINTABLE = klass(C0 + DEL);
 // The character a key opens the launcher with from niri's overview: one printable key with no Ctrl, Alt or Mod, else "".
 export function overviewChar(text, { ctrl, alt, meta }) {
-  if (ctrl || alt || meta || [...text].length !== 1 || /[\u0000-\u001f\u007f]/.test(text)) return '';
+  if (ctrl || alt || meta || [...text].length !== 1 || UNPRINTABLE.test(text)) return '';
   return text;
 }
 

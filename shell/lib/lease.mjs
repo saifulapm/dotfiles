@@ -1,6 +1,7 @@
 // Pure pieces of an agent's lease on the unlocked session (MBFQCTFH, RJA7QN1K).
 
 import { line } from './voice.mjs';
+import { CONTROL, MARK } from './clean.mjs';
 
 export const DEFAULT_MIN = 15;
 // No lease ends later than this after its unlock, however often it is renewed.
@@ -14,11 +15,7 @@ export function minutesOf(s) {
 
 export const leaseEnd = (unlockedAt, now, minutes) => Math.min(now + minutes * 60000, unlockedAt + MAX_MS);
 
-// C0, DEL and C1 controls draw as tofu, blob the journal and replay on a terminal, and U+0085 ends a line; the bidi marks reorder what follows.
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/g;
-const MARK = /[\u200e\u200f\u061c]/g;
-
-// The name any caller gave, as one line of plain text; an empty one still holds a lease.
+// The name any caller gave, as one line of plain text; an empty one still holds a lease. C0, DEL and C1 controls draw as tofu, blob the journal and replay on a terminal, and U+0085 ends a line; the bidi marks reorder what follows.
 export const holder = (who) => line((who || '').replace(CONTROL, ' ').replace(MARK, '')) || 'agent';
 
 export const unlockLine = (who, minutes) => `lock: agent unlock by ${who} for ${minutes} min`;

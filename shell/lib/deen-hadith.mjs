@@ -1,5 +1,6 @@
 // Hadith's words: the corpus download read from fetch's events, a hit's collection, grade and narrator, and the text y copies.
 import { answer, oneLine } from './deen.mjs';
+import { C0_BUT_LF, DEL, C1, EMBEDS, ISOLATES, klass } from './clean.mjs';
 
 const MB = 1e6;
 const whole = (bytes) => Math.round((bytes || 0) / MB);
@@ -84,8 +85,9 @@ export function narrator(en) {
   return m ? { by: m[1].trim(), body: s.slice(m[0].length) } : { by: '', body: s };
 }
 
+const WRAP_DROP = klass(C0_BUT_LF + DEL + C1 + EMBEDS + ISOLATES, 'g');
 // Text that wraps keeps its newlines; every other control and the bidi overrides and isolates go.
-export const wrapped = (s) => String(s ?? '').replace(/[\u0000-\u0009\u000b-\u001f\u007f-\u009f‪-‮⁦-⁩]/g, '');
+export const wrapped = (s) => String(s ?? '').replace(WRAP_DROP, '');
 
 export function narrations(a) {
   if (!a || !Array.isArray(a.collections)) return '';

@@ -1,5 +1,6 @@
 // What bin/dots-pinentry and the shell's card say to each other: one request line, with gpg's Assuan text still percent-escaped, and the Assuan answer the stub hands gpg as it is.
 import { line } from './voice.mjs';
+import { C0, DEL, klass } from './clean.mjs';
 
 export const CANCEL = 'ERR 83886179 Operation cancelled\n';
 export const ALLOW = 'OK\n';
@@ -24,9 +25,10 @@ export function parseRequest(text) {
   return { kind: f[0], description: unescape(f[1]), prompt: unescape(f[2]), error: unescape(f[3]) };
 }
 
+const ASSUAN_ESCAPED = klass('%' + C0 + DEL, 'g');
 // The passphrase on one Assuan data line: %, CR, LF and the other controls escaped, the rest as typed.
 export function pinAnswer(pin) {
-  return 'D ' + pin.replace(/[%\x00-\x1f\x7f]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')) + '\nOK\n';
+  return 'D ' + pin.replace(ASSUAN_ESCAPED, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')) + '\nOK\n';
 }
 
 // gpg-agent's "Bad Passphrase (try 2 of 3)" as the board writes it.
