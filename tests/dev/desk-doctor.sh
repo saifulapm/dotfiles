@@ -29,7 +29,7 @@ until_ok 3000 lock_is '.locked == true'
 out=$("$screen" doctor)
 rc=$?
 check "locked, screen doctor exits 1 (got $rc)" test "$rc" = 1
-check "with blockers holding locked and next naming dots-call lock unlock: $out" bash -c "jq -e '.locked == true and .blockers == [\"locked\"] and (.next | test(\"dots-call lock unlock\"))' <<<'$out' >/dev/null"
+check "with blockers holding locked and next naming dots-call lock unlock claude 15: $out" bash -c "jq -e '.locked == true and .blockers == [\"locked\"] and .next == \"dots-call lock unlock claude 15\"' <<<'$out' >/dev/null"
 
 exit $((fails > 0))
 }

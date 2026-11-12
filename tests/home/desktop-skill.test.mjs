@@ -440,7 +440,18 @@ test('screen doctor while locked names the lock and how to lift it', () => {
   const { status, out } = doctor(doctorEnv({ lock: locked }));
   assert.equal(status, 1);
   assert.deepEqual(out.blockers, ['locked']);
-  assert.match(out.next, /dots-call lock unlock/);
+  assert.equal(out.next, 'dots-call lock unlock claude 15');
+});
+
+// The skill and the operator give an agent 15 minutes; 120 is only the cap a lease cannot pass.
+test('no page or script of the skill, and no agent file, names a lease longer than 15 minutes to take', () => {
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+  const agents = join(repo, 'home/dot_claude/agents');
+  const all = [...walk(skill), ...readdirSync(agents).map((f) => join(agents, f))];
+  const hits = all.flatMap((f) =>
+    [...text(f).matchAll(/lock\s+(?:unlock|renew)\s+\S+\s+(\d+)/g)].filter((m) => Number(m[1]) > 15).map((m) => `${f}: ${m[0]}`),
+  );
+  assert.deepEqual(hits, []);
 });
 
 test('screen doctor names a missing dots-pointer, and only a missing tool the skill needs blocks', () => {

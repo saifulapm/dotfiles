@@ -57,7 +57,7 @@ TOOLS = ("grim", "wtype", "dots-pointer", "ydotoold", "tesseract")
 # The first blocker's way out; a tool the skill does not call (ydotoold, tesseract) blocks nothing.
 NEXT = {
     "niri": "run inside the niri session, or source the env bin/dots-dev prints",
-    "locked": "dots-call lock unlock claude 120",
+    "locked": "dots-call lock unlock claude 15",
     "grim": "dots install",
     "wtype": "dots install",
     "dots-pointer": "chezmoi apply (it builds ~/.local/bin/dots-pointer)",
