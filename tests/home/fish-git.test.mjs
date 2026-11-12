@@ -110,6 +110,14 @@ test('fish writes its history to the file dots sync reads', () => {
   assert.deepEqual(files(join(env.XDG_DATA_HOME, 'fish')), ['fish_history']);
 });
 
+// fish adds a typed line before it runs, so dots forget's own line would carry the text it forgets.
+test('fish keeps a typed dots forget line out of its history, and still a line that starts with a space', () => {
+  const asks = { 'dots forget TOKEN123': 1, "dots   forget 'a b'": 1, ' ls': 1, ls: 0, 'echo dots forget': 0, 'dots forgetful': 0, 'dots sync': 0 };
+  const script = Object.keys(asks).map((line) => `fish_should_add_to_history ${JSON.stringify(line).replace(/\$/g, '\\$')}; echo $status`).join('; ');
+  const r = run('fish', ['-i', '-c', script]);
+  assert.deepEqual(r.stdout.trim().split('\n').map(Number), Object.values(asks));
+});
+
 test('the prompt is starship\'s, as in v1: the directory, the git branch behind its Nerd Font symbol, then ❯', () => {
   const r = run('fish', ['-i', '-c', 'mkdir -p ~/code/proj; cd ~/code/proj; git init -q -b main; fish_prompt']);
   assert.equal(r.status, 0, r.stderr);
