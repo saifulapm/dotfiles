@@ -9,8 +9,9 @@ import { spawn, spawnSync } from 'node:child_process';
 const bin = new URL('../../bin/', import.meta.url).pathname;
 const GIT = 'git -c user.name=t -c user.email=t@t';
 
+// The fixture's git reads no global config, so the machine's hooks (an agent's push guard among them) never run on the scratch repos.
 const sh = (cwd, cmd) => {
-  const r = spawnSync('sh', ['-c', cmd], { cwd, encoding: 'utf8' });
+  const r = spawnSync('sh', ['-c', cmd], { cwd, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } });
   assert.equal(r.status, 0, `${cmd}: ${r.stderr}`);
   return r.stdout.trim();
 };
