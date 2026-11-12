@@ -108,14 +108,20 @@ ssh_hash() {
   printf '%s' "${m%$'\n'}" | sha256sum | cut -d' ' -f1
 }
 
-# The last five plaintext tarballs of ~/.ssh stay in the state dir, mode 600, before anything overwrites it.
+# The last five plaintext tarballs of ~/.ssh stay in the state dir, mode 600; it fails when no good tarball was written, and then nothing is rotated.
 ssh_backup() {
-  local out
+  local out tmp_out
   out=$ssh_state/backups/ssh-$(date +%Y%m%d-%H%M%S)-$1.tar.gz
+  tmp_out=$ssh_state/backups/.ssh-$$.tmp
+  # A missing or empty ~/.ssh holds nothing to lose.
+  [[ -n $(ls -A "$ssh_dir" 2>/dev/null) ]] || return 0
   mkdir -p "$ssh_state/backups"
-  chmod 700 "$ssh_state/backups"
-  tar czf "$out" -C "$HOME" .ssh 2>/dev/null
-  chmod 600 "$out" 2>/dev/null
+  # Only group and other bits go, so a folder made read-only stays read-only.
+  chmod go= "$ssh_state/backups"
+  if ! (umask 077 && tar czf "$tmp_out" -C "$HOME" .ssh 2>/dev/null) || ! mv "$tmp_out" "$out" 2>/dev/null; then
+    rm -f "$tmp_out"
+    return 1
+  fi
   # shellcheck disable=SC2012 # these names are ours and hold no newlines; with nullglob an empty glob would list the cwd, so ls lists the dir
   (cd "$ssh_state/backups" && ls -1t | tail -n +6 | xargs -r rm -f)
 }
@@ -155,7 +161,10 @@ ssh_pull() {
       cp "$ssh_dir/authorized_keys" "$stage/authorized_keys"
     fi
   fi
-  ssh_backup pull
+  if ! ssh_backup pull; then
+    err="could not back up ~/.ssh, so the blob is not applied"
+    return 1
+  fi
   mkdir -p "$ssh_dir"
   if ! out=$(rsync -a --checksum --delete --exclude 'known_hosts' --exclude 'known_hosts.old' --exclude 'cm-*' --exclude '*.sock' "$stage/" "$ssh_dir/" 2>&1); then
     err="applying the ssh blob failed: $(head -n 1 <<<"$out")"

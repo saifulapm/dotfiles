@@ -1,7 +1,10 @@
 // ~/.ssh travels as v1's age blob under qshell-sync/ssh, with a three-way rule that stops when both sides changed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
 import { join } from 'node:path';
 import { holdLock, identity, machine, sync, world } from './lib.mjs';
 
@@ -171,4 +174,83 @@ test('with no base and a ~/.ssh holding its own id_ed25519 beside authorized_key
   assert.match(r.stderr, /conflict, run dots sync --adopt local or remote: ~\/\.ssh here was never synced/);
   assert.deepEqual(tree(c, true), before.mine);
   assert.deepEqual(blob(w), before.remote);
+});
+
+const backups = (m) => join(m.env.XDG_STATE_HOME, 'dots/sync/ssh/backups');
+const sha = (m) => Object.fromEntries(readdirSync(sshDir(m)).sort().map((f) => [f, createHash('sha256').update(readFileSync(join(sshDir(m), f))).digest('hex')]));
+const NOT_APPLIED = 'could not back up ~/.ssh, so the blob is not applied';
+
+// a pushes a newer blob while b's backup folder is read-only; the folder is opened again so the scratch dir can go.
+async function refusedPull(args) {
+  const { a, b } = await agreed();
+  put(a, 'config', 'Host nuc\n');
+  await ok(a, ['--only', 'ssh']);
+  const before = sha(b);
+  chmodSync(backups(b), 0o500);
+  try {
+    const r = await sync(b, args);
+    assert.notEqual(r.code, 0, r.stdout + r.stderr);
+    assert.deepEqual(sha(b), before);
+    assert.equal(status(b).ssh.ok, false);
+    assert.equal(status(b).ssh.error, NOT_APPLIED);
+  } finally {
+    chmodSync(backups(b), 0o700);
+  }
+}
+
+test('a pull whose backup cannot be written leaves ~/.ssh as it was', () => refusedPull(['--only', 'ssh']));
+
+test('--adopt remote whose backup cannot be written leaves ~/.ssh as it was', async () => {
+  const { a, b } = await agreed();
+  put(a, 'config', 'Host nuc\n');
+  await ok(a, ['--only', 'ssh']);
+  put(b, 'config', 'Host mac\n');
+  const before = sha(b);
+  chmodSync(backups(b), 0o500);
+  try {
+    const r = await sync(b, ['--adopt', 'remote']);
+    assert.notEqual(r.code, 0, r.stdout + r.stderr);
+    assert.deepEqual(sha(b), before);
+    assert.equal(status(b).ssh.ok, false);
+    assert.equal(status(b).ssh.error, NOT_APPLIED);
+  } finally {
+    chmodSync(backups(b), 0o700);
+  }
+});
+
+test('the backup of a pull lists every file ~/.ssh held, a control socket among them', async () => {
+  const { a, b } = await agreed();
+  put(b, 'cm-user@host:22', 'control\n');
+  const srv = createServer();
+  await new Promise((res) => srv.listen(join(sshDir(b), 'agent.sock'), res));
+  try {
+    put(a, 'config', 'Host nuc\n');
+    await ok(a, ['--only', 'ssh']);
+    await ok(b, ['--only', 'ssh']);
+  } finally {
+    srv.close();
+  }
+  const newest = readdirSync(backups(b)).sort().at(-1);
+  const r = spawnSync('tar', ['tzf', join(backups(b), newest)], { encoding: 'utf8' });
+  assert.equal(r.status, 0);
+  const listed = r.stdout.split('\n');
+  for (const f of ['id_ed25519', 'id_ed25519.pub', 'known_hosts', 'cm-user@host:22']) assert.ok(listed.includes(`.ssh/${f}`), `${f} missing from ${listed}`);
+});
+
+test('a sixth backup that fails leaves the five good ones and no partial file', async () => {
+  const { a, b } = await agreed();
+  mkdirSync(backups(b), { recursive: true });
+  const names = [1, 2, 3, 4, 5].map((i) => `ssh-2020010${i}-000000-pull.tar.gz`);
+  for (const n of names) writeFileSync(join(backups(b), n), `good ${n}`);
+  for (const f of readdirSync(backups(b))) if (!names.includes(f)) rmSync(join(backups(b), f));
+  put(a, 'config', 'Host nuc\n');
+  await ok(a, ['--only', 'ssh']);
+  chmodSync(backups(b), 0o500);
+  try {
+    await sync(b, ['--only', 'ssh']);
+  } finally {
+    chmodSync(backups(b), 0o700);
+  }
+  assert.deepEqual(readdirSync(backups(b)).sort(), names);
+  for (const n of names) assert.equal(readFileSync(join(backups(b), n), 'utf8'), `good ${n}`);
 });
