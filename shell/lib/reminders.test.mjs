@@ -32,6 +32,16 @@ test('0m, 25:00 and 9:60 cannot be set, and the row says so', () => {
   }
 });
 
+test('a time past what a Date holds is too far ahead, and a year is still set', () => {
+  for (const q of ['3000000000h tea', '99999999999999999999m tea']) {
+    const r = parseReminder(q, now);
+    assert.equal(r.due, undefined, q);
+    assert.equal(r.error, `Cannot set ${q.split(' ')[0]}: it is too far ahead`, q);
+    assert.deepEqual(reminderRows(q, now, [], false), [{ title: r.error, detail: '' }], q);
+  }
+  assert.equal(parseReminder('8760h renew', now).due, now + 8760 * 3600000);
+});
+
 test('a query with no time or no text yet previews nothing', () => {
   for (const q of ['', '20m', '20m ', 'tea', 'soon tea']) assert.equal(parseReminder(q, now), null, q);
 });

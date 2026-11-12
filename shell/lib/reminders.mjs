@@ -68,6 +68,8 @@ export function parseReminder(q, now) {
     const mins = Number(rel[1] || 0) * 60 + Number(rel[2] || 0);
     if (mins <= 0) return { error: `Cannot set ${m[1]}: it is not in the future` };
     due = now + mins * MIN;
+    // A due no Date can hold would make the next read take the whole file as broken.
+    if (!isTime(due)) return { error: `Cannot set ${m[1]}: it is too far ahead` };
   } else if (at) {
     const [h, min] = [Number(at[1]), Number(at[2])];
     if (h > 23 || min > 59) return { error: `Cannot set ${m[1]}: no clock shows it` };
