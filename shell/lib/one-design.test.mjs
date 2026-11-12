@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-// Behaviour 3 of m80: nothing in the shell, the bin scripts or the tests names a deleted design, and no shell file asks niri to soften what lies behind it; the words are built from parts, so this file never matches its own scan.
-const WORDS = new RegExp(['hard-' + 'offset', 'engr' + 'aved', 'brack' + 'et', 'brus' + 'hed', 'fro' + 'st', 'hi' + 'fi', 'hi-' + 'fi', 'gl' + 'ow', 'typew' + 'riter'].join('|'));
+// Behaviour 3 of m80: nothing in the shell, the bin scripts or the tests names a deleted design, and no shell file asks niri to soften what lies behind it; the words are built from parts, so this file never matches its own scan; the two spellings of one design must stand alone, so a package name such as asahi-fix27 is not read as one.
+const WORDS = new RegExp(['hard-' + 'offset', 'engr' + 'aved', 'brack' + 'et', 'brus' + 'hed', 'fro' + 'st', '(?<![a-z])hi-?' + 'fi(?![a-z])', 'gl' + 'ow', 'typew' + 'riter'].join('|'));
 const BLUR = new RegExp('bl' + 'ur');
 // The emoji names (a star that shines) and the markdown pager the installs carry are words, not designs.
 const ALLOWED = [/shell\/data\/emoji\.json$/];
@@ -20,6 +20,14 @@ const text = (p) => {
   const b = readFileSync(p);
   return b.includes(0) ? '' : b.toString('utf8');
 };
+
+test('a deleted design is found as a word of its own, and not inside a package name', () => {
+  const name = 'hi-' + 'fi';
+  assert.equal(WORDS.test(`the ${name} design`), true);
+  assert.equal(WORDS.test(`'${name}'`), true);
+  assert.equal(WORDS.test(`${name.replace('-', '')}Card`), true);
+  assert.equal(WORDS.test(`dnf install asa${name}x27`), false);
+});
 
 test('no file in shell, bin or tests names a deleted design', () => {
   const found = [];
