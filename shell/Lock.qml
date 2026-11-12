@@ -7,6 +7,7 @@ import "." as Root
 import "services" as Services
 import "lib/lock-look.mjs" as L
 import "lib/lease.mjs" as Lease
+import "lib/lock-pam.mjs" as Pam
 
 // The session lock: a WlSessionLock cannot live in the Overlay host, so it is the one surface outside it.
 Scope {
@@ -229,7 +230,7 @@ Scope {
     PamContext {
         id: pam
         config: pamService.loaded ? "dots-lock" : "login"
-        configDirectory: Quickshell.env("DOTS_PAM_DIR") || "/etc/pam.d"
+        configDirectory: Pam.pamDir(Quickshell.env("DOTS_PAM_DIR"), Quickshell.env("DOTS_DEV_DIR"))
         // A second prompt gets an empty answer, which no password matches.
         onPamMessage: {
             if (responseRequired) {

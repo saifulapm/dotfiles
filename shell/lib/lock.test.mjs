@@ -34,3 +34,17 @@ test('the dev PAM checker accepts only the test password', () => {
   assert.equal(checker('dots-test-pas'), 1);
   assert.equal(checker('wrong'), 1);
 });
+
+test('the lock asks /etc/pam.d unless a nested session names its dev folder beside the PAM override', async () => {
+  const { pamDir } = await import('./lock-pam.mjs');
+  assert.equal(pamDir('/tmp/dots-dev-x/pam.d', undefined), '/etc/pam.d');
+  assert.equal(pamDir('/tmp/dots-dev-x/pam.d', ''), '/etc/pam.d');
+  assert.equal(pamDir('/tmp/dots-dev-x/pam.d', '/tmp/dots-dev-x'), '/tmp/dots-dev-x/pam.d');
+  assert.equal(pamDir(undefined, undefined), '/etc/pam.d');
+  assert.equal(pamDir(undefined, '/tmp/dots-dev-x'), '/etc/pam.d');
+});
+
+test('the lock reads its PAM folder through pamDir, with both variables', () => {
+  assert.match(lock, /import "lib\/lock-pam\.mjs" as Pam/);
+  assert.match(lock, /configDirectory:\s*Pam\.pamDir\(Quickshell\.env\("DOTS_PAM_DIR"\),\s*Quickshell\.env\("DOTS_DEV_DIR"\)\)/);
+});
