@@ -38,6 +38,15 @@ test('lib.sh\'s slow-drawing FAIL prints the live session\'s lock state', () => 
   assert.ok(lib.indexOf('live_wl=') < lib.indexOf('source "$dev_out"'), 'live_wl is taken before the nested env replaces WAYLAND_DISPLAY');
 });
 
+// An agent unlock's darken left the live output off under a lease (m88), and the nested output drew once a second, so lib.sh lights it before it times a frame.
+test('lib.sh powers on the live output through the live niri before its draw-rate guard', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const on = lib.search(/NIRI_SOCKET="\$live_niri" niri msg action power-on-monitors/);
+  assert.ok(on >= 0, 'lib.sh runs niri msg action power-on-monitors on the live socket');
+  assert.ok(on < lib.indexOf('grim_ms >/dev/null'), 'before the first frame is timed');
+  assert.ok(lib.indexOf('live_niri=') < lib.indexOf('source "$dev_out"'), 'live_niri is taken before the nested env replaces NIRI_SOCKET');
+});
+
 // A walker's orphaned sleep held the lock past its walk twice (m56, m75); the FAIL names who holds it, so nothing is killed blind.
 test('lib-lock-holders.sh names each process holding the lock file, and lib.sh\'s lock FAIL runs it', () => {
   const scratch = mkdtempSync(join(tmpdir(), 'lock-holders-'));

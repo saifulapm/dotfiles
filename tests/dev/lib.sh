@@ -5,6 +5,8 @@ repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 live_bus=${DBUS_SESSION_BUS_ADDRESS:-}
 # The live display, before the nested env replaces it, so a FAIL can ask the live shell why it draws slowly.
 live_wl=${WAYLAND_DISPLAY:-}
+# The live niri, so the draw-rate guard below can power its output on.
+live_niri=${NIRI_SOCKET:-}
 fails=0
 
 check() {
@@ -137,6 +139,8 @@ unset TMUX
 # A nested niri whose window the live session hides (a lock screen, an output off) draws about once a second, which turns every timing below into noise.
 until_ok 5000 shell_status >/dev/null
 grim_ms() { local t0; t0=$(now_ms); grim -s 0.1 -t ppm - >/dev/null 2>&1; echo $(($(now_ms) - t0)); }
+# An agent unlock's darken can leave the live output off under a lease (m88), so it is powered on before a frame is timed.
+if [ -n "$live_niri" ]; then NIRI_SOCKET="$live_niri" niri msg action power-on-monitors >/dev/null 2>&1; fi
 grim_ms >/dev/null
 if (($(grim_ms) > 500 && $(grim_ms) > 500)); then
   echo "FAIL the nested output draws about once a second: is the live session locked, or its output off?"
