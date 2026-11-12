@@ -74,8 +74,7 @@ Item {
             fetcher.running = true;
     }
 
-    // dots claude-account is the registry's only writer, so ACTIVE moves only once it has written and the registry is read again.
-    // On a Context7 key row, dots context7 use makes the key this device's, and the state file is read again.
+    // dots claude-account is the registry's only writer, so ACTIVE moves only once it has written and the registry is read again; on a Context7 key row, dots context7 use makes the key this device's, and the state file is read again.
     function use() {
         const key = A.context7Target(items[current]);
         if (key) {
