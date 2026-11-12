@@ -74,16 +74,17 @@ sync_youtube() {
   store_unit youtube
 }
 
-# Every machine's file, its own included, merges into the live history, which then goes up as this machine's file.
+# Every machine's file, its own included, merges into the live history, less every line on any machine's forgotten list; the list goes up before the history, each as this machine's file.
 sync_fish() {
-  local live=${XDG_DATA_HOME:-$HOME/.local/share}/fish/fish_history pulled=$tmp/fish out
+  local live=${XDG_DATA_HOME:-$HOME/.local/share}/fish/fish_history list=$data/fish/forgotten pulled=$tmp/fish out
   mkdir -p "$pulled"
   rc mkdir "$root/fish" &&
-    rc copy "$root/fish" "$pulled" --max-depth 1 --include '*.history' || return
-  if ! out=$("$here/dots-sync-fish" "$live" "$pulled"/*.history 2>&1); then
+    rc copy "$root/fish" "$pulled" --max-depth 1 --include '*.history' --include '*.forgotten' || return
+  if ! out=$("$here/dots-sync-fish" "$live" "$list" "$pulled"/*.history "$pulled"/*.forgotten 2>&1); then
     err=$(tail -n 1 <<<"$out")
     return 1
   fi
+  [[ ! -f $list ]] || rc copyto "$list" "$root/fish/$machine.forgotten" --checksum || return
   [[ ! -f $live ]] || rc copyto "$live" "$root/fish/$machine.history" --checksum
 }
 

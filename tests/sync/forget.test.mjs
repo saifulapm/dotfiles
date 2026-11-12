@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { forget, machine, world } from './lib.mjs';
+import { forget, machine, sync, world } from './lib.mjs';
 
 const live = (m) => join(m.env.XDG_DATA_HOME, 'fish/fish_history');
 const list = (m) => join(m.env.XDG_DATA_HOME, 'dots/fish/forgotten');
@@ -73,4 +73,109 @@ test('dots forget matches its text as plain text: a quote, a dot, a backslash, a
     delete lines[gone];
     assert.equal(readFileSync(live(a), 'latin1'), Object.values(lines).join(''), `${JSON.stringify(text)} took out only its own line`);
   }
+});
+
+async function ok(m) {
+  const r = await sync(m, ['--only', 'fish']);
+  assert.equal(r.code, 0, `dots sync on ${m.id} exited ${r.code}: ${r.stdout}${r.stderr}`);
+}
+const holds = (m, text) => existsSync(live(m)) && readFileSync(live(m), 'latin1').includes(text);
+// Every *.history file on the remote whose text holds text, by name.
+const remoteHolding = (w, text) =>
+  readdirSync(join(w.remote, 'dots-sync/fish')).filter((f) => f.endsWith('.history') && readFileSync(join(w.remote, 'dots-sync/fish', f), 'latin1').includes(text));
+
+// a and b both hold the TOKEN123 line and one other, after a round each.
+async function shared(w) {
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  seed(a, block('echo TOKEN123', 1760000000) + block('echo from-a', 1760000001));
+  seed(b, block('echo from-b', 1760000002));
+  await ok(a);
+  await ok(b);
+  assert.ok(holds(b, 'TOKEN123'), 'b pulled the line before the forget');
+  return [a, b];
+}
+
+test('a line a forgets is gone from both live histories and every remote history after a round on a, b and a again', async () => {
+  const w = world();
+  const [a, b] = await shared(w);
+  assert.equal((await forget(a, ['TOKEN123'])).stdout.split('\n')[0], 'forgot 1 line');
+  await ok(a);
+  await ok(b);
+  await ok(a);
+  assert.ok(!holds(a, 'TOKEN123'), 'a');
+  assert.ok(!holds(b, 'TOKEN123'), 'b');
+  assert.deepEqual(remoteHolding(w, 'TOKEN123'), []);
+  assert.ok(existsSync(join(w.remote, 'dots-sync/fish/a.forgotten')), "a's list went up beside its history");
+  for (const m of [a, b]) for (const other of ['from-a', 'from-b']) assert.ok(holds(m, other), `${m.id} keeps ${other}`);
+});
+
+test('a line b adds after a forgets, and the same command typed again later, are kept on both', async () => {
+  const w = world();
+  const [a, b] = await shared(w);
+  await forget(a, ['TOKEN123']);
+  appendFileSync(live(b), block('echo after-the-forget', 1760000100) + block('echo TOKEN123', 1760000101));
+  await ok(a);
+  await ok(b);
+  await ok(a);
+  for (const m of [a, b]) {
+    const text = readFileSync(live(m), 'latin1');
+    assert.ok(text.includes(block('echo after-the-forget', 1760000100)), `${m.id} has b's new line`);
+    assert.ok(text.includes(block('echo TOKEN123', 1760000101)), `${m.id} has the command typed again`);
+    assert.ok(!text.includes(block('echo TOKEN123', 1760000000)), `${m.id} has not the forgotten one`);
+  }
+});
+
+test('a forgotten line a fish session writes back into the live history is taken out at the next round', async () => {
+  const w = world();
+  const [a] = await shared(w);
+  await forget(a, ['TOKEN123']);
+  await ok(a);
+  appendFileSync(live(a), block('echo TOKEN123', 1760000000));
+  await ok(a);
+  assert.ok(!holds(a, 'TOKEN123'));
+  assert.ok(!remoteHolding(w, 'TOKEN123').includes('a.history'), "a's history on the remote");
+});
+
+test('a machine off since before the forget drops the line before its own next push', async () => {
+  const w = world();
+  const [a] = await shared(w);
+  const c = machine(w, 'c');
+  await ok(c);
+  assert.ok(holds(c, 'TOKEN123'));
+  await forget(a, ['TOKEN123']);
+  await ok(a);
+  await ok(c);
+  assert.ok(!holds(c, 'TOKEN123'));
+  assert.ok(!remoteHolding(w, 'TOKEN123').includes('c.history'), "c's first push");
+});
+
+test('a reinstall with no history and no list forgets nothing and takes its old list back', async () => {
+  const w = world();
+  const [a, b] = await shared(w);
+  await forget(a, ['TOKEN123']);
+  await ok(a);
+  await ok(b);
+  const old = readFileSync(list(a), 'latin1');
+  rmSync(a.env.XDG_DATA_HOME, { recursive: true, force: true });
+  mkdirSync(a.env.XDG_DATA_HOME);
+  await ok(a);
+  assert.ok(holds(a, 'from-a') && holds(a, 'from-b'), 'every line comes back');
+  assert.ok(!holds(a, 'TOKEN123'));
+  assert.equal(readFileSync(list(a), 'latin1'), old);
+});
+
+test('two machines forgetting different lines in the same round both stay gone', async () => {
+  const w = world();
+  const [a, b] = await shared(w);
+  await forget(a, ['TOKEN123']);
+  await forget(b, ['from-b']);
+  await ok(a);
+  await ok(b);
+  await ok(a);
+  await ok(b);
+  for (const m of [a, b]) {
+    assert.ok(!holds(m, 'TOKEN123') && !holds(m, 'from-b'), m.id);
+    assert.ok(holds(m, 'from-a'), m.id);
+  }
+  assert.deepEqual(remoteHolding(w, 'TOKEN123').concat(remoteHolding(w, 'from-b')), []);
 });

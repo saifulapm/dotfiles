@@ -60,7 +60,7 @@ old=$fish/${slug//[^a-zA-Z0-9_]/_}_history
 entries() { grep -c '^- cmd: ' "$fish/fish_history" 2>/dev/null; }
 before=$(entries)
 if [[ -f $old ]]; then
-  "$here/dots-sync-fish" "$fish/fish_history" "$old" || exit 1
+  "$here/dots-sync-fish" "$fish/fish_history" "$data/dots/fish/forgotten" "$old" || exit 1
 fi
 after=$(entries)
 

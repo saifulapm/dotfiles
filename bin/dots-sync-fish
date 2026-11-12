@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// dots-sync-fish <live> <pulled>...: unions fish history files into the live one, each (cmd, when) once, ordered by when; dots-sync-fish forget <text> takes every line holding text out of it and records each as forgotten.
+// dots-sync-fish <live> <list> <pulled>...: unions the pulled .history files into the live one, each (cmd, when) once, ordered by when, leaving out every line on the list or a pulled .forgotten list; dots-sync-fish forget <text> takes every line holding text out of it and records each as forgotten.
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
@@ -39,14 +39,22 @@ function replace(path, text, before) {
   return true;
 }
 
+const hashes = (path) => read(path).split('\n').filter(Boolean);
+
 // One try: false when fish appended while the union was built, so the caller starts again from the new file.
-function round(live, pulled) {
+function round(live, list, pulled) {
+  const lists = pulled.filter((f) => f.endsWith('.forgotten'));
+  const known = hashes(list);
+  // This machine's list takes in every pulled one, its own old file on Dropbox among them, so a reinstall gets it back before its next push.
+  const forgotten = new Set(known.concat(...lists.map(hashes)));
+  if (forgotten.size > known.length) replace(list, [...forgotten].map((h) => h + '\n').join(''));
   const before = mtime(live);
   const own = parse(read(live));
+  const kept = (e) => forgotten.size === 0 || !forgotten.has(hash(e));
   const merged = new Map();
-  for (const e of own.concat(...pulled.map((f) => parse(read(f))))) if (!merged.has(e.key)) merged.set(e.key, e);
-  // Nothing new means no write, so the file's mtime and fish's own appends stay untouched.
-  if (merged.size === new Set(own.map((e) => e.key)).size) return true;
+  for (const e of own.concat(...pulled.filter((f) => !lists.includes(f)).map((f) => parse(read(f))))) if (kept(e) && !merged.has(e.key)) merged.set(e.key, e);
+  // Nothing new and nothing forgotten means no write, so the file's mtime and fish's own appends stay untouched.
+  if (own.every(kept) && merged.size === new Set(own.map((e) => e.key)).size) return true;
   return replace(live, [...merged.values()].sort((x, y) => x.when - y.when).map((e) => e.block).join(''), before);
 }
 
@@ -79,11 +87,11 @@ function forget(args) {
 }
 
 if (process.argv[2] === 'forget') forget(process.argv.slice(3));
-const [live, ...pulled] = process.argv.slice(2);
-if (!live) {
-  process.stderr.write('usage: dots-sync-fish <live> <pulled>...\n');
+const [live, list, ...pulled] = process.argv.slice(2);
+if (!live || !list) {
+  process.stderr.write('usage: dots-sync-fish <live> <list> <pulled>...\n');
   process.exit(2);
 }
-for (let i = 0; i < 3; i++) if (round(live, pulled)) process.exit(0);
+for (let i = 0; i < 3; i++) if (round(live, list, pulled)) process.exit(0);
 process.stderr.write('fish: the live history kept changing, so this round left it alone\n');
 process.exit(1);
