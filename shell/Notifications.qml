@@ -352,7 +352,10 @@ Item {
                     }
                     Repeater {
                         model: centre.hintKeys
-                        KeyChip {}
+                        KeyPair {
+                            theme: centre.theme
+                            look: centre.look
+                        }
                     }
                 }
 
@@ -486,7 +489,9 @@ Item {
                                         Repeater {
                                             id: actionRepeater
                                             model: item.actionChips
-                                            KeyChip {
+                                            KeyPair {
+                                                theme: centre.theme
+                                                look: centre.look
                                                 objectName: "click:notif-chip:" + modelData.key
                                                 keyColor: look.cursor.text
                                                 wordColor: look.cursor.detail
@@ -590,46 +595,12 @@ Item {
 
                     Repeater {
                         model: centre.legendKeys
-                        KeyChip {}
+                        KeyPair {
+                            theme: centre.theme
+                            look: centre.look
+                        }
                     }
                 }
-            }
-        }
-    }
-
-    // A key and its word as the legend draws them, plain dim text.
-    component KeyChip: Rectangle {
-        required property var modelData
-        readonly property string drawn: modelData.key + " " + modelData.word
-        property color keyColor: look.chip.key
-        property color wordColor: c.muted
-        property int keyWeight: Font.Medium
-        width: pair.implicitWidth + 14
-        height: pair.implicitHeight + 6
-        radius: 6
-        color: look.chip.fill
-
-        Row {
-            id: pair
-            anchors.centerIn: parent
-            spacing: 6
-
-            Text {
-                textFormat: Text.PlainText
-                text: modelData.key
-                color: keyColor
-                font.family: fonts.mono
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
-                font.weight: keyWeight
-            }
-            Text {
-                textFormat: Text.PlainText
-                text: modelData.word
-                color: wordColor
-                font.family: look.small.font
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
             }
         }
     }

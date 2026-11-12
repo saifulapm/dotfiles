@@ -189,41 +189,10 @@ Item {
                     id: hintRepeater
                     model: recorder.look.keys([["hjkl", "move"], ["⇧HJKL", "size"], ["f", "full"], ["↵", "rec"], ["esc", "cancel"]])
 
-                    Rectangle {
+                    KeyPair {
                         id: keyPair
-                        required property var modelData
-                        readonly property string keyLabel: keyText.text
-                        readonly property string wordLabel: wordText.text
-                        width: pairRow.implicitWidth + 14
-                        height: pairRow.implicitHeight + 6
-                        radius: 6
-                        color: recorder.look.chip.fill
-
-                        Row {
-                            id: pairRow
-                            anchors.centerIn: parent
-                            spacing: 6
-
-                            Text {
-                                id: keyText
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.key
-                                color: recorder.look.chip.key
-                                font.family: recorder.fonts.mono
-                                font.pixelSize: recorder.look.small.size
-                                font.letterSpacing: recorder.look.small.spacing
-                                font.weight: Font.Medium
-                            }
-                            Text {
-                                id: wordText
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.word
-                                color: recorder.c.muted
-                                font.family: recorder.look.small.font
-                                font.pixelSize: recorder.look.small.size
-                                font.letterSpacing: recorder.look.small.spacing
-                            }
-                        }
+                        theme: recorder.theme
+                        look: recorder.look
                     }
                 }
             }

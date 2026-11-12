@@ -236,47 +236,16 @@ Item {
                     id: hintRepeater
                     model: prompt.look.keys([["↵", "authenticate"], ["esc", "cancel"]])
 
-                    Rectangle {
+                    KeyPair {
                         id: keyPair
-                        required property var modelData
                         required property int index
-                        readonly property string keyLabel: keyText.text
-                        readonly property string wordLabel: wordText.text
-                        width: pairRow.implicitWidth + 14
-                        height: pairRow.implicitHeight + 6
-                        radius: 6
-                        color: prompt.look.chip.fill
+                        theme: prompt.theme
+                        look: prompt.look
 
                         // The first chip is ↵ and the second esc, so a click on one does what its key does.
                         Root.Click {
                             name: "polkit-key:" + keyPair.index
                             onTapped: keyPair.index === 0 ? prompt.submit() : prompt.close()
-                        }
-
-                        Row {
-                            id: pairRow
-                            anchors.centerIn: parent
-                            spacing: 6
-
-                            Text {
-                                id: keyText
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.key
-                                color: prompt.look.chip.key
-                                font.family: prompt.fonts.mono
-                                font.pixelSize: prompt.look.small.size
-                                font.letterSpacing: prompt.look.small.spacing
-                                font.weight: Font.Medium
-                            }
-                            Text {
-                                id: wordText
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.word
-                                color: prompt.c.muted
-                                font.family: prompt.look.small.font
-                                font.pixelSize: prompt.look.small.size
-                                font.letterSpacing: prompt.look.small.spacing
-                            }
                         }
                     }
                 }

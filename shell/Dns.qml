@@ -230,7 +230,7 @@ Item {
             leaseRows.push(leaseRepeater.itemAt(i).drawn());
         const keys = [];
         for (let i = 0; i < keyRepeater.count; i++)
-            keys.push(keyRepeater.itemAt(i).drawnKey);
+            keys.push(keyRepeater.itemAt(i).keyLabel);
         return JSON.stringify({
             loaded: true,
             open: shown,
@@ -1287,38 +1287,10 @@ Item {
                 Repeater {
                     id: keyRepeater
                     model: panel.adding ? D.addKeys(look) : D.dnsKeys(look)
-                    Rectangle {
+                    KeyPair {
                         id: keyPair
-                        required property var modelData
-                        readonly property string drawnKey: chipKey.text
-                        width: pair.implicitWidth + 14
-                        height: pair.implicitHeight + 6
-                        radius: 6
-                        color: look.chip.fill
-                        Row {
-                            id: pair
-                            anchors.centerIn: parent
-                            spacing: 6
-                            Text {
-                                id: chipKey
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.key
-                                color: look.chip.key
-                                font.family: fonts.mono
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                                font.weight: Font.Medium
-                            }
-                            Text {
-                                visible: text !== ""
-                                textFormat: Text.PlainText
-                                text: keyPair.modelData.word
-                                color: c.muted
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                            }
-                        }
+                        theme: panel.theme
+                        look: panel.look
                     }
                 }
             }

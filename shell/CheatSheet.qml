@@ -201,6 +201,8 @@ Item {
                             KeyPair {
                                 id: headKey
                                 required property int index
+                                theme: sheet.theme
+                                look: sheet.look
 
                                 // The first chip is / and the second esc, so a click on one does what its key does.
                                 Root.Click {
@@ -340,48 +342,12 @@ Item {
                     Repeater {
                         id: legendRepeater
                         model: look.keys([["j/k", "move"], ["↵", "act"], ["/", "search"], ["⇥", "section"], ["esc", "close"]])
-                        KeyPair {}
+                        KeyPair {
+                            theme: sheet.theme
+                            look: sheet.look
+                        }
                     }
                 }
-            }
-        }
-    }
-
-    // One key and its word as the launcher's legend draws them, as plain dim text.
-    component KeyPair: Rectangle {
-        id: keyPair
-        required property var modelData
-        readonly property string keyLabel: keyText.text
-        readonly property string wordLabel: wordText.text
-        readonly property real wordSpacing: wordText.font.letterSpacing
-        width: pairRow.implicitWidth + 14
-        height: pairRow.implicitHeight + 6
-        radius: 6
-        color: look.chip.fill
-
-        Row {
-            id: pairRow
-            anchors.centerIn: parent
-            spacing: 6
-
-            Text {
-                id: keyText
-                textFormat: Text.PlainText
-                text: keyPair.modelData.key
-                color: look.chip.key
-                font.family: fonts.mono
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
-                font.weight: Font.Medium
-            }
-            Text {
-                id: wordText
-                textFormat: Text.PlainText
-                text: keyPair.modelData.word
-                color: c.muted
-                font.family: look.small.font
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
             }
         }
     }

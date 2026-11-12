@@ -708,39 +708,9 @@ Item {
                             id: footerKeys
                             model: look.legend(launcher.mode).keys
 
-                            Rectangle {
-                                required property var modelData
-                                width: pair.implicitWidth + 14
-                                height: pair.implicitHeight + 6
-                                radius: 6
-                                color: look.chip.fill
-
-                                property alias keyGlyph: pairKey
-
-                                Row {
-                                    id: pair
-                                    anchors.centerIn: parent
-                                    spacing: 6
-
-                                    Text {
-                                        id: pairKey
-                                        textFormat: Text.PlainText
-                                        text: modelData.key
-                                        color: look.chip.key
-                                        font.family: fonts.mono
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: look.small.spacing
-                                        font.weight: Font.Medium
-                                    }
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        text: modelData.word
-                                        color: c.muted
-                                        font.family: look.small.font
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: look.small.spacing
-                                    }
-                                }
+                            KeyPair {
+                                theme: launcher.theme
+                                look: launcher.look
                             }
                         }
                     }

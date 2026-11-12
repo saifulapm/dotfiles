@@ -737,42 +737,10 @@ Item {
                         id: keyRepeater
                         model: A.accountsKeys(look)
 
-                        Rectangle {
+                        KeyPair {
                             id: keyPair
-                            required property var modelData
-                            readonly property string keyLabel: keyText.text
-                            readonly property string wordLabel: wordText.text
-                            width: pair.implicitWidth + 14
-                            height: pair.implicitHeight + 6
-                            radius: 6
-                            color: look.chip.fill
-
-                            Row {
-                                id: pair
-                                anchors.centerIn: parent
-                                spacing: 6
-
-                                Text {
-                                    id: keyText
-                                    textFormat: Text.PlainText
-                                    text: keyPair.modelData.key
-                                    color: look.chip.key
-                                    font.family: fonts.mono
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                    font.weight: Font.Medium
-                                }
-                                Text {
-                                    id: wordText
-                                    visible: text !== ""
-                                    textFormat: Text.PlainText
-                                    text: keyPair.modelData.word
-                                    color: c.muted
-                                    font.family: look.small.font
-                                    font.pixelSize: look.small.size
-                                    font.letterSpacing: look.small.spacing
-                                }
-                            }
+                            theme: panel.theme
+                            look: panel.look
                         }
                     }
                 }

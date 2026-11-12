@@ -118,7 +118,7 @@ Item {
             cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
             cursorDetail: cur ? Object.assign(box(cur.detailItem), { truncated: cur.detailItem.truncated }) : null,
             legend: legend.map(k => k.key + " " + k.word).join("  "),
-            legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).label).join("  "),
+            legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).drawn).join("  "),
             legendSpacing: look.small.spacing,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: control.Window.active
@@ -386,39 +386,9 @@ Item {
                     id: legendRepeater
                     model: control.legend
 
-                    Rectangle {
-                        required property var modelData
-                        readonly property string label: pairKey.text + " " + pairWord.text
-                        width: pair.implicitWidth + 14
-                        height: pair.implicitHeight + 6
-                        radius: 6
-                        color: look.chip.fill
-
-                        Row {
-                            id: pair
-                            anchors.centerIn: parent
-                            spacing: 6
-
-                            Text {
-                                id: pairKey
-                                textFormat: Text.PlainText
-                                text: modelData.key
-                                color: look.chip.key
-                                font.family: fonts.mono
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                                font.weight: Font.Medium
-                            }
-                            Text {
-                                id: pairWord
-                                textFormat: Text.PlainText
-                                text: modelData.word
-                                color: c.muted
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: look.small.spacing
-                            }
-                        }
+                    KeyPair {
+                        theme: control.theme
+                        look: control.look
                     }
                 }
             }
