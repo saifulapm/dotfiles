@@ -221,6 +221,15 @@ colorscheme() {
   printf '{"from":"%s","to":"%s","start":%d,"end":%d,"ms":%d}\n' "$from" "$name" "$t0" "$end" $((end - t0)) >"$state/theme-switch.json"
 }
 
+# A sync round rewrites the forgotten list, so a forget waits out a round that holds the sync lock rather than lose its hashes to it.
+forget() {
+  local state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+  mkdir -p "$state"
+  exec 9>"$state/dots-sync.lock"
+  flock -w 600 9 || die "a dots sync round held its lock for 10 minutes, so nothing was forgotten"
+  exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-sync-fish" forget "$@"
+}
+
 main() {
   case ${1:-} in
     install) install ;;
@@ -229,11 +238,11 @@ main() {
     theme) die "the theme command is gone; use dots colorscheme <name>" ;;
     # `dots awake 60` keeps the session from dimming, locking or turning the monitors off for 60 min; `dots awake off` ends it.
     awake) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-call" idle awake "${2:-off}" ;;
-    forget) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-sync-fish" forget "${@:2}" ;;
+    forget) forget "${@:2}" ;;
     dev) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-services" "${@:2}" ;;
     sync | update | bump | secrets | cutover | claude-account | context7 | dns | clean) exec "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/dots-$1" "${@:2}" ;;
     *)
-      echo "usage: dots install | dots update | dots bump | dots secrets | dots colorscheme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots context7 use <id> | apply | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots forget <text> | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
+      echo "usage: dots install | dots update | dots bump | dots secrets | dots colorscheme <name> | dots awake <minutes>|off | dots cutover | dots claude-account add <label> | use <id> | dots context7 use <id> | apply | dots dns <verb> | dots dev [stop <name>] | dots clean [--yes] | dots forget [--] <text> | dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
       exit 2
       ;;
   esac

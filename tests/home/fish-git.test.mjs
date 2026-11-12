@@ -111,8 +111,8 @@ test('fish writes its history to the file dots sync reads', () => {
 });
 
 // fish adds a typed line before it runs, so dots forget's own line would carry the text it forgets.
-test('fish keeps a typed dots forget line out of its history, and still a line that starts with a space', () => {
-  const asks = { 'dots forget TOKEN123': 1, "dots   forget 'a b'": 1, ' ls': 1, ls: 0, 'echo dots forget': 0, 'dots forgetful': 0, 'dots sync': 0 };
+test('fish keeps a typed dots forget, history search or history delete line out of its history, and still a line that starts with a space', () => {
+  const asks = { 'dots forget TOKEN123': 1, "dots   forget 'a b'": 1, 'history search TOKEN123': 1, 'history delete --contains TOKEN123': 1, ' ls': 1, ls: 0, history: 0, 'history merge': 0, 'echo dots forget': 0, 'dots forgetful': 0, 'dots sync': 0 };
   const script = Object.keys(asks).map((line) => `fish_should_add_to_history ${JSON.stringify(line).replace(/\$/g, '\\$')}; echo $status`).join('; ');
   const r = run('fish', ['-i', '-c', script]);
   assert.deepEqual(r.stdout.trim().split('\n').map(Number), Object.values(asks));

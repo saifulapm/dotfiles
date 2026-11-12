@@ -70,8 +70,11 @@ function forgetRound(live, list, text) {
 }
 
 function forget(args) {
+  // A text that looks like a flag goes after --, so dots forget --help is never a forget of every line holding --help.
+  if (args[0] === '--') args = args.slice(1);
+  else if (args[0]?.startsWith('-')) args = [];
   if (args.length !== 1) {
-    process.stderr.write('usage: dots forget <text>\n');
+    process.stderr.write('usage: dots forget [--] <text>\n');
     process.exit(2);
   }
   const share = process.env.XDG_DATA_HOME || join(process.env.HOME, '.local/share');
@@ -79,7 +82,7 @@ function forget(args) {
     const n = forgetRound(join(share, 'fish/fish_history'), join(share, 'dots/fish/forgotten'), args[0]);
     if (n === null) continue;
     process.stdout.write(`forgot ${n} line${n === 1 ? '' : 's'}\n`);
-    if (n > 0) process.stdout.write('a secret typed in a forgotten line is still out there: rotate it\n');
+    if (n > 0) process.stdout.write('a secret typed in a forgotten line is still out there: rotate it; open fish sessions keep the line until they restart\n');
     process.exit(0);
   }
   process.stderr.write('fish: the live history kept changing, so its lines are recorded as forgotten and go at the next dots sync\n');

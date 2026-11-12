@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { forget, machine, sync, world } from './lib.mjs';
+import { forget, holdLock, machine, sync, world } from './lib.mjs';
 
 const live = (m) => join(m.env.XDG_DATA_HOME, 'fish/fish_history');
 const list = (m) => join(m.env.XDG_DATA_HOME, 'dots/fish/forgotten');
@@ -46,12 +46,46 @@ test('dots forget with no text exits 2 with its usage line, and empty text forge
   seed(a, text);
   const none = await forget(a, []);
   assert.equal(none.code, 2);
-  assert.match(none.stderr, /^usage: dots forget <text>$/m);
+  assert.match(none.stderr, /^usage: dots forget \[--\] <text>$/m);
   const empty = await forget(a, ['']);
   assert.equal(empty.code, 0, empty.stderr);
   assert.equal(empty.stdout, 'forgot 0 lines\n');
   assert.equal(readFileSync(live(a), 'latin1'), text);
   assert.ok(!existsSync(list(a)) || readFileSync(list(a), 'latin1') === '', 'no line was recorded');
+});
+
+test('dots forget refuses a text that looks like a flag, and forgets one after --', async () => {
+  const a = machine(world(), 'a');
+  const text = block('ls --help', 1760000000) + block('du -h', 1760000001) + block('curl --token=abc', 1760000002);
+  seed(a, text);
+  for (const args of [['--help'], ['-h'], ['--token=abc']]) {
+    const r = await forget(a, args);
+    assert.equal(r.code, 2, args.join(' '));
+    assert.match(r.stderr, /^usage: dots forget \[--\] <text>$/m);
+    assert.equal(readFileSync(live(a), 'latin1'), text, `${args.join(' ')} forgot nothing`);
+  }
+  const r = await forget(a, ['--', '--token=abc']);
+  assert.equal(r.stdout.split('\n')[0], 'forgot 1 line', r.stderr);
+  assert.equal(readFileSync(live(a), 'latin1'), block('ls --help', 1760000000) + block('du -h', 1760000001));
+});
+
+test('dots forget says the fish sessions open now still hold the line', async () => {
+  const a = machine(world(), 'a');
+  seed(a, block('echo TOKEN123', 1760000000));
+  const r = await forget(a, ['TOKEN123']);
+  assert.match(r.stdout, /open fish sessions/);
+  assert.equal(r.stdout.split('\n').filter(Boolean).length, 2, 'the count and one line');
+});
+
+test('dots forget waits for a sync round holding the lock, so the round cannot write its list over the new hashes', async () => {
+  const a = machine(world(), 'a');
+  seed(a, block('echo TOKEN123', 1760000000));
+  const held = await holdLock(a, 1.5);
+  const t0 = Date.now();
+  const r = await forget(a, ['TOKEN123']);
+  assert.equal(r.stdout.split('\n')[0], 'forgot 1 line', r.stderr);
+  assert.ok(Date.now() - t0 >= 1000, `forget returned after ${Date.now() - t0} ms, before the lock was let go`);
+  await held.freed;
 });
 
 test('dots forget matches its text as plain text: a quote, a dot, a backslash, a newline and Bangla', async () => {
@@ -164,6 +198,21 @@ test('a reinstall with no history and no list forgets nothing and takes its old 
   assert.equal(readFileSync(list(a), 'latin1'), old);
 });
 
+test('a lone machine reinstalled takes its old list back from its own file on the remote', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  seed(a, block('echo TOKEN123', 1760000000) + block('echo kept', 1760000001));
+  await ok(a);
+  await forget(a, ['TOKEN123']);
+  await ok(a);
+  const old = readFileSync(list(a), 'latin1');
+  rmSync(a.env.XDG_DATA_HOME, { recursive: true, force: true });
+  mkdirSync(a.env.XDG_DATA_HOME);
+  await ok(a);
+  assert.equal(readFileSync(list(a), 'latin1'), old);
+  assert.ok(holds(a, 'echo kept') && !holds(a, 'TOKEN123'));
+});
+
 test('two machines forgetting different lines in the same round both stay gone', async () => {
   const w = world();
   const [a, b] = await shared(w);
@@ -195,5 +244,5 @@ test('a pulled list that does not parse fails the fish unit naming it, changes n
   assert.match(status.fish.error, /b\.forgotten/);
   assert.equal(readFileSync(live(a), 'latin1'), text, 'the live history is as it was');
   assert.equal(readFileSync(join(w.remote, 'dots-sync/fish/a.history'), 'latin1'), pushed, "a's history on the remote is as it was");
-  for (const unit of ['notes', 'goals', 'youtube']) assert.equal(status[unit].ok, true, `${unit}: ${status[unit].error}`);
+  for (const unit of ['notes', 'goals', 'youtube', 'ssh']) assert.equal(status[unit].ok, true, `${unit}: ${status[unit].error}`);
 });
