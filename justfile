@@ -21,6 +21,16 @@ test-sync:
 test-dots:
     tests/scratch.sh node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
 
+# the fast, dots and sync suites one after another, each run even when one before it is red, so the fast suite's 5 s is not spent beside the others
+check:
+    #!/usr/bin/env bash
+    red=()
+    for suite in test test-dots test-sync; do
+      "{{just_executable()}}" "$suite" || red+=("$suite")
+    done
+    [ ${#red[@]} -eq 0 ] || { echo "just check: red: ${red[*]}" >&2; exit 1; }
+    echo "just check: the fast, dots and sync suites are green"
+
 # checks that each open a nested niri for a few seconds
 test-dev:
     tests/dev/run.sh
