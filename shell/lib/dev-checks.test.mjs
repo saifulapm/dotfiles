@@ -39,7 +39,7 @@ test('lib.sh\'s slow-drawing FAIL prints the live session\'s lock state', () => 
 });
 
 // A walker's orphaned sleep held the lock past its walk twice (m56, m75); the FAIL names who holds it, so nothing is killed blind.
-test('lock-holders.sh names each process holding the lock file, and lib.sh\'s lock FAIL runs it', () => {
+test('lib-lock-holders.sh names each process holding the lock file, and lib.sh\'s lock FAIL runs it', () => {
   const scratch = mkdtempSync(join(tmpdir(), 'lock-holders-'));
   const lock = join(scratch, 'dots-dev-check.lock');
   writeFileSync(lock, '');
@@ -47,7 +47,7 @@ test('lock-holders.sh names each process holding the lock file, and lib.sh\'s lo
   try {
     let out = '';
     for (let i = 0; i < 50 && !out.includes('sleep'); i++) {
-      out = spawnSync('bash', [dir + 'lock-holders.sh', lock], { encoding: 'utf8' }).stdout;
+      out = spawnSync('bash', [dir + 'lib-lock-holders.sh', lock], { encoding: 'utf8' }).stdout;
       if (!out.includes('sleep')) spawnSync('sleep', ['0.05']);
     }
     assert.match(out, new RegExp(`\\b${holder.pid}\\b.*sleep 30`), 'prints the holder\'s pid and command line');
@@ -57,7 +57,7 @@ test('lock-holders.sh names each process holding the lock file, and lib.sh\'s lo
   }
   const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
   const fail = lib.slice(lib.search(/flock\s+-w\s+\d+\s+9\b/)).split('\n')[0];
-  assert.match(fail, /lock-holders\.sh/, 'the 15 min FAIL prints the holders');
+  assert.match(fail, /lib-lock-holders\.sh/, 'the 15 min FAIL prints the holders');
 });
 
 // bin/ is on the live desktop's PATH, so a fake ddcutil there would hide the real one from the live shell.

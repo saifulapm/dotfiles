@@ -70,7 +70,7 @@ fi
 
 # Two nested sessions at once stretch every timing, so each check waits for the one before it to finish.
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock"
-flock -w 900 9 || { echo "FAIL another nested check held the lock for 15 min; held by:"; "$repo/tests/dev/lock-holders.sh" "${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock" | grep -v "^$$:"; exit 1; }
+flock -w 900 9 || { echo "FAIL another nested check held the lock for 15 min; held by:"; "$repo/tests/dev/lib-lock-holders.sh" "${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock" | grep -v "^$$:"; exit 1; }
 
 dev_out=$(mktemp)
 dev_log=$(mktemp)
