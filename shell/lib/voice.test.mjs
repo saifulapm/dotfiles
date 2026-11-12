@@ -352,9 +352,9 @@ test('the sending slot is a 380 by 40 pill with an upload glyph, the percent in 
   const s = sending('artboard');
   assert.deepEqual([s.width, s.height, s.pad, s.gap, s.mark], [380, 40, 16, 10, { shape: 'upload', size: 16, color: '' }]);
   assert.equal(s.parts.length, 1);
-  assert.deepEqual([s.parts[0].text(2, 'nuc', 48), s.parts[0].text(1, 'n‮u\nc', 0), s.parts[0].size, s.parts[0].weight, s.parts[0].name, s.pct], ['Sending 2 files to nuc · 48%', 'Sending 1 file to nu c · 0%', 13, 500, true, null]);
-  assert.deepEqual(s.bar, { at: 'inline', height: 6, radius: 3, track: '#2B2F36', fill: '#6C83FF' });
-  assert.deepEqual(sendingLook(null).bar, { at: 'inline', height: 6, radius: 3, track: 'gray', fill: 'white' });
+  assert.deepEqual([s.parts[0].text(2, 'nuc', 48), s.parts[0].text(1, 'n‮u\nc', 0), s.parts[0].size, s.parts[0].weight, s.parts[0].name, 'pct' in s], ['Sending 2 files to nuc · 48%', 'Sending 1 file to nu c · 0%', 13, 500, true, false]);
+  assert.deepEqual(s.bar, { height: 6, radius: 3, track: '#2B2F36', fill: '#6C83FF' });
+  assert.deepEqual(sendingLook(null).bar, { height: 6, radius: 3, track: 'gray', fill: 'white' });
 });
 
 test('the downloading slot is 440 wide with a 40 px play tile, YouTube and the folder at 12 px, a 15 px bold line, a 4 px rounded bar and a failed chip', () => {
@@ -364,7 +364,7 @@ test('the downloading slot is 440 wide with a 40 px play tile, YouTube and the f
   assert.deepEqual([d.line.size, d.line.weight, d.line.color], [15, 700, '']);
   assert.deepEqual(d.bar, { height: 4, radius: 2, track: '#2B2F36', fill: '#6C83FF' });
   assert.deepEqual(d.chip, { fill: '#FFF1E8', color: '#B4380B', radius: 8, padX: 8, padY: 2 });
-  assert.deepEqual(d.failure, { mark: null, color: '', box: null });
+  assert.equal('failure' in d, false);
 });
 
 const chip = (name) => chipLook(schemeTokens(name));
@@ -377,7 +377,6 @@ test("the file chip is a rounded tile-coloured pill beside the card; dragged, a 
     gap: 6,
     grip: { w: 8, h: 12, r: 1 },
     glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
-    toastPlace: 'column',
     toast: { fill: '#2B2F36', frame: '#2B2F36', text: '#C9CED6', grip: '#A3A9B4', glyph: '#FFFFFF', pad: [8, 10, 8, 10], radius: 10 },
     row: { fill: '#F2F3F6', frame: '#F2F3F6', text: '#57606A', grip: '#8A909B', glyph: '#57606A', pad: [5, 8, 5, 8], radius: 8 },
     cursor: { fill: '#FFFFFF', frame: '#FFFFFF', text: '#57606A', grip: '#8A909B', glyph: '#57606A', pad: [5, 8, 5, 8], radius: 8 },
@@ -401,7 +400,7 @@ const clock = (name) => clockLook(schemeTokens(name));
 
 test("the world clock reads Dhaka · home over a bold 26 px time, the offset under each city and #2B2F36 rules", () => {
   const a = clock('artboard');
-  assert.deepEqual([a.gridWidth, a.gap, a.city('Dhaka') + a.mark.text, a.mark.boxed, a.place, a.offsetWidth], [224, 22, 'Dhaka · home', false, 'under', 0]);
+  assert.deepEqual([a.gridWidth, a.gap, a.city('Dhaka') + a.mark.text, a.mark, 'place' in a, 'offsetWidth' in a], [224, 22, 'Dhaka · home', { text: ' · home' }, false, false]);
   assert.deepEqual([a.homeTime.size, a.homeTime.weight, a.time.size, a.time.weight, a.name.size, a.name.weight], [26, 700, 17, 700, 14, 500]);
   assert.deepEqual([a.homeLabel.color, a.offset.size, a.offset.color, a.rule, a.dayText('yesterday'), a.offsetText('−10h'), a.city('New York')], ['#A3A9B4', 12, '#A3A9B4', undefined, 'yesterday', '−10h', 'New York']);
   assert.equal('head' in a, false);

@@ -579,13 +579,12 @@ PanelWindow {
         }
         return {
             label: parts.join(" "),
-            pct: sendingPct.visible ? sendingPct.text : "",
             elided: name ? name.truncated : false,
             lines: name ? name.lineCount : 0,
             barFill: Math.round(sendingFill.width),
-            barWidth: Math.round(sendingFill.track.width),
+            barWidth: Math.round(sendingInline.width),
             barHeight: Math.round(sendingFill.height),
-            right: Math.round((sendingPct.visible ? sendingPct.mapToItem(sendingPart, sendingPct.width, 0).x : sendingInline.mapToItem(sendingPart, sendingInline.width, 0).x))
+            right: Math.round(sendingInline.mapToItem(sendingPart, sendingInline.width, 0).x)
         };
     }
 
@@ -1208,15 +1207,13 @@ PanelWindow {
                 width: island.sizes.sending[0]
                 height: island.sizes.sending[1]
                 readonly property var look: island.sendingLook
-                // What the parts other than the machine's name take, so that one elides into what is left; an inline bar keeps 40 px.
-                readonly property real fixed: 2 * look.pad + (look.mark ? look.mark.size + look.gap : 0) + (look.pct ? sendingPct.implicitWidth + look.gap : 0) + (look.bar.at === "inline" ? 40 + look.gap : 0) + sendingParts.fixedWidth
+                // What the parts other than the machine's name take, so that one elides into what is left; the bar keeps 40 px.
+                readonly property real fixed: 2 * look.pad + (look.mark ? look.mark.size + look.gap : 0) + 40 + look.gap + sendingParts.fixedWidth
 
-                // The mark and the words from the left, the percent at the right edge, and the bar after the words or along the bottom, as each board draws the slot.
+                // The mark and the words from the left, and the bar after the words.
                 Row {
-                    id: sendingRow
                     x: sendingPart.look.pad
                     anchors.verticalCenter: parent.verticalCenter
-                    anchors.verticalCenterOffset: sendingPart.look.bar.at === "bottom" ? -sendingPart.look.bar.height / 2 : 0
                     spacing: sendingPart.look.gap
 
                     Item {
@@ -1285,45 +1282,18 @@ PanelWindow {
 
                     Rectangle {
                         id: sendingInline
-                        visible: sendingPart.look.bar.at === "inline"
                         anchors.verticalCenter: parent.verticalCenter
-                        width: visible ? Math.max(40, 40 + sendingPart.width - sendingPart.fixed - sendingParts.nameWidth) : 0
+                        width: Math.max(40, 40 + sendingPart.width - sendingPart.fixed - sendingParts.nameWidth)
                         height: sendingPart.look.bar.height
                         radius: sendingPart.look.bar.radius
                         color: sendingPart.look.bar.track
                     }
                 }
 
-                Text {
-                    id: sendingPct
-                    visible: sendingPart.look.pct !== null
-                    anchors.right: parent.right
-                    anchors.rightMargin: sendingPart.look.pad
-                    anchors.verticalCenter: sendingRow.verticalCenter
-                    textFormat: Text.PlainText
-                    text: sendingPart.look.pct ? sendingPart.look.pct.text(island.sending?.pct ?? 0) : ""
-                    color: sendingPart.look.pct?.color || box.style.text
-                    font.family: sendingPart.look.pct?.font ?? ""
-                    font.pixelSize: sendingPart.look.pct?.size ?? 12
-                    font.weight: sendingPart.look.pct?.weight ?? Font.Normal
-                    font.letterSpacing: sendingPart.look.pct?.spacing ?? 0
-                    font.features: { "tnum": 1 }
-                }
-
-                Rectangle {
-                    id: sendingBottom
-                    visible: sendingPart.look.bar.at === "bottom"
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: sendingPart.look.bar.height
-                    color: sendingPart.look.bar.track
-                }
-
-                // The fill sits on whichever track this theme draws.
+                // The fill sits on the bar's track.
                 Rectangle {
                     id: sendingFill
-                    readonly property Item track: sendingPart.look.bar.at === "inline" ? sendingInline : sendingBottom
+                    readonly property Item track: sendingInline
                     x: track.mapToItem(sendingPart, 0, 0).x
                     y: track.mapToItem(sendingPart, 0, 0).y
                     width: track.width * (island.sending?.pct ?? 0) / 100
@@ -1345,7 +1315,7 @@ PanelWindow {
                 readonly property var held: island.heldDownloading
                 readonly property bool failed: held ? !!held.failure : false
                 readonly property var words: held ? I.downloadingParts(held, look.chip !== null) : { chip: "", main: "", tail: "" }
-                readonly property color ink: failed && look.failure.color ? look.failure.color : look.line.color || box.style.text
+                readonly property color ink: look.line.color || box.style.text
 
                 // Artboard's tile holds a play glyph.
                 Rectangle {
@@ -1415,24 +1385,10 @@ PanelWindow {
                         }
                     }
 
-                    // The failure's mark or chip, then the title and reason (or the download's title) eliding before the percent, which never does.
+                    // The failure's chip, then the title and reason (or the download's title) eliding before the percent, which never does.
                     Row {
                         id: dlLine
                         height: Math.max(dlMain.implicitHeight, dlChip.height)
-
-                        Item {
-                            id: dlMark
-                            visible: downloadingPart.failed && downloadingPart.look.failure.mark !== null
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: visible ? downloadingPart.look.failure.mark.size + 8 : 0
-                            height: visible ? downloadingPart.look.failure.mark.size : 0
-
-                            Rectangle {
-                                width: parent.height
-                                height: parent.height
-                                color: downloadingPart.look.failure.mark?.color ?? "transparent"
-                            }
-                        }
 
                         Item {
                             id: dlChip
@@ -1465,7 +1421,7 @@ PanelWindow {
                             id: dlMain
                             anchors.verticalCenter: parent.verticalCenter
                             textFormat: Text.PlainText
-                            width: Math.max(0, Math.min(implicitWidth, dlColumn.width - dlMark.width - dlChip.width - dlTail.implicitWidth))
+                            width: Math.max(0, Math.min(implicitWidth, dlColumn.width - dlChip.width - dlTail.implicitWidth))
                             elide: Text.ElideRight
                             maximumLineCount: 1
                             text: downloadingPart.words.main
@@ -2041,7 +1997,7 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
                         width: implicitWidth
                         height: implicitHeight
-                        look: island.chipLook.toastPlace === "column" ? island.chipLook : null
+                        look: island.chipLook
                         at: island.chipLook.toast
                         files: island.heldNotification?.files ?? []
                         empty: island.noteDragging
@@ -2218,8 +2174,6 @@ PanelWindow {
                                     required property var modelData
                                     readonly property var look: island.clockLook
                                     readonly property bool home: modelData.home
-                                    // One of three offset texts is drawn, by where the theme puts it.
-                                    readonly property Text offsetShown: look.place === "right" ? offsetRight : look.place === "under" ? offsetUnder : offsetBeside
                                     width: cityColumn.width
                                     height: Math.max(cityNames.height, cityTime.implicitHeight) + (home ? 8 : 18)
 
@@ -2227,7 +2181,7 @@ PanelWindow {
                                         return {
                                             city: cityName.text,
                                             time: cityTime.text,
-                                            offset: offsetShown.visible ? offsetShown.text : "",
+                                            offset: offsetUnder.visible ? offsetUnder.text : "",
                                             day: cityDay.visible ? cityDay.text : ""
                                         };
                                     }
@@ -2254,21 +2208,16 @@ PanelWindow {
                                                 font.letterSpacing: at.spacing
                                             }
 
-                                            Rectangle {
-                                                readonly property bool boxed: cityRow.look.mark.boxed
+                                            Item {
                                                 visible: cityRow.home
                                                 anchors.left: cityName.right
-                                                anchors.leftMargin: boxed ? 10 : 0
                                                 anchors.verticalCenter: cityName.verticalCenter
-                                                width: cityMark.implicitWidth + (boxed ? 10 : 0)
-                                                height: cityMark.implicitHeight + (boxed ? 2 : 0)
-                                                color: "transparent"
-                                                border.width: boxed ? 1 : 0
-                                                border.color: box.style.text
+                                                width: cityMark.implicitWidth
+                                                height: cityMark.implicitHeight
 
                                                 Text {
                                                     id: cityMark
-                                                    readonly property var at: parent.boxed ? cityRow.look.offset : cityRow.look.homeLabel
+                                                    readonly property var at: cityRow.look.homeLabel
                                                     anchors.centerIn: parent
                                                     textFormat: Text.PlainText
                                                     text: cityRow.look.mark.text
@@ -2278,30 +2227,16 @@ PanelWindow {
                                                     font.letterSpacing: at.spacing
                                                 }
                                             }
-
-                                            Text {
-                                                id: offsetBeside
-                                                visible: !cityRow.home && cityRow.look.place === "name"
-                                                anchors.left: cityName.right
-                                                anchors.leftMargin: 10
-                                                anchors.baseline: cityName.baseline
-                                                textFormat: Text.PlainText
-                                                text: cityRow.look.offsetText(cityRow.modelData.offset)
-                                                color: cityRow.look.offset.color || box.style.text
-                                                font.family: cityRow.look.offset.font
-                                                font.pixelSize: cityRow.look.offset.size
-                                                font.letterSpacing: cityRow.look.offset.spacing
-                                            }
                                         }
 
                                         // The day word shows only when the city's day is not home's. A child's visible is false while this row is hidden, so this reads their conditions.
                                         Row {
-                                            visible: (!cityRow.home && cityRow.look.place === "under") || cityRow.modelData.day !== ""
+                                            visible: !cityRow.home || cityRow.modelData.day !== ""
                                             spacing: 6
 
                                             Text {
                                                 id: offsetUnder
-                                                visible: !cityRow.home && cityRow.look.place === "under"
+                                                visible: !cityRow.home
                                                 textFormat: Text.PlainText
                                                 text: cityRow.look.offsetText(cityRow.modelData.offset)
                                                 color: cityRow.look.offset.color || box.style.text
@@ -2326,8 +2261,7 @@ PanelWindow {
                                     Text {
                                         id: cityTime
                                         readonly property var at: cityRow.home ? cityRow.look.homeTime : cityRow.look.time
-                                        anchors.right: offsetRight.visible ? offsetRight.left : parent.right
-                                        anchors.rightMargin: offsetRight.visible ? 10 : 0
+                                        anchors.right: parent.right
                                         anchors.verticalCenter: parent.verticalCenter
                                         anchors.verticalCenterOffset: cityRow.home ? -4 : 0
                                         textFormat: Text.PlainText
@@ -2337,21 +2271,6 @@ PanelWindow {
                                         font.pixelSize: at.size
                                         font.weight: at.weight
                                         font.letterSpacing: at.spacing
-                                    }
-
-                                    Text {
-                                        id: offsetRight
-                                        visible: !cityRow.home && cityRow.look.place === "right"
-                                        anchors.right: parent.right
-                                        anchors.baseline: cityTime.baseline
-                                        width: cityRow.look.offsetWidth
-                                        horizontalAlignment: Text.AlignRight
-                                        textFormat: Text.PlainText
-                                        text: cityRow.look.offsetText(cityRow.modelData.offset)
-                                        color: cityRow.look.offset.color || box.style.text
-                                        font.family: cityRow.look.offset.font
-                                        font.pixelSize: cityRow.look.offset.size
-                                        font.letterSpacing: cityRow.look.offset.spacing
                                     }
                                 }
                             }

@@ -245,8 +245,7 @@ export function sendingLook(tokens) {
     gap: 10,
     mark: { shape: 'upload', size: 16, color: '' },
     parts: [{ font: t.ui, size: 13, color: '', weight: 500, spacing: 0, name: true, text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` }],
-    pct: null,
-    bar: { at: 'inline', height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
+    bar: { height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
   };
 }
 
@@ -265,7 +264,6 @@ export function downloadingLook(tokens) {
     line: text(15, '', { weight: 700 }),
     bar: { height: 4, radius: 2, track: plainTones(tokens).island.tile, fill: plainTones(tokens).bar },
     chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
-    failure: { mark: null, color: '', box: null },
   };
 }
 
@@ -289,8 +287,6 @@ export function chipLook(tokens) {
     gap: 6,
     grip: { w: 8, h: 12, r: 1 },
     glyph: { w: 14, h: 14, stroke: 1.3, path: 'M3 1.5h5l3 3v8H3z M8 1.5v3h3' },
-    // The toast's chip sits in a column beside the card.
-    toastPlace: 'column',
     toast: place(plainTones(tokens).island.tile, plainTones(tokens).island.tile, plainTones(tokens).island.body, plainTones(tokens).island.head, plainTones(tokens).island.summary, [8, 10, 8, 10], 10),
     row,
     cursor: Object.assign({}, row, { fill: c.surface, frame: c.surface }),
@@ -324,13 +320,11 @@ export function clockLook(tokens) {
     gridWidth: 224,
     gap: 22,
     homeLabel: text(t.ui, 12, { color: head }),
-    mark: { text: ' · home', boxed: false },
+    mark: { text: ' · home' },
     homeTime: text(t.ui, 26, { weight: 700 }),
     name: text(t.ui, 14, { weight: 500 }),
     time: text(t.ui, 17, { weight: 700 }),
     offset: text(t.ui, 12, { color: head }),
-    place: 'under',
-    offsetWidth: 0,
     city: same,
     offsetText: same,
     dayText: same,
