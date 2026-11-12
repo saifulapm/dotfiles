@@ -92,6 +92,13 @@ if (!live || !list) {
   process.stderr.write('usage: dots-sync-fish <live> <list> <pulled>...\n');
   process.exit(2);
 }
+// A list that does not parse could hold a line that must stay gone, so nothing merges or goes up until it is fixed.
+for (const f of [list].concat(pulled.filter((f) => f.endsWith('.forgotten')))) {
+  if (hashes(f).some((h) => !/^[0-9a-f]{64}$/.test(h))) {
+    process.stderr.write(`fish: ${f === list ? f : basename(f)} is not a list of forgotten lines, so this round left the history alone\n`);
+    process.exit(1);
+  }
+}
 for (let i = 0; i < 3; i++) if (round(live, list, pulled)) process.exit(0);
 process.stderr.write('fish: the live history kept changing, so this round left it alone\n');
 process.exit(1);

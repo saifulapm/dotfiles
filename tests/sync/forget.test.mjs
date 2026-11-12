@@ -179,3 +179,21 @@ test('two machines forgetting different lines in the same round both stay gone',
   }
   assert.deepEqual(remoteHolding(w, 'TOKEN123').concat(remoteHolding(w, 'from-b')), []);
 });
+
+test('a pulled list that does not parse fails the fish unit naming it, changes no history, and the other units still sync', async () => {
+  const w = world();
+  const [a, b] = await shared(w);
+  appendFileSync(live(b), block('echo new-on-b', 1760000200));
+  await ok(b);
+  writeFileSync(join(w.remote, 'dots-sync/fish/b.forgotten'), 'not a hash\n');
+  const text = readFileSync(live(a), 'latin1');
+  const pushed = readFileSync(join(w.remote, 'dots-sync/fish/a.history'), 'latin1');
+  const r = await sync(a);
+  assert.notEqual(r.code, 0);
+  const status = JSON.parse(readFileSync(a.status, 'utf8'));
+  assert.equal(status.fish.ok, false);
+  assert.match(status.fish.error, /b\.forgotten/);
+  assert.equal(readFileSync(live(a), 'latin1'), text, 'the live history is as it was');
+  assert.equal(readFileSync(join(w.remote, 'dots-sync/fish/a.history'), 'latin1'), pushed, "a's history on the remote is as it was");
+  for (const unit of ['notes', 'goals', 'youtube']) assert.equal(status[unit].ok, true, `${unit}: ${status[unit].error}`);
+});
