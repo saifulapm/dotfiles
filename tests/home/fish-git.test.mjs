@@ -24,6 +24,8 @@ before(() => {
     XDG_DATA_HOME: join(home, '.local/share'),
     XDG_STATE_HOME: join(home, '.local/state'),
     GIT_CONFIG_NOSYSTEM: '1',
+    // The rendered config is the one under test, so git reads it and never the machine's.
+    GIT_CONFIG_GLOBAL: join(home, '.config/git/config'),
   };
   const applied = spawnSync(
     'chezmoi',

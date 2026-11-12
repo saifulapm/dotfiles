@@ -41,6 +41,7 @@ export function home(root, id, conf) {
     GIT_AUTHOR_EMAIL: 'test@example.invalid',
     GIT_COMMITTER_NAME: 'test',
     GIT_COMMITTER_EMAIL: 'test@example.invalid',
+    GIT_CONFIG_GLOBAL: '/dev/null',
   };
   for (const k of ['XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_STATE_HOME', 'XDG_RUNTIME_DIR']) mkdirSync(env[k], { recursive: true, mode: 0o700 });
   mkdirSync(env.GNUPGHOME, { mode: 0o700 });

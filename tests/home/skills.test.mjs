@@ -10,7 +10,7 @@ const repo = new URL('../../', import.meta.url).pathname;
 const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_31-skills.sh.tmpl'), 'utf8');
 
 function git(cwd, ...args) {
-  const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8' });
+  const r = spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd, encoding: 'utf8', env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null' } });
   assert.equal(r.status, 0, r.stderr);
 }
 

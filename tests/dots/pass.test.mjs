@@ -26,6 +26,7 @@ function baseEnv(root) {
     GIT_AUTHOR_EMAIL: 'test@example.com',
     GIT_COMMITTER_NAME: 'Test',
     GIT_COMMITTER_EMAIL: 'test@example.com',
+    GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_COUNT: '1',
     GIT_CONFIG_KEY_0: 'init.defaultBranch',
     GIT_CONFIG_VALUE_0: 'main',
