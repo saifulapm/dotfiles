@@ -2,11 +2,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { join } from 'node:path';
-import { holdLock, identity, machine, sync, world } from './lib.mjs';
+import { holdLock, identity, machine, sync, tarList, world } from './lib.mjs';
 
 const KEY = '-----BEGIN OPENSSH PRIVATE KEY-----\nmarker-only-in-the-key\n-----END OPENSSH PRIVATE KEY-----\n';
 
@@ -231,8 +230,8 @@ test('the backup of a pull lists every file ~/.ssh held, a control socket among 
     srv.close();
   }
   const newest = readdirSync(backups(b)).sort().at(-1);
-  const r = spawnSync('tar', ['tzf', join(backups(b), newest)], { encoding: 'utf8' });
-  assert.equal(r.status, 0);
+  const r = await tarList(b, join(backups(b), newest));
+  assert.equal(r.code, 0, r.stderr);
   const listed = r.stdout.split('\n');
   for (const f of ['id_ed25519', 'id_ed25519.pub', 'known_hosts', 'cm-user@host:22']) assert.ok(listed.includes(`.ssh/${f}`), `${f} missing from ${listed}`);
 });

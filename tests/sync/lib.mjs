@@ -66,6 +66,9 @@ export function checked(env) {
 
 export const sync = (m, args = []) => run(m, dots, ['sync'].concat(args));
 
+// The names in a tarball, listed as machine m.
+export const tarList = (m, path) => run(m, 'tar', ['tzf', path]);
+
 // What `history` prints in fish run as m, newest command first.
 export const fishHistory = (m) => run(m, 'fish', ['-c', 'history']);
 
