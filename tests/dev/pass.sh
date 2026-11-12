@@ -27,6 +27,8 @@ pass_state() { timeout 0.5 dots-call pass state 2>/dev/null; }
 state_is() { pass_state | jq -e "$1" >/dev/null; }
 island_text() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -r .text; }
 clip() { timeout 1 wl-paste -n 2>/dev/null; }
+# What another machine on the tailnet gets when it asks this one for the clipboard.
+peer_get() { printf 'GET / HTTP/1.1\r\n\r\n' | REMOTE_ADDR=100.64.1.2 "$repo/bin/dots-clip-serve" 2>/dev/null | awk 'body { printf "%s", $0 } /^\r?$/ { body = 1 }'; }
 
 check "before Mod+P the surface is not loaded" state_is '.loaded == false'
 niri msg action spawn -- dots-call pass toggle
@@ -42,6 +44,7 @@ check "its matched letters are underlined" state_is '.rows[0].underlined == "ghb
 wtype -k Return
 until_ok 5000 bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = '$password' ]"
 check "Enter puts the password on the clipboard" test "$(clip)" = "$password"
+check "and offers it marked sensitive ($(timeout 1 wl-paste --list-types 2>/dev/null | tr '\n' ' '))" bash -c "timeout 1 wl-paste --list-types | grep -qx x-kde-passwordManagerHint"
 copied_at=$(now_ms)
 history_count() { cliphist -db-path "$XDG_STATE_HOME/dots/clips.db" list 2>/dev/null | grep -cF "$password"; }
 sleep 0.5
@@ -78,8 +81,14 @@ until_ok 2000 state_is '.count == 1'
 wtype -k Return
 until_ok 5000 bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = '$password' ]"
 copied_at=$(now_ms)
+check "a peer asking for the clipboard 1 s in gets nothing ($(peer_get | wc -c) bytes)" bash -c "$(declare -f peer_get); repo=$repo; [ -z \"\$(peer_get)\" ]"
+while [ $(($(now_ms) - copied_at)) -lt 43500 ]; do sleep 0.2; done
+check "and 44 s in, with the password still held, it gets nothing ($(peer_get | wc -c) bytes)" bash -c "$(declare -f peer_get); repo=$repo; [ \"\$(timeout 1 wl-paste -n)\" = '$password' ] && [ -z \"\$(peer_get)\" ]"
 until_ok 50000 bash -c '[ -z "$(timeout 1 wl-paste -n 2>/dev/null)" ]'
 check "45 s after Enter wl-paste prints nothing ($(($(now_ms) - copied_at)) ms)" bash -c "[ -z \"\$(timeout 1 wl-paste -n 2>/dev/null)\" ] && [ $(($(now_ms) - copied_at)) -ge 44000 ]"
+wl-copy hello
+until_ok 2000 bash -c '[ "$(timeout 1 wl-paste -n 2>/dev/null)" = hello ]'
+check "a plain copy after the clear is the peer's answer ($(peer_get))" bash -c "$(declare -f peer_get); repo=$repo; [ \"\$(peer_get)\" = hello ]"
 
 # s shows the password on its row for 10 s.
 niri msg action spawn -- dots-call pass toggle

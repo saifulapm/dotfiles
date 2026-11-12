@@ -59,8 +59,12 @@ done
 if [[ $method == GET ]]; then
   tmp=$(mktemp -p "$runtime" dots-clip-serve.XXXXXX) || exit 1
   trap 'rm -f "$tmp"' EXIT
+  # A copy a password manager marks sensitive (wl-copy --sensitive, as dots-pass copies) answers as empty, and so does a type list that fails; it is read again after the text, for a copy that lands mid-read.
+  sensitive() { ! types=$(timeout 2s wl-paste --list-types 2>/dev/null) || grep -qx 'x-kde-passwordManagerHint' <<<"$types"; }
   # A clipboard with no text, or an owner that stalls, answers as empty.
-  timeout 2s wl-paste --no-newline --type text >"$tmp" 2>/dev/null || : >"$tmp"
+  if sensitive || ! timeout 2s wl-paste --no-newline --type text >"$tmp" 2>/dev/null || sensitive; then
+    : >"$tmp"
+  fi
   printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %s\r\nConnection: close\r\n\r\n' "$(stat -c %s "$tmp")"
   cat "$tmp"
   exit 0

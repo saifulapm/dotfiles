@@ -14,13 +14,14 @@ function scratch() {
   const runtime = join(root, 'run');
   mkdirSync(stubs);
   mkdirSync(runtime);
-  const s = { root, runtime, clip: join(root, 'clip'), copied: join(root, 'copied'), log: join(root, 'calls.log') };
+  const s = { root, runtime, clip: join(root, 'clip'), types: join(root, 'types'), copied: join(root, 'copied'), log: join(root, 'calls.log') };
   writeFileSync(s.clip, 'on this machine');
+  writeFileSync(s.types, 'text/plain\n');
   const stub = (name, body) => {
     writeFileSync(join(stubs, name), `#!/bin/sh\n${body}\n`);
     chmodSync(join(stubs, name), 0o755);
   };
-  stub('wl-paste', `case "$*" in *--list-types*) echo text/plain ;; *) cat '${s.clip}' ;; esac`);
+  stub('wl-paste', `case "$*" in *--list-types*) cat '${s.types}' ;; *) cat '${s.clip}' ;; esac`);
   // The body file is the last argument; the real unit reads it into wl-copy.
   stub('systemd-run', `echo "systemd-run" >>'${s.log}'\nfor a; do last=$a; done\ncp "$last" '${s.copied}'`);
   stub('notify-send', `echo "notify-send $*" >>'${s.log}'`);
@@ -47,6 +48,48 @@ test('a GET answers with the clipboard\'s exact bytes', () => {
   assert.match(r.stdout, /^HTTP\/1\.1 200 OK\r\n/);
   assert.match(r.stdout, /\r\nContent-Length: 15\r\n/);
   assert.ok(r.stdout.endsWith('\r\n\r\non this machine'));
+});
+
+// wl-copy --sensitive, as dots-pass copies, offers this type beside the text.
+const HINT = 'x-kde-passwordManagerHint';
+
+test('a GET while a password manager holds the clipboard answers 200 with no body, and says nothing of it anywhere', () => {
+  const s = scratch();
+  writeFileSync(s.clip, 'hunter2');
+  writeFileSync(s.types, `text/plain;charset=utf-8\ntext/plain\n${HINT}\n`);
+  const r = serve(s, 'GET / HTTP/1.1\r\n\r\n', '100.64.1.2');
+  assert.equal(r.status, 0);
+  assert.match(r.stdout, /^HTTP\/1\.1 200 OK\r\n/);
+  assert.match(r.stdout, /\r\nContent-Length: 0\r\n/);
+  assert.ok(r.stdout.endsWith('\r\n\r\n'));
+  assert.ok(!r.stdout.includes('hunter2'));
+  assert.equal(r.stderr, '');
+  assert.deepEqual(calls(s), []);
+});
+
+test('a sensitive copy made while a GET reads the text is held back too', () => {
+  const s = scratch();
+  writeFileSync(s.clip, 'hunter2');
+  // The text read is when the password manager's copy lands.
+  writeFileSync(join(s.root, 'stubs', 'wl-paste'), `#!/bin/sh\ncase "$*" in *--list-types*) cat '${s.types}' ;; *) printf '%s\\n' text/plain ${HINT} >'${s.types}'; cat '${s.clip}' ;; esac\n`);
+  const r = serve(s, 'GET / HTTP/1.1\r\n\r\n');
+  assert.match(r.stdout, /\r\nContent-Length: 0\r\n/);
+  assert.ok(!r.stdout.includes('hunter2'));
+});
+
+test('a GET of a plain copy made after the password was cleared answers it', () => {
+  const s = scratch();
+  writeFileSync(s.clip, 'hello');
+  const r = serve(s, 'GET / HTTP/1.1\r\n\r\n', '100.64.1.2');
+  assert.match(r.stdout, /\r\nContent-Length: 5\r\n/);
+  assert.ok(r.stdout.endsWith('\r\n\r\nhello'));
+});
+
+test('a GET from outside the tailnet is refused', () => {
+  const s = scratch();
+  const r = serve(s, 'GET / HTTP/1.1\r\n\r\n', '::ffff:192.168.1.20');
+  assert.match(r.stdout, /^HTTP\/1\.1 403 /);
+  assert.ok(!r.stdout.includes('on this machine'));
 });
 
 test('a caller outside the tailnet is refused and the clipboard is left alone', () => {
