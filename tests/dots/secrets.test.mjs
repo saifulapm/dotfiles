@@ -3,7 +3,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { dufsConfig, home, must, run, scratch, secrets } from './secrets-lib.mjs';
 
@@ -254,6 +254,67 @@ test('with no base and an id_ed25519 that differs from the blob, it stops on the
   assert.match(r.stderr, /conflict, run dots sync --adopt local or remote/);
   assert.deepEqual(readdirSync(join(m.HOME, '.ssh')), ['id_ed25519']);
   assert.equal(readFileSync(join(m.HOME, '.ssh/id_ed25519'), 'utf8'), 'another key\n');
+});
+
+// A home of its own with a good first run, so a corrupted entry shows what the second run keeps.
+async function settled(id) {
+  const m = { ...home(w.root, id, w.conf), DOTS_PASS_REPO: w.m.DOTS_PASS_REPO };
+  await must(m, 'git', ['clone', '--quiet', w.m.DOTS_PASS_REPO, m.PASSWORD_STORE_DIR]);
+  const r = await secrets(m);
+  assert.equal(r.code, 0, r.stdout + r.stderr);
+  return m;
+}
+
+// The home's files without gnupg/, where gpg rewrites its trust database on any run.
+const kept = (m) => Object.fromEntries(Object.entries(snapshot(m.HOME)).filter(([p]) => !p.startsWith(m.GNUPGHOME + '/')));
+
+const noValues =(r) => {
+  for (const v of Object.values(PASS)) assert.ok(!(r.stdout + r.stderr).includes(v), 'a token value reached the output');
+};
+
+test('an entry in the store that does not decrypt stops dots secrets and leaves the home as it was', async () => {
+  const m = await settled('undecryptable');
+  try {
+    writeFileSync(join(m.PASSWORD_STORE_DIR, 'workflow/slack-bot-token.gpg'), 'not a gpg file\n');
+    const beforeRun = kept(m);
+    const r = await secrets(m);
+    assert.notEqual(r.code, 0, r.stdout + r.stderr);
+    assert.match(r.stderr, /workflow\/slack-bot-token/);
+    noValues(r);
+    assert.deepEqual(kept(m), beforeRun);
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
+});
+
+test('an entry whose .gpg is absent from the store leaves its line out of the hub file', async () => {
+  const m = await settled('absent');
+  try {
+    unlinkSync(join(m.PASSWORD_STORE_DIR, 'workflow/slack-bot-token.gpg'));
+    const r = await secrets(m);
+    assert.equal(r.code, 0, r.stdout + r.stderr);
+    noValues(r);
+    const env = readFileSync(join(m.XDG_CONFIG_HOME, 'hub/local.env'), 'utf8');
+    assert.doesNotMatch(env, /SLACK_BOT_TOKEN/);
+    assert.match(env, /^HUB_PEER_TOKEN=peer-test$/m);
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
+});
+
+test('a cloud environment entry that does not decrypt stops dots secrets and leaves the environments file as it was', async () => {
+  const m = await settled('undecryptable-env');
+  try {
+    writeFileSync(join(m.PASSWORD_STORE_DIR, 'claude/cloud-environment/work@example.com.gpg'), 'not a gpg file\n');
+    const beforeRun = kept(m);
+    const r = await secrets(m);
+    assert.notEqual(r.code, 0, r.stdout + r.stderr);
+    assert.match(r.stderr, /claude\/cloud-environment\/work@example\.com/);
+    noValues(r);
+    assert.deepEqual(kept(m), beforeRun);
+  } finally {
+    await run(m, 'gpgconf', ['--kill', 'gpg-agent']);
+  }
 });
 
 // Last in the file: killing this home's gpg-agent also drops the fresh home's secret keys, which the tests above still use.
