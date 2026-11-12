@@ -21,12 +21,15 @@ test-sync:
 test-dots:
     tests/scratch.sh node --test 'tests/dots/*.test.mjs' 'tests/home/*.test.mjs'
 
+# what just check runs each suite with; shell/lib/just-check.test.mjs sets a stand-in to pin its exit code
+runner := just_executable()
+
 # the fast, dots and sync suites one after another, each run even when one before it is red, so the fast suite's 5 s is not spent beside the others
 check:
     #!/usr/bin/env bash
     red=()
     for suite in test test-dots test-sync; do
-      "{{just_executable()}}" "$suite" || red+=("$suite")
+      "{{runner}}" "$suite" || red+=("$suite")
     done
     [ ${#red[@]} -eq 0 ] || { echo "just check: red: ${red[*]}" >&2; exit 1; }
     echo "just check: the fast, dots and sync suites are green"
