@@ -6,8 +6,8 @@ cmd=$(sed -n 's/^ *passwordCMD: *"\(.*\)" *$/\1/p' "$1")
 [[ -n $cmd ]] || { echo "imapnotify-wait: no passwordCMD in $1" >&2; exit 1; }
 # pass hands these to gpg, which then fails on an uncached passphrase instead of asking for it.
 export PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error
-# The password goes to /dev/null, since this unit's output lands in the journal.
-until bash -o pipefail -c "$cmd" >/dev/null 2>&1; do
+# The password goes to /dev/null, since this unit's output lands in the journal. Status 141 is pass hit by SIGPIPE after head took line one, so it had decrypted.
+until bash -o pipefail -c "$cmd" >/dev/null 2>&1 || [[ $? -eq 141 ]]; do
   sleep "${IMAPNOTIFY_WAIT_SECONDS:-30}"
 done
 exit 0

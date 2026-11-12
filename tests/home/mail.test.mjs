@@ -149,7 +149,7 @@ test('gpg-agent keeps a passphrase for 400 days and asks for it through dots-pin
 });
 
 // A fake pass stands in for the store: it fails as gpg does on a locked key until its Nth call, so the wait is seen to retry and then stop.
-function fakePass(dir, succeedOn) {
+function fakePass(dir, succeedOn, pause = 0) {
   mkdirSync(dir, { recursive: true });
   const pass = join(dir, 'pass');
   writeFileSync(pass, `#!/bin/bash
@@ -158,6 +158,7 @@ echo $n > "${dir}/calls"
 echo "$PASSWORD_STORE_GPG_OPTS|$*" >> "${dir}/log"
 [ $n -ge ${succeedOn} ] || { echo "gpg: decryption failed: No pinentry" >&2; exit 2; }
 echo hunter2
+sleep ${pause}
 echo "host: imap.mail.me.com"
 `);
   chmodSync(pass, 0o755);
@@ -182,6 +183,14 @@ test('imapnotify-wait returns once the password decrypts without a prompt, and p
     '--pinentry-mode=error|email/icloud/test',
     '--pinentry-mode=error|email/icloud/test',
   ]);
+});
+
+test('imapnotify-wait does not retry when head closes the pipe before pass finishes writing', () => {
+  const dir = join(root, 'wait-slow');
+  const r = wait(dir, fakePass(dir, 3, 0.2), 10000);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout, '');
+  assert.equal(readFileSync(join(dir, 'log'), 'utf8').trim().split('\n').length, 3);
 });
 
 test('imapnotify-wait keeps waiting while the agent is locked', () => {
