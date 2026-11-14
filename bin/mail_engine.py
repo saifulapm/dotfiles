@@ -781,12 +781,14 @@ def class_tags(cls):
     return CLASS_TAGS[cls]
 
 
+# What a regex reads as more than itself; ADDR keeps most of them out of a key, and the rest are escaped.
+RX_SPECIAL = set(".^$|?*+()[]{}")
+
+
 def from_query(key):
-    """The from: query for a sender key of the db files: an @domain key as a regex anchored to the address's end, in any case, since notmuch reads from:"@d" as a phrase that also matches a subdomain, another domain ending in it, and a display name."""
-    if not key.startswith("@"):
-        return "from:" + key
-    rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else "\\" + c if c in ".^$|?+" else c for c in key)
-    return f'from:"/{rx}>?$/"'
+    """The from: query for a sender key of the db files, as a regex in any case: an address key matches that From address exactly and an @domain key any address of that domain alone, since notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it."""
+    rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else "\\" + c if c in RX_SPECIAL else c for c in key)
+    return f'from:"/{rx}>?$/"' if key.startswith("@") else f'from:"/(^|<){rx}>?$/"'
 
 
 # How far back an unscreened sender's mail waits in the Screener again; older mail stays archived.

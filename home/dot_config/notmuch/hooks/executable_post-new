@@ -18,20 +18,25 @@ fi
 # A double quote from a mail header would break the query, so it is stripped: dropping a malformed sender's rule beats matching too much.
 sanitize() { printf '%s' "${1//\"/}"; }
 
-# notmuch reads from:"@d" as a phrase that also matches a subdomain, another domain ending in it and a display name, so an @domain line becomes a regex anchored to the address's end, each letter in either case; mail_engine.from_query writes the same.
+# A sender line as mail_engine.ADDR holds a decision to, one address or one @domain; any other line could widen its query, so it is left out.
+ADDR_RE='^[^][[:space:]"*(){}\\/@]*@([^][[:space:]"*(){}\\/@.]+\.)+[^][[:space:]"*(){}\\/@.]+$'
+
+# notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it, so a sender line becomes a regex, each letter in either case: an address anchored to the whole From address, an @domain to the address's end; mail_engine.from_query writes the same.
 from_q() {
-    local a c i rx=""
-    a="$(sanitize "$1")"
-    case "$a" in @*) ;; *) printf 'from:"%s"' "$a"; return ;; esac
+    local a="$1" c i rx=""
+    [[ $a =~ $ADDR_RE ]] || return 1
     for ((i = 0; i < ${#a}; i++)); do
         c="${a:i:1}"
         case "$c" in
             [[:alpha:]]) rx+="[${c,,}${c^^}]" ;;
-            [.^\$\|?+]) rx+="\\$c" ;;
+            [.^\$\|?*+\(\)\{\}\[\]]) rx+="\\$c" ;;
             *) rx+="$c" ;;
         esac
     done
-    printf 'from:"/%s>?$/"' "$rx"
+    case "$a" in
+        @*) printf 'from:"/%s>?$/"' "$rx" ;;
+        *) printf 'from:"/(^|<)%s>?$/"' "$rx" ;;
+    esac
 }
 
 # new.tags marks the copies from Sent/Drafts/Junk unread+inbox too, so those are fixed first and routing sees only incoming mail.
@@ -67,7 +72,8 @@ route_simple() {
     while IFS= read -r addr; do
         addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
         case "$addr" in ''|'#'*) continue ;; esac
-        printf '%s -- tag:new and %s\n' "$ops" "$(from_q "$addr")"
+        q="$(from_q "$addr")" || continue
+        printf '%s -- tag:new and %s\n' "$ops" "$q"
     done <"$db" | notmuch tag --batch 2>>"$LOG"
     [ "${count:-0}" -gt 0 ] && log "routed via $(basename "$db"): $count rules"
     return 0
@@ -82,9 +88,8 @@ if [ -s "$DB_DIR/ledger.db" ]; then
         case "$line" in ''|'#'*) continue ;; esac
         cat="$(printf '%s' "$line" | awk '{print $1}' | tr -cd '[:alnum:]_-')"
         addr="$(printf '%s' "$line" | awk '{print $2}' | tr -d '[:space:]')"
-        [ -n "$cat" ] && [ -n "$addr" ] || continue
-        printf '+ledger/%s +archived -inbox -unread -- tag:new and %s\n' \
-            "$cat" "$(from_q "$addr")"
+        [ -n "$cat" ] && q="$(from_q "$addr")" || continue
+        printf '+ledger/%s +archived -inbox -unread -- tag:new and %s\n' "$cat" "$q"
     done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
 fi
 
@@ -93,8 +98,8 @@ if [ -s "$DB_DIR/autofile.db" ]; then
         case "$line" in ''|'#'*) continue ;; esac
         addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
         label="$(printf '%s' "$line" | awk '{print $2}' | tr -cd '[:alnum:]_-')"
-        [ -n "$addr" ] && [ -n "$label" ] || continue
-        printf '+label/%s -- tag:new and from:"%s"\n' "$label" "$(sanitize "$addr")"
+        [ -n "$label" ] && q="$(from_q "$addr")" || continue
+        printf '+label/%s -- tag:new and %s\n' "$label" "$q"
     done <"$DB_DIR/autofile.db" | notmuch tag --batch 2>>"$LOG"
 fi
 
@@ -127,11 +132,10 @@ if [ -s "$DB_DIR/recycle.db" ]; then
         case "$line" in ''|'#'*) continue ;; esac
         addr="$(printf '%s' "$line" | awk '{print $1}' | tr -d '[:space:]')"
         days="$(printf '%s' "$line" | awk '{print $2}')"
-        [ -n "$addr" ] || continue
+        q="$(from_q "$addr")" || continue
         case "$days" in ''|*[!0-9]*) continue ;; esac
         # notmuch reads "30_days_ago"; "30d_ago" does not parse and silently matches nothing.
-        printf '+deleted -inbox -unread -- from:"%s" and date:..%s_days_ago\n' \
-            "$(sanitize "$addr")" "$days"
+        printf '+deleted -inbox -unread -- %s and date:..%s_days_ago\n' "$q" "$days"
     done <"$DB_DIR/recycle.db" | notmuch tag --batch 2>>"$LOG"
 fi
 
@@ -245,7 +249,8 @@ if [ -s "$DB_DIR/notify.db" ]; then
     while IFS= read -r addr; do
         addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
         case "$addr" in ''|'#'*) continue ;; esac
-        n=$(notmuch count -- "tag:new and tag:inbox and from:\"$(sanitize "$addr")\"" 2>/dev/null || echo 0)
+        q="$(from_q "$addr")" || continue
+        n=$(notmuch count -- "tag:new and tag:inbox and $q" 2>/dev/null || echo 0)
         [ "${n:-0}" -gt 0 ] && notify_senders="${notify_senders:+$notify_senders, }$addr"
     done <"$DB_DIR/notify.db"
 fi
