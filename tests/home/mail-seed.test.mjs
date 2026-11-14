@@ -89,3 +89,26 @@ test('mail seed counts a HEY/Read mail of a sender it puts in The Feed as a move
   assert.ok(out.includes('  1  HEY/Read -> HEY/Feed'), res.stdout);
   assert.ok(out.includes('HEY/Read moves: 1'), res.stdout);
 });
+
+test('mail seed --apply writes each decision once and leaves unread as it was', (t) => {
+  const r = store(t);
+  const unread = r.notmuch('count', '--exclude=false', 'tag:unread');
+  const zed = r.tags('z1@x.test');
+  assert.ok(r.tags('r1@shop.test').includes('unread'));
+  const res = r.seed('--apply');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(lines(res.stdout)[0], /applied/);
+  assert.ok(r.tags('r1@shop.test').includes('ledger/receipts'));
+  assert.equal(r.notmuch('count', '--exclude=false', 'tag:unread'), unread);
+  assert.equal(r.db('ledger.db'), 'receipts noreply@shop.test\n');
+  assert.equal(r.db('screened.db'), 'zed@bills.test\nme@x.test\nbob@people.test\n');
+  assert.equal(r.db('thefeed.db'), 'alerts@ci.test\nnews@list.test\n');
+  assert.deepEqual(r.tags('z1@x.test'), zed);
+  const stamped = readFileSync(r.journal, 'utf8').trim().split('\n').map((l) => l.split(' ').slice(1).join(' ')).sort();
+  assert.deepEqual(stamped, ['sender alerts@ci.test', 'sender bob@people.test', 'sender me@x.test', 'sender news@list.test', 'sender noreply@shop.test']);
+  const before = r.snapshot();
+  const again = r.seed('--apply');
+  assert.equal(again.status, 0, again.stdout + again.stderr);
+  assert.equal(again.stdout, 'nothing to change\n');
+  assert.deepEqual(r.snapshot(), before);
+});

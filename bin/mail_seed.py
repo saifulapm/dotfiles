@@ -3,6 +3,7 @@
 Its functions return data and raise MailError; bin/mail prints the report.
 """
 
+import fcntl
 import os
 import re
 import sys
@@ -220,5 +221,37 @@ def report(p, applied):
     return "\n".join(out) + "\n"
 
 
-def run():
-    return report(plan(), False)
+def lock():
+    """Hold mail-sync's lock, as dots-sync-mail does, so neither post-new nor hey-folder-sync runs mid-apply."""
+    state = os.path.join(os.environ.get("XDG_STATE_HOME") or E.HOME + "/.local/state", "hey-mail")
+    os.makedirs(state, exist_ok=True)
+    fd = os.open(os.path.join(state, "sync.lock"), os.O_WRONLY | os.O_CREAT, 0o644)
+    for _ in range(300):
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            time.sleep(1)
+    os.close(fd)
+    raise E.MailError("a mail sync held its lock for 5 minutes, so seed changed nothing")
+
+
+def run(apply=False):
+    """The report of a dry run, or with APPLY the report of what it wrote, or `nothing to change`."""
+    if not apply:
+        return report(plan(), False)
+    fd = lock()
+    try:
+        p = plan()
+        if not p["batch"] and not p["lines"]:
+            return "nothing to change\n"
+        if p["batch"]:
+            E.nm("tag", "--batch", stdin="".join(p["batch"]))
+        for db, line, _ in p["lines"]:
+            E.db_add(db, line)
+        for _, _, key in p["lines"]:
+            E.stamp("sender " + key)
+        E.refresh_count()
+        return report(p, True)
+    finally:
+        os.close(fd)

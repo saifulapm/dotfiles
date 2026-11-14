@@ -15,7 +15,8 @@
   mail hey ACTION ID [--category C] [--at DATE]   file a message HEY's way, in ways that can be undone:
                                                screen-in, feed, papertrail, replylater, setaside, bubble, archive, clear
   mail hey screen-out --sender ADDR            screen out a sender Saiful named
-  mail seed                                    sort the senders already in the store into HEY classes, as plain text; changes nothing
+  mail seed [--apply]                          sort the senders already in the store into HEY classes, as plain text;
+                                               changes nothing without --apply, which runs only after Saiful's go
 
 ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
 also takes thread:THREAD. Every command prints one JSON object,
@@ -475,7 +476,7 @@ def cmd_hey(a):
 
 def cmd_seed(a):
     # Saiful reads the report before he says go, so it is plain text; a failure still comes back as main()'s JSON.
-    sys.stdout.write(mail_seed.run())
+    sys.stdout.write(mail_seed.run(a.apply))
     sys.exit(0)
 
 
@@ -528,7 +529,9 @@ def parser():
     c.add_argument("--category", help="for papertrail: letters, digits, - or _")
     c.add_argument("--at", help="for bubble: when it comes back, as date -d reads it")
     c.set_defaults(fn=cmd_hey)
-    sub.add_parser("seed", help="sort the senders already in the store into HEY classes; prints what it would do").set_defaults(fn=cmd_seed)
+    c = sub.add_parser("seed", help="sort the senders already in the store into HEY classes; prints what it would do")
+    c.add_argument("--apply", action="store_true", help="write the db lines and tags, only after Saiful's go")
+    c.set_defaults(fn=cmd_seed)
     for name, unread in (("read", False), ("unread", True)):
         c = sub.add_parser(name, help=f"mark a message {name}")
         c.add_argument("id", help="a message id")
