@@ -786,7 +786,7 @@ def refile(addr, old, new):
 
 SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
 DECIDES_CLASS = {"screen-in": "screened", "feed": "thefeed", "papertrail": "ledger", "screen-out": "spam"}
-THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive")
+THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive", "mute")
 
 
 def decide(action, addr, arg=None):
@@ -848,6 +848,18 @@ def pile(action, queries, arg=None):
             tag(q, "-replylater", "-setaside", "-bubbled")
         elif action == "archive":
             tag(q, "-inbox", "+archived")
+        elif action == "mute":
+            # Named by its first Message-ID, as a bubble is, so post-new on every machine keeps the thread's new mail muted.
+            first = nm("search", "--exclude=false", "--output=messages", "--sort=oldest-first", q).split()[0]
+            try:
+                with open(db_path("muted.db")) as f:
+                    known = f.read().split()
+            except FileNotFoundError:
+                known = []
+            if first not in known:
+                db_add("muted.db", first)
+            stamp("mute " + first)
+            tag(q, "+muted", "-inbox")
         elif action == "bubble":
             # Named by its first Message-ID, which every machine knows the thread by, where a thread id is this machine's own.
             first = nm("search", "--exclude=false", "--output=messages", "--sort=oldest-first", q).split()[0]

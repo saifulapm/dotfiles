@@ -469,6 +469,7 @@ r / R  reply / reply all     F  forward
 e / a  archive
 s      screener: undo screening this sender
 f      feed: move this sender to The Feed
+M      mute this thread
 H      hey… (screen in/out, feed, piles, bubble up…)
 o      open a link           A  save + open an attachment (whole thread)
 u      refresh               G  sync now
@@ -482,6 +483,7 @@ F          forward it
 V / <a-v>  open its HTML in the browser / with images
 o          open a link           A  save + open an attachment
 gu         open the URL under the cursor
+M          mute this thread
 H          hey… (screen in/out, feed, piles, bubble up…)
 c          compose               G  sync now
 b          jump to a box
@@ -570,6 +572,7 @@ hook global WinSetOption filetype=mail-(list|thread) %{
     map buffer normal H ':enter-user-mode hey<ret>'   -docstring 'hey…'
     map buffer normal o ':mail-links<ret>'            -docstring 'open a link'
     map buffer normal A ':mail-attachments<ret>'      -docstring 'save + open an attachment'
+    map buffer normal M ':mail-hey mute<ret>'         -docstring 'mute this thread'
 }
 
 hook global WinSetOption filetype=mail-list %{

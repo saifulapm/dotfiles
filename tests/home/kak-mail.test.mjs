@@ -482,3 +482,28 @@ test('opening a Screener mail leaves it unread, and opening an Imbox thread mark
   assert.equal(r.kakMail('show', '--out', out, thread).status, 0);
   assert.equal(unread('b1@x.test'), '0');
 });
+
+test('M mutes the thread: muted, out of the inbox, in the Muted box, and named in muted.db for dots sync', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Bob <bob@people.test>', 'Message-ID': '<m1@x.test>' });
+  r.deliver({ From: 'Ann <ann@people.test>', 'Message-ID': '<m2@x.test>', 'In-Reply-To': '<m1@x.test>', References: '<m1@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', '*');
+  const res = r.kakMail('hey', 'mute', 'id:m2@x.test');
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(r.notmuch('count', '--', 'tag:muted and not tag:inbox').trim(), '2');
+  const out = join(r.M, 'list');
+  assert.equal(r.kakMail('list', '--out', out, 'Muted').status, 0);
+  assert.equal(readFileSync(out, 'utf8').split('\n').filter(Boolean).length, 1);
+  assert.equal(r.db('muted.db'), 'id:m1@x.test\n');
+  assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), /^\d+ mute id:m1@x\.test$/m);
+  // A second mute of the same thread adds no line.
+  assert.equal(r.kakMail('hey', 'mute', 'id:m1@x.test').status, 0);
+  assert.equal(r.db('muted.db'), 'id:m1@x.test\n');
+});
+
+test('M is mapped in a list and a thread, and the help names it', () => {
+  const kak = readFileSync(join(repo, 'home/dot_config/kak/autoload/tools/mail.kak'), 'utf8');
+  const both = kak.slice(kak.indexOf('hook global WinSetOption filetype=mail-(list|thread)'));
+  assert.match(both.slice(0, both.indexOf('\n}')), /map buffer normal M ':mail-hey mute<ret>'/);
+  assert.match(kak, /^M +mute this thread/m);
+});
