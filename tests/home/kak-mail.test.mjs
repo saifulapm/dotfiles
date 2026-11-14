@@ -363,3 +363,22 @@ test('a list of 1,200 threads shows 500 rows from its offset and says which', (t
   // An offset past the end, as after archiving a last page's rows, shows the last page.
   assert.match(page('--offset', '1500', 'Everything').said, /^set-option buffer mail_offset 1000$/m);
 });
+
+test('o labels the links of a newsletter sent with a plain part beside its HTML one', (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<alt@x.test>', 'MIME-Version': '1.0', 'Content-Type': 'multipart/alternative; boundary="b0"' },
+    '--b0\nContent-Type: text/plain\n\nShop now: https://shop.test/\nTrack: https://ups.com/track?num=1Z\n--b0\nContent-Type: text/html\n\n<p><a href="https://shop.test/">Shop now</a> <a href="https://ups.com/track?num=1Z">Track</a></p>\n--b0--\n');
+  const links = r.kakMail('links', 'id:alt@x.test');
+  assert.equal(links.status, 0, links.stderr);
+  assert.deepEqual(links.stdout.split('\n').filter(Boolean), ['1 Shop now — shop.test', '2 Track — ups.com/track…']);
+});
+
+test('a link whose host cannot be read, or that holds control characters, still lists as one clean line', (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<odd@x.test>' }, 'see http://[2001:db8::1]/ and https://x.test:99999/a and https://ok.test/a‮gnp.exe\n');
+  const links = r.kakMail('links', 'id:odd@x.test');
+  assert.equal(links.status, 0, links.stderr);
+  const rows = links.stdout.split('\n').filter(Boolean);
+  assert.equal(rows.length, 3, links.stdout);
+  assert.ok(rows.every((l) => !/[\x00-\x1f‪-‮⁦-⁩]/.test(l)), links.stdout);
+});

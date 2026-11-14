@@ -1,4 +1,4 @@
-// Kakoune's mail buffers from tests/home/mail-fixtures.mjs's store, against golden/mail-kak.txt, written by kak-mail at 23947802 before its read side moved into bin/mail_engine.py, and again in m92 when list began naming the rows it shows (only those lines changed).
+// Kakoune's mail buffers from tests/home/mail-fixtures.mjs's store, against golden/mail-kak.txt, written by kak-mail at 23947802 before its read side moved into bin/mail_engine.py, and again when list began naming the rows it shows (only those lines changed).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';

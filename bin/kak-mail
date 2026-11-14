@@ -186,10 +186,28 @@ def cmd_show(args):
 
 
 def shown(url):
-    """URL as the picker shows it: host and path, with a query or fragment cut to …."""
-    u = urlsplit(url)
-    host = (u.hostname or "") + (f":{u.port}" if u.port else "")
-    return host + u.path.rstrip("/") + ("…" if u.query or u.fragment else "")
+    """URL as the picker shows it: host and path, with a query or fragment cut to …, as one line of the sender's text."""
+    try:
+        u = urlsplit(url)
+        host = (u.hostname or "") + (f":{u.port}" if u.port else "")
+    except ValueError:
+        # A host urlsplit cannot read (a cut IPv6 address, a port past 65535) shows as written.
+        return " ".join(line(url).split())
+    return " ".join(line(host + u.path.rstrip("/") + ("…" if u.query or u.fragment else "")).split())
+
+
+def html_first(parts):
+    """PARTS with each multipart/alternative's plain part dropped when it has an HTML one, so links keep their anchor text."""
+    out = []
+    for p in parts:
+        c = p.get("content")
+        if isinstance(c, list) and p.get("content-type", "").lower() == "multipart/alternative" \
+                and any(q.get("content-type", "").lower() == "text/html" for q in c):
+            p = {**p, "content": [q for q in c if q.get("content-type", "").lower() != "text/plain"]}
+        elif isinstance(c, list) and all("content-type" in q for q in c):
+            p = {**p, "content": html_first(c)}
+        out.append(p)
+    return out
 
 
 def gathered(query):
@@ -209,11 +227,11 @@ def link_rows(query):
     rows = {}
     for m, who in gathered(query):
         found = []
-        text = body_text(m.get("body", []), [], found=found)
+        text = body_text(html_first(m.get("body", [])), [], found=found)
         # A body lynx's link list did not parse keeps its URLs in the text.
         found += [(u, u) for u in (u.rstrip(".,;:!?") for u in URL.findall(text))]
         for label, url in found:
-            if urlsplit(url).scheme.lower() not in ("http", "https") or url in rows:
+            if not re.match(r"https?://", url, re.I) or url in rows:
                 continue
             # The anchor text is the sender's: one line, and cut short.
             label = " ".join(line(label).split())
