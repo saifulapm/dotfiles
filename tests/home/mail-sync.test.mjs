@@ -2,9 +2,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { mailRig } from "./mail-rig.mjs";
 
 const script = resolve(import.meta.dirname, "../../bin/mail-sync");
 
@@ -156,6 +157,25 @@ test("a notice notify-send could not deliver is sent on the next failed run, the
   assert.equal(r.calls().length, 2);
   r.run("fail");
   assert.equal(r.calls().length, 2);
+});
+
+test("after a move made on the phone one sync makes the margin's count match the Imbox", (t) => {
+  const r = mailRig(t);
+  writeFileSync(join(r.M, "bin/mbsync"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  r.deliver({});
+  r.notmuch("tag", "+screened", "--", "tag:inbox");
+  assert.equal(r.kakMail("count").stdout.trim(), "1");
+  const countFile = join(r.env.XDG_STATE_HOME, "dots/mail-unread");
+  const sync = () => spawnSync(script, ["--quiet"], { env: r.env, encoding: "utf8" });
+  assert.equal(sync().status, 0);
+  assert.equal(readFileSync(countFile, "utf8"), "1\n");
+  // mbsync moves the file like this after the phone archives the mail.
+  for (const s of ["cur", "new", "tmp"]) mkdirSync(join(r.mail, "icloud/Archive", s), { recursive: true });
+  renameSync(join(r.mail, "icloud/INBOX/new/0.eml"), join(r.mail, "icloud/Archive/cur/0.eml:2,S"));
+  const result = sync();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(r.notmuch("count", "--", "tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled").trim(), "0");
+  assert.equal(readFileSync(countFile, "utf8"), "0\n");
 });
 
 test("the service treats exit 69 and 75 as success", () => {
