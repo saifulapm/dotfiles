@@ -95,9 +95,10 @@ if [ -s "$DB_DIR/bubble.db" ]; then
         tid="$(printf '%s' "$line" | awk '{print $1}')"
         due="$(printf '%s' "$line" | awk '{print $2}')"
         case "$due" in ''|*[!0-9]*) continue ;; esac
+        # A line names its thread by a Message-ID, or by this machine's thread id in a line from before bubbles synced.
+        case "$tid" in id:*) thread="thread:{$(sanitize "$tid")}" ;; *) thread="thread:$(sanitize "$tid")" ;; esac
         if [ "$now" -ge "$due" ]; then
-            notmuch tag +inbox +unread +bubbled -bubble -- \
-                "thread:$(sanitize "$tid")" 2>>"$LOG" && fired=$((fired + 1))
+            notmuch tag +inbox +unread +bubbled -bubble -- "$thread" 2>>"$LOG" && fired=$((fired + 1))
         else
             printf '%s\n' "$line" >>"$remaining"
         fi

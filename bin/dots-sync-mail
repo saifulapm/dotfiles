@@ -7,7 +7,8 @@ winning per key, and what the merge changed is written back to those files
 and its mail re-filed on this machine. A record's key is "sender ADDR"
 (value screened, thefeed, spam or "ledger CATEGORY"), "folder NAME"
 (foldersync.db), "autofile ADDR LABEL", "notify ADDR", "recycle ADDR" (value
-its days) or "speakeasy" (value the code); a value of null is a removal. The
+its days), "speakeasy" (value the code) or "bubble id:MESSAGE-ID" (value its
+due time in epoch seconds); a value of null is a removal. The
 away message and its replied list are never read, so only the machine that
 holds them replies.
 
@@ -27,11 +28,14 @@ sys.dont_write_bytecode = True
 import mail_engine as E
 
 DAY = 24 * 3600 * 1000
-SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy")
+SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
 # An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query.
 ADDR = re.compile(r'[^\s"*(){}\[\]\\@]*@[^\s"*(){}\[\]\\@]+')
 DAYS = re.compile(r"[0-9]{1,5}")
+# A Message-ID goes into a thread:{} query, so nothing in it may close the braces or widen the query.
+MSGID = re.compile(r'id:[^\s"(){}\[\]\\]+')
+THREAD = re.compile(r"[0-9a-f]{16}")
 # post-new puts the code in a subject: query with its quotes dropped.
 CODE = re.compile(r'[^\s"\\]{1,64}')
 
@@ -56,6 +60,8 @@ def valid(key, value):
         return ADDR.fullmatch(rest) is not None and rest == rest.lower() and value in (None, True)
     if kind == "recycle":
         return ADDR.fullmatch(rest) is not None and rest == rest.lower() and (value is None or (isinstance(value, str) and DAYS.fullmatch(value) is not None))
+    if kind == "bubble":
+        return MSGID.fullmatch(rest) is not None and (value is None or (type(value) is int and value > 0))
     if key == "speakeasy":
         return value is None or (isinstance(value, str) and CODE.fullmatch(value) is not None)
     return False
@@ -100,6 +106,9 @@ def line_record(name, line):
     if name == "speakeasy":
         code = "".join(line.split())
         return ("speakeasy", code) if CODE.fullmatch(code) else None
+    if name == "bubble.db":
+        w = line.split()
+        return (f"bubble {w[0]}", int(w[1])) if len(w) == 2 and MSGID.fullmatch(w[0]) and w[1].isdigit() and int(w[1]) > 0 else None
     if name in E.CLASS_FILES:
         got = E.class_line(name, line)
         return (f"sender {got[0]}", got[1]) if got and ADDR.fullmatch(got[0]) else None
@@ -133,7 +142,7 @@ def render(key, value):
     kind, _, rest = key.partition(" ")
     if kind == "sender" and value.startswith("ledger "):
         return f"{value[7:]} {rest}"
-    if kind in ("recycle", "speakeasy"):
+    if kind in ("recycle", "speakeasy", "bubble"):
         return f"{rest} {value}".strip()
     return rest
 
@@ -199,10 +208,26 @@ def journal():
     return stamps, taken
 
 
-def apply(changed):
-    """Write each changed key's line where it now belongs and drop its old lines, touching only the files that change."""
+def migrate_bubbles():
+    """Name each bubble.db line's thread by its first Message-ID, as every machine knows it, where a line from before bubbles synced named this machine's thread id."""
+    lines = read("bubble.db") or []
+    out = []
+    for line in lines:
+        w = line.split()
+        if len(w) == 2 and THREAD.fullmatch(w[0]):
+            first = E.nm("search", "--exclude=false", "--output=messages", "--sort=oldest-first", "thread:" + w[0]).split()
+            line = f"{first[0]} {w[1]}" if first else line
+        out.append(line)
+    if out != lines:
+        write("bubble.db", out)
+
+
+def apply(changed, view, now_s):
+    """Write each changed key's line where it now belongs and drop its old lines, touching only the files that change; a due bubble line stays for post-new to fire."""
     edits = {}
     for key, (_, new) in changed.items():
+        if new is None and key.startswith("bubble ") and view.get(key) is not None and view[key] <= now_s:
+            continue
         for name in files_of(key):
             edits.setdefault(name, (set(), []))[0].add(key)
         if new is not None:
@@ -237,6 +262,10 @@ def main(path, pulled):
         said.append(f"mail: re-stamped {plural(len(fixed), 'stamped more than a day ahead', 'stamped more than a day ahead')}")
 
     # A file's change since the last round is a decision made here, stamped when the engine made it; a missing file is not every line of it removed.
+    try:
+        migrate_bubbles()
+    except E.MailError as e:
+        print(f"mail: could not name bubble.db's threads by Message-ID: {e}", file=sys.stderr)
     view, missing = local_view()
     stamps, taken = journal()
     records = dict(own)
@@ -247,7 +276,18 @@ def main(path, pulled):
             continue
         prev = own.get(key)
         # Never at or below the key's last stamp, so a decision made after seeing another machine's wins on a slow clock too.
-        records[key] = {"v": value, "at": max(stamps.get(key, now), prev["at"] + 1 if prev else 0)}
+        floor = prev["at"] + 1 if prev else 0
+        if key.startswith("bubble "):
+            # A due line is post-new's to fire: it is no decision, and its firing is the removal, stamped at its due.
+            if value is not None and value <= now // 1000:
+                continue
+            if value is None and live[key] <= now // 1000:
+                records[key] = {"v": None, "at": max(live[key] * 1000, floor)}
+                continue
+            # hey-folder-sync's default day for a mail dragged into HEY/Bubbled is no decision either, so any made one outvotes it.
+            records[key] = {"v": value, "at": max(stamps.get(key, 1), floor)}
+            continue
+        records[key] = {"v": value, "at": max(stamps.get(key, now), floor)}
 
     before = {k: r["v"] for k, r in records.items()}
     left_out = False
@@ -277,13 +317,15 @@ def main(path, pulled):
         left_out = left_out or bool(bad or ahead)
 
     changed = {k: (before.get(k), r["v"]) for k, r in records.items() if r["v"] != before.get(k)}
-    apply(changed)
+    apply(changed, view, now // 1000)
     refused = []
     for key, (old, new) in sorted(changed.items()):
         kind, _, rest = key.partition(" ")
         try:
             if kind == "sender":
                 E.refile(rest, old, new)
+            elif kind == "bubble" and new is not None:
+                E.tag(f"thread:{{{rest}}}", "+bubble", "-inbox", "-unread", "-bubbled")
             elif kind == "autofile":
                 addr, label = rest.split(" ")
                 E.tag("from:" + addr, ("+" if new else "-") + "label/" + label)

@@ -42,7 +42,7 @@ test('mail hey replylater, setaside, archive and bubble each set their tag on th
     assert.ok(r.tags('b1@x.test').includes(tag), `${action} sets ${tag}`);
   }
   assert.ok(!r.tags('b1@x.test').includes('inbox'), 'archive and bubble take it out of the inbox');
-  assert.match(r.db('bubble.db'), /^[0-9a-f]+ \d+$/m);
+  assert.match(r.db('bubble.db'), /^id:b1@x\.test \d+$/m);
   const cleared = r.mail('hey', 'clear', 'b1@x.test');
   assert.equal(cleared.status, 0, cleared.stdout);
   assert.ok(!r.tags('b1@x.test').includes('replylater'));

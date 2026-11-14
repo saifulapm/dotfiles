@@ -77,20 +77,36 @@ export const fishHistory = (m) => run(m, 'fish', ['-c', 'history']);
 
 const bin = new URL('../../bin/', import.meta.url).pathname;
 
-// A notmuch store in m's scratch home, found through $HOME/.notmuch-config; m.db names a file in its hey-mail folder.
-export function mailbox(m) {
+// A notmuch store in m's scratch home, found through $HOME/.notmuch-config; with opts.hooks, notmuch new runs the repo's post-new, beside a notify-send and msmtp that do nothing.
+export function mailbox(m, opts = {}) {
   const mail = join(m.env.HOME, 'Mail');
   for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(mail, 'icloud/INBOX', s), { recursive: true });
-  writeFileSync(join(m.env.HOME, '.notmuch-config'), `[database]\npath=${mail}\n[user]\nname=Me\nprimary_email=me@x.test\n[new]\ntags=unread;inbox;new\n`);
+  let hooks = '';
+  if (opts.hooks) {
+    const dir = join(m.env.HOME, 'hooks');
+    const stubs = join(m.env.HOME, 'stubs');
+    mkdirSync(dir, { recursive: true });
+    mkdirSync(stubs, { recursive: true });
+    copyFileSync(new URL('../../home/dot_config/notmuch/hooks/executable_post-new', import.meta.url).pathname, join(dir, 'post-new'));
+    chmodSync(join(dir, 'post-new'), 0o755);
+    for (const tool of ['notify-send', 'msmtp']) {
+      writeFileSync(join(stubs, tool), '#!/bin/sh\nexit 0\n');
+      chmodSync(join(stubs, tool), 0o755);
+    }
+    m.env.PATH = stubs + delimiter + m.env.PATH;
+    hooks = `hook_dir=${dir}\n`;
+  }
+  writeFileSync(join(m.env.HOME, '.notmuch-config'), `[database]\npath=${mail}\n${hooks}[user]\nname=Me\nprimary_email=me@x.test\n[new]\ntags=unread;inbox;new\n`);
   m.mail = mail;
   m.hey = join(m.env.XDG_DATA_HOME, 'hey-mail');
   mkdirSync(m.hey, { recursive: true });
   return run(m, 'notmuch', ['new', '--quiet']);
 }
 
-// Puts one mail from FROM with Message-ID ID in m's INBOX and indexes it.
-export function deliver(m, from, id) {
-  writeFileSync(join(m.mail, 'icloud/INBOX/new', id.replace(/[^\w.-]/g, '_') + '.eml'), `From: ${from}\nTo: me@x.test\nSubject: hi\nMessage-ID: <${id}>\n\nhello\n`);
+// Puts one mail from FROM with Message-ID ID in m's INBOX, a reply to REPLYTO when given, and indexes it.
+export function deliver(m, from, id, replyTo) {
+  const thread = replyTo ? `In-Reply-To: <${replyTo}>\nReferences: <${replyTo}>\n` : '';
+  writeFileSync(join(m.mail, 'icloud/INBOX/new', id.replace(/[^\w.-]/g, '_') + '.eml'), `From: ${from}\nTo: me@x.test\nSubject: hi\nMessage-ID: <${id}>\n${thread}\nhello\n`);
   return run(m, 'notmuch', ['new', '--quiet']);
 }
 

@@ -180,3 +180,62 @@ test("autofile, notify, recycle and speakeasy travel with the sender's label, an
   assert.deepEqual(['autofile.db', 'recycle.db', 'notify.db', 'speakeasy'].map((f) => db(b, f)), ['', '', '', '']);
   assert.equal(await count(b, 'tag:label/Work'), 0);
 });
+
+const bubbles = (m) => db(m, 'bubble.db');
+const tags = async (m, id) => (await notmuch(m, ['search', '--exclude=false', '--output=tags', 'id:' + id])).stdout.trim().split('\n');
+
+test("a bubble.db line keyed by a thread id becomes its thread's first Message-ID once, keeping its due time", async () => {
+  const { b } = await pair();
+  await deliver(b, 'x@y.test', 'first@y.test');
+  await deliver(b, 'x@y.test', 'second@y.test', 'first@y.test');
+  const tid = (await notmuch(b, ['search', '--output=threads', 'id:second@y.test'])).stdout.trim().replace(/^thread:/, '');
+  writeFileSync(join(b.hey, 'bubble.db'), `${tid} 4102444800\n`);
+  await ok(b, ['--only', 'mail']);
+  assert.equal(bubbles(b), 'id:first@y.test 4102444800\n');
+  await ok(b, ['--only', 'mail']);
+  assert.equal(bubbles(b), 'id:first@y.test 4102444800\n');
+});
+
+test('a bubble set on a comes up on b once its time passed, after a sync and one mail sync', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  await mailbox(a);
+  await mailbox(b, { hooks: true });
+  for (const m of [a, b]) await ok(m, ['--only', 'mail']);
+  await deliver(a, 'x@y.test', 'b1@x.test');
+  await deliver(b, 'x@y.test', 'b1@x.test');
+  await notmuch(b, ['tag', '-unread', '-inbox', '--', 'id:b1@x.test']);
+  const r = await kakMail(a, ['hey', 'bubble', '--arg', '2 seconds', 'id:b1@x.test']);
+  assert.equal(r.code, 0, r.stderr);
+  await ok(a);
+  await new Promise((done) => setTimeout(done, 2500));
+  await ok(b);
+  assert.match(bubbles(b), /^id:b1@x\.test \d+$/m);
+  await notmuch(b, ['new', '--quiet']);
+  const got = await tags(b, 'b1@x.test');
+  for (const t of ['bubbled', 'inbox', 'unread']) assert.ok(got.includes(t), `${t} in ${got}`);
+  assert.ok(!got.includes('bubble'), got.join(' '));
+  assert.equal(bubbles(b), '');
+  // b's fired bubble is not set again by a's line, which a's own mail sync has yet to fire.
+  await ok(b);
+  await ok(a);
+  await ok(b);
+  assert.equal(bubbles(b), '');
+});
+
+// hey-folder-sync writes a day's default for a mail dragged into HEY/Bubbled before the bubble's record arrives.
+test("a bubble's real due on a outvotes the default b wrote for the same thread", async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'b1@x.test');
+  await deliver(b, 'x@y.test', 'b1@x.test');
+  const r = await kakMail(a, ['hey', 'bubble', '--arg', '2099-01-01 09:00', 'id:b1@x.test']);
+  assert.equal(r.code, 0, r.stderr);
+  const due = bubbles(a);
+  assert.match(due, /^id:b1@x\.test \d+\n$/);
+  await ok(a);
+  writeFileSync(join(b.hey, 'bubble.db'), `id:b1@x.test ${Math.floor(Date.now() / 1000) + 86400}\n`);
+  await ok(b);
+  await ok(a);
+  assert.equal(bubbles(b), due);
+  assert.equal(bubbles(a), due);
+});

@@ -851,6 +851,9 @@ def pile(action, queries, arg=None):
         elif action == "archive":
             tag(q, "-inbox", "+archived")
         elif action == "bubble":
-            db_add("bubble.db", f"{tid} {when}")
+            # Named by its first Message-ID, which every machine knows the thread by, where a thread id is this machine's own.
+            first = nm("search", "--exclude=false", "--output=messages", "--sort=oldest-first", q).split()[0]
+            db_add("bubble.db", f"{first} {when}")
+            stamp("bubble " + first)
             tag(q, "+bubble", "-inbox", "-unread", "-bubbled")
     return len(threads), when

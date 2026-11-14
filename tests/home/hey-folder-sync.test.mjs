@@ -81,6 +81,31 @@ test('a mail first seen in an enabled HEY folder its own tags already file there
   assert.deepEqual(r.files('HEY/PaperTrail'), ['bill.eml']);
 });
 
+test("a mail dragged into HEY/Bubbled comes back in a day, named by its thread's first Message-ID, unless a line already names the thread", (t) => {
+  for (const known of [false, true]) {
+    const r = heyRig(t);
+    for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(r.box('HEY/Bubbled'), s), { recursive: true });
+    r.setDb('foldersync.db', 'HEY/Bubbled\n');
+    r.arrive('INBOX', 'drag@x.test', 'drag.eml');
+    r.notmuch('tag', '+screened', '--', 'id:drag@x.test');
+    if (known) r.setDb('bubble.db', 'id:drag@x.test 4102444800\n');
+    assert.equal(r.sync(r.env, '--apply'), '0 0\n');
+    renameSync(join(r.box('INBOX'), 'new', 'drag.eml'), join(r.box('HEY/Bubbled'), 'new', 'drag.eml'));
+    r.notmuch('new', '--quiet');
+    const before = Math.floor(Date.now() / 1000);
+
+    r.sync(r.env, '--apply');
+
+    if (known) {
+      assert.equal(r.db('bubble.db'), 'id:drag@x.test 4102444800\n');
+      continue;
+    }
+    const [id, due] = r.db('bubble.db').trim().split(' ');
+    assert.equal(id, 'id:drag@x.test');
+    assert.ok(Number(due) >= before + 86400 && Number(due) <= before + 86460, due);
+  }
+});
+
 test('a mail first seen in INBOX is still filed by its tags', (t) => {
   const r = heyRig(t);
   assert.equal(r.sync(r.env, '--apply'), '0 0\n');
