@@ -5,6 +5,7 @@ mail read as a side effect of reading. The box list lives here only.
 """
 
 import email.policy
+import hashlib
 import json
 import mimetypes
 import os
@@ -416,8 +417,24 @@ def mailto(url):
     return out
 
 
-def write_draft(kind, arg=None):
-    """A new draft of KIND (new, reply, replyall, forward of the message ARG names, or mailto URL ARG); returns its path."""
+# The address headers and Subject in the order a draft writes them.
+HEADER_ORDER = ["From", "To", "Cc", "Bcc", "Subject"]
+
+
+def with_header(headers, name, value):
+    """HEADERS with NAME's value set to VALUE: in place of the first NAME line, else after the headers that come before it."""
+    if any(k.lower() == name.lower() for k, _ in headers):
+        first = next(i for i, (k, _) in enumerate(headers) if k.lower() == name.lower())
+        return [(name, value) if i == first else (k, v) for i, (k, v) in enumerate(headers)
+                if i == first or k.lower() != name.lower()]
+    rank = HEADER_ORDER.index(name)
+    at = next((i for i, (k, _) in enumerate(headers) if k in HEADER_ORDER and HEADER_ORDER.index(k) > rank), len(headers))
+    return headers[:at] + [(name, value)] + headers[at:]
+
+
+def write_draft(kind, arg=None, overrides=(), text=None, attach=()):
+    """A new draft of KIND (new, reply, replyall, forward of the message ARG names, or mailto URL ARG); returns its path.
+    OVERRIDES are (header, value) pairs that replace the draft's own, TEXT goes above any quote, ATTACH are file paths."""
     headers, body = [], ""
     if kind == "new":
         headers = [("From", identities()[0]), ("To", ""), ("Subject", "")]
@@ -459,6 +476,13 @@ def write_draft(kind, arg=None):
                 "\n" + text)
     else:
         raise MailError(f"unknown compose kind: {kind}")
+    for name, value in overrides:
+        headers = with_header(headers, name, value)
+    headers += [("Attach", a) for a in attach]
+    if text is not None:
+        text = text.replace("\r\n", "\n").rstrip("\n") + "\n"
+        # The body starts with the blank line that ends the headers; the text goes after it, above a quote or a forward.
+        body = "\n" + text + body[1:]
     os.makedirs(DRAFTS, exist_ok=True)
     path = os.path.join(DRAFTS, time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3) + ".eml")
     with open(path, "w") as f:
@@ -478,14 +502,33 @@ def parse_draft(text):
     return headers, body
 
 
-def send_draft(path):
-    """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses."""
-    # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
-    mark = path + ".sent"
-    if os.path.exists(mark):
-        raise MailError(f"already sent; {mark} holds the message as it went out")
-    with open(path) as f:
-        headers, body = parse_draft(f.read())
+# A draft's file name as write_draft makes it; a forward's attachments beside the drafts are named fwd-….
+DRAFT_NAME = re.compile(r"\d{8}-\d{6}-[0-9a-f]{6}")
+
+
+def draft_path(arg):
+    """The draft file ARG names, by its id or its path, or None when ARG names no file in the drafts folder."""
+    stem = os.path.basename(arg).removesuffix(".eml")
+    if not DRAFT_NAME.fullmatch(stem) or os.path.basename(arg) not in (stem, stem + ".eml"):
+        return None
+    if os.sep in arg and os.path.dirname(os.path.abspath(arg)) != os.path.abspath(DRAFTS):
+        return None
+    return os.path.join(DRAFTS, stem + ".eml")
+
+
+def drafts():
+    """The draft files, newest first."""
+    try:
+        names = [n for n in os.listdir(DRAFTS) if n.endswith(".eml") and DRAFT_NAME.fullmatch(n[:-4])]
+    except FileNotFoundError:
+        return []
+    paths = [os.path.join(DRAFTS, n) for n in names]
+    return sorted(paths, key=lambda p: -os.stat(p).st_mtime)
+
+
+def draft_message(text):
+    """The message a draft's TEXT sends, without its Date and Message-ID, its attachment paths and its body; send and show read a draft only this way."""
+    headers, body = parse_draft(text)
     msg = EmailMessage(policy=email.policy.SMTP)
     attach = []
     for k, v in headers:
@@ -498,6 +541,30 @@ def send_draft(path):
             msg[k] = merged
         elif v:
             msg[k] = v
+    return msg, attach, body
+
+
+def digest(raw, attach):
+    """A digest of a draft's bytes RAW and of each attachment's bytes, so a change to either shows."""
+    h = hashlib.sha256(raw)
+    for a in attach:
+        h.update(b"\0" + os.fsencode(a) + b"\0")
+        try:
+            with open(a, "rb") as f:
+                h.update(hashlib.sha256(f.read()).digest())
+        except OSError:
+            h.update(b"missing")
+    return h.hexdigest()[:16]
+
+
+def send_draft(path):
+    """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses."""
+    # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
+    mark = path + ".sent"
+    if os.path.exists(mark):
+        raise MailError(f"already sent; {mark} holds the message as it went out")
+    with open(path) as f:
+        msg, attach, body = draft_message(f.read())
     if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):
         raise MailError("no recipients (To/Cc/Bcc all empty)")
     if not msg.get("From"):

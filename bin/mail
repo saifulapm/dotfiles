@@ -7,6 +7,10 @@
   mail thread ID                               every message of a thread, oldest first
   mail read ID / mail unread ID                mark a message read or unread
   mail preview ID [--images]                   the HTML part as a file a browser opens with nothing remote loaded
+  mail draft new|reply|replyall|forward [ID] [--to A] [--cc A] [--bcc A] [--subject S] [--from ADDR]
+             [--body-file F] [--attach FILE]...  write a draft where Kakoune keeps them; prints its id and path
+  mail drafts                                  every draft, newest first
+  mail draft show DRAFT                        what the draft sends, and the digest send takes
 
 ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
 also takes thread:THREAD. Every command prints one JSON object,
@@ -32,8 +36,9 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MailError, NotFound, body_text, both, box_counts, boxes_of, idq, line, matched_messages, nm,
-                         one_message, part_sizes, search_threads, set_unread, thread_messages, thread_of)
+from mail_engine import (BOXES, MailError, NotFound, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+                         drafts, identities, idq, line, matched_messages, nm, one_message, part_sizes, search_threads,
+                         set_unread, thread_messages, thread_of, write_draft)
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
 LIMIT_MAX = 500
@@ -44,7 +49,16 @@ class Usage(Exception):
 
 
 class Refused(Exception):
-    pass
+    def __init__(self, error, hint="run it in a desktop session"):
+        super().__init__(error)
+        self.hint = hint
+
+
+def missing(error, hint):
+    """NotFound with the hint main() prints for it."""
+    e = NotFound(error)
+    e.hint = hint
+    return e
 
 
 class Parser(argparse.ArgumentParser):
@@ -252,6 +266,78 @@ def cmd_preview(a):
     return {"path": path}
 
 
+def cmd_draft_write(a):
+    fields = []
+    if a.sender is not None:
+        addr = parseaddr(a.sender)[1].lower()
+        mine = next((i for i in identities() if parseaddr(i)[1].lower() == addr), None)
+        if not addr or not mine:
+            raise Usage(f"{a.sender} is not one of your addresses")
+        fields.append(("From", mine))
+    fields += [(name, v) for name, v in (("To", a.to), ("Cc", a.cc), ("Bcc", a.bcc), ("Subject", a.subject)) if v is not None]
+    attach = []
+    for p in a.attach:
+        p = os.path.abspath(os.path.expanduser(p))
+        if not os.path.isfile(p):
+            raise Usage(f"no such file: {p}")
+        attach.append(p)
+    text = None
+    if a.body_file is not None:
+        try:
+            with open(a.body_file, encoding="utf-8") as f:
+                text = f.read()
+        except OSError as e:
+            raise Usage(f"cannot read {a.body_file}: {e.strerror}") from None
+    arg = None if a.kind == "new" else "id:" + found(a.id)["id"]
+    path = write_draft(a.kind, arg, fields, text, attach)
+    return {"id": os.path.basename(path).removesuffix(".eml"), "path": path}
+
+
+def addresses(msg, name):
+    return [person(f'"{n}" <{a}>' if n else a) for n, a in getaddresses([str(msg.get(name, ""))]) if a or n]
+
+
+def draft_file(arg):
+    path = draft_path(arg)
+    if path is None:
+        raise Usage(f"not a draft: {arg}")
+    if not os.path.isfile(path):
+        raise missing(f"no draft {arg}", "list them with mail drafts")
+    return path
+
+
+def cmd_drafts(a):
+    rows = []
+    for path in drafts():
+        with open(path, "rb") as f:
+            msg, _, _ = draft_message(f.read().decode("utf-8", "replace"))
+        rows.append({"id": os.path.basename(path).removesuffix(".eml"), "path": path,
+                     "date": datetime.fromtimestamp(os.stat(path).st_mtime).astimezone().isoformat(),
+                     "to": addresses(msg, "To"), "subject": untrusted(line(msg.get("Subject", "")))})
+    return rows
+
+
+def cmd_draft_show(a):
+    path = draft_file(a.draft)
+    with open(path, "rb") as f:
+        raw = f.read()
+    # A reply quotes the sender and takes To and Cc from their headers, so the draft's text is wrapped as mail text is.
+    msg, attach, body = draft_message(raw.decode("utf-8", "replace"))
+    return {
+        "id": os.path.basename(path).removesuffix(".eml"),
+        "path": path,
+        "from": person(str(msg.get("From", ""))),
+        "to": addresses(msg, "To"),
+        "cc": addresses(msg, "Cc"),
+        "bcc": addresses(msg, "Bcc"),
+        "subject": untrusted(line(msg.get("Subject", ""))),
+        "attachments": [{"path": p, "name": untrusted(line(os.path.basename(p))),
+                         "size": os.path.getsize(p) if os.path.isfile(p) else None} for p in attach],
+        "body": untrusted(body.strip("\n")),
+        "digest": digest(raw, attach),
+    }
+
+
 def parser():
     p = Parser(prog="mail", description="Read mail as JSON.")
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
@@ -271,6 +357,24 @@ def parser():
     v.add_argument("id", help="a message id")
     v.add_argument("--images", action="store_true", help="let images over https load")
     v.set_defaults(fn=cmd_preview)
+    d = sub.add_parser("draft", help="write a draft, or show one")
+    dsub = d.add_subparsers(dest="kind", required=True, parser_class=Parser)
+    for kind in ("new", "reply", "replyall", "forward"):
+        c = dsub.add_parser(kind, help=f"a {kind} draft" if kind == "new" else f"a draft that does {kind} on the message ID")
+        if kind != "new":
+            c.add_argument("id", help="a message id")
+        c.add_argument("--to", help="recipients, comma separated")
+        c.add_argument("--cc", help="recipients, comma separated")
+        c.add_argument("--bcc", help="recipients, comma separated")
+        c.add_argument("--subject")
+        c.add_argument("--from", dest="sender", help="one of your addresses; a new draft goes from the primary, a reply from the address it was sent to")
+        c.add_argument("--body-file", help="the text of the mail, above any quote")
+        c.add_argument("--attach", action="append", default=[], metavar="FILE", help="a file to attach; give it once per file")
+        c.set_defaults(fn=cmd_draft_write)
+    c = dsub.add_parser("show", help="what a draft sends, with the digest mail send takes")
+    c.add_argument("draft", help="a draft id or path, as mail drafts gives it")
+    c.set_defaults(fn=cmd_draft_show)
+    sub.add_parser("drafts", help="every draft, newest first").set_defaults(fn=cmd_drafts)
     for name, unread in (("read", False), ("unread", True)):
         c = sub.add_parser(name, help=f"mark a message {name}")
         c.add_argument("id", help="a message id")
@@ -296,9 +400,10 @@ def main():
     except Usage as e:
         emit({"ok": False, "error": str(e), "hint": p.format_usage().strip()}, 1)
     except NotFound as e:
-        emit({"ok": False, "error": str(e), "hint": "take ids from mail search" if str(e) != "no HTML part" else "read it with mail show"}, 2)
+        hint = getattr(e, "hint", "take ids from mail search" if str(e) != "no HTML part" else "read it with mail show")
+        emit({"ok": False, "error": str(e), "hint": hint}, 2)
     except Refused as e:
-        emit({"ok": False, "error": str(e), "hint": "run it in a desktop session"}, 3)
+        emit({"ok": False, "error": str(e), "hint": e.hint}, 3)
     except MailError as e:
         emit({"ok": False, "error": str(e), "hint": "notmuch failed; try again, or run mail boxes to see the store answers"}, 1)
     except Exception as e:
