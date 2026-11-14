@@ -39,6 +39,8 @@ test('links and attachments of a mail whose Message-ID holds quotes and $( ) lis
 
 test('a mail whose Message-ID holds quotes and $( ) opens, replies and archives', (t) => {
   const r = hostile(t);
+  // Screened in, as mail in the Screener stays unread when opened.
+  r.notmuch('tag', '+screened', '--', '*');
   const shown = r.kakMail('show', '--out', join(r.M, 'thread'), r.id);
   assert.equal(shown.status, 0, shown.stderr);
   assert.equal(r.notmuch('count', 'tag:unread'), '0\n');
@@ -464,4 +466,19 @@ test('mail with a seen or bundled tag from before still shows in the Imbox', (t)
   const out = join(r.M, 'list');
   assert.equal(r.kakMail('list', '--out', out, 'Imbox').status, 0);
   assert.match(r.kakMail('list', '--out', out, 'Imbox').stdout, /mail_ids 'thread:/);
+});
+
+test('opening a Screener mail leaves it unread, and opening an Imbox thread marks it read', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Shop <hi@shop.test>', 'Message-ID': '<h1@shop.test>' });
+  r.deliver({ From: 'Bob <bob@people.test>', 'Message-ID': '<b1@x.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  r.notmuch('tag', '+screened', '--', 'id:b1@x.test');
+  const out = join(r.M, 'show');
+  const unread = (id) => r.notmuch('count', '--', `tag:unread and id:${id}`).trim();
+  assert.equal(r.kakMail('show', '--out', out, 'id:h1@shop.test').status, 0);
+  assert.equal(unread('h1@shop.test'), '1');
+  const thread = r.notmuch('search', '--output=threads', '--', 'id:b1@x.test').trim();
+  assert.equal(r.kakMail('show', '--out', out, thread).status, 0);
+  assert.equal(unread('b1@x.test'), '0');
 });

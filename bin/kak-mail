@@ -35,7 +35,7 @@ from urllib.parse import urlsplit
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, box, box_counts, decide,
+from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, both, box, box_counts, decide,
                          draft_message, drafts, identities, line, matched_messages, message_of, nm, one_message,
                          part_bytes, pile, refresh_count, search_threads, send_draft, sender, set_unread, target,
                          thread_messages, write_count, write_draft)
@@ -190,8 +190,8 @@ def cmd_show(args):
         lines.append("")
     with open(out, "w") as f:
         f.write("\n".join(lines) + "\n")
-    # Opening a thread marks it read.
-    set_unread(query, False)
+    # Opening a thread marks it read, but mail in the Screener stays unread until Saiful screens its sender in or out.
+    set_unread(both(query, f"not ({box('Screener')[2]})"), False)
     print("set-option buffer mail_msgs " + " ".join(kq(x) for x in marks))
 
 
