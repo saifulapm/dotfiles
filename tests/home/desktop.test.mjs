@@ -56,7 +56,7 @@ test('a mailto link opens mail-open', () => {
   const r = spawnSync('xdg-mime', ['query', 'default', 'x-scheme-handler/mailto'], { env, encoding: 'utf8' });
   assert.equal(r.stdout, 'mail-open.desktop\n');
   const entry = readFileSync(join(home, '.local/share/applications/mail-open.desktop'), 'utf8');
-  assert.match(entry, /^Exec=mail-open$/m);
+  assert.match(entry, /^Exec=mail-open %u$/m);
   assert.match(entry, /^MimeType=x-scheme-handler\/mailto;$/m);
 });
 

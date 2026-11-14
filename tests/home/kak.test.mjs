@@ -128,7 +128,7 @@ function mailSession(t, expr) {
     thread('0002', 'Second read row', ['inbox']),
     thread('0003', 'Third unread row', ['inbox', 'unread']),
   ]));
-  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in search) cat ${dir}/search.json ;; esac\n`, { mode: 0o755 });
+  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in search) cat ${dir}/search.json ;; count) echo 3 ;; esac\n`, { mode: 0o755 });
   const kakEnv = { ...env, PATH: [dir, join(repo, 'bin'), env.PATH].join(':') };
   const p = spawn('kak', ['-ui', 'json', '-e', `${expr}`], { env: kakEnv });
   let buf = '';
