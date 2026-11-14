@@ -97,7 +97,7 @@ fi
 # The post-new hook wrote the count before folder sync retagged mail moved on another client, so write it again.
 "$(dirname "$(readlink -f "$0")")/kak-mail" count >/dev/null 2>>"$LOG" || log "count refresh failed"
 
-log "done in$(( $(date +%s) - start ))s"
+log "done in $(( $(date +%s) - start ))s"
 [ "$fetched" -eq 1 ] || exit "$EX_UNAVAILABLE"
 exit 0
 }

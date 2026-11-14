@@ -171,7 +171,7 @@ test("after a move made on the phone one sync makes the margin's count match the
   assert.equal(readFileSync(countFile, "utf8"), "1\n");
   // mbsync moves the file like this after the phone archives the mail.
   for (const s of ["cur", "new", "tmp"]) mkdirSync(join(r.mail, "icloud/Archive", s), { recursive: true });
-  renameSync(join(r.mail, "icloud/INBOX/new/0.eml"), join(r.mail, "icloud/Archive/cur/0.eml:2,S"));
+  renameSync(join(r.mail, "icloud/INBOX/new/0.eml"), join(r.mail, "icloud/Archive/cur/0.eml:2,"));
   const result = sync();
   assert.equal(result.status, 0, result.stderr);
   assert.equal(r.notmuch("count", "--", "tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled").trim(), "0");
