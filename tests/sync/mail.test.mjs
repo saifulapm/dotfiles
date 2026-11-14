@@ -157,13 +157,15 @@ test('a pulled record naming a sender notmuch would read as a query is left out,
     // A regex code, a top-level domain and a zero-day recycle each match every mail post-new sees.
     speakeasy: { v: '/./', at },
     'sender @test': { v: 'spam', at },
+    // One freemail sender never decides everyone there.
+    'sender @gmail.com': { v: 'thefeed', at },
     'recycle ok@y.test': { v: '0', at },
     'sender ok@y.test': { v: 'screened', at },
   };
   writeFileSync(remote(w, 'a'), JSON.stringify({ v: 1, records }));
   const r = await sync(b, ['--only', 'mail']);
   assert.equal(r.code, 5, r.stdout + r.stderr);
-  assert.match(r.stderr, /^dots sync: mail: left out 8 records from a\.json, which are not HEY decisions$/m);
+  assert.match(r.stderr, /^dots sync: mail: left out 9 records from a\.json, which are not HEY decisions$/m);
   assert.equal(db(b, 'screened.db'), 'ok@y.test\n');
   assert.equal(db(b, 'spam.db'), '');
 });
@@ -359,4 +361,66 @@ test("a round drops a sender's line from each class file its decision does not n
   assert.equal(db(a, 'spam.db'), 'x@y.test\n');
   await ok(a, ['--only', 'mail']);
   assert.equal(db(a, 'screened.db'), 'keep@y.test\n');
+});
+
+// A domain line from another machine re-files the domain's mail here, and an address with its own line keeps its class.
+async function vendor() {
+  const { a, b } = await pair();
+  for (const m of [a, b]) {
+    await deliver(m, 'Boss <boss@vendor.test>', `boss-${m.id}@x.test`);
+    await deliver(m, 'News <news@vendor.test>', `news-${m.id}@x.test`);
+    await notmuch(m, ['tag', '-new', '--', '*']);
+  }
+  return { a, b };
+}
+
+async function heyDomain(m, action, id) {
+  const r = await kakMail(m, ['hey', action, '--domain', 'id:' + id]);
+  assert.equal(r.code, 0, r.stderr);
+}
+
+test("a domain decision reaches b and re-files the domain's mail there, leaving an address with its own line as it was", async () => {
+  const { a, b } = await vendor();
+  await hey(a, 'screen-in', 'boss-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'screened.db'), 'boss@vendor.test\n');
+  await heyDomain(a, 'feed', 'news-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'thefeed.db'), '@vendor.test\n');
+  assert.deepEqual((await tags(b, 'news-b@x.test')).sort(), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual((await tags(b, 'boss-b@x.test')).sort(), ['inbox', 'screened', 'unread']);
+});
+
+test('a domain decision and an address line under it pulled in one round keep the address out of the domain', async () => {
+  const { a, b } = await vendor();
+  await hey(a, 'screen-in', 'boss-a@x.test');
+  await heyDomain(a, 'feed', 'news-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'screened.db'), 'boss@vendor.test\n');
+  assert.equal(db(b, 'thefeed.db'), '@vendor.test\n');
+  assert.deepEqual((await tags(b, 'news-b@x.test')).sort(), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual((await tags(b, 'boss-b@x.test')).sort(), ['inbox', 'screened', 'unread']);
+});
+
+test("an address carved out of a domain on a, and handed back, files its mail on b as it does on a", async () => {
+  const { a, b } = await vendor();
+  await heyDomain(a, 'screen-in', 'news-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.deepEqual((await tags(b, 'news-b@x.test')).sort(), ['inbox', 'screened', 'unread']);
+  await hey(a, 'feed', 'news-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'thefeed.db'), 'news@vendor.test\n');
+  assert.deepEqual((await tags(b, 'news-b@x.test')).sort(), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual((await tags(b, 'boss-b@x.test')).sort(), ['inbox', 'screened', 'unread']);
+  await hey(a, 'unscreen', 'news-a@x.test');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'thefeed.db'), '');
+  const news = await tags(b, 'news-b@x.test');
+  assert.ok(news.includes('screened') && news.includes('inbox') && !news.includes('thefeed'), news.join(' '));
 });

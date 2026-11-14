@@ -51,7 +51,7 @@ def valid(key, value):
         return False
     kind, _, rest = key.partition(" ")
     if kind == "sender":
-        return (ADDR.fullmatch(rest) is not None and rest == rest.lower()
+        return (ADDR.fullmatch(rest) is not None and rest == rest.lower() and not (rest.startswith("@") and rest[1:] in E.FREEMAIL)
                 and (value is None or value in E.CLASS_TAGS
                      or (isinstance(value, str) and value.startswith("ledger ") and E.CATEGORY.fullmatch(value[7:]) is not None)))
     if kind == "folder":
@@ -345,12 +345,22 @@ def main(path, pulled):
         said.append(f"mail: could not tell which bubbles share a thread: {e}")
 
     changed = {k: (before.get(k), r["v"]) for k, r in records.items() if r["v"] != before.get(k)}
+    after = {k: r["v"] for k, r in records.items()}
+
+    def inherited(addr, values):
+        """The class an address with no line of its own takes from its domain's line in VALUES."""
+        return None if addr.startswith("@") else values.get("sender " + E.domain_of(addr))
+
     refused = []
     for key, (old, new) in sorted(changed.items()):
         kind, _, rest = key.partition(" ")
         try:
-            if kind == "sender":
-                E.refile(rest, old, new)
+            # An address's own line beats its domain's, so a domain's re-filing leaves out the addresses with a line after this round, and an address with none follows its domain's line.
+            if kind == "sender" and rest.startswith("@"):
+                E.refile(rest, old, new, [k[7:] for k, v in after.items() if k.startswith("sender ") and v is not None
+                                          and not k[7:].startswith("@") and E.domain_of(k[7:]) == rest])
+            elif kind == "sender":
+                E.refile(rest, old or inherited(rest, before), new or inherited(rest, after))
             elif kind == "mute":
                 E.tag(f"thread:{{{rest}}}", *(("+muted", "-inbox") if new else ("-muted",)))
             elif kind == "bubble" and new is not None:
