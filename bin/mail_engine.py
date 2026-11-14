@@ -562,19 +562,19 @@ def digest(raw, attach):
     return h.hexdigest()[:16]
 
 
-def send_draft(path, expect=None):
+def send_draft(path, expect=None, env=None):
     """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses.
-    With EXPECT, a draft whose digest is not EXPECT is refused. One send at a time holds the drafts folder's lock,
+    With EXPECT, a draft whose digest is not EXPECT is refused; ENV is msmtp's environment. One send at a time holds the drafts folder's lock,
     so two sends of one draft run msmtp once: the second finds the draft gone."""
     folder = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
     try:
         fcntl.flock(folder, fcntl.LOCK_EX)
-        return locked_send(path, expect)
+        return locked_send(path, expect, env)
     finally:
         os.close(folder)
 
 
-def locked_send(path, expect):
+def locked_send(path, expect, env):
     # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
     mark = path + ".sent"
     if os.path.exists(mark):
@@ -605,7 +605,7 @@ def locked_send(path, expect):
     raw = msg.as_bytes()
     # -t takes recipients from To/Cc/Bcc (msmtp strips Bcc) and the envelope-from from From, so every iCloud+ alias sends as itself.
     r = subprocess.run(["msmtp", "-a", MSMTP_ACCOUNT, "--read-envelope-from", "-t"],
-                       input=raw, capture_output=True)
+                       input=raw, capture_output=True, env=env)
     if r.returncode != 0:
         raise MailError("msmtp: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1])
     with open(mark, "wb") as f:

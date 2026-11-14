@@ -242,3 +242,47 @@ test('two sends of one draft at once run msmtp once', async (t) => {
   assert.deepEqual(results.map((x) => x.code).sort(), [0, 2], JSON.stringify(results));
   assert.equal(r.sends().length, 1);
 });
+
+// msmtp's password comes from pass through ~/.msmtprc, as home/private_dot_msmtprc.tmpl writes it. The fake pass logs the gpg options it was given;
+// asked without --pinentry-mode=error, it does what gpg does with a locked agent: starts pinentry and waits on it.
+function lockedPass(r, { locked }) {
+  writeFileSync(join(r.env.HOME, '.msmtprc'), 'defaults\nauth on\n\naccount         icloud\nhost            smtp.mail.me.com\npasswordeval    "pass email/icloud/me | head -n1"\n\naccount default : icloud\n');
+  const log = join(r.M, 'pass.log');
+  const pinentry = join(r.M, 'pinentry-started');
+  writeFileSync(join(r.M, 'bin/pass'), `#!/bin/sh
+printf '%s|%s\\n' "$*" "$PASSWORD_STORE_GPG_OPTS" >>"${log}"
+${locked ? '' : 'echo secret; exit 0'}
+case "$PASSWORD_STORE_GPG_OPTS" in *--pinentry-mode=error*) echo 'gpg: decryption failed: No pinentry' >&2; exit 2 ;; esac
+touch "${pinentry}"; sleep 30; exit 2
+`);
+  r.run('chmod', ['755', join(r.M, 'bin/pass')]);
+  return { log, pinentry };
+}
+
+test('mail send with the pass store locked fails at once with the unlock step, and starts no pinentry', (t) => {
+  const r = rig(t);
+  const { id, path, digest } = shownDraft(r);
+  const { log, pinentry } = lockedPass(r, { locked: true });
+  const t0 = Date.now();
+  const res = r.mail('send', id, '--yes', '--digest', digest);
+  assert.ok(Date.now() - t0 < 5000, `took ${Date.now() - t0} ms`);
+  assert.equal(res.status, 3, res.stdout + res.stderr);
+  assert.equal(res.json.error, 'refused: the pass store is locked');
+  assert.match(res.json.hint, /pass email\/icloud\/me >\/dev\/null/);
+  assert.ok(!existsSync(pinentry), 'no pinentry started');
+  assert.match(readFileSync(log, 'utf8'), /^email\/icloud\/me\|.*--pinentry-mode=error/m);
+  assert.equal(r.sends().length, 0);
+  assert.ok(existsSync(path));
+});
+
+test('mail send with the pass store open runs msmtp with pinentry off, so a lock in between fails rather than asks', (t) => {
+  const r = rig(t);
+  const { id, digest } = shownDraft(r);
+  lockedPass(r, { locked: false });
+  const msmtp = join(r.M, 'bin/msmtp');
+  writeFileSync(msmtp, readFileSync(msmtp, 'utf8').replace('#!/bin/sh\n', `#!/bin/sh\nprintf '%s' "$PASSWORD_STORE_GPG_OPTS" >"${join(r.M, 'msmtp-gpg-opts')}"\n`));
+  const res = r.mail('send', id, '--yes', '--digest', digest);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(readFileSync(join(r.M, 'msmtp-gpg-opts'), 'utf8'), /--pinentry-mode=error/);
+  assert.equal(r.sends().length, 1);
+});

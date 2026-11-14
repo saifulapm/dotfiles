@@ -28,6 +28,7 @@ import html
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -37,7 +38,7 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MailError, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+from mail_engine import (BOXES, MSMTP_ACCOUNT, MailError, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          drafts, identities, idq, line, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, write_draft)
 
@@ -339,6 +340,48 @@ def cmd_draft_show(a):
     }
 
 
+# pass hands these to gpg, which then fails on an uncached passphrase instead of drawing pinentry over Saiful's screen.
+NO_PINENTRY = "--pinentry-mode=error"
+PASS_WAIT = 3
+
+
+def password_command():
+    """The passwordeval of ~/.msmtprc's account, without the `| head` that would hide a failed decrypt, or None."""
+    try:
+        with open(os.path.expanduser("~/.msmtprc")) as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return None
+    account = None
+    for l in lines:
+        words = l.split(None, 1)
+        if words[:1] == ["account"]:
+            account = words[1].split(":")[0].strip() if len(words) > 1 else None
+        elif words[:1] == ["passwordeval"] and account == MSMTP_ACCOUNT and len(words) > 1:
+            cmd = words[1].strip()
+            if len(cmd) > 1 and cmd[0] == cmd[-1] == '"':
+                cmd = cmd[1:-1]
+            return re.sub(r"\s*\|\s*head\b.*$", "", cmd)
+    return None
+
+
+def unlocked_env():
+    """msmtp's environment, after refusing at once when the pass store would ask for its passphrase."""
+    env = dict(os.environ, PASSWORD_STORE_GPG_OPTS=(os.environ.get("PASSWORD_STORE_GPG_OPTS", "") + " " + NO_PINENTRY).strip())
+    cmd = password_command()
+    if cmd is None:
+        return env
+    try:
+        ok = subprocess.run(["bash", "-o", "pipefail", "-c", cmd], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL, timeout=PASS_WAIT).returncode == 0
+    except subprocess.TimeoutExpired:
+        ok = False
+    if not ok:
+        raise Refused("refused: the pass store is locked",
+                      f"ask Saiful to unlock it: he runs `{cmd} >/dev/null` in a terminal and types the passphrase; then send again")
+    return env
+
+
 def cmd_send(a):
     path = draft_file(a.draft)
     if not a.yes:
@@ -346,7 +389,7 @@ def cmd_send(a):
     if not a.digest:
         raise Refused("refused: needs --digest D from mail draft show", "show Saiful the draft with mail draft show, and pass its digest")
     try:
-        to = send_draft(path, a.digest)
+        to = send_draft(path, a.digest, unlocked_env())
     except Refusal as e:
         raise Refused(f"refused: {e}", "show the draft again with mail draft show, and ask Saiful again") from None
     except NotFound:
