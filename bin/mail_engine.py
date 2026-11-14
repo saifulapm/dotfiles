@@ -825,7 +825,9 @@ def undo_last():
         with open(UNDO) as f:
             move = json.load(f)
     except FileNotFoundError:
-        raise MailError("nothing to undo") from None
+        e = MailError("nothing to undo")
+        e.hint = "undo-last undoes only the last archive or Feed move, once"
+        raise e from None
     addr = move.get("sender")
     if addr:
         for db in CLASS_FILES:

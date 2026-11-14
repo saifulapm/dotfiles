@@ -109,3 +109,11 @@ test('mail hey papertrail needs --category and bubble needs --at, with the usage
     assert.match(res.json.hint, /^usage: mail/);
   }
 });
+
+test('mail hey undo-last with nothing to undo says so, and hints at what it undoes', (t) => {
+  const r = rig(t);
+  const res = r.mail('hey', 'undo-last');
+  assert.equal(res.status, 1);
+  assert.equal(res.json.error, 'nothing to undo');
+  assert.match(res.json.hint, /last archive or Feed move/);
+});
