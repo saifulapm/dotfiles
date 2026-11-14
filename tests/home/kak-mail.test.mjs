@@ -541,3 +541,45 @@ test('H c on a thread with a pending bubble cancels it: no bubble.db line, no bu
   assert.ok(!tags.includes('bubble') && tags.includes('inbox'), tags.join(' '));
   assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), /\d+ bubble id:z1@x\.test\n.*\n\d+ bubble id:z1@x\.test\n$/s);
 });
+
+test('a on an Imbox thread, then U, returns it to the Imbox; mail hey undo-last does the same, and a second undo has nothing to undo', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Bob <bob@people.test>', 'Message-ID': '<u1@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', '*');
+  const before = r.notmuch('dump', '--', 'id:u1@x.test');
+  const thread = r.notmuch('search', '--output=threads', '--', 'id:u1@x.test').trim();
+  assert.equal(r.kakMail('hey', 'archive', thread).status, 0);
+  assert.notEqual(r.notmuch('dump', '--', 'id:u1@x.test'), before);
+  const undone = r.kakMail('hey', 'undo-last');
+  assert.equal(undone.status, 0, undone.stderr);
+  assert.equal(r.notmuch('dump', '--', 'id:u1@x.test'), before);
+  assert.equal(r.kakMail('hey', 'archive', thread).status, 0);
+  const byAgent = r.run(join(repo, 'bin/mail'), ['hey', 'undo-last']);
+  assert.equal(byAgent.status, 0, byAgent.stdout);
+  assert.equal(r.notmuch('dump', '--', 'id:u1@x.test'), before);
+  const again = r.kakMail('hey', 'undo-last');
+  assert.equal(again.status, 1);
+  assert.match(again.stderr, /nothing to undo/);
+});
+
+test('U after f puts the sender back in its class: no thefeed.db line, its screened.db line back, its mail as it was', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Shop <news@shop.test>', 'Message-ID': '<f1@shop.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  assert.equal(r.kakMail('hey', 'screen-in', 'id:f1@shop.test').status, 0);
+  const before = r.notmuch('dump', '--', 'id:f1@shop.test');
+  assert.equal(r.kakMail('hey', 'feed', 'id:f1@shop.test').status, 0);
+  assert.match(r.db('thefeed.db'), /news@shop\.test/);
+  assert.equal(r.kakMail('hey', 'undo-last').status, 0);
+  assert.equal(r.db('thefeed.db'), '');
+  assert.equal(r.db('screened.db'), 'news@shop.test\n');
+  assert.equal(r.notmuch('dump', '--', 'id:f1@shop.test'), before);
+  assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8').trim().split('\n').at(-1), /^\d+ sender news@shop\.test$/);
+});
+
+test('U is mapped in a list and a thread, and the help names it', () => {
+  const kak = readFileSync(join(repo, 'home/dot_config/kak/autoload/tools/mail.kak'), 'utf8');
+  const both = kak.slice(kak.indexOf('hook global WinSetOption filetype=mail-(list|thread)'));
+  assert.match(both.slice(0, both.indexOf('\n}')), /map buffer normal U ':mail-undo<ret>'/);
+  assert.match(kak, /^U +undo the last archive or Feed move/m);
+});

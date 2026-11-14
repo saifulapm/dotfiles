@@ -43,7 +43,7 @@ from email.utils import getaddresses, parseaddr
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, check_recipients, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
-                         send_draft, set_unread, thread_messages, thread_of, write_draft)
+                         send_draft, set_unread, thread_messages, thread_of, undo_last, write_draft)
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
 LIMIT_MAX = 500
@@ -424,12 +424,19 @@ def cmd_send(a):
 
 # mail hey's action names, as kak-mail spells them.
 HEY = {"screen-in": "screen-in", "feed": "feed", "papertrail": "papertrail", "replylater": "reply-later",
-       "setaside": "set-aside", "bubble": "bubble", "archive": "archive", "clear": "clear", "screen-out": "screen-out"}
+       "setaside": "set-aside", "bubble": "bubble", "archive": "archive", "clear": "clear", "screen-out": "screen-out",
+       "undo-last": "undo-last"}
 # One address and nothing notmuch reads as more: a * would match every sender.
 ADDRESS = re.compile(r"[^\s<>\"'(),;:@*]+@[^\s<>\"'(),;:@*]+")
 
 
 def cmd_hey(a):
+    if a.action == "undo-last":
+        if a.id is not None or a.sender or a.category or a.at:
+            raise Usage("undo-last takes nothing; it undoes the last archive or Feed move")
+        undid = undo_last()
+        refresh_count()
+        return {"action": a.action, "undid": undid}
     if a.action == "screen-out":
         # An agent screens out only a sender Saiful named, never one it read off a mail.
         if a.id is not None or not a.sender:

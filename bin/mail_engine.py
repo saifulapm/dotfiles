@@ -28,6 +28,8 @@ MSMTP_ACCOUNT = "icloud"
 SENT_DRAFTS = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "kak-mail", "sent-drafts")
 # When each HEY decision was made here, one "MILLISECONDS KEY" line each; dots sync's mail unit stamps the change with it, so the later decision wins, not the later sync.
 JOURNAL = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "decided")
+# The last archive or Feed move, for undo-last: the tags of the mail it changed as `notmuch dump` wrote them, and the sender's class before a Feed move.
+UNDO = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "undo.json")
 # The shell's margin watches this file for the Imbox unread count.
 COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
 
@@ -807,6 +809,34 @@ DECIDES_CLASS = {"screen-in": "screened", "feed": "thefeed", "papertrail": "ledg
 THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive", "mute")
 
 
+def remember(query, **move):
+    """Keep QUERY's tags, and MOVE, as the one move undo_last undoes; written by rename, so a failed write leaves the last one."""
+    os.makedirs(os.path.dirname(UNDO), exist_ok=True)
+    with open(UNDO + ".tmp", "w") as f:
+        json.dump({**move, "dump": nm("dump", "--format=batch-tag", "--", query)}, f)
+    os.replace(UNDO + ".tmp", UNDO)
+
+
+def undo_last():
+    """Put back the mail the last archive or Feed move changed, and the sender's class before a Feed move; return what it undid."""
+    try:
+        with open(UNDO) as f:
+            move = json.load(f)
+    except FileNotFoundError:
+        raise MailError("nothing to undo") from None
+    addr = move.get("sender")
+    if addr:
+        for db in CLASS_FILES:
+            db_drop(db, addr)
+        old = move.get("old")
+        if old:
+            db_add(old.split(" ")[0] + ".db", f"{old[7:]} {addr}" if old.startswith("ledger ") else addr)
+        stamp("sender " + addr)
+    nm("restore", "--format=batch-tag", stdin=move["dump"])
+    os.unlink(UNDO)
+    return f"feed of {addr}" if addr else "archive"
+
+
 def decide(action, addr, arg=None):
     """Apply a sender ACTION to ADDR: its decision line in the db the post-new hook reads, and the tags on its mail so far."""
     if "*" in addr:
@@ -816,6 +846,8 @@ def decide(action, addr, arg=None):
         # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
         new = "ledger " + sanitize(arg, "Category") if action == "papertrail" else DECIDES_CLASS[action]
         old = sender_class(addr)
+        if action == "feed":
+            remember(frm, sender=addr.lower(), old=old)
         # Tags first: a notmuch that fails then leaves the files, and the sender's class, as they were.
         refile(addr, old, new)
         for db in CLASS_FILES:
@@ -856,6 +888,8 @@ def pile(action, queries, arg=None):
         when = int(r.stdout)
         if when <= time.time():
             raise MailError("that time is already past")
+    if action == "archive" and threads:
+        remember(" or ".join("thread:" + tid for tid in threads))
     for tid in threads:
         q = "thread:" + tid
         if action == "reply-later":

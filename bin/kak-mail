@@ -38,7 +38,7 @@ sys.dont_write_bytecode = True
 from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, both, box, box_counts, decide,
                          draft_message, drafts, identities, line, matched_messages, message_of, nm, one_message,
                          part_bytes, pile, refresh_count, search_threads, send_draft, sender, set_unread, target,
-                         thread_messages, write_count, write_draft)
+                         thread_messages, undo_last, write_count, write_draft)
 
 LIST_LIMIT = 500
 
@@ -337,6 +337,10 @@ def cmd_send(args):
 # ───────────────────────────── HEY actions ─────────────────────────────
 
 def cmd_hey(args):
+    if args[:1] == ["undo-last"]:
+        print(f"undid the last {undo_last()}")
+        refresh_count()
+        return
     action, arg = args[0], None
     rest = args[1:]
     if rest[:1] == ["--arg"]:

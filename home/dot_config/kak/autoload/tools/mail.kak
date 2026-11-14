@@ -337,6 +337,16 @@ define-command -hidden -params 1..2 mail-hey %{
     }
 }
 
+# Undo needs no row, as the list an archive emptied has none.
+define-command -hidden mail-undo %{
+    evaluate-commands %sh{
+        eval "$kak_opt_mail_sh"
+        if out=$(kak-mail hey undo-last 2>&1); then
+            printf 'mail-refresh-all\necho %s\n' "$(kq "$out")"
+        else printf 'fail %s\n' "$(kq "$out")"; fi
+    }
+}
+
 define-command -hidden mail-sender %{
     evaluate-commands %sh{
         # $kak_quoted_opt_mail_ids $kak_selections_desc $kak_cursor_line $kak_quoted_opt_mail_msgs $kak_opt_filetype
@@ -470,6 +480,7 @@ e / a  archive
 s      screener: undo screening this sender
 f      feed: move this sender to The Feed
 M      mute this thread
+U      undo the last archive or Feed move
 H      hey… (screen in/out, feed, piles, bubble up…)
 o      open a link           A  save + open an attachment (whole thread)
 u      refresh               G  sync now
@@ -484,6 +495,7 @@ V / <a-v>  open its HTML in the browser / with images
 o          open a link           A  save + open an attachment
 gu         open the URL under the cursor
 M          mute this thread
+U          undo the last archive or Feed move
 H          hey… (screen in/out, feed, piles, bubble up…)
 c          compose               G  sync now
 b          jump to a box
@@ -573,6 +585,7 @@ hook global WinSetOption filetype=mail-(list|thread) %{
     map buffer normal o ':mail-links<ret>'            -docstring 'open a link'
     map buffer normal A ':mail-attachments<ret>'      -docstring 'save + open an attachment'
     map buffer normal M ':mail-hey mute<ret>'         -docstring 'mute this thread'
+    map buffer normal U ':mail-undo<ret>'             -docstring 'undo the last archive or Feed move'
 }
 
 hook global WinSetOption filetype=mail-list %{
