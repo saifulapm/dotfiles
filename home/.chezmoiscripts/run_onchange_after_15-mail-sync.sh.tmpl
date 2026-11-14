@@ -1,0 +1,3 @@
+#!/bin/bash
+# mail-sync.service is a symlink into the checkout, so a pulled change waits for a reload, and until then a failed fetch's exit 69 marks the old unit failed. Unit hash: {{ joinPath .chezmoi.sourceDir "dot_config/systemd/user/mail-sync.service" | include | sha256sum }}
+systemctl --user daemon-reload 2>/dev/null || true

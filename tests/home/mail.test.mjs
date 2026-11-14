@@ -77,6 +77,13 @@ test('the mail-sync service and timer are in place and both wait for ~/.mbsyncrc
   }
 });
 
+// The unit is a symlink into the checkout, so a pulled change to it waits for a reload: without one a failed fetch's exit 69 still marks the old unit failed.
+test('a changed mail-sync unit is reloaded when chezmoi applies it', () => {
+  const script = readFileSync(join(repo, 'home/.chezmoiscripts/run_onchange_after_15-mail-sync.sh.tmpl'), 'utf8');
+  assert.match(script, /\{\{ joinPath \.chezmoi\.sourceDir "dot_config\/systemd\/user\/mail-sync\.service" \| include \| sha256sum \}\}/);
+  assert.match(script, /^systemctl --user daemon-reload 2>\/dev\/null \|\| true$/m);
+});
+
 test('niri starts the mail-sync timer at login', () => {
   const niri = readFileSync(join(keyless.home, '.config/niri/config.kdl'), 'utf8');
   assert.match(niri, /^spawn-at-startup "systemctl" "--user" "start" "mail-sync\.timer"$/m);
