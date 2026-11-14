@@ -42,15 +42,41 @@ class NotFound(MailError):
 
 
 def nm(*args, stdin=None):
+    """notmuch's output; a byte that is not UTF-8 stays as a surrogate for mended() to read."""
     try:
-        return subprocess.run(["notmuch", *args], input=stdin, capture_output=True,
-                              text=True, check=True).stdout
+        r = subprocess.run(["notmuch", *args], input=stdin.encode() if stdin is not None else None,
+                           capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
-        raise MailError(f"notmuch {args[0]}: {(e.stderr or '').strip() or 'failed'}") from None
+        raise MailError(f"notmuch {args[0]}: {e.stderr.decode(errors='replace').strip() or 'failed'}") from None
+    return r.stdout.decode("utf-8", "surrogateescape")
+
+
+RAW = re.compile("[\udc80-\udcff]+")
+CHARSET = re.compile(rb"charset=[\"']?([\w.:-]+)", re.I)
+
+
+def mended(obj):
+    """OBJ with each run of raw bytes decoded: a part with no charset in its header comes through notmuch as the sender
+    wrote it, so the charset its own text names (an HTML <meta>) reads it, and windows-1252 when it names none."""
+    if isinstance(obj, list):
+        return [mended(x) for x in obj]
+    if isinstance(obj, dict):
+        return {k: mended(v) for k, v in obj.items()}
+    if not isinstance(obj, str) or not RAW.search(obj):
+        return obj
+    named = CHARSET.search(obj.encode("utf-8", "surrogateescape"))
+
+    def decode(run):
+        raw = run.group().encode("utf-8", "surrogateescape")
+        try:
+            return raw.decode(named.group(1).decode() if named else "cp1252", "replace")
+        except LookupError:
+            return raw.decode("cp1252", "replace")
+    return RAW.sub(decode, obj)
 
 
 def show_json(*args):
-    return json.loads(nm("show", "--format=json", "--format-version=5", *args))
+    return mended(json.loads(nm("show", "--format=json", "--format-version=5", *args)))
 
 
 def idq(msg_id):
@@ -96,7 +122,7 @@ def line(s):
 
 def search_threads(query, limit, offset=0):
     """notmuch's thread summaries for QUERY, newest first."""
-    return json.loads(nm("search", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", "--", query))
+    return mended(json.loads(nm("search", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", "--", query)))
 
 
 def matched_messages(query):

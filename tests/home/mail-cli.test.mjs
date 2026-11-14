@@ -1,7 +1,7 @@
 // bin/mail on a scratch notmuch store (tests/home/mail-rig.mjs): one JSON object per command, mail text between untrusted markers, and reading changes nothing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig, repo } from './mail-rig.mjs';
 
@@ -20,7 +20,7 @@ function rig(t) {
     } catch {}
     return { ...res, json };
   };
-  return { ...r, mail };
+  return { ...r, maildir: r.mail, mail };
 }
 
 // One screened mail in the Imbox and one from a new sender in the Screener.
@@ -226,4 +226,20 @@ test('a Message-ID holding a quote and a space is found by the id search gives, 
     assert.equal(res.status, 0, `${id}: ${res.stdout}`);
     assert.equal(res.json.data.subject, wrapped('odd id'));
   }
+});
+
+// No charset in the header, only in the HTML's <meta>, so notmuch passes the sender's windows-1252 bytes through as they are.
+test('an HTML mail naming windows-1252 only in its <meta> reads é, in mail show and in Kakoune', (t) => {
+  const r = rig(t);
+  const head = 'From: Jo <jo@people.test>\nTo: me@x.test\nSubject: meta only\nDate: Sat, 14 Nov 2026 10:00:00 +0000\nMessage-ID: <meta@x.test>\nMIME-Version: 1.0\nContent-Type: text/html\nContent-Transfer-Encoding: 8bit\n\n';
+  const html = '<html><head><meta http-equiv="Content-Type" content="text/html; charset=windows-1252"></head><body><p>un caf\xe9</p></body></html>\n';
+  writeFileSync(join(r.maildir, 'icloud/INBOX/new/meta.eml'), Buffer.concat([Buffer.from(head), Buffer.from(html, 'latin1')]));
+  r.notmuch('new', '--quiet');
+  const res = r.mail('show', 'id:meta@x.test');
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(res.json.data.body, wrapped('un café'));
+  const out = join(r.M, 'thread');
+  const kak = r.kakMail('show', '--out', out, 'id:meta@x.test');
+  assert.equal(kak.status, 0, kak.stderr);
+  assert.match(readFileSync(out, 'utf8'), /^un café$/m);
 });
