@@ -33,8 +33,7 @@ COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state
 
 # The HEY boxes in HEY's order as (key, name, query, unthreaded); the queries use the post-new hook's tags, and tests/home/mail-engine.test.mjs pins them to the hook's and hey-folder-sync's.
 BOXES = [
-    ("i", "Imbox", "tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled", False),
-    ("y", "Prev. Seen", "tag:inbox and tag:screened and tag:unread and tag:seen", False),
+    ("i", "Imbox", "tag:inbox and tag:screened and tag:unread", False),
     # Unthreaded, alone among the boxes: the Screener decides on people, and one sender's year of notifications would thread into one row.
     ("s", "Screener", "tag:inbox and tag:unread and not tag:screened", True),
     ("f", "The Feed", "tag:thefeed and tag:unread", False),
@@ -43,7 +42,6 @@ BOXES = [
     ("a", "Set Aside", "tag:setaside", False),
     ("b", "Bubbled Up", "tag:bubbled and tag:unread", False),
     ("I", "Read", "tag:inbox and tag:screened and not tag:unread", False),
-    ("n", "Notes", "tag:note", False),
     ("m", "Muted", "tag:muted", False),
     ("t", "Sent", "tag:sent", False),
     ("e", "Everything", "*", False),
@@ -175,8 +173,7 @@ def matched_messages(query):
 
 
 # Where a mail lives when several boxes hold it, as hey-folder-sync files it: a pile, then the Feed and Paper Trail, then the Screener and the Imbox.
-HOME_ORDER = ["Bubbled Up", "Reply Later", "Set Aside", "The Feed", "Paper Trail", "Screener", "Imbox", "Prev. Seen", "Read",
-              "Muted", "Notes", "Sent"]
+HOME_ORDER = ["Bubbled Up", "Reply Later", "Set Aside", "The Feed", "Paper Trail", "Screener", "Imbox", "Read", "Muted", "Sent"]
 
 
 def boxes_of(msg_ids):

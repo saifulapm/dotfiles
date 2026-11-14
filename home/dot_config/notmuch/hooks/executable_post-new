@@ -72,8 +72,6 @@ if [ -s "$DB_DIR/ledger.db" ]; then
     done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
 fi
 
-route_simple "$DB_DIR/bundle.db" "+bundled"
-
 if [ -s "$DB_DIR/autofile.db" ]; then
     while IFS= read -r line; do
         case "$line" in ''|'#'*) continue ;; esac
@@ -247,7 +245,7 @@ kak_mail=$(command -v kak-mail || echo "$HOME/Codes/dotfiles/bin/kak-mail")
 if [ -x "$kak_mail" ]; then
     imbox=$("$kak_mail" count 2>>"$LOG") || imbox=0
 else
-    imbox=$(count tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled)
+    imbox=$(count tag:inbox and tag:screened and tag:unread)
 fi
 screener=$(count tag:inbox and tag:unread and not tag:screened)
 

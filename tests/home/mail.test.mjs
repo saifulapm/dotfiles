@@ -341,7 +341,7 @@ test('kak-mail count writes the Imbox unread count by rename and prints it', (t)
   assert.equal(r.stdout, '3\n');
   assert.equal(readFileSync(f.file, 'utf8'), '3\n');
   assert.deepEqual(readdirSync(f.folder), ['mail-unread']);
-  assert.match(readFileSync(join(f.dir, 'log'), 'utf8'), /^count -- tag:inbox and tag:screened and tag:unread and not tag:seen and not tag:bundled$/m);
+  assert.match(readFileSync(join(f.dir, 'log'), 'utf8'), /^count -- tag:inbox and tag:screened and tag:unread$/m);
 });
 
 test('kak-mail count leaves the old file when notmuch fails', (t) => {

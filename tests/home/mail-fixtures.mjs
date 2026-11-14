@@ -45,7 +45,7 @@ export function fixtureStore(t) {
   return r;
 }
 
-export const boxNames = ['Imbox', 'Prev. Seen', 'Screener', 'The Feed', 'Paper Trail', 'Reply Later', 'Set Aside', 'Bubbled Up', 'Read', 'Notes', 'Muted', 'Drafts', 'Sent', 'Everything'];
+export const boxNames = ['Imbox', 'Screener', 'The Feed', 'Paper Trail', 'Reply Later', 'Set Aside', 'Bubbled Up', 'Read', 'Muted', 'Drafts', 'Sent', 'Everything'];
 
 // What Kakoune shows of the store: the box list, then each box's list buffer and what kak-mail tells kak, then each thread oldest first; a thread opens last, since opening marks it read.
 export function renderAll(r) {

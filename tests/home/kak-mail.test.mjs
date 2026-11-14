@@ -447,3 +447,21 @@ test("e's archive refuses a draft row with kak-mail's error, and no tag changes"
   assert.equal(res.stderr, 'kak-mail: a draft is not mail; it opens with <ret>\n');
   assert.equal(r.notmuch('search', '--output=tags', '*'), before);
 });
+
+test('the box list is the HEY boxes alone, with no Prev. Seen, Notes or Bundled', (t) => {
+  const r = mailRig(t);
+  const boxes = r.kakMail('boxes');
+  assert.equal(boxes.status, 0, boxes.stderr);
+  assert.deepEqual(boxes.stdout.trimEnd().split('\n').map((l) => l.slice(4, 16).trim()),
+    ['Imbox', 'Screener', 'The Feed', 'Paper Trail', 'Reply Later', 'Set Aside', 'Bubbled Up', 'Read', 'Muted', 'Drafts', 'Sent', 'Everything']);
+  assert.doesNotMatch(boxes.stdout, /Prev\. Seen|Notes|Bundled/);
+});
+
+test('mail with a seen or bundled tag from before still shows in the Imbox', (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<old@x.test>' });
+  r.notmuch('tag', '+screened', '+seen', '+bundled', '-new', '--', '*');
+  const out = join(r.M, 'list');
+  assert.equal(r.kakMail('list', '--out', out, 'Imbox').status, 0);
+  assert.match(r.kakMail('list', '--out', out, 'Imbox').stdout, /mail_ids 'thread:/);
+});

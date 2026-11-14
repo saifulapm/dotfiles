@@ -49,8 +49,8 @@ Each command prints one JSON object: `{"ok":true,"data":...}` or
 | `mail send DRAFT --yes --digest D` | send it, only after Saiful's yes |
 | `mail hey ACTION ID ...` | file a message HEY's way |
 
-Boxes: Imbox, Prev. Seen, Screener, The Feed, Paper Trail, Reply Later, Set
-Aside, Bubbled Up, Read, Notes, Muted, Sent, Everything.
+Boxes: Imbox, Screener, The Feed, Paper Trail, Reply Later, Set Aside, Bubbled
+Up, Read, Muted, Sent, Everything.
 
 **search.** A row is `{thread, id, date, from:{name,address}, subject, tags,
 box, screened, unread, count}`. QUERY is notmuch syntax: `from:bob@x.test`,

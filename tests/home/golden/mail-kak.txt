@@ -1,6 +1,5 @@
 == boxes
- i  Imbox            8
- y  Prev. Seen       1
+ i  Imbox            9
  s  Screener         2
  f  The Feed         1
  p  Paper Trail      1
@@ -8,14 +7,12 @@
  a  Set Aside        1
  b  Bubbled Up       1
  I  Read             3
- n  Notes            1
  m  Muted            1
  d  Drafts           0
  t  Sent             1
  e  Everything      21
 == boxes --maps
 map global mail-jump 'i' ':mail-box %{Imbox}<ret>' -docstring 'Imbox'
-map global mail-jump 'y' ':mail-box %{Prev. Seen}<ret>' -docstring 'Prev. Seen'
 map global mail-jump 's' ':mail-box %{Screener}<ret>' -docstring 'Screener'
 map global mail-jump 'f' ':mail-box %{The Feed}<ret>' -docstring 'The Feed'
 map global mail-jump 'p' ':mail-box %{Paper Trail}<ret>' -docstring 'Paper Trail'
@@ -23,7 +20,6 @@ map global mail-jump 'l' ':mail-box %{Reply Later}<ret>' -docstring 'Reply Later
 map global mail-jump 'a' ':mail-box %{Set Aside}<ret>' -docstring 'Set Aside'
 map global mail-jump 'b' ':mail-box %{Bubbled Up}<ret>' -docstring 'Bubbled Up'
 map global mail-jump 'I' ':mail-box %{Read}<ret>' -docstring 'Read'
-map global mail-jump 'n' ':mail-box %{Notes}<ret>' -docstring 'Notes'
 map global mail-jump 'm' ':mail-box %{Muted}<ret>' -docstring 'Muted'
 map global mail-jump 'd' ':mail-box %{Drafts}<ret>' -docstring 'Drafts'
 map global mail-jump 't' ':mail-box %{Sent}<ret>' -docstring 'Sent'
@@ -33,20 +29,14 @@ map global mail-jump 'e' ':mail-box %{Everything}<ret>' -docstring 'Everything'
 2020-01-21 Kim                    the file  [attachment inbox screened unread]
 2020-01-20 Jo                     café  [inbox screened unread]
 2020-01-19 Ivy                    both parts  [inbox screened unread]
+2020-01-03 Bob                    seen before  [inbox screened seen unread]
 2020-01-02 Bob                    lunch on friday  [inbox screened unread]
 2020-01-01 Hal, Me                plan (3/3)  [inbox screened unread]
 -- kak
-set-option buffer mail_ids 'thread:0000000000000012' 'thread:0000000000000011' 'thread:0000000000000010' 'thread:000000000000000f' 'thread:0000000000000001' 'thread:000000000000000e'
+set-option buffer mail_ids 'thread:0000000000000012' 'thread:0000000000000011' 'thread:0000000000000010' 'thread:000000000000000f' 'thread:0000000000000002' 'thread:0000000000000001' 'thread:000000000000000e'
 set-option buffer mail_offset 0
-set-option buffer mail_total 6
-set-option buffer mail_rows 'rows 1–6 of 6'
-== list Prev. Seen
-2020-01-03 Bob                    seen before  [inbox screened seen unread]
--- kak
-set-option buffer mail_ids 'thread:0000000000000002'
-set-option buffer mail_offset 0
-set-option buffer mail_total 1
-set-option buffer mail_rows 'rows 1–1 of 1'
+set-option buffer mail_total 7
+set-option buffer mail_rows 'rows 1–7 of 7'
 == list Screener
 2020-01-05 Carol                  Re: first note  [inbox unread]
 2020-01-04 Carol                  first note  [inbox unread]
@@ -99,13 +89,6 @@ set-option buffer mail_ids 'thread:000000000000000a' 'thread:0000000000000008' '
 set-option buffer mail_offset 0
 set-option buffer mail_total 3
 set-option buffer mail_rows 'rows 1–3 of 3'
-== list Notes
-2020-01-13 Me                     a note  [note]
--- kak
-set-option buffer mail_ids 'thread:000000000000000b'
-set-option buffer mail_offset 0
-set-option buffer mail_total 1
-set-option buffer mail_rows 'rows 1–1 of 1'
 == list Muted
 2020-01-14 List                   noisy thread  [muted unread]
 -- kak
