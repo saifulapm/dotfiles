@@ -11,10 +11,10 @@ Subcommands (the kak side is the only intended caller):
   query NAME                  the notmuch query of a box
   list --out F [--unthreaded] QUERY   render a list into F, print `mail_ids`
   show --out F QUERY          render a thread into F, print `mail_msgs`, mark read
-  links QUERY                 `N label — host/path` per link of a message
+  links QUERY                 `N label — host/path` per link of a message, or of a thread: with sender and date
   link QUERY PICK             the URL of the links line PICK
-  attachments QUERY           `PART: name (type)` per attachment
-  save QUERY PART             attachment → ~/Downloads (never overwrites)
+  attachments QUERY           `N: name (type)` per attachment, as links gathers them
+  save QUERY PICK             the attachment on line PICK → ~/Downloads (never overwrites)
   identities                  sender identities, one per line
   compose new|reply|replyall|forward [QUERY]   write a draft, print its path
   header FILE set|add NAME VALUE   edit a draft's headers (From, Attach)
@@ -183,21 +183,52 @@ def shown(url):
     return host + u.path.rstrip("/") + ("…" if u.query or u.fragment else "")
 
 
+def gathered(query):
+    """The messages o and A read for QUERY, each with the words that name it: a list's thread: row is every message
+    of the thread, oldest first, named by sender and date; a thread view's id: is its one message, unnamed."""
+    if not query.startswith("thread:"):
+        return [(one_message(message_of(query)), "")]
+    named = []
+    for m in sorted(thread_messages(query), key=lambda m: m["timestamp"]):
+        name, addr = parseaddr(m["headers"].get("From", ""))
+        named.append((m, f" ({line(name or addr).strip()}, {fmt_date(m['timestamp'])})"))
+    return named
+
+
 def link_rows(query):
-    """(picker text, url) for each http and https link of QUERY's message, in reading order, a url once under its first label."""
-    found = []
-    text = body_text(one_message(message_of(query)).get("body", []), [], found=found)
-    # A body lynx's link list did not parse keeps its URLs in the text.
-    found += [(u, u) for u in (u.rstrip(".,;:!?") for u in URL.findall(text))]
+    """(picker text, url) for each http and https link of QUERY's messages, in reading order, a url once under its first label."""
     rows = {}
-    for label, url in found:
-        if urlsplit(url).scheme.lower() not in ("http", "https") or url in rows:
-            continue
-        # The anchor text is the sender's: one line, and cut short.
-        label = " ".join(line(label).split())
-        label = label if len(label) <= 60 else label[:59] + "…"
-        rows[url] = f"{label} — {shown(url)}" if label and label != url else shown(url)
+    for m, who in gathered(query):
+        found = []
+        text = body_text(m.get("body", []), [], found=found)
+        # A body lynx's link list did not parse keeps its URLs in the text.
+        found += [(u, u) for u in (u.rstrip(".,;:!?") for u in URL.findall(text))]
+        for label, url in found:
+            if urlsplit(url).scheme.lower() not in ("http", "https") or url in rows:
+                continue
+            # The anchor text is the sender's: one line, and cut short.
+            label = " ".join(line(label).split())
+            label = label if len(label) <= 60 else label[:59] + "…"
+            rows[url] = (f"{label} — {shown(url)}" if label and label != url else shown(url)) + who
     return [(text, url) for url, text in rows.items()]
+
+
+def attachment_rows(query):
+    """(picker text, message id, part, name) for each attachment of QUERY's messages."""
+    rows = []
+    for m, who in gathered(query):
+        atts = []
+        body_text(m.get("body", []), atts)
+        rows += [(f"{name} ({ct}){who}", m["id"], part, name) for part, name, ct in atts]
+    return rows
+
+
+def picked(rows, pick, what):
+    """The row PICK names by its leading number."""
+    n = re.match(r"\d+", pick)
+    if not n or not 1 <= int(n.group()) <= len(rows):
+        die(f"no {what} {pick}")
+    return rows[int(n.group()) - 1]
 
 
 def cmd_links(args):
@@ -208,30 +239,19 @@ def cmd_links(args):
 
 def cmd_link(args):
     """link QUERY PICK — the url of the line PICK, as links numbered it."""
-    n = re.match(r"\d+", args[1])
-    rows = link_rows(args[0])
-    if not n or not 1 <= int(n.group()) <= len(rows):
-        die(f"no link {args[1]}")
-    print(rows[int(n.group()) - 1][1])
+    print(picked(link_rows(args[0]), args[1], "link")[1])
 
 
 def cmd_attachments(args):
-    """attachments ID — one `PART: name (type)` line per attachment."""
-    atts = []
-    body_text(one_message(message_of(args[0])).get("body", []), atts)
-    for part, name, ct in atts:
-        print(f"{part}: {name} ({ct})")
+    """attachments QUERY — one `N: name (type)` line per attachment."""
+    for i, (text, *_) in enumerate(attachment_rows(args[0]), 1):
+        print(f"{i}: {text}")
 
 
 def cmd_save(args):
-    """save ID PART — write an attachment to ~/Downloads, print its path.
+    """save QUERY PICK — write the attachment on line PICK of attachments to ~/Downloads, print its path.
     An existing file is never overwritten: name (1).ext, name (2).ext, …"""
-    msg_id, part = message_of(args[0]), int(args[1])
-    atts = []
-    body_text(one_message(msg_id).get("body", []), atts)
-    name = next((n for p, n, _ in atts if p == part), None)
-    if name is None:
-        die(f"no attachment {part}")
+    _, msg_id, part, name = picked(attachment_rows(args[0]), args[1], "attachment")
     folder = os.path.join(HOME, "Downloads")
     os.makedirs(folder, exist_ok=True)
     stem, ext = os.path.splitext(os.path.basename(name) or "attachment")

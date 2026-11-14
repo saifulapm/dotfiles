@@ -263,3 +263,39 @@ test('a picked link opens by its number, whatever text follows it', (t) => {
   assert.equal(none.status, 1);
   assert.match(none.stderr, /no link 9/);
 });
+
+// A two-message thread: Ann's older mail holds a link and an attachment, Bob's reply a link of its own and one Ann's mail already had.
+function twoInThread(t) {
+  const r = mailRig(t);
+  r.env.TZ = 'UTC';
+  r.deliver({ 'Message-ID': '<old@x.test>', From: 'Ann <ann@people.test>', Date: 'Thu, 02 Jan 2020 12:00:00 +0000', 'MIME-Version': '1.0', 'Content-Type': 'multipart/mixed; boundary="b0"' },
+    '--b0\nContent-Type: text/plain\n\nthe plan https://plan.test/doc\n--b0\nContent-Type: application/pdf\nContent-Disposition: attachment; filename="plan.pdf"\n\n%PDF-1.4\n--b0--\n');
+  r.deliver({ 'Message-ID': '<new@x.test>', From: 'Bob <bob@people.test>', Date: 'Fri, 03 Jan 2020 12:00:00 +0000', 'In-Reply-To': '<old@x.test>', References: '<old@x.test>' },
+    'see https://reply.test/x and https://plan.test/doc\n');
+  const thread = r.notmuch('search', '--output=threads', 'id:new@x.test').trim();
+  return { ...r, thread };
+}
+
+test("in a list, o on a thread lists every message's links, each with its sender and date", (t) => {
+  const r = twoInThread(t);
+  const links = r.kakMail('links', r.thread);
+  assert.equal(links.status, 0, links.stderr);
+  assert.deepEqual(links.stdout.split('\n').filter(Boolean), ['1 plan.test/doc (Ann, 2020-01-02)', '2 reply.test/x (Bob, 2020-01-03)']);
+  assert.equal(r.kakMail('link', r.thread, '1').stdout, 'https://plan.test/doc\n');
+});
+
+test("in a list, A on a thread lists the older message's attachment with its sender and date, and saves it", (t) => {
+  const r = twoInThread(t);
+  const atts = r.kakMail('attachments', r.thread);
+  assert.equal(atts.status, 0, atts.stderr);
+  assert.equal(atts.stdout, '1: plan.pdf (application/pdf) (Ann, 2020-01-02)\n');
+  const saved = r.kakMail('save', r.thread, '1');
+  assert.equal(saved.status, 0, saved.stderr);
+  assert.equal(readFileSync(saved.stdout.trim(), 'utf8'), '%PDF-1.4');
+});
+
+test('in a thread, o and A keep to the message under the cursor', (t) => {
+  const r = twoInThread(t);
+  assert.equal(r.kakMail('links', 'id:new@x.test').stdout, '1 reply.test/x\n2 plan.test/doc\n');
+  assert.equal(r.kakMail('attachments', 'id:new@x.test').stdout, '');
+});

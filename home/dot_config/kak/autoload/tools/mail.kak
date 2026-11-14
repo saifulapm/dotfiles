@@ -181,9 +181,9 @@ define-command -hidden -params 1 mail-thread-jump %{
     }
 }
 
-# Links and attachments of the message under the cursor (in a list: the
-# thread's newest). Both open through url_open_cmd (commands.kak), the same
-# opener `gu` uses.
+# Links and attachments of the message under the cursor (in a list: every
+# message of the thread, each named by sender and date). Both open through
+# url_open_cmd (commands.kak), the same opener `gu` uses.
 # The message id is the sender's text, so it goes into mail_target with kq
 # and the prompt reads it back as $kak_opt_mail_target and %opt{mail_target}:
 # spliced into the candidates script or a %{ } body, a ' or } in it would end
@@ -443,7 +443,7 @@ e / a  archive
 s      screener: undo screening this sender
 f      feed: move this sender to The Feed
 H      hey… (screen in/out, feed, piles, bubble up…)
-o      open a link           A  save + open an attachment
+o      open a link           A  save + open an attachment (whole thread)
 u      refresh               G  sync now
 c      compose               b  jump to a box
 q      back to the boxes     ?  this help
