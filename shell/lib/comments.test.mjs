@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { covered, doubled } from './comments.mjs';
@@ -34,4 +34,31 @@ test('dots-pre-commit refuses a staged file with two comment lines in a row, and
   const r = hook();
   assert.equal(r.status, 1);
   assert.match(r.stderr, /a\.sh:3/);
+});
+
+// The shell/lib lint tests went red only in the wave suite five times (m24, m28, m61, m62, m95), so a commit touching shell or tests runs them.
+test('dots-pre-commit runs the qml-js and fixture-git lint tests when a staged file is under shell or tests, and not otherwise', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'pre-commit-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env });
+  git('init', '-q');
+  const hook = () => spawnSync(join(root, 'bin/dots-pre-commit'), [], { cwd: dir, encoding: 'utf8', env });
+  mkdirSync(join(dir, 'shell/lib'), { recursive: true });
+  mkdirSync(join(dir, 'tests'));
+  const red = "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('lint', () => assert.fail('NAME went red'));\n";
+  writeFileSync(join(dir, 'shell/lib/qml-js.test.mjs'), red.replace('NAME', 'qml-js'));
+  writeFileSync(join(dir, 'shell/lib/fixture-git.test.mjs'), red.replace('NAME', 'fixture-git'));
+  writeFileSync(join(dir, 'a.sh'), '#!/bin/sh\necho a\n');
+  git('add', 'a.sh');
+  assert.equal(hook().status, 0, hook().stderr);
+  writeFileSync(join(dir, 'tests/b.mjs'), 'export const b = 1;\n');
+  git('add', 'tests/b.mjs');
+  const r = hook();
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /qml-js went red/);
+  assert.match(r.stderr, /fixture-git went red/);
+  writeFileSync(join(dir, 'shell/lib/qml-js.test.mjs'), red.replace("assert.fail('NAME went red')", 'assert.ok(true)'));
+  writeFileSync(join(dir, 'shell/lib/fixture-git.test.mjs'), red.replace("assert.fail('NAME went red')", 'assert.ok(true)'));
+  assert.equal(hook().status, 0, hook().stderr);
 });

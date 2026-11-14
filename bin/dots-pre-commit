@@ -1,12 +1,29 @@
 #!/usr/bin/env node
-// The repo's own pre-commit hook, which .git/hooks/pre-commit links to: refuses a commit whose staged text holds two comment lines in a row.
-import { execFileSync } from 'node:child_process';
+// The repo's own pre-commit hook, which .git/hooks/pre-commit links to: refuses a commit whose staged text holds two comment lines in a row, or a red shell/lib lint test.
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { covered, doubled } from '../shell/lib/comments.mjs';
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 << 20 });
-const staged = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z').split('\0').filter((f) => f && covered(f));
+const names = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z').split('\0').filter(Boolean);
+const staged = names.filter(covered);
 const found = staged.flatMap((f) => doubled(f, git('show', `:${f}`)).map((n) => `${f}:${n}`));
 if (found.length) {
   process.stderr.write(`pre-commit: two comment lines in a row; keep each comment to one line:\n${found.map((f) => `  ${f}\n`).join('')}`);
   process.exit(1);
+}
+
+// These went red only in the wave suite five times, and run in well under a second; they read the working tree, as the suite does.
+const LINTS = ['shell/lib/qml-js.test.mjs', 'shell/lib/fixture-git.test.mjs'];
+if (names.some((f) => /^(shell|tests)\//.test(f))) {
+  const top = git('rev-parse', '--show-toplevel').trim();
+  const lints = LINTS.filter((f) => existsSync(join(top, f)));
+  // A hook run under node --test inherits NODE_TEST_CONTEXT, which makes a nested run report to its parent and exit 0.
+  const { NODE_TEST_CONTEXT, ...env } = process.env;
+  const r = lints.length ? spawnSync(process.execPath, ['--test', ...lints], { cwd: top, encoding: 'utf8', env }) : { status: 0 };
+  if (r.status !== 0) {
+    process.stderr.write(`pre-commit: a shell/lib lint test is red:\n${r.stdout}${r.stderr}`);
+    process.exit(1);
+  }
 }
