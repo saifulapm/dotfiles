@@ -346,3 +346,15 @@ test('a bubble set and fired again between two rounds leaves the round green', a
   await ok(b);
   assert.equal(bubbles(b), '');
 });
+
+// The first sync took the union of three machines' files, which left some senders with a line in two class files.
+test("a round drops a sender's line from each class file its decision does not name", async () => {
+  const { a } = await pair();
+  writeFileSync(join(a.hey, 'screened.db'), 'x@y.test\nkeep@y.test\n');
+  writeFileSync(join(a.hey, 'spam.db'), 'x@y.test\n');
+  await ok(a, ['--only', 'mail']);
+  assert.equal(db(a, 'screened.db'), 'keep@y.test\n');
+  assert.equal(db(a, 'spam.db'), 'x@y.test\n');
+  await ok(a, ['--only', 'mail']);
+  assert.equal(db(a, 'screened.db'), 'keep@y.test\n');
+});

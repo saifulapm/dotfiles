@@ -366,7 +366,15 @@ def main(path, pulled):
                 records[key] = detected[key]
             else:
                 records.pop(key)
-    apply(changed, view, now // 1000)
+    # A sender line in a class file its decision does not name goes, as the first sync's union of three machines' files left some senders in two.
+    stale = {}
+    for name in E.CLASS_FILES:
+        for line in read(name) or []:
+            key = (line_record(name, line) or (None,))[0]
+            value = records.get(key, {}).get("v")
+            if key not in changed and isinstance(value, str) and file_of(key, value) != name:
+                stale[key] = (value, value)
+    apply({**changed, **stale}, view, now // 1000)
 
     out = json.dumps({"v": 1, "records": records}, sort_keys=True)
     if out != text:
