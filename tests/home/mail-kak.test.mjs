@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { mailRig, repo } from './mail-rig.mjs';
@@ -88,3 +88,42 @@ test('A in a thread offers a.txt of a mail whose Message-ID holds quotes and %{ 
   // MIME counts the line break before a boundary as part of the boundary.
   assert.equal(readFileSync(saved, 'utf8'), 'attached');
 });
+
+// G runs mail-sync in the background and echoes what its exit code means; a fake mail-sync first on PATH exits CODE, and the second parameter of the JSON UI's draw_status, the status line, carries the echo.
+async function syncStatus(t, code) {
+  const r = mailRig(t);
+  mkdirSync(join(r.M, 'run'), { mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const fake = join(r.M, 'fake-sync');
+  mkdirSync(fake);
+  writeFileSync(join(fake, 'mail-sync'), `#!/bin/sh\nexit ${code}\n`, { mode: 0o755 });
+  const env = { ...r.env, PATH: `${fake}:${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = spawn('kak', ['-ui', 'json', '-e', 'mail-sync'], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const statuses = [];
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') statuses.push(m.params[1].map((atom) => atom.contents).join(''));
+    }
+  });
+  const last = () => statuses.findLast((s) => s.startsWith('mail: ') && s !== 'mail: syncing…');
+  for (let i = 0; i < 100 && !last(); i++) await sleep(50);
+  k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params: ['<esc>', ':quit!<ret>'] }) + '\n');
+  assert.equal(await exited, 0);
+  return last();
+}
+
+for (const [code, said] of [
+  [0, 'mail: synced'],
+  [69, 'mail: fetch failed — showing what arrived'],
+  [75, 'mail: another sync is running'],
+  [1, 'mail: sync failed — see ~/.local/state/hey-mail/sync.log'],
+]) {
+  test(`G says "${said}" when mail-sync exits ${code}`, async (t) => {
+    assert.equal(await syncStatus(t, code), said);
+  });
+}

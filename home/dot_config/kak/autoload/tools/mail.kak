@@ -254,7 +254,14 @@ define-command mail-refresh-all -docstring 'refresh every open mail box and list
 define-command mail-sync -docstring 'fetch mail now (mbsync + notmuch new)' %{
     nop %sh{
         (
-            if mail-sync >/dev/null 2>&1; then msg='mail: synced'; else msg='mail: sync failed — see ~/.local/state/hey-mail/sync.log'; fi
+            # bin/mail-sync's exit codes: 69 fetched nothing but indexed what had arrived, 75 found the lock held.
+            mail-sync >/dev/null 2>&1
+            case $? in
+                0) msg='mail: synced' ;;
+                69) msg='mail: fetch failed — showing what arrived' ;;
+                75) msg='mail: another sync is running' ;;
+                *) msg='mail: sync failed — see ~/.local/state/hey-mail/sync.log' ;;
+            esac
             printf "evaluate-commands -client %s %%{ mail-refresh-all; echo '%s' }\n" "$kak_client" "$msg" | kak -p "$kak_session"
         ) >/dev/null 2>&1 </dev/null &
     }
