@@ -1,7 +1,7 @@
 // bin/kak-mail on a scratch notmuch store (tests/home/mail-rig.mjs): what a sender writes into a mail reaches notmuch as data, never as query syntax or shell.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig } from './mail-rig.mjs';
 
@@ -45,4 +45,54 @@ test('a mail whose Message-ID holds quotes and $( ) opens, replies and archives'
   assert.equal(archived.status, 0, archived.stderr);
   assert.equal(r.notmuch('count', 'tag:archived'), '1\n');
   assert.equal(existsSync(r.pwned), false);
+});
+
+// Each db keeps its own line format: an address alone, `category address`, `address label` and `address days`.
+const dbs = {
+  'screened.db': (a) => a,
+  'thefeed.db': (a) => a,
+  'spam.db': (a) => a,
+  'ledger.db': (a) => `Bills ${a}`,
+  'autofile.db': (a) => `${a} Work`,
+  'recycle.db': (a) => `${a} 30`,
+};
+const others = ['joann@people.test', 'ann+news@people.test', 'annXpeople.test@people.test', 'ANN@people.test.uk'];
+
+test('unscreening a sender drops its line from every db and keeps every other sender, regex characters and all', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@people.test>' });
+  for (const [name, line] of Object.entries(dbs)) r.setDb(name, ['ann@people.test', ...others].map(line).join('\n') + '\n');
+  const u = r.kakMail('hey', 'unscreen', 'tag:inbox');
+  assert.equal(u.status, 0, u.stderr);
+  for (const [name, line] of Object.entries(dbs)) assert.equal(r.db(name), others.map(line).join('\n') + '\n', name);
+});
+
+test('screen-in, feed and papertrail keep every other sender in their db', (t) => {
+  for (const [action, name, extra] of [['screen-in', 'screened.db', []], ['feed', 'thefeed.db', []], ['papertrail', 'ledger.db', ['--arg', 'Bills']]]) {
+    const r = mailRig(t);
+    r.deliver({ From: 'Ann <ann@people.test>' });
+    r.setDb(name, others.map(dbs[name]).join('\n') + '\n');
+    const res = r.kakMail('hey', action, ...extra, 'tag:inbox');
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(r.db(name), [...others, 'ann@people.test'].map(dbs[name]).join('\n') + '\n', action);
+  }
+});
+
+test('a sender whose address holds + is tagged alone', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann+news@people.test>' });
+  r.deliver({ From: 'Ann <ann@people.test>' });
+  const res = r.kakMail('hey', 'screen-in', `from:"ann+news@people.test"`);
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(r.notmuch('address', '--output=sender', '--output=address', 'tag:screened').trim(), 'ann+news@people.test');
+});
+
+test('the HEY dbs live in HEY_MAIL_DB_DIR, where the post-new hook reads them', (t) => {
+  const r = mailRig(t);
+  r.deliver({});
+  r.env.HEY_MAIL_DB_DIR = join(r.M, 'elsewhere');
+  const res = r.kakMail('hey', 'screen-in', 'tag:inbox');
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(readFileSync(join(r.M, 'elsewhere/screened.db'), 'utf8'), 'ann@people.test\n');
+  assert.equal(r.db('screened.db'), '');
 });

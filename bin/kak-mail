@@ -36,7 +36,7 @@ from email.utils import formatdate, getaddresses, make_msgid, parseaddr
 import json
 
 HOME = os.path.expanduser("~")
-DB_DIR = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "hey-mail")
+DB_DIR = os.environ.get("HEY_MAIL_DB_DIR") or os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "hey-mail")
 DRAFTS = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "kak-mail", "drafts")
 SENT_FOLDER = "icloud/Sent Messages"
 MSMTP_ACCOUNT = "icloud"
@@ -519,16 +519,16 @@ def db_add(db, line):
         f.write(line + "\n")
 
 
-def db_drop(db, needle):
-    """Remove lines containing NEEDLE; written via rename so the post-new hook
-    never reads a half-written routing table (suffix distinct from the hook's
-    own `.tmp')."""
+def db_drop(db, addr):
+    """Remove the lines naming ADDR as one whole field, so joann@ outlives ann@;
+    written via rename so the post-new hook never reads a half-written routing
+    table (suffix distinct from the hook's own `.tmp')."""
     path = db_path(db)
     if not os.path.exists(path):
         return
     with open(path) as f:
         lines = f.readlines()
-    keep = [l for l in lines if needle not in l]
+    keep = [l for l in lines if addr.lower() not in (w.lower() for w in l.split())]
     if len(keep) != len(lines):
         with open(path + ".kak-tmp", "w") as f:
             f.writelines(keep)
