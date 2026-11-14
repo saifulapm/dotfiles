@@ -65,6 +65,12 @@ def target(query):
     return idq(rest) if bare else query
 
 
+def both(a, b):
+    """Mail matching query A and query B; notmuch reads a bare * only alone, and (*) matches nothing."""
+    terms = [q for q in (a, b) if q.strip() != "*"]
+    return " and ".join(f"({q})" for q in terms) or "*"
+
+
 def box(name):
     for b in BOXES:
         if b[1] == name:
@@ -89,7 +95,7 @@ def line(s):
 
 def search_threads(query, limit, offset=0):
     """notmuch's thread summaries for QUERY, newest first."""
-    return json.loads(nm("search", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", query))
+    return json.loads(nm("search", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", "--", query))
 
 
 def matched_messages(query):
@@ -103,9 +109,33 @@ def matched_messages(query):
             elif isinstance(node, dict) and "id" in node:
                 if node.get("match"):
                     msgs.append(node)
-    walk(show_json("--body=false", "--entire-thread=false", query))
+    walk(show_json("--body=false", "--entire-thread=false", "--", query))
     msgs.sort(key=lambda m: -m["timestamp"])
     return msgs
+
+
+# Where a mail lives when several boxes hold it, as hey-folder-sync files it: a pile, then the Feed and Paper Trail, then the Screener and the Imbox.
+HOME_ORDER = ["Bubbled Up", "Reply Later", "Set Aside", "The Feed", "Paper Trail", "Screener", "Imbox", "Prev. Seen", "Read",
+              "Muted", "Notes", "Sent"]
+
+
+def boxes_of(msg_ids):
+    """The box each of MSG_IDS lives in, by HOME_ORDER; a message no box holds is left out."""
+    home = {}
+    if not msg_ids:
+        return home
+    ids = " or ".join(idq(i) for i in msg_ids)
+    for name in HOME_ORDER:
+        for i in json.loads(nm("search", "--format=json", "--output=messages", "--", both(box(name)[2], ids))):
+            home.setdefault(i, name)
+    return home
+
+
+def thread_of(msg_id):
+    found = nm("search", "--output=threads", "--", idq(msg_id)).split()
+    if not found:
+        raise NotFound(f"no message {idq(msg_id)}")
+    return found[0].removeprefix("thread:")
 
 
 def write_count():
@@ -187,7 +217,7 @@ def thread_messages(query):
                 walk(node)
             elif isinstance(node, dict) and "id" in node:
                 msgs.append(node)
-    walk(show_json("--include-html", "--entire-thread=true", query))
+    walk(show_json("--include-html", "--entire-thread=true", "--", query))
     return msgs
 
 

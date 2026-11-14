@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""mail — Saiful's mail as JSON for an agent, read through the engine Kakoune uses.
+
+  mail boxes                                   each box: key, name, total, unread
+  mail search [QUERY] [--box NAME] [--limit N] [--offset N]
+
+Every command prints one JSON object, {"ok":true,"data":...} or
+{"ok":false,"error":...,"hint":...}, and exits 0 ok, 1 usage, 2 not found,
+3 refused. Mail text (subjects, names, bodies) sits between
+<<<untrusted-mail>>> and <<<end-untrusted-mail>>>, and any <<< inside it
+becomes ‹‹‹, so a mail cannot close its own field.
+"""
+
+import argparse
+import json
+import sys
+from datetime import datetime
+from email.utils import parseaddr
+
+# Python would write bin/__pycache__ into the checkout on the first import.
+sys.dont_write_bytecode = True
+from mail_engine import (BOXES, MailError, NotFound, both, box_counts, boxes_of, line, matched_messages, nm, search_threads,
+                         thread_of)
+
+OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
+LIMIT_MAX = 500
+
+
+class Usage(Exception):
+    pass
+
+
+class Parser(argparse.ArgumentParser):
+    def error(self, message):
+        raise Usage(message)
+
+
+def untrusted(text):
+    return OPEN + text.replace("<<<", "‹‹‹") + CLOSE
+
+
+def person(header):
+    name, address = parseaddr(header)
+    name = line(name).strip()
+    return {"name": untrusted(name) if name else None, "address": address}
+
+
+def row(m, thread, count, home):
+    h, tags = m["headers"], m["tags"]
+    return {
+        "thread": thread,
+        "id": m["id"],
+        "date": datetime.fromtimestamp(m["timestamp"]).astimezone().isoformat(),
+        "from": person(h.get("From", "")),
+        "subject": untrusted(line(h.get("Subject", ""))),
+        "tags": tags,
+        "box": home,
+        "screened": "screened" in tags,
+        "unread": "unread" in tags,
+        "count": count,
+    }
+
+
+def cmd_boxes(a):
+    # One batch of counts for every box, then one for each box's unread mail.
+    unread = [int(n) for n in nm("count", "--batch", stdin="".join(both(b[2], "tag:unread") + "\n" for b in BOXES)).split()]
+    return [{"key": b[0], "name": b[1], "total": total, "unread": u} for b, total, u in zip(BOXES, box_counts(), unread)]
+
+
+def cmd_search(a):
+    if not 1 <= a.limit <= LIMIT_MAX:
+        raise Usage(f"limit must be 1 to {LIMIT_MAX}")
+    if a.offset < 0:
+        raise Usage("offset must be 0 or more")
+    b = None
+    if a.box:
+        b = next((b for b in BOXES if b[1].lower() == a.box.lower()), None)
+        if not b:
+            raise Usage(f"no box named {a.box}; the boxes are {', '.join(b[1] for b in BOXES)}")
+    words = " ".join(a.query)
+    if not words and not b:
+        raise Usage("give a query, or --box NAME")
+    query = both(b[2], words) if b and words else (b[2] if b else words)
+    if b and b[3]:
+        # The Screener decides on people, so each mail is its own row.
+        rows = [(m, thread_of(m["id"]), 1) for m in matched_messages(query)[a.offset:a.offset + a.limit]]
+    else:
+        rows = [(matched_messages(both(f"thread:{t['thread']}", query))[0], t["thread"], t["total"])
+                for t in search_threads(query, a.limit, a.offset)]
+    homes = boxes_of([m["id"] for m, _, _ in rows])
+    return [row(m, thread, count, homes.get(m["id"])) for m, thread, count in rows]
+
+
+def parser():
+    p = Parser(prog="mail", description="Read mail as JSON.")
+    sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
+    sub.add_parser("boxes", help="each box with its total and unread count").set_defaults(fn=cmd_boxes)
+    s = sub.add_parser("search", help="threads matching a notmuch query, newest first")
+    s.add_argument("query", nargs="*", help="a notmuch query; one starting with - goes after --")
+    s.add_argument("--box", help="only mail in this box, such as Imbox or Screener")
+    s.add_argument("--limit", type=int, default=50, help=f"rows to return, 1 to {LIMIT_MAX}")
+    s.add_argument("--offset", type=int, default=0, help="rows to skip")
+    s.set_defaults(fn=cmd_search)
+    return p
+
+
+def emit(obj, code):
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False, separators=(",", ":")) + "\n")
+    sys.exit(code)
+
+
+def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    p = parser()
+    try:
+        a = p.parse_args()
+        data = a.fn(a)
+    except Usage as e:
+        emit({"ok": False, "error": str(e), "hint": p.format_usage().strip()}, 1)
+    except NotFound as e:
+        emit({"ok": False, "error": str(e), "hint": "take ids from mail search"}, 2)
+    except MailError as e:
+        emit({"ok": False, "error": str(e), "hint": "notmuch failed; try again, or run mail boxes to see the store answers"}, 1)
+    emit({"ok": True, "data": data}, 0)
+
+
+if __name__ == "__main__":
+    main()
