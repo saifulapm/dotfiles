@@ -200,3 +200,46 @@ test('V on a plain-text mail says no HTML part and opens nothing', async (t) => 
   assert.equal(k.status, 'no HTML part');
   assert.equal(k.opened, '');
 });
+
+// Opens BOX on a store of 1,200 single-mail threads, presses each of KEYS in turn, and returns the list's mode line (draw_status's fourth parameter) after the open and after each key.
+async function modelines(t, keys) {
+  const r = mailRig(t);
+  for (let i = 0; i < 1200; i++) {
+    writeFileSync(join(r.mail, 'icloud/INBOX/new', `big${i}.eml`), `From: Ann <ann@people.test>\nTo: me@x.test\nSubject: mail ${i}\nMessage-ID: <big${i}@x.test>\n\nhello\n`);
+  }
+  r.notmuch('new', '--quiet');
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = spawn('kak', ['-ui', 'json', '-e', 'mail-box Everything'], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const send = (...params) => k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params }) + '\n');
+  let mode = '';
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') mode = m.params[3].map((atom) => atom.contents).join('');
+    }
+  });
+  const settled = async (was) => {
+    for (let i = 0; i < 100 && (!mode.includes('rows') || mode === was); i++) await sleep(50);
+    return mode;
+  };
+  const seen = [await settled('')];
+  for (const key of keys) {
+    send(key);
+    seen.push(await settled(seen.at(-1)));
+  }
+  send('<esc>', ':quit!<ret>');
+  assert.equal(await exited, 0);
+  return seen;
+}
+
+test('] and [ page a long list by 500, and its strip says which rows it shows', async (t) => {
+  const seen = await modelines(t, [']', '[']);
+  assert.deepEqual(seen.map((m) => m.match(/rows [^·]*/)?.[0].trim()), ['rows 1–500 of 1200', 'rows 501–1000 of 1200', 'rows 1–500 of 1200']);
+  assert.match(seen[0], /open/);
+});

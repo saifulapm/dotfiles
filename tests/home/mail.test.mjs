@@ -294,7 +294,7 @@ test('kak-mail keeps a forged From and Subject on one line, without bidi control
   const show = JSON.stringify([[[msg, []]]]);
   writeFileSync(join(dir, 'show.json'), show);
   writeFileSync(join(dir, 'search.json'), JSON.stringify([thread]));
-  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in show) cat ${dir}/show.json ;; search) cat ${dir}/search.json ;; esac\n`, { mode: 0o755 });
+  writeFileSync(join(dir, 'notmuch'), `#!/bin/sh\ncase "$1" in show) cat ${dir}/show.json ;; search) cat ${dir}/search.json ;; count) echo 1 ;; esac\n`, { mode: 0o755 });
   const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, HOME: dir, XDG_STATE_HOME: join(dir, 'state') };
   const bad = /[\x00-\x08\x0b-\x1f\x7f‎‏‪-‮⁦-⁩]/;
   for (const args of [['list', '--out', join(dir, 'list'), 'tag:inbox'], ['list', '--out', join(dir, 'flat'), '--unthreaded', 'tag:inbox']]) {

@@ -14,6 +14,10 @@ declare-option -hidden str-list mail_msgs
 declare-option -hidden str mail_return_buf
 declare-option -hidden str mail_return_id
 declare-option -hidden int mail_return_line 1
+# A list shows 500 rows from mail_offset; kak-mail list sets the three.
+declare-option -hidden int mail_offset 0
+declare-option -hidden int mail_total 0
+declare-option -hidden str mail_rows
 
 # Shell helpers shared by the %sh blocks below. Kakoune only exports the
 # kak_* variables a block mentions by name, so every block that evals this
@@ -92,8 +96,21 @@ define-command -hidden -params 2 mail-list-open %{
     set-option buffer filetype mail-list
     set-option buffer mail_query %arg{1}
     set-option buffer mail_unthreaded %arg{2}
+    set-option buffer mail_offset 0
     mail-list-render
     execute-keys gg
+}
+
+# ] and [ in a list: the next or previous 500 rows.
+define-command -hidden -params 1 mail-page %{
+    evaluate-commands %sh{
+        offset=$(( kak_opt_mail_offset + $1 ))
+        if [ "$offset" -lt 0 ] || [ "$offset" -ge "$kak_opt_mail_total" ]; then
+            [ "$1" -gt 0 ] && echo "echo 'mail: this is the last page'" || echo "echo 'mail: this is the first page'"
+        else
+            printf 'set-option buffer mail_offset %s\nmail-list-render\nexecute-keys gg\n' "$offset"
+        fi
+    }
 }
 
 define-command -hidden mail-list-render %{
@@ -101,7 +118,7 @@ define-command -hidden mail-list-render %{
         eval "$kak_opt_mail_sh"
         f=$(mktemp "${TMPDIR:-/tmp}/kak-mail.XXXXXX")
         flag=; [ "$kak_opt_mail_unthreaded" = true ] && flag=--unthreaded
-        if out=$(kak-mail list --out "$f" $flag "$kak_opt_mail_query" 2>&1); then
+        if out=$(kak-mail list --out "$f" $flag --offset "$kak_opt_mail_offset" "$kak_opt_mail_query" 2>&1); then
             printf '%s\n' "$out"
             mail_fill "$f"
         else rm -f "$f"; printf 'fail %s\n' "$(kq "$out")"; fi
@@ -452,6 +469,7 @@ f      feed: move this sender to The Feed
 H      hey… (screen in/out, feed, piles, bubble up…)
 o      open a link           A  save + open an attachment (whole thread)
 u      refresh               G  sync now
+] / [  next / previous 500 rows
 c      compose               b  jump to a box
 q      back to the boxes     ?  this help
 select several rows (x, J, %) to act on all of them}" ;;
@@ -500,7 +518,7 @@ define-command -hidden mail-cursor-row %{
 }
 
 define-command -hidden mail-strip %{
-    set-option window modelinefmt %opt{mail_keys}
+    set-option window modelinefmt "{MailStrip} %%opt{mail_rows} · %opt{mail_keys}"
 }
 
 define-command -hidden mail-strip-all %{
@@ -554,6 +572,8 @@ hook global WinSetOption filetype=mail-list %{
     map buffer normal e ':mail-hey archive<ret>'     -docstring 'archive'
     map buffer normal s ':mail-hey unscreen<ret>'    -docstring 'back to the screener'
     map buffer normal f ':mail-hey feed<ret>'        -docstring 'move sender to the feed'
+    map buffer normal ] ':mail-page 500<ret>'        -docstring 'next 500 rows'
+    map buffer normal [ ':mail-page -500<ret>'       -docstring 'previous 500 rows'
     add-highlighter window/mail-list group
     add-highlighter window/mail-list/ regex '^(.{10}) (.{22}) (.*?)  \[[^\]\n]*\]$' 1:MailDate 2:MailSender 3:MailSubject
     add-highlighter window/mail-list/ regex '\[([^\]\n]*)\]$' 1:keyword

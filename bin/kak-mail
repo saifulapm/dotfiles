@@ -9,7 +9,7 @@ writes the HEY decision files the post-new hook reads.
 Subcommands (the kak side is the only intended caller):
   boxes [--maps]              box list with counts, or kak `map` lines for J
   query NAME                  the notmuch query of a box
-  list --out F [--unthreaded] QUERY   render a list into F, print `mail_ids`
+  list --out F [--unthreaded] [--offset N] QUERY   render 500 rows from N into F, print `mail_ids` and the rows shown
   show --out F QUERY          render a thread into F, print `mail_msgs`, mark read
   links QUERY                 `N label — host/path` per link of a message, or of a thread: with sender and date
   link QUERY PICK             the URL of the links line PICK
@@ -115,34 +115,42 @@ def cmd_query(args):
 
 
 def cmd_list(args):
-    out, flat, words = None, False, []
+    out, flat, offset, words = None, False, 0, []
     it = iter(args)
     for a in it:
         if a == "--out":
             out = next(it)
         elif a == "--unthreaded":
             flat = True
+        elif a == "--offset":
+            offset = int(next(it))
         else:
             words.append(a)
     query = " ".join(words)
     b = box(query)
     unthreaded = b[3] if b else flat
     q = b[2] if b else query
+    total = int(nm("count", *([] if unthreaded else ["--output=threads"]), "--", q))
+    # A page an archive emptied falls back to the last page that still has rows.
+    if offset >= total:
+        offset = max(0, (total - 1) // LIST_LIMIT * LIST_LIMIT)
     ids, lines = [], []
     if unthreaded:
-        for m in matched_messages(q)[:LIST_LIMIT]:
+        for m in matched_messages(q)[offset:offset + LIST_LIMIT]:
             h = m["headers"]
             name, addr = parseaddr(h.get("From", ""))
             ids.append("id:" + m["id"])
             lines.append(row(m["timestamp"], name or addr, h.get("Subject", ""), m["tags"]))
     else:
-        for t in search_threads(q, LIST_LIMIT):
+        for t in search_threads(q, LIST_LIMIT, offset):
             ids.append("thread:" + t["thread"])
             count = f" ({t['matched']}/{t['total']})" if t["total"] > 1 else ""
             lines.append(row(t["timestamp"], t["authors"], t["subject"] + count, t["tags"]))
     with open(out, "w") as f:
         f.write("\n".join(lines) + ("\n" if lines else f"(nothing in {query})\n"))
     print("set-option buffer mail_ids " + " ".join(kq(i) for i in ids))
+    rows = f"rows {offset + 1}–{offset + len(ids)} of {total}" if ids else "no rows"
+    print(f"set-option buffer mail_offset {offset}\nset-option buffer mail_total {total}\nset-option buffer mail_rows {kq(rows)}")
 
 
 def cmd_count(args):

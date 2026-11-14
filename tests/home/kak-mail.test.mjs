@@ -332,3 +332,34 @@ test('compose mailto refuses what is not a mailto URL', (t) => {
   assert.equal(a.status, 1);
   assert.match(a.stderr, /not a mailto/);
 });
+
+// 1,200 mails, each its own thread, written at once and indexed by one notmuch new.
+function bigStore(t) {
+  const r = mailRig(t);
+  for (let i = 0; i < 1200; i++) {
+    writeFileSync(join(r.mail, 'icloud/INBOX/new', `big${i}.eml`), `From: Ann <ann@people.test>\nTo: me@x.test\nSubject: mail ${i}\nMessage-ID: <big${i}@x.test>\nDate: ${new Date(Date.UTC(2020, 0, 1, 0, i)).toUTCString()}\n\nhello\n`);
+  }
+  r.notmuch('new', '--quiet');
+  return r;
+}
+
+test('a list of 1,200 threads shows 500 rows from its offset and says which', (t) => {
+  const r = bigStore(t);
+  const out = join(r.M, 'list');
+  const page = (...args) => {
+    const res = r.kakMail('list', '--out', out, ...args);
+    assert.equal(res.status, 0, res.stderr);
+    return { said: res.stdout, rows: readFileSync(out, 'utf8').split('\n').filter(Boolean) };
+  };
+  const first = page('Everything');
+  assert.equal(first.rows.length, 500);
+  assert.match(first.said, /^set-option buffer mail_rows 'rows 1–500 of 1200'$/m);
+  const second = page('--offset', '500', 'Everything');
+  assert.match(second.said, /^set-option buffer mail_rows 'rows 501–1000 of 1200'$/m);
+  assert.match(second.rows[0], /mail 699/);
+  const last = page('--offset', '1000', 'Everything');
+  assert.equal(last.rows.length, 200);
+  assert.match(last.said, /^set-option buffer mail_rows 'rows 1001–1200 of 1200'$/m);
+  // An offset past the end, as after archiving a last page's rows, shows the last page.
+  assert.match(page('--offset', '1500', 'Everything').said, /^set-option buffer mail_offset 1000$/m);
+});
