@@ -174,8 +174,7 @@ def cmd_search(a):
         # The Screener decides on people, so each mail is its own row.
         rows = [(m, thread_of(m["id"]), 1) for m in matched_messages(query)[a.offset:a.offset + a.limit]]
     else:
-        # A row names its newest matched message; notmuch reads a query like -tag:x one way alone and another inside
-        # `thread:T and (...)`, so a thread it lists may match nothing there, and then its newest message stands in.
+        # notmuch reads -tag:x alone and inside `thread:T and (...)` differently, so a listed thread may match nothing there; its newest message stands in.
         rows = [((matched_messages(both(f"thread:{t['thread']}", query)) or matched_messages(f"thread:{t['thread']}"))[0],
                  t["thread"], t["total"]) for t in search_threads(query, a.limit, a.offset)]
     homes = boxes_of([m["id"] for m, _, _ in rows])
