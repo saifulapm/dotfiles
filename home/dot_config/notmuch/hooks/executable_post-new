@@ -33,11 +33,11 @@ from_q() {
             *) rx+="$c" ;;
         esac
     done
-    # notmuch matches a regex byte by byte, so only an ASCII letter gets its other case; an old-style (comment) may follow the address.
-    local end='>?([[:space:]]*\([^()]*\))?$'
+    # notmuch matches a regex byte by byte, so only an ASCII letter gets its other case; an old-style (comment) may follow a bare address that is the whole header.
+    local comment='[[:space:]]*\([^()]*\)$'
     case "$a" in
-        @*) printf 'from:"/%s%s/"' "$rx" "$end" ;;
-        *) printf 'from:"/(^|<|,[[:space:]]*)%s%s/"' "$rx" "$end" ;;
+        @*) printf 'from:"/%s>?$|^[^[:space:]<>(),@]*%s%s/"' "$rx" "$rx" "$comment" ;;
+        *) printf 'from:"/(^|<|,[[:space:]]*)%s>?$|^%s%s/"' "$rx" "$rx" "$comment" ;;
     esac
 }
 

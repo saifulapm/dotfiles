@@ -792,9 +792,11 @@ def from_query(key):
     """The from: query for a sender key of the db files, as a regex in any case: an address key matches that From address exactly and an @domain key any address of that domain alone, since notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it."""
     # notmuch matches a regex byte by byte, so only an ASCII letter gets its other case.
     rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isascii() and c.isalpha() else "\\" + c if c in RX_SPECIAL else c for c in key)
-    # An address starts the header, follows its <, or follows the comma of a list, whose last address its domain's line matches too; an old-style (comment) may follow it.
-    end = r">?([[:space:]]*\([^()]*\))?$"
-    return f'from:"/{rx}{end}/"' if key.startswith("@") else f'from:"/(^|<|,[[:space:]]*){rx}{end}/"'
+    # An address starts the header, follows its <, or follows the comma of a list, whose last address its domain's line matches too; an old-style (comment) may follow a bare address that is the whole header.
+    comment = r"[[:space:]]*\([^()]*\)$"
+    if key.startswith("@"):
+        return f'from:"/{rx}>?$|^[^[:space:]<>(),@]*{rx}{comment}/"'
+    return f'from:"/(^|<|,[[:space:]]*){rx}>?$|^{rx}{comment}/"'
 
 
 def domain_of(addr):

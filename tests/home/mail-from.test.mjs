@@ -311,3 +311,17 @@ test('a domain decision on several selected mails changes nothing when one of th
   assert.equal(r.db('screened.db'), '');
   assert.equal(r.notmuch('dump'), before);
 });
+
+test('a comment that holds a sender before another comment never stands in for it', (t) => {
+  const r = hooked(t);
+  r.setDb('screened.db', 'ann@people.test\n@vendor.test\n');
+  r.deliver({ From: 'evil@bad.test (x <ann@people.test> (y)', 'Message-ID': '<k1@x.test>' });
+  r.deliver({ From: 'evil@bad.test (x@vendor.test (y)', 'Message-ID': '<k2@x.test>' });
+  r.deliver({ From: 'Ann <ann@people.test> (y)', 'Message-ID': '<k3@x.test>' });
+  assert.deepEqual(tagged(r, 'screened'), []);
+  r.notmuch('tag', '-new', '--', '*');
+  for (const key of ['ann@people.test', '@vendor.test']) {
+    const q = py(r, `print(E.from_query('${key}'))`).stdout.trim();
+    assert.equal(r.notmuch('count', '--', q).trim(), '0', key);
+  }
+});
