@@ -243,8 +243,7 @@ test('two sends of one draft at once run msmtp once', async (t) => {
   assert.equal(r.sends().length, 1);
 });
 
-// msmtp's password comes from pass through ~/.msmtprc, as home/private_dot_msmtprc.tmpl writes it. The fake pass logs the gpg options it was given;
-// asked without --pinentry-mode=error, it does what gpg does with a locked agent: starts pinentry and waits on it.
+// msmtp's password comes from pass through ~/.msmtprc, as home/private_dot_msmtprc.tmpl writes it. The fake pass logs the gpg options it was given; asked without --pinentry-mode=error, it does what gpg does with a locked agent: starts pinentry and waits on it.
 function lockedPass(r, { locked }) {
   writeFileSync(join(r.env.HOME, '.msmtprc'), 'defaults\nauth on\n\naccount         icloud\nhost            smtp.mail.me.com\npasswordeval    "pass email/icloud/me | head -n1"\n\naccount default : icloud\n');
   const log = join(r.M, 'pass.log');
