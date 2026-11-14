@@ -327,3 +327,22 @@ test('a pulled decision whose re-filing failed is re-filed by the next round', a
   assert.match(db(b, 'spam.db'), /^x@y\.test$/m);
   assert.equal(await count(b, 'tag:spam and from:x@y.test'), 1);
 });
+
+// The journal names the key, the store holds its removal, and the line fired before this round looked.
+test('a bubble set and fired again between two rounds leaves the round green', async () => {
+  const w = world();
+  const b = machine(w, 'b');
+  await mailbox(b, { hooks: true });
+  await ok(b, ['--only', 'mail']);
+  await deliver(b, 'x@y.test', 'b1@x.test');
+  for (let i = 0; i < 2; i++) {
+    const r = await kakMail(b, ['hey', 'bubble', '--arg', '2 seconds', 'id:b1@x.test']);
+    assert.equal(r.code, 0, r.stderr);
+    if (i === 0) await ok(b);
+    await new Promise((done) => setTimeout(done, 2500));
+    await notmuch(b, ['new', '--quiet']);
+    await ok(b);
+  }
+  await ok(b);
+  assert.equal(bubbles(b), '');
+});

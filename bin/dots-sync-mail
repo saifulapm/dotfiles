@@ -300,8 +300,8 @@ def main(path, pulled):
         # Never at or below the key's last stamp, so a decision made after seeing another machine's wins on a slow clock too.
         floor = prev["at"] + 1 if prev else 0
         if key.startswith("bubble "):
-            # A due line is post-new's to fire: it is no decision, and its firing is the removal, stamped at its due.
-            if value is not None and value <= now // 1000:
+            # A due line is post-new's to fire, so it is no decision and its firing is the removal, stamped at its due; one set and fired between two rounds tells the others nothing.
+            if (value is not None and value <= now // 1000) or (value is None and key not in live):
                 continue
             if value is None and live[key] <= now // 1000:
                 records[key] = {"v": None, "at": max(live[key] * 1000, floor)}
