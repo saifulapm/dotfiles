@@ -1,16 +1,27 @@
-"""mail_engine: reads the notmuch mail store for kak-mail and bin/mail.
+"""mail_engine: reads the notmuch mail store, and writes and sends drafts, for kak-mail and bin/mail.
 
 Its functions return data and raise MailError; none prints, exits, or marks
 mail read as a side effect of reading. The box list lives here only.
 """
 
+import email.policy
 import json
+import mimetypes
 import os
 import re
+import secrets
 import subprocess
+import time
+from email.message import EmailMessage
+from email.utils import formatdate, getaddresses, make_msgid, parseaddr
 from html.parser import HTMLParser
+from urllib.parse import unquote
 
 HOME = os.path.expanduser("~")
+DB_DIR = os.environ.get("HEY_MAIL_DB_DIR") or os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "hey-mail")
+DRAFTS = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "kak-mail", "drafts")
+SENT_FOLDER = "icloud/Sent Messages"
+MSMTP_ACCOUNT = "icloud"
 # The shell's margin watches this file for the Imbox unread count.
 COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
 
@@ -351,3 +362,182 @@ def part_bytes(msg_id, part):
                               capture_output=True, check=True).stdout
     except subprocess.CalledProcessError as e:
         raise MailError(f"notmuch show: {e.stderr.decode(errors='replace').strip() or 'failed'}") from None
+
+
+# ───────────────────────────── compose / send ─────────────────────────────
+
+def identities():
+    name = nm("config", "get", "user.name").strip()
+    addrs = [nm("config", "get", "user.primary_email").strip()]
+    addrs += [a for a in nm("config", "get", "user.other_email").split() if a]
+    return [f"{name} <{a}>" if name else a for a in addrs]
+
+
+def nametag():
+    try:
+        with open(os.path.join(DB_DIR, "nametag")) as f:
+            s = f.read().strip()
+        return f"\n\n-- \n{s}\n" if s else "\n"
+    except FileNotFoundError:
+        return "\n"
+
+
+def quote(text):
+    return "".join("> " + l if l.strip() else ">\n" for l in text.splitlines(True)) + "\n"
+
+
+# Every character str.splitlines() breaks on: a sender's header value holding one would start a header line of its own in the draft.
+LINE_BREAKS = re.compile("[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")
+
+
+def oneline(value):
+    return LINE_BREAKS.sub(" ", value)
+
+
+# The mailto fields a draft takes; any other (bcc, from, attach, in-reply-to) is a web page's say about who the mail goes to or what it holds, so it is dropped.
+MAILTO_FIELDS = {"to": "To", "cc": "Cc", "subject": "Subject", "body": "Body"}
+
+
+def mailto(url):
+    """URL's draft headers (To, Cc, Subject) and Body, as RFC 6068 spells them; + is a plus, not a space."""
+    if not url.lower().startswith("mailto:"):
+        raise MailError(f"not a mailto URL: {url}")
+    path, _, query = url[7:].partition("?")
+    fields = {"To": [unquote(path)] if path else [], "Cc": [], "Subject": [], "Body": []}
+    for pair in query.split("&"):
+        k, _, v = pair.partition("=")
+        name = MAILTO_FIELDS.get(unquote(k).lower())
+        if name:
+            fields[name].append(unquote(v))
+    out = [(k, ", ".join(a for a in fields[k] if a)) for k in ("To", "Cc") if any(fields[k])]
+    out.append(("Subject", fields["Subject"][0] if fields["Subject"] else ""))
+    if fields["Body"]:
+        out.append(("Body", fields["Body"][0].replace("\r\n", "\n")))
+    return out
+
+
+def write_draft(kind, arg=None):
+    """A new draft of KIND (new, reply, replyall, forward of the message ARG names, or mailto URL ARG); returns its path."""
+    headers, body = [], ""
+    if kind == "new":
+        headers = [("From", identities()[0]), ("To", ""), ("Subject", "")]
+    elif kind in ("reply", "replyall"):
+        msg_id = message_of(arg)
+        r = json.loads(nm("reply", "--format=json",
+                          "--reply-to=" + ("all" if kind == "replyall" else "sender"), idq(msg_id)))
+        rh = r["reply-headers"]
+        # notmuch spells it "In-reply-to"; send keys off the canonical name.
+        rh = {k.lower(): v for k, v in rh.items()}
+        headers = [(k, rh[k.lower()]) for k in ("From", "To", "Cc", "Subject", "In-Reply-To", "References")
+                   if rh.get(k.lower())]
+        orig = one_message(msg_id)
+        oh = orig["headers"]
+        body = (f"\n\nOn {oh.get('Date', '')}, {oh.get('From', '')} wrote:\n" +
+                quote(body_text(orig.get("body", []), [], links=False)))
+    elif kind == "mailto":
+        fields = mailto(arg)
+        headers = [("From", identities()[0])] + [f for f in fields if f[0] != "Body"]
+        body = "".join("\n" + v for k, v in fields if k == "Body")
+    elif kind == "forward":
+        msg_id = message_of(arg)
+        orig = one_message(msg_id)
+        oh = orig["headers"]
+        subj = oh.get("Subject", "")
+        headers = [("From", identities()[0]), ("To", ""),
+                   ("Subject", subj if subj.lower().startswith("fwd:") else "Fwd: " + subj)]
+        atts = []
+        text = body_text(orig.get("body", []), atts)
+        # The original's attachments ride along as Attach: pseudo-headers, like a hand-added one, so send has one path.
+        os.makedirs(DRAFTS, exist_ok=True)
+        for part_id, name, _ in atts:
+            path = os.path.join(DRAFTS, f"fwd-{secrets.token_hex(4)}-{oneline(os.path.basename(name))}")
+            with open(path, "wb") as f:
+                f.write(part_bytes(msg_id, part_id))
+            headers.append(("Attach", path))
+        body = ("\n\n---------- Forwarded message ----------\n" +
+                "".join(f"{k}: {oh[k]}\n" for k in ("From", "Date", "Subject", "To") if oh.get(k)) +
+                "\n" + text)
+    else:
+        raise MailError(f"unknown compose kind: {kind}")
+    os.makedirs(DRAFTS, exist_ok=True)
+    path = os.path.join(DRAFTS, time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3) + ".eml")
+    with open(path, "w") as f:
+        f.write("".join(f"{k}: {oneline(v)}\n" for k, v in headers) + body + nametag())
+    return path
+
+
+def parse_draft(text):
+    head, _, body = text.partition("\n\n")
+    headers = []
+    for line in head.splitlines():
+        if line[:1] in (" ", "\t") and headers:
+            headers[-1] = (headers[-1][0], headers[-1][1] + " " + line.strip())
+        elif ":" in line:
+            k, v = line.split(":", 1)
+            headers.append((k.strip(), v.strip()))
+    return headers, body
+
+
+def send_draft(path):
+    """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses."""
+    # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
+    mark = path + ".sent"
+    if os.path.exists(mark):
+        raise MailError(f"already sent; {mark} holds the message as it went out")
+    with open(path) as f:
+        headers, body = parse_draft(f.read())
+    msg = EmailMessage(policy=email.policy.SMTP)
+    attach = []
+    for k, v in headers:
+        if k.lower() == "attach":
+            attach.append(os.path.expanduser(v))
+        elif v and k.lower() in ("to", "cc", "bcc") and msg.get(k):
+            # A second To line adds its people; the message can hold only one.
+            merged = f"{msg[k]}, {v}"
+            del msg[k]
+            msg[k] = merged
+        elif v:
+            msg[k] = v
+    if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):
+        raise MailError("no recipients (To/Cc/Bcc all empty)")
+    if not msg.get("From"):
+        raise MailError("no From header")
+    domain = parseaddr(msg["From"])[1].rpartition("@")[2] or None
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
+    msg.set_content(body)
+    for a in attach:
+        if not os.path.isfile(a):
+            raise MailError(f"attachment not found: {a}")
+        ctype = mimetypes.guess_type(a)[0] or "application/octet-stream"
+        maintype, subtype = ctype.split("/", 1)
+        with open(a, "rb") as f:
+            msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(a))
+    raw = msg.as_bytes()
+    # -t takes recipients from To/Cc/Bcc (msmtp strips Bcc) and the envelope-from from From, so every iCloud+ alias sends as itself.
+    r = subprocess.run(["msmtp", "-a", MSMTP_ACCOUNT, "--read-envelope-from", "-t"],
+                       input=raw, capture_output=True)
+    if r.returncode != 0:
+        raise MailError("msmtp: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1])
+    with open(mark, "wb") as f:
+        f.write(raw)
+    # File the sent copy in icloud/Sent Messages, tagged +sent -inbox -unread -new.
+    filed = subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
+                           input=raw, capture_output=True)
+    if filed.returncode != 0:
+        why = (filed.stderr.decode(errors="replace").strip().splitlines() or ["notmuch insert failed"])[-1]
+        # Kakoune's status line cuts a long message, so the file to look in comes before notmuch's reason.
+        raise MailError(f"sent, but not filed in Sent; {os.path.basename(mark)} beside the draft holds it: {why}")
+    irt = msg.get("In-Reply-To", "").strip().strip("<>")
+    if irt:
+        subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])
+        # The mail is out and filed, so a busy database only leaves the thread's piles as they were.
+        threads = subprocess.run(["notmuch", "search", "--output=threads", idq(irt)], capture_output=True, text=True).stdout.split()
+        if threads:
+            subprocess.run(["notmuch", "tag", "-replylater", "-setaside", "--", " or ".join(threads)])
+    for a in attach:
+        if os.path.dirname(a) == DRAFTS:
+            os.unlink(a)
+    os.unlink(path)
+    os.unlink(mark)
+    return [a for _, a in getaddresses([msg.get('To', ''), msg.get('Cc', '')]) if a]
