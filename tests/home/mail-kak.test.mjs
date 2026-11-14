@@ -142,3 +142,61 @@ test("' k discards a draft along with the mark a sent draft keeps beside it", (t
   assert.equal(existsSync(draft), false);
   assert.equal(existsSync(`${draft}.sent`), false);
 });
+
+// Opens the inbox's one mail as a thread, presses KEYS there, and returns what url_open_cmd was handed and the last status line (the second parameter of the JSON UI's draw_status).
+async function pressInThread(r, keys) {
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const out = join(r.M, 'out');
+  const opened = join(r.M, 'opened');
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const script = [
+    `set-option global url_open_cmd %{printf '%%s\\n' %s >>${opened}}`,
+    'mail-list-open tag:inbox true',
+    'mail-open',
+    `eval -draft %{ execute-keys '%' ; echo -to-file ${out}.thread %val{selection} }`,
+  ].join('\n');
+  const k = spawn('kak', ['-ui', 'json', '-e', script], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const send = (...params) => k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params }) + '\n');
+  const statuses = [];
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') statuses.push(m.params[1].map((atom) => atom.contents).join(''));
+    }
+  });
+  for (let i = 0; i < 100 && !read(`${out}.thread`); i++) await sleep(50);
+  const before = statuses.length;
+  send(...keys);
+  // The opener runs in the background; a refusal shows on the status line at once.
+  for (let i = 0; i < 60 && !read(opened) && !statuses.slice(before).some(Boolean); i++) await sleep(50);
+  await sleep(200);
+  send('<esc>', ':quit!<ret>');
+  assert.equal(await exited, 0);
+  return { opened: read(opened), status: statuses.slice(before).filter(Boolean).at(-1) ?? '' };
+}
+
+for (const [keys, images] of [[['V'], false], [['<a-v>'], true]]) {
+  test(`${keys[0]} in a thread opens a preview of its HTML mail${images ? ' with images' : ''}`, async (t) => {
+    const r = mailRig(t);
+    r.deliver({ 'Message-ID': '<news@x.test>', 'MIME-Version': '1.0', 'Content-Type': 'text/html; charset=utf-8' }, '<p>Shop now</p>\n');
+    const k = await pressInThread(r, keys);
+    const path = k.opened.trim();
+    assert.ok(path.startsWith(join(r.env.XDG_RUNTIME_DIR, 'mail-preview/')), `${k.opened} / ${k.status}`);
+    const page = readFileSync(path, 'utf8');
+    assert.match(page, /Shop now/);
+    assert.equal(page.includes('img-src https: data:'), images);
+  });
+}
+
+test('V on a plain-text mail says no HTML part and opens nothing', async (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<plain@x.test>' }, 'just text\n');
+  const k = await pressInThread(r, ['V']);
+  assert.equal(k.status, 'no HTML part');
+  assert.equal(k.opened, '');
+});

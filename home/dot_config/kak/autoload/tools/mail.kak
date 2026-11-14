@@ -221,6 +221,25 @@ define-command -hidden -params 2 mail-attachment-get %{
     }
 }
 
+# The HTML part of the message under the cursor, opened through url_open_cmd
+# as bin/mail preview writes it: a page that loads nothing remote, or with
+# --images, images over https.
+define-command mail-preview -params ..1 -docstring 'mail-preview [--images]: open this message''s HTML in the browser' %{
+    evaluate-commands %sh{
+        # $kak_quoted_opt_mail_msgs $kak_cursor_line
+        eval "$kak_opt_mail_sh"
+        t=$(mail_msg_at)
+        [ -z "$t" ] && { echo "fail 'mail: no message here'"; exit; }
+        # A path is absolute, so a leading ! marks bin/mail's error.
+        said=$(mail preview "$@" -- "$t" | jq -r 'if .ok then .data.path else "!" + .error end' 2>&1)
+        case $said in
+            /*) printf 'mail-open-with %s\n' "$(kq "$said")" ;;
+            !*) printf 'fail %s\n' "$(kq "${said#!}")" ;;
+            *) printf 'fail %s\n' "$(kq "mail preview: $said")" ;;
+        esac
+    }
+}
+
 define-command -hidden -params 1 mail-open-with %{
     nop %sh{
         set -- "$1"
@@ -423,6 +442,7 @@ select several rows (x, J, %) to act on all of them}" ;;
         mail-thread) printf '%s\n' "info -title 'mail: thread' %{r / R      reply / reply all to the message under the cursor
 F          forward it
 <c-n>/<c-p> next / previous message
+V / <a-v>  open its HTML in the browser / with images
 o          open a link           A  save + open an attachment
 gu         open the URL under the cursor
 H          hey… (screen in/out, feed, piles, bubble up…)
@@ -536,6 +556,8 @@ hook global WinSetOption filetype=mail-thread %{
     map buffer normal q ':mail-back<ret>'              -docstring 'back to the list'
     map buffer normal <c-n> ':mail-thread-jump next<ret>' -docstring 'next message'
     map buffer normal <c-p> ':mail-thread-jump prev<ret>' -docstring 'previous message'
+    map buffer normal V ':mail-preview<ret>'              -docstring 'open the HTML in the browser'
+    map buffer normal <a-v> ':mail-preview --images<ret>' -docstring 'open the HTML with images'
     add-highlighter window/mail-thread group
     add-highlighter window/mail-thread/ ref kak-mail
     add-highlighter window/mail-thread/ regex '^━+$' 0:comment
