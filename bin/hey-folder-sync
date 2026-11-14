@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Usage: hey-folder-sync [--apply|--state]. Files mail into IMAP folders by its tags, since iOS Mail only notifies for INBOX; with no flag it prints what would move.
 
-# A message whose folder changed since the last run wins for tags and any other is placed by its tags, which stops the two directions fighting.
+# A message whose folder changed since the last run, or first seen in an enabled HEY folder, wins for tags and any other is placed by its tags, which stops the two directions fighting.
 set -uo pipefail
 {
 
@@ -119,6 +119,17 @@ build_claims() {
     done
 }
 build_claims
+
+# claimed MSG FOLDER: MSG's tags alone would file it into FOLDER.
+claimed() {
+    local i
+    for i in "${!RULE_FOLDER[@]}"; do
+        [ "${RULE_FOLDER[i]}" = "$2" ] || continue
+        [ "$(nm_count "($1) and ${CLAIM[i]}")" -gt 0 ]
+        return
+    done
+    return 1
+}
 
 move_query() {
     local i="$1"
@@ -244,6 +255,8 @@ apply() {
         [ -n "$msg" ] && [ -n "$folder" ] || continue
         if [ -z "$old" ]; then
             case "$folder" in HEY/*) enabled "$folder" || continue ;; *) continue ;; esac
+            # Mail its own tags already file there keeps them: the folder's tags would add Paper Trail's ledger/unfiled or Bubbled's default day.
+            claimed "$msg" "$folder" && continue
         fi
         local ops
         ops="$(reverse_ops "$folder")" || continue

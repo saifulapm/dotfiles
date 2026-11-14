@@ -66,6 +66,21 @@ test('a failed retag keeps the old folder in the state and the move is retried, 
   assert.equal(r.sync(r.env, '--state'), 'id:moved@x.test\tHEY/ReplyLater\n');
 });
 
+// The phone's tags for the folder say less than the mail's own: Paper Trail's would add ledger/unfiled beside the vendor.
+test('a mail first seen in an enabled HEY folder its own tags already file there keeps its tags', (t) => {
+  const r = heyRig(t);
+  for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(r.box('HEY/PaperTrail'), s), { recursive: true });
+  r.setDb('foldersync.db', 'HEY/ReplyLater\nHEY/PaperTrail\n');
+  assert.equal(r.sync(r.env, '--apply'), '0 0\n');
+  r.arrive('HEY/PaperTrail', 'bill@x.test', 'bill.eml');
+  r.notmuch('tag', '+ledger/acme', '+archived', '-inbox', '--', 'id:bill@x.test');
+
+  assert.equal(r.sync(r.env, '--apply'), '0 0\n');
+
+  assert.deepEqual(r.tags('bill@x.test').filter((x) => x.startsWith('ledger/')), ['ledger/acme']);
+  assert.deepEqual(r.files('HEY/PaperTrail'), ['bill.eml']);
+});
+
 test('a mail first seen in INBOX is still filed by its tags', (t) => {
   const r = heyRig(t);
   assert.equal(r.sync(r.env, '--apply'), '0 0\n');
