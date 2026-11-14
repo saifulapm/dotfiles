@@ -26,6 +26,8 @@ SENT_FOLDER = "icloud/Sent Messages"
 MSMTP_ACCOUNT = "icloud"
 # The draft names send has sent: a Kakoune buffer still open on a draft an agent sent writes the file back, and this refuses it.
 SENT_DRAFTS = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "kak-mail", "sent-drafts")
+# When each HEY decision was made here, one "MILLISECONDS KEY" line each; dots sync's mail unit stamps the change with it, so the later decision wins, not the later sync.
+JOURNAL = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "decided")
 # The shell's margin watches this file for the Imbox unread count.
 COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
 
@@ -717,7 +719,49 @@ def tag(query, *changes):
     nm("tag", *changes, "--", query)
 
 
-# What each sender class puts on the sender's mail, as post-new does for new mail; a Paper Trail class is "ledger CATEGORY".
+# Each sender class file and the class its lines give; a ledger.db line names its category first, and its class is "ledger CATEGORY".
+CLASS_FILES = {"screened.db": "screened", "thefeed.db": "thefeed", "spam.db": "spam", "ledger.db": "ledger"}
+# An address in two class files reads as post-new's tags leave its mail: spam over Paper Trail over The Feed over screened in.
+CLASS_RANK = ("screened", "thefeed", "ledger", "spam")
+CATEGORY = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def class_line(name, line):
+    """The (address, class) a line of class file NAME gives, or None for a comment or a line no decision reads."""
+    w = line.split()
+    if not w or w[0].startswith("#"):
+        return None
+    if name == "ledger.db":
+        return (w[1].lower(), "ledger " + w[0]) if len(w) > 1 and CATEGORY.fullmatch(w[0]) else None
+    return w[0].lower(), CLASS_FILES[name]
+
+
+def class_rank(cls):
+    return CLASS_RANK.index(cls.split(" ")[0])
+
+
+def sender_class(addr):
+    """ADDR's class in this machine's files, or None."""
+    best = None
+    for name in CLASS_FILES:
+        try:
+            with open(db_path(name)) as f:
+                lines = f.read().splitlines()
+        except FileNotFoundError:
+            continue
+        for got in filter(None, (class_line(name, line) for line in lines)):
+            if got[0] == addr.lower() and (best is None or class_rank(got[1]) > class_rank(best)):
+                best = got[1]
+    return best
+
+
+def stamp(key):
+    os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+    with open(JOURNAL, "a") as f:
+        f.write(f"{int(time.time() * 1000)} {key}\n")
+
+
+# What each sender class puts on the sender's mail, as post-new does for new mail.
 CLASS_TAGS = {
     "screened": ("+screened",),
     "thefeed": ("+thefeed", "+archived", "-inbox"),
@@ -737,11 +781,12 @@ def refile(addr, old, new):
     frm = "from:" + addr
     if old and old != new:
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
-    if new and new != old:
+    if new:
         tag(frm, *class_tags(new))
 
 
 SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
+DECIDES_CLASS = {"screen-in": "screened", "feed": "thefeed", "papertrail": "ledger", "screen-out": "spam"}
 THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive")
 
 
@@ -750,23 +795,20 @@ def decide(action, addr, arg=None):
     if "*" in addr:
         raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
     frm = "from:" + addr
-    if action == "screen-in":
-        tag(frm, "+screened")
-        db_add("screened.db", addr)
-    elif action == "feed":
-        tag(frm, "+thefeed", "+archived", "-inbox")
-        db_add("thefeed.db", addr)
-    elif action == "papertrail":
-        cat = sanitize(arg, "Category")
-        tag(frm, f"+ledger/{cat}", "+archived", "-inbox", "-unread")
-        db_add("ledger.db", f"{cat} {addr}")
-    elif action == "screen-out":
-        tag(frm, "+spam", "+deleted", "+archived", "-inbox", "-unread", "-screened")
-        db_add("spam.db", addr)
+    if action in DECIDES_CLASS:
+        # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
+        new = "ledger " + sanitize(arg, "Category") if action == "papertrail" else DECIDES_CLASS[action]
+        old = sender_class(addr)
+        for db in CLASS_FILES:
+            db_drop(db, addr)
+        refile(addr, old, new)
+        db_add(new.split(" ")[0] + ".db", f"{new[7:]} {addr}" if action == "papertrail" else addr)
+        stamp("sender " + addr.lower())
     elif action == "unscreen":
         for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db", "autofile.db", "recycle.db"):
             db_drop(db, addr)
-        tag(frm, "-screened", "-thefeed", "-spam", "-deleted", "-bubble", "+inbox")
+        tag(frm, *UNSCREEN_TAGS)
+        stamp("sender " + addr.lower())
     elif action == "autofile":
         label = sanitize(arg, "Label")
         db_add("autofile.db", f"{addr} {label}")

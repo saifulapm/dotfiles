@@ -81,6 +81,19 @@ test('screen-in, feed and papertrail keep every other sender in their db', (t) =
   }
 });
 
+test('screening in a sender on The Feed takes it off The Feed, so a sender has one class', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@people.test>' });
+  r.setDb('thefeed.db', 'joann@people.test\n');
+  for (const action of ['feed', 'screen-in']) {
+    const res = r.kakMail('hey', action, 'tag:new or tag:inbox or tag:thefeed');
+    assert.equal(res.status, 0, res.stderr);
+  }
+  assert.equal(r.db('thefeed.db'), 'joann@people.test\n');
+  assert.equal(r.db('screened.db'), 'ann@people.test\n');
+  assert.equal(r.notmuch('search', '--output=tags', 'from:ann@people.test').split('\n').filter((x) => /^(screened|thefeed|inbox)$/.test(x)).join(' '), 'inbox screened');
+});
+
 test('a sender whose address holds + is tagged alone', (t) => {
   const r = mailRig(t);
   r.deliver({ From: 'Ann <ann+news@people.test>' });

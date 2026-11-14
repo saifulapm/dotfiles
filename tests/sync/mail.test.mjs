@@ -73,6 +73,40 @@ test('a sender unscreened on b is gone from a after b then a sync', async () => 
   assert.equal(await count(a, 'tag:screened'), 0);
 });
 
+// b syncs first, so a stamp taken at sync time would hand the win to a's earlier decision.
+test('a sender a moved to The Feed and b later screened in ends screened in on both, wherever the syncs fall', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'z@y.test', 'a1@y.test');
+  await deliver(b, 'z@y.test', 'b1@y.test');
+  await hey(a, 'feed', 'a1@y.test');
+  await new Promise((done) => setTimeout(done, 20));
+  await hey(b, 'screen-in', 'b1@y.test');
+  for (const m of [b, a, b, a]) await ok(m);
+  for (const m of [a, b]) {
+    assert.match(db(m, 'screened.db'), /^z@y\.test$/m, m.id);
+    assert.doesNotMatch(db(m, 'thefeed.db'), /z@y\.test/, m.id);
+  }
+  assert.equal(await count(a, 'tag:thefeed'), 0);
+  assert.equal(await count(a, 'tag:screened'), 1);
+});
+
+// b decides after it has seen a's decision, with a clock a minute behind a's.
+test("a decision made after another machine's still wins when its clock runs a minute slow", async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'z@y.test', 'a1@y.test');
+  await deliver(b, 'z@y.test', 'b1@y.test');
+  await hey(a, 'screen-in', 'a1@y.test');
+  await ok(a);
+  await ok(b);
+  const journal = join(b.env.XDG_STATE_HOME, 'hey-mail/decided');
+  await hey(b, 'feed', 'b1@y.test');
+  writeFileSync(journal, readFileSync(journal, 'utf8').replace(/^\d+/gm, (t) => String(Number(t) - 60000)));
+  await ok(b);
+  await ok(a);
+  assert.match(db(a, 'thefeed.db'), /^z@y\.test$/m);
+  assert.doesNotMatch(db(a, 'screened.db'), /z@y\.test/);
+});
+
 test("another machine's mail file that does not parse fails the unit with 5 and leaves the local files as they were", async () => {
   const { w, b } = await pair();
   writeFileSync(join(b.hey, 'screened.db'), 'x@y.test\n');
