@@ -32,7 +32,9 @@ function rig() {
   const mbsyncCalls = join(root, "mbsync-calls");
   const verdict = join(root, "verdict");
   const dropped = join(root, "dropped");
-  fake(bin, "notify-send", `printf '%s\\n' "$*" >>"${notified}"`);
+  const notifyExit = join(root, "notify-exit");
+  writeFileSync(notifyExit, "0");
+  fake(bin, "notify-send", `printf '%s\\n' "$*" >>"${notified}"\nexit "$(cat "${notifyExit}")"`);
   fake(bin, "notmuch", `echo "$*" >>"${notmuchCalls}"`);
   fake(
     bin,
@@ -40,18 +42,22 @@ function rig() {
     `echo run >>"${mbsyncCalls}"\n[ "$(cat "${verdict}")" = fail ] && { echo m >"${dropped}"; exit 1; }\nexit 0`,
   );
   const env = {
-    ...process.env,
+    PATH: `${bin}:/usr/bin:/bin`,
     HOME: home,
     XDG_STATE_HOME: state,
-    PATH: `${bin}:${process.env.PATH}`,
+    XDG_DATA_HOME: join(root, "data"),
+    XDG_CONFIG_HOME: join(root, "config"),
+    XDG_CACHE_HOME: join(root, "cache"),
   };
+  const exitFor = { ok: 0, fail: 69 };
   const run = (outcome) => {
     writeFileSync(verdict, outcome);
     const result = spawnSync(script, ["--quiet"], { env, encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.status, exitFor[outcome], result.stderr);
   };
   const calls = () => (existsSync(notified) ? readFileSync(notified, "utf8").trim().split("\n") : []);
-  return { run, calls, state, env, notmuchCalls, dropped };
+  const notifySendExits = (code) => writeFileSync(notifyExit, String(code));
+  return { run, calls, state, env, notmuchCalls, dropped, notifySendExits };
 }
 
 test("three failed fetches after a good one notify once with the good run's time", () => {
@@ -126,7 +132,33 @@ test("a run that finds the lock held changes no streak state", () => {
     ["-n", `${r.state}/hey-mail/sync.lock`, script, "--quiet"],
     { env: r.env, encoding: "utf8" },
   );
-  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.status, 75, result.stderr);
   assert.equal(snapshot(), held);
   assert.deepEqual(r.calls(), []);
+});
+
+test("fail, fail, ok, fail, fail sends nothing", () => {
+  const r = rig();
+  for (const outcome of ["fail", "fail", "ok", "fail", "fail"]) r.run(outcome);
+  assert.deepEqual(r.calls(), []);
+});
+
+test("a notice notify-send could not deliver is sent on the next failed run, then not again", () => {
+  const r = rig();
+  r.run("ok");
+  r.run("fail");
+  r.run("fail");
+  r.notifySendExits(1);
+  r.run("fail");
+  assert.equal(r.calls().length, 1);
+  r.notifySendExits(0);
+  r.run("fail");
+  assert.equal(r.calls().length, 2);
+  r.run("fail");
+  assert.equal(r.calls().length, 2);
+});
+
+test("the service treats exit 69 and 75 as success", () => {
+  const unit = readFileSync(resolve(import.meta.dirname, "../../home/dot_config/systemd/user/mail-sync.service"), "utf8");
+  assert.match(unit, /^SuccessExitStatus=69 75$/m);
 });

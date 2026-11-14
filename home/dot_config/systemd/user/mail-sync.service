@@ -9,6 +9,8 @@ ConditionPathExists=%h/.mbsyncrc
 [Service]
 Type=oneshot
 ExecStart=%h/Codes/dotfiles/bin/mail-sync --quiet
+# 69 is a failed fetch that was still indexed and 75 a sync skipped for the lock; neither is a unit failure.
+SuccessExitStatus=69 75
 Nice=19
 IOSchedulingClass=idle
 # Backstop for a sync stuck on a half-open connection, which would hold the lock every later sync needs.

@@ -8,6 +8,9 @@ LOG="$STATE/sync.log"
 LOCK="$STATE/sync.lock"
 mkdir -p "$STATE"
 
+# Exit codes: 0 fetched, 69 fetch failed but what arrived is indexed, 75 another sync holds the lock, 1 a real failure.
+readonly EX_UNAVAILABLE=69 EX_TEMPFAIL=75
+
 quiet=0
 [ "${1:-}" = "--quiet" ] && quiet=1
 
@@ -24,7 +27,7 @@ fi
 exec 9>"$LOCK"
 if ! flock -n 9; then
     log "another sync is running — skipping"
-    exit 0
+    exit "$EX_TEMPFAIL"
 fi
 
 command -v mbsync >/dev/null 2>&1 || { log "mbsync not installed"; exit 1; }
@@ -57,9 +60,11 @@ else
     if [ "$fails" -ge 3 ] && [ "$notified" -eq 0 ]; then
         since=$lastok
         [ "$since" -eq 0 ] && since=$firstfail
-        notified=1
+        # A notice notify-send could not deliver stays unsent, so the next failed run tries again. With no notify-send at all there is nothing to retry.
         if command -v notify-send >/dev/null 2>&1; then
-            notify-send -a "Mail" -i mail-unread "Mail has not synced since $(date -d "@$since" +%H:%M)" || true
+            notify-send -a "Mail" -i mail-unread "Mail has not synced since $(date -d "@$since" +%H:%M)" && notified=1
+        else
+            notified=1
         fi
     fi
 fi
@@ -90,5 +95,6 @@ if [ -x "$FOLDER_SYNC" ]; then
 fi
 
 log "done in $(( $(date +%s) - start ))s"
+[ "$fetched" -eq 1 ] || exit "$EX_UNAVAILABLE"
 exit 0
 }
