@@ -24,6 +24,8 @@ DB_DIR = os.environ.get("HEY_MAIL_DB_DIR") or os.path.join(os.environ.get("XDG_D
 DRAFTS = os.path.join(os.environ.get("XDG_DATA_HOME", HOME + "/.local/share"), "kak-mail", "drafts")
 SENT_FOLDER = "icloud/Sent Messages"
 MSMTP_ACCOUNT = "icloud"
+# The draft names send has sent: a Kakoune buffer still open on a draft an agent sent writes the file back, and this refuses it.
+SENT_DRAFTS = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "kak-mail", "sent-drafts")
 # The shell's margin watches this file for the Imbox unread count.
 COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
 
@@ -56,6 +58,14 @@ class NotFound(MailError):
 
 class Refusal(MailError):
     """A send that must not go: the draft was sent already, or changed since it was shown."""
+
+
+class MissingAttachment(MailError):
+    """A draft's Attach: file is gone; PATH may hold a sender's file name, from a forward."""
+
+    def __init__(self, path):
+        super().__init__(f"attachment not found: {path}")
+        self.path = path
 
 
 def nm(*args, stdin=None):
@@ -582,6 +592,12 @@ def locked_send(path, expect, env):
     if os.path.exists(mark):
         raise Refusal(f"already sent; {mark} holds the message as it went out")
     try:
+        with open(SENT_DRAFTS) as f:
+            if os.path.basename(path) in f.read().split():
+                raise Refusal("already sent; this draft went out before, so discard it")
+    except FileNotFoundError:
+        pass
+    try:
         with open(path, "rb") as f:
             raw = f.read()
     except FileNotFoundError:
@@ -599,7 +615,7 @@ def locked_send(path, expect, env):
     msg.set_content(body)
     for a in attach:
         if not os.path.isfile(a):
-            raise MailError(f"attachment not found: {a}")
+            raise MissingAttachment(a)
         ctype = mimetypes.guess_type(a)[0] or "application/octet-stream"
         maintype, subtype = ctype.split("/", 1)
         with open(a, "rb") as f:
@@ -612,6 +628,9 @@ def locked_send(path, expect, env):
         raise MailError("msmtp: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1])
     with open(mark, "wb") as f:
         f.write(raw)
+    os.makedirs(os.path.dirname(SENT_DRAFTS), exist_ok=True)
+    with open(SENT_DRAFTS, "a") as f:
+        f.write(os.path.basename(path) + "\n")
     # File the sent copy in icloud/Sent Messages, tagged +sent -inbox -unread -new.
     filed = subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
                            input=raw, capture_output=True)
@@ -690,6 +709,8 @@ THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive")
 
 def decide(action, addr, arg=None):
     """Apply a sender ACTION to ADDR: its decision line in the db the post-new hook reads, and the tags on its mail so far."""
+    if "*" in addr:
+        raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
     frm = "from:" + addr
     if action == "screen-in":
         tag(frm, "+screened")

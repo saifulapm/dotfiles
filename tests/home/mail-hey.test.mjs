@@ -86,3 +86,26 @@ test('mail hey acts on one message it can find, never on a query', (t) => {
   const unknown = r.mail('hey', 'mute', 'b1@x.test');
   assert.equal(unknown.status, 1, unknown.stdout);
 });
+
+test('mail hey decides on no address holding a *, which notmuch reads as every sender', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 't*@*', Subject: 'wild', 'Message-ID': '<w1@x.test>' });
+  r.notmuch('tag', '+screened', '--', 'id:w1@x.test');
+  const res = r.mail('hey', 'feed', 'w1@x.test');
+  assert.equal(res.status, 1, res.stdout);
+  assert.equal(r.db('thefeed.db'), '');
+  assert.ok(r.imbox().includes('b1@x.test'));
+  const out = r.mail('hey', 'screen-out', '--sender', '*@shop.test');
+  assert.equal(out.status, 1, out.stdout);
+  assert.equal(r.db('spam.db'), '');
+});
+
+test('mail hey papertrail needs --category and bubble needs --at, with the usage as the hint', (t) => {
+  const r = rig(t);
+  for (const action of ['papertrail', 'bubble']) {
+    const res = r.mail('hey', action, 'b1@x.test');
+    assert.equal(res.status, 1, res.stdout);
+    assert.match(res.json.error, action === 'papertrail' ? /--category/ : /--at/);
+    assert.match(res.json.hint, /^usage: mail/);
+  }
+});

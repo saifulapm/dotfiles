@@ -41,7 +41,7 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MSMTP_ACCOUNT, MailError, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+from mail_engine import (BOXES, MSMTP_ACCOUNT, MailError, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, write_draft)
 
@@ -76,7 +76,11 @@ def untrusted(text):
 
 
 def person(header):
-    name, address = parseaddr(header)
+    return who(*parseaddr(header))
+
+
+def who(name, address):
+    """A name and address as the sender wrote them; parsed once, so a quote in the name cannot change the address shown."""
     name = line(name).strip()
     # An address is a short token; one holding spaces, quotes or <> is a sentence the sender wrote.
     plain = re.fullmatch(r'[^\s<>"]*', address)
@@ -129,7 +133,7 @@ def message(m, thread, home):
     atts, links = [], []
     body = body_text(m.get("body", []), atts, found=links)
     sizes = part_sizes(m.get("body", []))
-    people = lambda k: [person(f'"{n}" <{a}>' if n else a) for n, a in getaddresses([h[k]])] if h.get(k) else []
+    people = lambda k: [who(n, a) for n, a in getaddresses([h[k]])] if h.get(k) else []
     return {
         "id": m["id"],
         "thread": thread,
@@ -299,7 +303,7 @@ def cmd_draft_write(a):
 
 
 def addresses(msg, name):
-    return [person(f'"{n}" <{a}>' if n else a) for n, a in getaddresses([str(msg.get(name, ""))]) if a or n]
+    return [who(n, a) for n, a in getaddresses([str(msg.get(name, ""))]) if a or n]
 
 
 def draft_file(arg):
@@ -336,7 +340,8 @@ def cmd_draft_show(a):
         "cc": addresses(msg, "Cc"),
         "bcc": addresses(msg, "Bcc"),
         "subject": untrusted(line(msg.get("Subject", ""))),
-        "attachments": [{"path": p, "name": untrusted(line(os.path.basename(p))),
+        # A forward's attachment is saved under the sender's file name, so its path is mail text too.
+        "attachments": [{"path": untrusted(line(p)), "name": untrusted(line(os.path.basename(p))),
                          "size": os.path.getsize(p) if os.path.isfile(p) else None} for p in attach],
         "body": untrusted(body.strip("\n")),
         "digest": digest(raw, attach),
@@ -398,16 +403,19 @@ def cmd_send(a):
     except NotFound:
         raise missing(f"no draft {a.draft}", "it was sent or discarded; list the drafts with mail drafts") from None
     except MailError as e:
+        if isinstance(e, MissingAttachment):
+            e = MailError(f"attachment not found: {untrusted(line(e.path))}")
         # msmtp may have taken the mail before the failure, so a retry could send it twice.
         e.hint = "tell Saiful this error, and do not send again without asking him"
-        raise
+        raise e from None
     return {"id": os.path.basename(path).removesuffix(".eml"), "to": to}
 
 
 # mail hey's action names, as kak-mail spells them.
 HEY = {"screen-in": "screen-in", "feed": "feed", "papertrail": "papertrail", "replylater": "reply-later",
        "setaside": "set-aside", "bubble": "bubble", "archive": "archive", "clear": "clear", "screen-out": "screen-out"}
-ADDRESS = re.compile(r"[^\s<>\"'(),;:@]+@[^\s<>\"'(),;:@]+")
+# One address and nothing notmuch reads as more: a * would match every sender.
+ADDRESS = re.compile(r"[^\s<>\"'(),;:@*]+@[^\s<>\"'(),;:@*]+")
 
 
 def cmd_hey(a):
@@ -428,6 +436,10 @@ def cmd_hey(a):
         raise Usage("--category is only for papertrail")
     if a.at is not None and a.action != "bubble":
         raise Usage("--at is only for bubble")
+    if a.action == "papertrail" and a.category is None:
+        raise Usage("papertrail takes --category C")
+    if a.action == "bubble" and a.at is None:
+        raise Usage("bubble takes --at DATE")
     msg_id = found(a.id)["id"]
     action = HEY[a.action]
     if action in SENDER_ACTIONS:
