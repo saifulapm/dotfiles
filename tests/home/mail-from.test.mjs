@@ -34,9 +34,8 @@ test('a decision on an @domain line re-files that domain alone', (t) => {
   const r = mailRig(t);
   deliverAll(r);
   r.notmuch('tag', '-new', '--', '*');
-  r.setDb('screened.db', '@vendor.test\n');
-  const res = r.kakMail('hey', 'feed', 'id:v0@x.test');
-  assert.equal(res.stdout, 'feed: @vendor.test\n', res.stderr);
+  const res = py(r, "E.refile('@vendor.test', 'screened', 'thefeed')");
+  assert.equal(res.status, 0, res.stderr);
   assert.deepEqual(tagged(r, 'thefeed'), ['id:v0@x.test', 'id:v1@x.test']);
 });
 
@@ -107,4 +106,63 @@ test("Kakoune's everything-from-this-sender list holds that address's mail alone
   const res = r.kakMail('hey', 'sender', 'id:a0@x.test');
   assert.equal(res.status, 0, res.stderr);
   assert.deepEqual(r.notmuch('search', '--output=messages', '--', res.stdout.trim()).split('\n').filter(Boolean), ['id:a0@x.test']);
+});
+
+// An address's own line decides its mail over its domain's line, in either direction, as Saiful ruled.
+const tagsOf = (r, id) => r.notmuch('search', '--exclude=false', '--output=tags', '--', `id:${id}`).split('\n').filter(Boolean).sort();
+const py = (r, code) => r.run('python3', ['-B', '-c', `import mail_engine as E; ${code}`], { env: { ...r.env, PYTHONPATH: join(repo, 'bin') } });
+
+test("post-new files an address with its own line by that line, not by its domain's", (t) => {
+  const r = hooked(t);
+  r.setDb('thefeed.db', '@vendor.test\nwebinars@mail.anthropic.test\n');
+  r.setDb('screened.db', 'Boss@Vendor.test\n@mail.anthropic.test\n');
+  r.setDb('ledger.db', 'receipts failed-payments@mail.anthropic.test\n');
+  r.deliver({ From: 'boss@vendor.test', 'Message-ID': '<boss@x.test>' });
+  r.deliver({ From: 'news@vendor.test', 'Message-ID': '<news@x.test>' });
+  r.deliver({ From: 'webinars@mail.anthropic.test', 'Message-ID': '<web@x.test>' });
+  r.deliver({ From: 'failed-payments@mail.anthropic.test', 'Message-ID': '<fail@x.test>' });
+  r.deliver({ From: 'no-reply-xyz789@mail.anthropic.test', 'Message-ID': '<nr@x.test>' });
+  assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual(tagsOf(r, 'web@x.test'), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual(tagsOf(r, 'fail@x.test'), ['archived', 'ledger/receipts']);
+  assert.deepEqual(tagsOf(r, 'nr@x.test'), ['inbox', 'screened', 'unread']);
+});
+
+test("a plain decision on an address under a domain line writes that address's line alone, which beats the domain's", (t) => {
+  const r = hooked(t);
+  r.setDb('screened.db', '@mail.anthropic.test\n');
+  r.deliver({ From: 'news@mail.anthropic.test', 'Message-ID': '<news@x.test>' });
+  r.deliver({ From: 'no-reply-abc123@mail.anthropic.test', 'Message-ID': '<nr1@x.test>' });
+  const res = r.kakMail('hey', 'feed', 'id:news@x.test');
+  assert.equal(res.stdout, 'feed: news@mail.anthropic.test\n', res.stderr);
+  assert.equal(r.db('thefeed.db'), 'news@mail.anthropic.test\n');
+  assert.equal(r.db('screened.db'), '@mail.anthropic.test\n');
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['archived', 'thefeed', 'unread']);
+  assert.deepEqual(tagsOf(r, 'nr1@x.test'), ['inbox', 'screened', 'unread']);
+  r.deliver({ From: 'no-reply-xyz789@mail.anthropic.test', 'Message-ID': '<nr2@x.test>' });
+  assert.deepEqual(tagsOf(r, 'nr2@x.test'), ['inbox', 'screened', 'unread']);
+  // Unscreening the address drops its line, so its mail follows the domain's line again.
+  assert.equal(r.kakMail('hey', 'unscreen', 'id:news@x.test').stdout, 'unscreen: news@mail.anthropic.test\n');
+  assert.equal(r.db('thefeed.db'), '');
+  // A stale archived tag beside inbox is m97's (the Feed-to-screened idea), so only the box tags are checked here.
+  const news = tagsOf(r, 'news@x.test');
+  assert.ok(news.includes('inbox') && news.includes('screened') && !news.includes('thefeed'), news.join(' '));
+});
+
+test("a domain's re-filing leaves alone every address with its own line, in either direction", (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'boss@vendor.test', 'Message-ID': '<boss@x.test>' });
+  r.deliver({ From: 'news@vendor.test', 'Message-ID': '<news@x.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  r.notmuch('tag', '+screened', '--', 'id:boss@x.test');
+  r.setDb('screened.db', 'boss@vendor.test\n');
+  const f = py(r, "E.refile('@vendor.test', None, 'thefeed')");
+  assert.equal(f.status, 0, f.stderr);
+  assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['archived', 'thefeed', 'unread']);
+  const u = py(r, "E.to_screener('@vendor.test')");
+  assert.equal(u.status, 0, u.stderr);
+  assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['inbox', 'unread']);
 });

@@ -39,6 +39,39 @@ from_q() {
     esac
 }
 
+# An address's own class line decides its mail over its domain's line, so a domain line's query leaves out each address under it with a line of its own; mail_engine.key_query does the same.
+declare -A domains=() own=()
+class_keys() {
+    local f
+    for f in screened.db thefeed.db spam.db; do
+        [ -s "$DB_DIR/$f" ] && awk '!/^[[:space:]]*(#|$)/ {print $1}' "$DB_DIR/$f"
+    done
+    [ -s "$DB_DIR/ledger.db" ] && awk '!/^[[:space:]]*(#|$)/ {print $2}' "$DB_DIR/ledger.db"
+    return 0
+}
+keys="$(class_keys)"
+while IFS= read -r k; do
+    case "$k" in @*) domains["${k,,}"]=1 ;; esac
+done <<<"$keys"
+if [ ${#domains[@]} -gt 0 ]; then
+    while IFS= read -r k; do
+        case "$k" in ''|@*) continue ;; esac
+        d="@${k##*@}"
+        d="${d,,}"
+        [ -n "${domains[$d]:-}" ] && q="$(from_q "$k")" || continue
+        own[$d]+="${own[$d]:+ or }$q"
+    done <<<"$keys"
+fi
+
+# The query for the mail a sender line decides.
+key_q() {
+    local q d
+    q="$(from_q "$1")" || return 1
+    d="${1,,}"
+    case "$d" in @*) [ -n "${own[$d]:-}" ] && q+=" and not (${own[$d]})" ;; esac
+    printf '%s' "$q"
+}
+
 # new.tags marks the copies from Sent/Drafts/Junk unread+inbox too, so those are fixed first and routing sees only incoming mail.
 notmuch tag --batch <<'EOF' 2>>"$LOG"
 -inbox -unread +sent -- tag:new and folder:"icloud/Sent Messages"
@@ -72,7 +105,7 @@ route_simple() {
     while IFS= read -r addr; do
         addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
         case "$addr" in ''|'#'*) continue ;; esac
-        q="$(from_q "$addr")" || continue
+        q="$(key_q "$addr")" || continue
         printf '%s -- tag:new and %s\n' "$ops" "$q"
     done <"$db" | notmuch tag --batch 2>>"$LOG"
     [ "${count:-0}" -gt 0 ] && log "routed via $(basename "$db"): $count rules"
@@ -88,7 +121,7 @@ if [ -s "$DB_DIR/ledger.db" ]; then
         case "$line" in ''|'#'*) continue ;; esac
         cat="$(printf '%s' "$line" | awk '{print $1}' | tr -cd '[:alnum:]_-')"
         addr="$(printf '%s' "$line" | awk '{print $2}' | tr -d '[:space:]')"
-        [ -n "$cat" ] && q="$(from_q "$addr")" || continue
+        [ -n "$cat" ] && q="$(key_q "$addr")" || continue
         printf '+ledger/%s +archived -inbox -unread -- tag:new and %s\n' "$cat" "$q"
     done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
 fi

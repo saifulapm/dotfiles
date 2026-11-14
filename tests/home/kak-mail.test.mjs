@@ -584,7 +584,8 @@ test('U is mapped in a list and a thread, and the help names it', () => {
   assert.match(kak, /^U +undo the last archive or Feed move/m);
 });
 
-test('a decision on an address under an @domain line moves the whole organisation, and unscreen undoes it', (t) => {
+// Saiful's ruling replaced m95's rule that a plain decision moved the whole organisation: it now carves the address out of its domain's line.
+test('a decision on an address under an @domain line moves that address alone, and unscreen of another sender undoes the domain line', (t) => {
   const r = mailRig(t);
   r.deliver({ From: 'A <a@vendor.test>', 'Message-ID': '<va@vendor.test>' });
   r.deliver({ From: 'B <b@vendor.test>', 'Message-ID': '<vb@vendor.test>' });
@@ -592,13 +593,16 @@ test('a decision on an address under an @domain line moves the whole organisatio
   r.setDb('screened.db', '@vendor.test\nbob@people.test\n');
   const res = r.kakMail('hey', 'feed', 'id:va@vendor.test');
   assert.equal(res.status, 0, res.stderr);
-  assert.equal(res.stdout, 'feed: @vendor.test\n');
+  assert.equal(res.stdout, 'feed: a@vendor.test\n');
+  assert.equal(r.db('screened.db'), '@vendor.test\nbob@people.test\n');
+  assert.equal(r.db('thefeed.db'), 'a@vendor.test\n');
+  assert.equal(r.notmuch('count', '--', 'tag:thefeed and not tag:screened and not tag:inbox').trim(), '1');
+  assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), /^\d+ sender a@vendor\.test$/m);
+  const u = r.kakMail('hey', 'unscreen', 'id:vb@vendor.test');
+  assert.equal(u.stdout, 'unscreen: @vendor.test\n', u.stderr);
   assert.equal(r.db('screened.db'), 'bob@people.test\n');
-  assert.equal(r.db('thefeed.db'), '@vendor.test\n');
-  assert.equal(r.notmuch('count', '--', 'tag:thefeed and not tag:screened and not tag:inbox').trim(), '2');
-  assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), /^\d+ sender @vendor\.test$/m);
-  assert.equal(r.kakMail('hey', 'unscreen', 'id:vb@vendor.test').status, 0);
-  assert.equal(r.db('thefeed.db'), '');
+  assert.equal(r.db('thefeed.db'), 'a@vendor.test\n');
+  assert.equal(r.notmuch('count', '--', 'id:va@vendor.test and tag:thefeed').trim(), '1');
 });
 
 test('an address with a line of its own is decided alone, though an @domain line covers its domain', (t) => {

@@ -791,13 +791,41 @@ def from_query(key):
     return f'from:"/{rx}>?$/"' if key.startswith("@") else f'from:"/(^|<){rx}>?$/"'
 
 
+def domain_of(addr):
+    return "@" + addr.rpartition("@")[2].lower()
+
+
+def own_lines(domain):
+    """The addresses under DOMAIN that a class line of their own decides."""
+    found = set()
+    for name in CLASS_FILES:
+        try:
+            with open(db_path(name)) as f:
+                lines = f.read().splitlines()
+        except FileNotFoundError:
+            continue
+        found.update(a for a, _ in filter(None, (class_line(name, line) for line in lines))
+                     if not a.startswith("@") and domain_of(a) == domain.lower())
+    return sorted(found)
+
+
+def key_query(key, keep=None):
+    """The query for the mail a sender KEY's line decides: an @domain line leaves out each address in KEEP, by default those with a line of their own, as that line decides their mail."""
+    q = from_query(key)
+    if key.startswith("@"):
+        keep = own_lines(key) if keep is None else keep
+        if keep:
+            q = f"{q} and not ({' or '.join(from_query(a) for a in keep)})"
+    return q
+
+
 # How far back an unscreened sender's mail waits in the Screener again; older mail stays archived.
 SCREENER_DAYS = 365
 
 
-def to_screener(addr, unread=True):
-    """Put ADDR's mail of the last SCREENER_DAYS back in the Screener, in no box and with UNREAD unread, and archive the rest."""
-    frm = from_query(addr)
+def to_screener(addr, unread=True, keep=None):
+    """Put the mail ADDR's line decided of the last SCREENER_DAYS back in the Screener, in no box and with UNREAD unread, and archive the rest."""
+    frm = key_query(addr, keep)
     ledger = [t for t in nm("search", "--exclude=false", "--output=tags", "--", frm).split() if t.startswith("ledger/")]
     tag(frm, *LEFT_TAGS, *(f"-{t}" for t in ledger))
     since = int(time.time()) - SCREENER_DAYS * 86400
@@ -805,12 +833,12 @@ def to_screener(addr, unread=True):
     tag(f"{frm} and date:..@{since}", "+archived", "-inbox")
 
 
-def refile(addr, old, new):
-    """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would."""
-    frm = from_query(addr)
+def refile(addr, old, new, keep=None):
+    """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would; an @domain leaves out the addresses in KEEP, as key_query does."""
+    frm = key_query(addr, keep)
     # The machine that unscreened marked the mail unread, and iCloud carries that flag here.
     if old and not new:
-        to_screener(addr, unread=False)
+        to_screener(addr, unread=False, keep=keep)
     elif old and old != new:
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
     if new:
@@ -853,10 +881,9 @@ def undo_last():
 
 
 def covering(addr):
-    """The key a decision on ADDR acts on: ADDR, or the @domain line that alone decides it, as an organisation moves as one."""
-    domain = "@" + addr.rpartition("@")[2]
-    if sender_class(addr) is None and sender_class(domain) is not None:
-        return domain
+    """The key an unscreen of ADDR acts on: ADDR, or the @domain line that alone decides it."""
+    if sender_class(addr) is None and sender_class(domain_of(addr)) is not None:
+        return domain_of(addr)
     return addr
 
 
@@ -866,10 +893,12 @@ def decide(action, addr, arg=None):
         raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
     if addr.startswith("@") or not ADDR.fullmatch(addr):
         raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
-    # Screen-out stays on the address: its spam line outranks an @domain line, and the rest of the organisation keeps its class.
-    if action in ("screen-in", "feed", "papertrail", "unscreen"):
+    # A decision writes a line for the address alone, which beats its domain's line; an unscreen of an address no line of its own decides undoes its domain's line.
+    if action == "unscreen":
         addr = covering(addr)
     frm = from_query(addr)
+    # The class the domain's line gives an address with no line of its own.
+    inherited = None if addr.startswith("@") else sender_class(domain_of(addr))
     if action in DECIDES_CLASS:
         # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
         new = "ledger " + sanitize(arg, "Category") if action == "papertrail" else DECIDES_CLASS[action]
@@ -877,12 +906,13 @@ def decide(action, addr, arg=None):
         if action == "feed":
             remember(frm, sender=addr.lower(), old=old)
         # Tags first: a notmuch that fails then leaves the files, and the sender's class, as they were.
-        refile(addr, old, new)
+        refile(addr, old or inherited, new)
         for db in CLASS_FILES:
             db_drop(db, addr)
         db_add(new.split(" ")[0] + ".db", f"{new[7:]} {addr}" if action == "papertrail" else addr)
         stamp("sender " + addr.lower())
     elif action == "unscreen":
+        own = sender_class(addr)
         for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db"):
             db_drop(db, addr)
         for w in db_drop("autofile.db", addr):
@@ -890,7 +920,11 @@ def decide(action, addr, arg=None):
                 stamp(f"autofile {addr.lower()} {w[1]}")
         if db_drop("recycle.db", addr):
             stamp("recycle " + addr.lower())
-        to_screener(addr)
+        # An address that loses its own line under a domain's line is that line's again.
+        if inherited:
+            refile(addr, own, inherited)
+        else:
+            to_screener(addr)
         stamp("sender " + addr.lower())
     elif action == "autofile":
         label = sanitize(arg, "Label")
