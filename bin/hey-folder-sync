@@ -231,25 +231,34 @@ move_one() {
 apply() {
     local moved=0 created=0 tagged=0 i msg folder line
 
-    # Pass 1, folder -> tag, runs first so pass 2 places mail by the tags it set; an unknown message counts as unchanged.
-    local cur="$STATE.new"
+    # Pass 1, folder -> tag, runs first so pass 2 places mail by the tags it set.
+    # A message unknown to the state counts as unchanged, unless it is in an enabled HEY folder: only another client puts new mail there.
+    local cur="$STATE.new" old
     # A message in two folders at once (a failed expunge) is dropped, so next run places it by its tags.
     current_state | awk -F'\t' '{ line[NR] = $0; id[NR] = $1; n[$1]++ }
                                 END { for (i = 1; i <= NR; i++)
                                           if (n[id[i]] == 1) print line[i] }' >"$cur"
-    if [ -s "$STATE" ]; then
-        while IFS=$'\t' read -r msg folder; do
-            [ -n "$msg" ] && [ -n "$folder" ] || continue
-            local ops
-            ops="$(reverse_ops "$folder")" || continue
-            # shellcheck disable=SC2086
-            notmuch tag $ops -- "$msg" 2>>"$LOG" && tagged=$((tagged + 1))
-            [ "$folder" = "HEY/Bubbled" ] && bubble_from_folder "$msg"
-            log "external move: $msg is now in $folder -> $ops"
-        done < <(awk -F'\t' 'NR==FNR { was[$1] = $2; next }
-                             ($1 in was) && was[$1] != $2 { print $1 "\t" $2 }' \
-                     "$STATE" "$cur")
-    fi
+    # A failed retag keeps the old folder here (none for a first-seen message), so pass 2 leaves the message be and the next run retries.
+    declare -A held=()
+    while IFS=$'\t' read -r msg folder old; do
+        [ -n "$msg" ] && [ -n "$folder" ] || continue
+        if [ -z "$old" ]; then
+            case "$folder" in HEY/*) enabled "$folder" || continue ;; *) continue ;; esac
+        fi
+        local ops
+        ops="$(reverse_ops "$folder")" || continue
+        # shellcheck disable=SC2086
+        if ! notmuch tag $ops -- "$msg" 2>>"$LOG"; then
+            held["$msg"]="$old"
+            log "FAILED retag $msg for $folder; kept as ${old:-unseen} to retry"
+            continue
+        fi
+        tagged=$((tagged + 1))
+        [ "$folder" = "HEY/Bubbled" ] && bubble_from_folder "$msg"
+        log "external move: $msg is now in $folder -> $ops"
+    done < <(awk -F'\t' -v state="$STATE" \
+                 'BEGIN { while ((getline l < state) > 0) { split(l, a, "\t"); was[a[1]] = a[2] } }
+                  !($1 in was) || was[$1] != $2 { print $1 "\t" $2 "\t" was[$1] }' "$cur")
     [ "$tagged" -gt 0 ] && log "retagged $tagged message(s) from external folder moves"
 
     # An enabled box exists even when empty, or the phone has no folder to drag into.
@@ -272,6 +281,7 @@ apply() {
         local n=0
         while IFS= read -r msg; do
             [ -n "$msg" ] || continue
+            [ -n "${held[$msg]+x}" ] && continue
             if move_one "$msg" "${RULE_FOLDER[i]}"; then
                 newfolder["$msg"]="${RULE_FOLDER[i]}"
                 moved=$((moved + 1)); n=$((n + 1))
@@ -281,10 +291,13 @@ apply() {
     done
 
     # Records the intended folders: notmuch has not reindexed yet, and the old ones would read as external moves next run.
-    if [ "${#newfolder[@]}" -gt 0 ]; then
+    # A held message keeps its old folder, and a held first-seen one is left out.
+    if [ "${#newfolder[@]}" -gt 0 ] || [ "${#held[@]}" -gt 0 ]; then
         awk -F'\t' -v OFS='\t' 'NR==FNR { to[$1]=$2; next }
-                                { print $1, ($1 in to ? to[$1] : $2) }' \
-            <(for msg in "${!newfolder[@]}"; do printf '%s\t%s\n' "$msg" "${newfolder[$msg]}"; done) \
+                                !($1 in to) { print; next }
+                                to[$1] != "" { print $1, to[$1] }' \
+            <(for msg in "${!newfolder[@]}"; do printf '%s\t%s\n' "$msg" "${newfolder[$msg]}"; done
+              for msg in "${!held[@]}"; do printf '%s\t%s\n' "$msg" "${held[$msg]}"; done) \
             "$cur" >"$STATE.merged" && mv "$STATE.merged" "$cur"
     fi
     mv "$cur" "$STATE"
