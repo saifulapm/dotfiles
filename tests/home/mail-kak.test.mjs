@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { mailRig, repo } from './mail-rig.mjs';
@@ -278,4 +278,42 @@ test("the thread view's bottom line is a key strip naming V preview, r reply and
   const word = inThread.find((a) => a.contents.includes('preview'));
   assert.ok(key && word && JSON.stringify(key.face) !== JSON.stringify(word.face), JSON.stringify(inThread));
   assert.match(back, /rows 1–1 of 1 · ↵ open/);
+});
+
+test("<ret> on a Drafts row opens an agent's draft with the draft keys, and ' k drops it from the list", async (t) => {
+  const r = mailRig(t);
+  r.env.TZ = 'UTC';
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const agent = r.run(join(repo, 'bin/mail'), ['draft', 'new', '--to', 'ann@people.test', '--subject', 'Hi']);
+  assert.equal(agent.status, 0, agent.stderr);
+  const byAgent = JSON.parse(agent.stdout).data.path;
+  const byKak = r.kakMail('compose', 'new').stdout.trim();
+  // The agent's draft is the newer, so it is the list's first row.
+  utimesSync(byKak, new Date('2020-01-02T12:00:00Z'), new Date('2020-01-02T12:00:00Z'));
+  const out = join(r.M, 'out');
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = spawn('kak', ['-ui', 'json', '-e', 'mail-box Drafts'], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const send = (...params) => k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params }) + '\n');
+  let mode = '';
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') mode = m.params[3].map((atom) => atom.contents).join('');
+    }
+  });
+  for (let i = 0; i < 100 && !mode.includes('rows'); i++) await sleep(50);
+  send('<ret>', `:echo -to-file ${out}.buffile %val{buffile}<ret>`);
+  for (let i = 0; i < 100 && !read(`${out}.buffile`); i++) await sleep(50);
+  send("'", 'k', `:eval -buffer *mail:Drafts* %{ eval -draft %{ execute-keys '%' ; echo -to-file ${out}.list %val{selection} } }<ret>`);
+  for (let i = 0; i < 100 && !read(`${out}.list`); i++) await sleep(50);
+  send('<esc>', `:eval -buffer *debug* %{ write ${out}.debug }<ret>`, ':quit!<ret>');
+  assert.equal(await exited, 0);
+  assert.equal(read(`${out}.buffile`), byAgent, read(`${out}.debug`));
+  assert.equal(existsSync(byAgent), false, read(`${out}.debug`));
+  assert.equal(read(`${out}.list`), '2020-01-02 (no recipient)           []\n', read(`${out}.debug`));
 });

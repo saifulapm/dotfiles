@@ -10,6 +10,7 @@ Subcommands (the kak side is the only intended caller):
   boxes [--maps]              box list with counts, or kak `map` lines for J
   query NAME                  the notmuch query of a box
   list --out F [--unthreaded] [--offset N] QUERY   render 500 rows from N into F, print `mail_ids` and the rows shown
+                              (QUERY Drafts lists the draft files, each id draft:PATH)
   show --out F QUERY          render a thread into F, print `mail_msgs`, mark read
   links QUERY                 `N label — host/path` per link of a message, or of a thread: with sender and date
   link QUERY PICK             the URL of the links line PICK
@@ -30,14 +31,15 @@ import subprocess
 import sys
 import time
 import unicodedata
-from email.utils import parseaddr
+from email.utils import getaddresses, parseaddr
 from urllib.parse import urlsplit
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, DB_DIR, HOME, URL, MailError, body_text, box, box_counts, identities, idq, line,
-                         matched_messages, message_of, nm, one_message, part_bytes, refresh_count, search_threads,
-                         send_draft, set_unread, target, thread_messages, write_count, write_draft)
+from mail_engine import (BOXES, DB_DIR, HOME, URL, MailError, body_text, box, box_counts, draft_message, drafts,
+                         identities, idq, line, matched_messages, message_of, nm, one_message, part_bytes,
+                         refresh_count, search_threads, send_draft, set_unread, target, thread_messages, write_count,
+                         write_draft)
 
 LIST_LIMIT = 500
 
@@ -90,13 +92,21 @@ def row(ts, who, subject, tags):
 
 # ───────────────────────────── boxes / lists ─────────────────────────────
 
+def listed():
+    """(key, name) of each box Kakoune lists: BOXES, with Drafts before Sent. Drafts are files, not notmuch mail, so BOXES leaves them out."""
+    keys = [(b[0], b[1]) for b in BOXES]
+    i = [name for _, name in keys].index("Sent")
+    return keys[:i] + [("d", "Drafts")] + keys[i:]
+
+
 def cmd_boxes(args):
     if args[:1] == ["--maps"]:
-        for key, name, _, _ in BOXES:
+        for key, name in listed():
             print(f"map global mail-jump {kq(key)} {kq(':mail-box %{' + name + '}<ret>')} -docstring {kq(name)}")
         return
-    for (key, name, _, _), n in zip(BOXES, box_counts()):
-        print(f" {key}  {name:<12} {n:>5}")
+    counts = dict(zip((b[1] for b in BOXES), box_counts()), Drafts=len(drafts()))
+    for key, name in listed():
+        print(f" {key}  {name:<12} {counts[name]:>5}")
 
 
 def cmd_query(args):
@@ -117,15 +127,26 @@ def cmd_list(args):
         else:
             words.append(a)
     query = " ".join(words)
-    b = box(query)
-    unthreaded = b[3] if b else flat
-    q = b[2] if b else query
-    total = int(nm("count", *([] if unthreaded else ["--output=threads"]), "--", q))
+    if query == "Drafts":
+        found = drafts()
+        total = len(found)
+    else:
+        b = box(query)
+        unthreaded = b[3] if b else flat
+        q = b[2] if b else query
+        total = int(nm("count", *([] if unthreaded else ["--output=threads"]), "--", q))
     # A page an archive emptied falls back to the last page that still has rows.
     if offset >= total:
         offset = max(0, (total - 1) // LIST_LIMIT * LIST_LIMIT)
     ids, lines = [], []
-    if unthreaded:
+    if query == "Drafts":
+        for path in found[offset:offset + LIST_LIMIT]:
+            with open(path, "rb") as f:
+                msg, _, _ = draft_message(f.read().decode("utf-8", "replace"))
+            to = ", ".join(addr for _, addr in getaddresses([str(msg.get("To", ""))]) if addr)
+            ids.append("draft:" + path)
+            lines.append(row(os.stat(path).st_mtime, to or "(no recipient)", msg.get("Subject", ""), []))
+    elif unthreaded:
         for m in matched_messages(q)[offset:offset + LIST_LIMIT]:
             h = m["headers"]
             name, addr = parseaddr(h.get("From", ""))
@@ -451,6 +472,9 @@ def main():
     }.get(cmd)
     if not fn:
         die(f"unknown command: {cmd}")
+    # A Drafts row's id is draft:PATH, a file; notmuch would read it as words and match nothing.
+    if cmd in ("hey", "compose", "links", "link", "attachments", "save", "show") and any(a.startswith("draft:") for a in args):
+        die("a draft is not mail; it opens with <ret>")
     try:
         fn(args)
     except MailError as e:

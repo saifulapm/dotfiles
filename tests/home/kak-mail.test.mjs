@@ -1,9 +1,9 @@
 // bin/kak-mail on a scratch notmuch store (tests/home/mail-rig.mjs): what a sender writes into a mail reaches notmuch as data, never as query syntax or shell.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mailRig } from './mail-rig.mjs';
+import { mailRig, repo } from './mail-rig.mjs';
 
 // A Message-ID is the sender's text: quotes, $( ), %{ } and braces all have to come back as the one message; notmuch drops a Message-ID's spaces, so ${IFS} stands in for touch's.
 function hostile(t) {
@@ -388,4 +388,49 @@ test('a url linked first from an image and then from text lists under the text',
   r.deliver({ 'Message-ID': '<img@x.test>', 'MIME-Version': '1.0', 'Content-Type': 'text/html; charset=utf-8' },
     '<p><a href="https://shop.test/"><img src="https://shop.test/i.png"></a></p><p><a href="https://shop.test/">Shop now</a></p>\n');
   assert.equal(r.kakMail('links', 'id:img@x.test').stdout, '1 Shop now — shop.test\n');
+});
+
+// Two drafts: one an agent wrote with mail draft, dated 3 Jan 2020, and an empty one Kakoune's compose wrote, dated 2 Jan 2020.
+function twoDrafts(t) {
+  const r = mailRig(t);
+  r.env.TZ = 'UTC';
+  const agent = r.run(join(repo, 'bin/mail'), ['draft', 'new', '--to', 'ann@people.test', '--subject', 'Hi']);
+  assert.equal(agent.status, 0, agent.stderr);
+  const byAgent = JSON.parse(agent.stdout).data.path;
+  const composed = r.kakMail('compose', 'new');
+  assert.equal(composed.status, 0, composed.stderr);
+  const byKak = composed.stdout.trim();
+  utimesSync(byAgent, new Date('2020-01-03T12:00:00Z'), new Date('2020-01-03T12:00:00Z'));
+  utimesSync(byKak, new Date('2020-01-02T12:00:00Z'), new Date('2020-01-02T12:00:00Z'));
+  return { ...r, byAgent, byKak };
+}
+
+test('the Drafts box counts the draft files and lists them newest first, an id of draft:PATH each', (t) => {
+  const r = twoDrafts(t);
+  const boxes = r.kakMail('boxes');
+  assert.equal(boxes.status, 0, boxes.stderr);
+  const names = boxes.stdout.split('\n').map((l) => l.slice(4, 16).trim());
+  assert.deepEqual(names.slice(names.indexOf('Muted'), names.indexOf('Sent') + 1), ['Muted', 'Drafts', 'Sent']);
+  assert.match(boxes.stdout, /^ d {2}Drafts {11}2$/m);
+  const maps = r.kakMail('boxes', '--maps');
+  assert.match(maps.stdout, /^map global mail-jump 'd' ':mail-box %\{Drafts\}<ret>' -docstring 'Drafts'$/m);
+  const out = join(r.M, 'list');
+  const list = r.kakMail('list', '--out', out, 'Drafts');
+  assert.equal(list.status, 0, list.stderr);
+  assert.equal(readFileSync(out, 'utf8'), [
+    '2020-01-03 ann@people.test        Hi  []',
+    '2020-01-02 (no recipient)           []',
+  ].join('\n') + '\n');
+  assert.match(list.stdout, new RegExp(`^set-option buffer mail_ids 'draft:${r.byAgent}' 'draft:${r.byKak}'$`, 'm'));
+  assert.match(list.stdout, /^set-option buffer mail_rows 'rows 1–2 of 2'$/m);
+});
+
+test("e's archive refuses a draft row with kak-mail's error, and no tag changes", (t) => {
+  const r = twoDrafts(t);
+  r.deliver({});
+  const before = r.notmuch('search', '--output=tags', '*');
+  const res = r.kakMail('hey', 'archive', `draft:${r.byAgent}`);
+  assert.equal(res.status, 1);
+  assert.equal(res.stderr, 'kak-mail: a draft is not mail; it opens with <ret>\n');
+  assert.equal(r.notmuch('search', '--output=tags', '*'), before);
 });

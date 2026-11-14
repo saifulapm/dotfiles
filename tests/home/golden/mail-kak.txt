@@ -10,6 +10,7 @@
  I  Read             3
  n  Notes            1
  m  Muted            1
+ d  Drafts           0
  t  Sent             1
  e  Everything      21
 == boxes --maps
@@ -24,6 +25,7 @@ map global mail-jump 'b' ':mail-box %{Bubbled Up}<ret>' -docstring 'Bubbled Up'
 map global mail-jump 'I' ':mail-box %{Read}<ret>' -docstring 'Read'
 map global mail-jump 'n' ':mail-box %{Notes}<ret>' -docstring 'Notes'
 map global mail-jump 'm' ':mail-box %{Muted}<ret>' -docstring 'Muted'
+map global mail-jump 'd' ':mail-box %{Drafts}<ret>' -docstring 'Drafts'
 map global mail-jump 't' ':mail-box %{Sent}<ret>' -docstring 'Sent'
 map global mail-jump 'e' ':mail-box %{Everything}<ret>' -docstring 'Everything'
 == list Imbox
@@ -111,6 +113,13 @@ set-option buffer mail_ids 'thread:000000000000000c'
 set-option buffer mail_offset 0
 set-option buffer mail_total 1
 set-option buffer mail_rows 'rows 1–1 of 1'
+== list Drafts
+(nothing in Drafts)
+-- kak
+set-option buffer mail_ids 
+set-option buffer mail_offset 0
+set-option buffer mail_total 0
+set-option buffer mail_rows 'no rows'
 == list Sent
 2020-01-15 Me                     lunch on friday  [sent]
 -- kak

@@ -148,6 +148,8 @@ define-command -hidden mail-open %{
         eval "$kak_opt_mail_sh"
         id=$(kak_selections_desc="$kak_cursor_line.1,$kak_cursor_line.1" mail_row_ids | head -1)
         [ -z "$id" ] && { echo "fail 'mail: no message on this line'"; exit; }
+        # A Drafts row is a draft file, which opens for editing, not as a thread.
+        case $id in draft:*) printf 'mail-draft-open %s\n' "$(kq "${id#draft:}")"; exit ;; esac
         printf 'set-option global mail_return_buf %s\n' "$(kq "$kak_bufname")"
         printf 'set-option global mail_return_id %s\n' "$(kq "$id")"
         printf 'set-option global mail_return_line %s\n' "$kak_cursor_line"
@@ -418,6 +420,7 @@ define-command mail-discard -docstring 'delete this draft' %{
     # kak-mail send leaves DRAFT.sent beside a draft msmtp took, so it goes too.
     nop %sh{ rm -f "$kak_buffile" "$kak_buffile.sent" }
     delete-buffer!
+    mail-refresh-all
 }
 
 define-command -hidden -params 3 mail-draft-header %{
