@@ -1,7 +1,7 @@
 // bin/kak-mail on a scratch notmuch store (tests/home/mail-rig.mjs): what a sender writes into a mail reaches notmuch as data, never as query syntax or shell.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig } from './mail-rig.mjs';
 
@@ -151,4 +151,32 @@ test('a draft with two To lines sends to both', (t) => {
   const [sent] = r.sends();
   const to = sent.eml.split(/\r?\n\r?\n/)[0].split(/\r?\n/).filter((l) => /^to:/i.test(l));
   assert.deepEqual(to, ['To: a@x.test, b@x.test']);
+});
+
+test('a draft whose Sent copy could not be filed is never sent a second time', (t) => {
+  const r = mailRig(t);
+  rmSync(join(r.mail, 'icloud/Sent Messages'), { recursive: true });
+  const draft = join(r.M, 'once.eml');
+  writeFileSync(draft, 'From: Me <me@x.test>\nTo: a@x.test\nSubject: hi\n\nhello\n');
+  const first = r.kakMail('send', draft);
+  assert.notEqual(first.status, 0);
+  assert.equal(r.sends().length, 1);
+  assert.equal(existsSync(draft), true);
+  const second = r.kakMail('send', draft);
+  assert.notEqual(second.status, 0);
+  assert.match(second.stderr, /already sent/);
+  assert.equal(r.sends().length, 1);
+});
+
+test('sending a reply takes its thread out of Reply Later and Set Aside', (t) => {
+  const r = mailRig(t);
+  r.deliver({});
+  r.notmuch('tag', '+replylater', '+setaside', '--', '*');
+  const c = r.kakMail('compose', 'reply', 'tag:inbox');
+  assert.equal(c.status, 0, c.stderr);
+  const s = r.kakMail('send', c.stdout.trim());
+  assert.equal(s.status, 0, s.stderr);
+  assert.equal(r.notmuch('count', 'tag:replylater or tag:setaside'), '0\n');
+  assert.equal(r.notmuch('count', 'id:m0@x.test and tag:replied'), '1\n');
+  assert.equal(r.notmuch('count', 'tag:sent'), '1\n');
 });

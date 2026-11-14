@@ -470,6 +470,10 @@ def cmd_header(args):
 
 def cmd_send(args):
     path = args[0]
+    # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
+    mark = path + ".sent"
+    if os.path.exists(mark):
+        die(f"already sent; {mark} holds the message as it went out")
     with open(path) as f:
         headers, body = parse_draft(f.read())
     msg = EmailMessage(policy=email.policy.SMTP)
@@ -505,16 +509,22 @@ def cmd_send(args):
                        input=raw, capture_output=True)
     if r.returncode != 0:
         die("msmtp: " + (r.stderr.decode(errors="replace").strip().splitlines() or ["failed"])[-1])
+    with open(mark, "wb") as f:
+        f.write(raw)
     # File the sent copy in icloud/Sent Messages, tagged +sent -inbox -unread -new.
     subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
                    input=raw, check=True)
     irt = msg.get("In-Reply-To", "").strip().strip("<>")
     if irt:
         subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])
+        threads = nm("search", "--output=threads", idq(irt)).split()
+        if threads:
+            tag(" or ".join(threads), "-replylater", "-setaside")
     for a in attach:
         if os.path.dirname(a) == DRAFTS:
             os.unlink(a)
     os.unlink(path)
+    os.unlink(mark)
     print(f"sent to {', '.join(a for _, a in getaddresses([msg.get('To', ''), msg.get('Cc', '')]) if a)}")
 
 
