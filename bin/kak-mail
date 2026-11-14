@@ -11,7 +11,8 @@ Subcommands (the kak side is the only intended caller):
   query NAME                  the notmuch query of a box
   list --out F [--unthreaded] QUERY   render a list into F, print `mail_ids`
   show --out F QUERY          render a thread into F, print `mail_msgs`, mark read
-  links QUERY                 URLs in a message, one per line
+  links QUERY                 `N label — host/path` per link of a message
+  link QUERY PICK             the URL of the links line PICK
   attachments QUERY           `PART: name (type)` per attachment
   save QUERY PART             attachment → ~/Downloads (never overwrites)
   identities                  sender identities, one per line
@@ -33,11 +34,12 @@ import time
 import unicodedata
 from email.message import EmailMessage
 from email.utils import formatdate, getaddresses, make_msgid, parseaddr
+from urllib.parse import urlsplit
 import json
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MailError, body_text, box, box_counts, idq, line, matched_messages, message_of, nm,
+from mail_engine import (BOXES, URL, MailError, body_text, box, box_counts, idq, line, matched_messages, message_of, nm,
                          one_message, part_bytes, refresh_count, search_threads, set_unread, target, thread_messages,
                          write_count)
 
@@ -174,11 +176,43 @@ def cmd_show(args):
     print("set-option buffer mail_msgs " + " ".join(kq(x) for x in marks))
 
 
+def shown(url):
+    """URL as the picker shows it: host and path, with a query or fragment cut to …."""
+    u = urlsplit(url)
+    host = (u.hostname or "") + (f":{u.port}" if u.port else "")
+    return host + u.path.rstrip("/") + ("…" if u.query or u.fragment else "")
+
+
+def link_rows(query):
+    """(picker text, url) for each http and https link of QUERY's message, in reading order, a url once under its first label."""
+    found = []
+    text = body_text(one_message(message_of(query)).get("body", []), [], found=found)
+    # A body lynx's link list did not parse keeps its URLs in the text.
+    found += [(u, u) for u in (u.rstrip(".,;:!?") for u in URL.findall(text))]
+    rows = {}
+    for label, url in found:
+        if urlsplit(url).scheme.lower() not in ("http", "https") or url in rows:
+            continue
+        # The anchor text is the sender's: one line, and cut short.
+        label = " ".join(line(label).split())
+        label = label if len(label) <= 60 else label[:59] + "…"
+        rows[url] = f"{label} — {shown(url)}" if label and label != url else shown(url)
+    return [(text, url) for url, text in rows.items()]
+
+
 def cmd_links(args):
-    """links ID — the URLs in one message, deduplicated, in reading order."""
-    text = render_message(one_message(message_of(args[0])))
-    urls = re.findall(r"https?://[^\s<>\"')\]]+", text)
-    print("\n".join(dict.fromkeys(u.rstrip(".,;:!?") for u in urls)))
+    """links QUERY — one numbered line per link, its label beside where it goes."""
+    for i, (text, _) in enumerate(link_rows(args[0]), 1):
+        print(f"{i} {text}")
+
+
+def cmd_link(args):
+    """link QUERY PICK — the url of the line PICK, as links numbered it."""
+    n = re.match(r"\d+", args[1])
+    rows = link_rows(args[0])
+    if not n or not 1 <= int(n.group()) <= len(rows):
+        die(f"no link {args[1]}")
+    print(rows[int(n.group()) - 1][1])
 
 
 def cmd_attachments(args):
@@ -513,7 +547,7 @@ def main():
     fn = {
         "boxes": cmd_boxes, "query": cmd_query, "list": cmd_list, "show": cmd_show,
         "identities": lambda a: print("\n".join(identities())),
-        "links": cmd_links, "attachments": cmd_attachments, "save": cmd_save,
+        "links": cmd_links, "link": cmd_link, "attachments": cmd_attachments, "save": cmd_save,
         "compose": cmd_compose, "header": cmd_header, "send": cmd_send, "hey": cmd_hey,
         "count": cmd_count,
     }.get(cmd)

@@ -197,7 +197,16 @@ define-command mail-links -docstring 'pick a link in this message and open it' %
         [ -z "$t" ] && { echo "fail 'mail: no message here'"; exit; }
         printf 'set-option window mail_target %s\n' "$(kq "$t")"
     }
-    prompt -menu -shell-script-candidates %{ kak-mail links "$kak_opt_mail_target" } 'link: ' %{ mail-open-with %val{text} }
+    prompt -menu -shell-script-candidates %{ kak-mail links "$kak_opt_mail_target" } 'link: ' %{ mail-link-get %opt{mail_target} %val{text} }
+}
+
+# The picked line's number names the link, so its label (the sender's text) is never read back as a URL.
+define-command -hidden -params 2 mail-link-get %{
+    evaluate-commands %sh{
+        eval "$kak_opt_mail_sh"
+        if u=$(kak-mail link "$1" "$2" 2>&1); then printf 'mail-open-with %s\n' "$(kq "$u")"
+        else printf 'fail %s\n' "$(kq "$u")"; fi
+    }
 }
 
 define-command mail-attachments -docstring 'pick an attachment: save to ~/Downloads and open it' %{

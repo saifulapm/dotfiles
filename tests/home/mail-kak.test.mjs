@@ -73,7 +73,7 @@ test('o in a thread offers the link of a mail whose Message-ID holds quotes and 
   const r = hostile(t);
   const k = await kak(r, 'mail-links');
   assert.equal(existsSync(r.pwned), false);
-  assert.deepEqual(k.menu, ['https://x.test/a'], k.debug);
+  assert.deepEqual(k.menu, ['1 x.test/a'], k.debug);
   assert.equal(k.opened, 'https://x.test/a\n');
 });
 

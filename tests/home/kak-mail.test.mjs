@@ -23,7 +23,10 @@ test('links and attachments of a mail whose Message-ID holds quotes and $( ) lis
   const r = hostile(t);
   const links = r.kakMail('links', r.id);
   assert.equal(links.status, 0, links.stderr);
-  assert.equal(links.stdout, 'https://x.test/a\n');
+  assert.equal(links.stdout, '1 x.test/a\n');
+  const link = r.kakMail('link', r.id, '1 x.test/a');
+  assert.equal(link.status, 0, link.stderr);
+  assert.equal(link.stdout, 'https://x.test/a\n');
   const atts = r.kakMail('attachments', r.id);
   assert.equal(atts.status, 0, atts.stderr);
   assert.match(atts.stdout, /^\d+: a\.txt \(text\/plain\)$/m);
@@ -225,4 +228,38 @@ test('an attachment whose name holds CR and LF is one line in the thread and the
   const saved = r.kakMail('save', 'tag:inbox', atts.stdout.split(':')[0]);
   assert.equal(saved.status, 0, saved.stderr);
   assert.equal(saved.stdout, `${join(r.env.HOME, 'Downloads/hostname x.txt')}\n`);
+});
+
+// A newsletter's links: anchor text beside the host and path, a query or fragment shown as …, an image anchor as its host alone (lynx drops an anchor that shows nothing), and no scheme but http and https.
+function newsletter(t) {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<news@x.test>', 'MIME-Version': '1.0', 'Content-Type': 'text/html; charset=utf-8' }, `<html><body>
+<p><a href="https://shop.test/">Shop now</a> or <a href="https://ups.com/track?num=1Z">Track</a></p>
+<p><a href="https://img.test/p?u=1"><img src="https://img.test/i.png"></a></p>
+<p><a href="https://shop.test/">Shop again</a> <a href="mailto:ann@people.test">mail</a> <a href="javascript:alert(1)">js</a></p>
+<p><a href="https://evil.test/">Bad\u202elabel</a></p>
+</body></html>\n`);
+  return r;
+}
+
+test('o lists each link of a mail by its anchor text beside its host, with a query shown as …', (t) => {
+  const r = newsletter(t);
+  const links = r.kakMail('links', 'id:news@x.test');
+  assert.equal(links.status, 0, links.stderr);
+  assert.deepEqual(links.stdout.split('\n').filter(Boolean), [
+    '1 Shop now — shop.test',
+    '2 Track — ups.com/track…',
+    '3 img.test/p…',
+    '4 Badlabel — evil.test',
+  ]);
+});
+
+test('a picked link opens by its number, whatever text follows it', (t) => {
+  const r = newsletter(t);
+  const url = (pick) => r.kakMail('link', 'id:news@x.test', pick);
+  assert.equal(url('2 Track — ups.com/track…').stdout, 'https://ups.com/track?num=1Z\n');
+  assert.equal(url('3').stdout, 'https://img.test/p?u=1\n');
+  const none = url('9 nothing');
+  assert.equal(none.status, 1);
+  assert.match(none.stderr, /no link 9/);
 });
