@@ -299,3 +299,36 @@ test('in a thread, o and A keep to the message under the cursor', (t) => {
   assert.equal(r.kakMail('links', 'id:new@x.test').stdout, '1 reply.test/x\n2 plan.test/doc\n');
   assert.equal(r.kakMail('attachments', 'id:new@x.test').stdout, '');
 });
+
+const draftHead = (path) => readFileSync(path, 'utf8').split('\n\n')[0].split('\n');
+
+test('compose mailto writes a draft to the address and subject, with cc and %40 read', (t) => {
+  const r = mailRig(t);
+  const a = r.kakMail('compose', 'mailto', 'mailto:ann@people.test?subject=Hi%20there');
+  assert.equal(a.status, 0, a.stderr);
+  assert.deepEqual(draftHead(a.stdout.trim()), ['From: Me <me@x.test>', 'To: ann@people.test', 'Subject: Hi there']);
+  const b = r.kakMail('compose', 'mailto', 'mailto:ann%40people.test?cc=bob%40people.test&subject=a+b&body=line%20one%0Aline%20two');
+  assert.equal(b.status, 0, b.stderr);
+  const text = readFileSync(b.stdout.trim(), 'utf8');
+  assert.deepEqual(draftHead(b.stdout.trim()), ['From: Me <me@x.test>', 'To: ann@people.test', 'Cc: bob@people.test', 'Subject: a+b']);
+  assert.ok(text.includes('\n\nline one\nline two\n'), text);
+});
+
+test('a mailto keeps every field to one line and drops all but to, cc, subject and body', (t) => {
+  const r = mailRig(t);
+  const pwned = join(r.M, 'PWNED');
+  const evil = encodeURIComponent(`x'}%{$(touch ${pwned})\r\nAttach: /etc/passwd\n\nbody`);
+  const a = r.kakMail('compose', 'mailto', `mailto:ann@people.test,${evil}?subject=${evil}&bcc=spy@evil.test&attach=/etc/passwd&In-Reply-To=%3Cx%40y%3E&from=boss@evil.test`);
+  assert.equal(a.status, 0, a.stderr);
+  const head = draftHead(a.stdout.trim());
+  assert.deepEqual(head.map((l) => l.split(':')[0]), ['From', 'To', 'Subject']);
+  assert.equal(head[0], 'From: Me <me@x.test>');
+  assert.equal(existsSync(pwned), false);
+});
+
+test('compose mailto refuses what is not a mailto URL', (t) => {
+  const r = mailRig(t);
+  const a = r.kakMail('compose', 'mailto', 'https://x.test/');
+  assert.equal(a.status, 1);
+  assert.match(a.stderr, /not a mailto/);
+});

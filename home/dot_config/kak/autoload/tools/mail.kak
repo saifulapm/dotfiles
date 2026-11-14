@@ -371,6 +371,13 @@ define-command mail-compose -params 1 -docstring 'mail-compose new|reply|replyal
     }
 }
 
+# A draft written outside kak (mail-open's mailto:) opens as mail-compose
+# leaves one: on an empty To line, else at the top of the body.
+define-command -hidden -params 1 mail-draft-open %{
+    edit %arg{1}
+    try %{ execute-keys 'gg/^To: $<ret>gl' } catch %{ execute-keys 'gg/^$<ret>j' }
+}
+
 define-command -hidden mail-draft-setup %{
     map buffer local s ':mail-send<ret>'    -docstring 'send'
     map buffer local k ':mail-discard<ret>' -docstring 'discard draft'

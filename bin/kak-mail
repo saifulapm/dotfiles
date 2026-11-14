@@ -17,6 +17,7 @@ Subcommands (the kak side is the only intended caller):
   save QUERY PICK             the attachment on line PICK → ~/Downloads (never overwrites)
   identities                  sender identities, one per line
   compose new|reply|replyall|forward [QUERY]   write a draft, print its path
+  compose mailto URL          a draft to a mailto: URL's to, cc, subject and body
   header FILE set|add NAME VALUE   edit a draft's headers (From, Attach)
   send FILE                   send a draft via msmtp, file it in Sent, delete it
   hey ACTION [--arg A] QUERY...   the HEY routing actions (see HEY below)
@@ -34,7 +35,7 @@ import time
 import unicodedata
 from email.message import EmailMessage
 from email.utils import formatdate, getaddresses, make_msgid, parseaddr
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 import json
 
 # Python would write bin/__pycache__ into the checkout on the first import.
@@ -294,6 +295,28 @@ def oneline(value):
     return LINE_BREAKS.sub(" ", value)
 
 
+# The mailto fields a draft takes; any other (bcc, from, attach, in-reply-to) is a web page's say about who the mail goes to or what it holds, so it is dropped.
+MAILTO_FIELDS = {"to": "To", "cc": "Cc", "subject": "Subject", "body": "Body"}
+
+
+def mailto(url):
+    """URL's draft headers (To, Cc, Subject) and Body, as RFC 6068 spells them; + is a plus, not a space."""
+    if not url.lower().startswith("mailto:"):
+        die(f"not a mailto URL: {url}")
+    path, _, query = url[7:].partition("?")
+    fields = {"To": [unquote(path)] if path else [], "Cc": [], "Subject": [], "Body": []}
+    for pair in query.split("&"):
+        k, _, v = pair.partition("=")
+        name = MAILTO_FIELDS.get(unquote(k).lower())
+        if name:
+            fields[name].append(unquote(v))
+    out = [(k, ", ".join(a for a in fields[k] if a)) for k in ("To", "Cc") if any(fields[k])]
+    out.append(("Subject", fields["Subject"][0] if fields["Subject"] else ""))
+    if fields["Body"]:
+        out.append(("Body", fields["Body"][0].replace("\r\n", "\n")))
+    return out
+
+
 def cmd_compose(args):
     kind = args[0]
     headers, body = [], ""
@@ -312,6 +335,10 @@ def cmd_compose(args):
         oh = orig["headers"]
         body = (f"\n\nOn {oh.get('Date', '')}, {oh.get('From', '')} wrote:\n" +
                 quote(body_text(orig.get("body", []), [], links=False)))
+    elif kind == "mailto":
+        fields = mailto(args[1])
+        headers = [("From", identities()[0])] + [f for f in fields if f[0] != "Body"]
+        body = "".join("\n" + v for k, v in fields if k == "Body")
     elif kind == "forward":
         msg_id = message_of(args[1])
         orig = one_message(msg_id)
