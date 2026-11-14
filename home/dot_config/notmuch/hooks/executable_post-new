@@ -124,6 +124,13 @@ fi
 # A muted thread stays muted as it grows; `unread` is left alone, since read state reaches the phone through the maildir flags.
 notmuch tag +muted -inbox -- 'tag:new and thread:{tag:muted}' 2>>"$LOG"
 
+# muted.db names a muted thread by a Message-ID, so a mute synced from another machine holds for mail of it this machine has yet to see.
+if [ -s "$DB_DIR/muted.db" ]; then
+    while IFS= read -r mid; do
+        case "$mid" in id:*) printf '+muted -inbox -- tag:new and thread:{%s}\n' "$(sanitize "$mid")" ;; esac
+    done <"$DB_DIR/muted.db" | notmuch tag --batch 2>>"$LOG"
+fi
+
 # The away reply goes once per screened-in sender, never to lists, auto-submitted mail, no-reply or yourself, as each of those risks a mail loop.
 AWAY_FILE="$DB_DIR/away"
 AWAY_MAX="${HEY_AWAY_MAX:-10}"

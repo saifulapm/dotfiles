@@ -7,8 +7,9 @@ winning per key, and what the merge changed is written back to those files
 and its mail re-filed on this machine. A record's key is "sender ADDR"
 (value screened, thefeed, spam or "ledger CATEGORY"), "folder NAME"
 (foldersync.db), "autofile ADDR LABEL", "notify ADDR", "recycle ADDR" (value
-its days), "speakeasy" (value the code) or "bubble id:MESSAGE-ID" (value its
-due time in epoch seconds); a value of null is a removal. The
+its days), "speakeasy" (value the code), "bubble id:MESSAGE-ID" (value its
+due time in epoch seconds) or "mute id:MESSAGE-ID"; a value of null is a
+removal. The
 away message and its replied list are never read, so only the machine that
 holds them replies.
 
@@ -28,7 +29,7 @@ sys.dont_write_bytecode = True
 import mail_engine as E
 
 DAY = 24 * 3600 * 1000
-SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db")
+SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db", "muted.db")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
 # An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query.
 ADDR = re.compile(r'[^\s"*(){}\[\]\\@]*@[^\s"*(){}\[\]\\@]+')
@@ -60,6 +61,8 @@ def valid(key, value):
         return ADDR.fullmatch(rest) is not None and rest == rest.lower() and value in (None, True)
     if kind == "recycle":
         return ADDR.fullmatch(rest) is not None and rest == rest.lower() and (value is None or (isinstance(value, str) and DAYS.fullmatch(value) is not None))
+    if kind == "mute":
+        return MSGID.fullmatch(rest) is not None and value in (None, True)
     if kind == "bubble":
         return MSGID.fullmatch(rest) is not None and (value is None or (type(value) is int and value > 0))
     if key == "speakeasy":
@@ -106,6 +109,8 @@ def line_record(name, line):
     if name == "speakeasy":
         code = "".join(line.split())
         return ("speakeasy", code) if CODE.fullmatch(code) else None
+    if name == "muted.db":
+        return (f"mute {line.strip()}", True) if MSGID.fullmatch(line.strip()) else None
     if name == "bubble.db":
         w = line.split()
         return (f"bubble {w[0]}", int(w[1])) if len(w) == 2 and MSGID.fullmatch(w[0]) and w[1].isdigit() and int(w[1]) > 0 else None
@@ -130,7 +135,7 @@ def file_of(key, value):
     kind = key.split(" ")[0]
     if kind == "sender":
         return value.split(" ")[0] + ".db"
-    return {"folder": "foldersync.db", "speakeasy": "speakeasy"}.get(kind, kind + ".db")
+    return {"folder": "foldersync.db", "speakeasy": "speakeasy", "mute": "muted.db"}.get(kind, kind + ".db")
 
 
 def files_of(key):
@@ -324,6 +329,8 @@ def main(path, pulled):
         try:
             if kind == "sender":
                 E.refile(rest, old, new)
+            elif kind == "mute":
+                E.tag(f"thread:{{{rest}}}", *(("+muted", "-inbox") if new else ("-muted",)))
             elif kind == "bubble" and new is not None:
                 E.tag(f"thread:{{{rest}}}", "+bubble", "-inbox", "-unread", "-bubbled")
             elif kind == "autofile":

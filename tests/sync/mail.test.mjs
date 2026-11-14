@@ -239,3 +239,28 @@ test("a bubble's real due on a outvotes the default b wrote for the same thread"
   assert.equal(bubbles(b), due);
   assert.equal(bubbles(a), due);
 });
+
+test("a mute on a's machine mutes the thread on b, keeps b's new mail in it muted, and an unmute travels too", async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  await mailbox(a);
+  await mailbox(b, { hooks: true });
+  for (const m of [a, b]) await ok(m, ['--only', 'mail']);
+  await deliver(b, 'x@y.test', 'm1@x.test');
+  await deliver(b, 'x@y.test', 'm2@x.test', 'm1@x.test');
+  writeFileSync(join(a.hey, 'muted.db'), 'id:m1@x.test\nid:m9@x.test\n');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'muted.db'), 'id:m1@x.test\nid:m9@x.test\n');
+  assert.equal(await count(b, 'tag:muted and not tag:inbox'), 2);
+  await deliver(b, 'x@y.test', 'm3@x.test', 'm2@x.test');
+  assert.ok((await tags(b, 'm3@x.test')).includes('muted'));
+  // The record came before any mail of that thread did.
+  await deliver(b, 'x@y.test', 'm9@x.test');
+  assert.ok((await tags(b, 'm9@x.test')).includes('muted'));
+  writeFileSync(join(a.hey, 'muted.db'), '');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'muted.db'), '');
+  assert.equal(await count(b, 'tag:muted'), 0);
+});
