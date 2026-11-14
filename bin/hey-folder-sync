@@ -242,8 +242,7 @@ move_one() {
 apply() {
     local moved=0 created=0 tagged=0 i msg folder line
 
-    # Pass 1, folder -> tag, runs first so pass 2 places mail by the tags it set.
-    # A message unknown to the state counts as unchanged, unless it is in an enabled HEY folder: only another client puts new mail there.
+    # Pass 1, folder -> tag, runs first so pass 2 places mail by the tags it set; a message unknown to the state counts as unchanged, unless it is in an enabled HEY folder, where only another client puts new mail.
     local cur="$STATE.new" old
     # A message in two folders at once (a failed expunge) is dropped, so next run places it by its tags.
     current_state | awk -F'\t' '{ line[NR] = $0; id[NR] = $1; n[$1]++ }
@@ -303,8 +302,7 @@ apply() {
         [ "$n" -gt 0 ] && log "moved $n message(s) -> ${RULE_FOLDER[i]}"
     done
 
-    # Records the intended folders: notmuch has not reindexed yet, and the old ones would read as external moves next run.
-    # A held message keeps its old folder, and a held first-seen one is left out.
+    # Records the intended folders, as notmuch has not reindexed yet and the old ones would read as external moves next run; a held message keeps its old folder, and a held first-seen one is left out.
     if [ "${#newfolder[@]}" -gt 0 ] || [ "${#held[@]}" -gt 0 ]; then
         awk -F'\t' -v OFS='\t' 'NR==FNR { to[$1]=$2; next }
                                 !($1 in to) { print; next }
