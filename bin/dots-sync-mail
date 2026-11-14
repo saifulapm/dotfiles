@@ -21,6 +21,7 @@ import re
 import sys
 import time
 
+sys.dont_write_bytecode = True
 import mail_engine as E
 
 DAY = 24 * 3600 * 1000
