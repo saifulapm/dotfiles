@@ -383,7 +383,7 @@ test('a failing count still opens the thread and keeps the old file', (t) => {
 test('the post-new hook writes the count for the margin with kak-mail off PATH', (t) => {
   const f = countFake(t);
   mkdirSync(join(f.dir, 'Codes/dotfiles/bin'), { recursive: true });
-  cpSync(join(repo, 'bin/kak-mail'), join(f.dir, 'Codes/dotfiles/bin/kak-mail'));
+  for (const f2 of ['kak-mail', 'mail_engine.py']) cpSync(join(repo, 'bin', f2), join(f.dir, 'Codes/dotfiles/bin', f2));
   writeFileSync(join(f.dir, 'notify-send'), `#!/bin/sh\necho "$*" >> ${f.dir}/notified\n`, { mode: 0o755 });
   const env = { PATH: `${f.dir}:/usr/bin:/bin`, HOME: f.dir, XDG_STATE_HOME: join(f.dir, 'state'), DBUS_SESSION_BUS_ADDRESS: 'unix:path=/nonexistent' };
   const r = spawnSync('bash', [join(repo, 'home/dot_config/notmuch/hooks/executable_post-new')], { env, encoding: 'utf8' });
