@@ -801,9 +801,10 @@ def decide(action, addr, arg=None):
         # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
         new = "ledger " + sanitize(arg, "Category") if action == "papertrail" else DECIDES_CLASS[action]
         old = sender_class(addr)
+        # Tags first: a notmuch that fails then leaves the files, and the sender's class, as they were.
+        refile(addr, old, new)
         for db in CLASS_FILES:
             db_drop(db, addr)
-        refile(addr, old, new)
         db_add(new.split(" ")[0] + ".db", f"{new[7:]} {addr}" if action == "papertrail" else addr)
         stamp("sender " + addr.lower())
     elif action == "unscreen":

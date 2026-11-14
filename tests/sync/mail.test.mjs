@@ -14,7 +14,7 @@ async function ok(m, args) {
   return r;
 }
 
-// Two machines with mail, each started once, as Saiful starts each after his go.
+// Two machines with mail, each started once, since a full round leaves a machine's mail alone until then.
 async function pair() {
   const w = world();
   const [a, b] = [machine(w, 'a'), machine(w, 'b')];
@@ -154,12 +154,16 @@ test('a pulled record naming a sender notmuch would read as a query is left out,
     'sender /.+@.+/': { v: 'spam', at },
     'sender l@y.test': { v: ['screened'], at },
     'mute id:m@y.test': { v: { x: 1 }, at },
+    // A regex code, a top-level domain and a zero-day recycle each match every mail post-new sees.
+    speakeasy: { v: '/./', at },
+    'sender @test': { v: 'spam', at },
+    'recycle ok@y.test': { v: '0', at },
     'sender ok@y.test': { v: 'screened', at },
   };
   writeFileSync(remote(w, 'a'), JSON.stringify({ v: 1, records }));
   const r = await sync(b, ['--only', 'mail']);
   assert.equal(r.code, 5, r.stdout + r.stderr);
-  assert.match(r.stderr, /^dots sync: mail: left out 5 records from a\.json, which are not HEY decisions$/m);
+  assert.match(r.stderr, /^dots sync: mail: left out 8 records from a\.json, which are not HEY decisions$/m);
   assert.equal(db(b, 'screened.db'), 'ok@y.test\n');
   assert.equal(db(b, 'spam.db'), '');
 });
@@ -271,4 +275,55 @@ test("a mute on a's machine mutes the thread on b, keeps b's new mail in it mute
   await ok(b);
   assert.equal(db(b, 'muted.db'), '');
   assert.equal(await count(b, 'tag:muted'), 0);
+});
+
+// a's unscreen and b's screen-in again both change nothing b's files hold, yet b decided last.
+test('a sender screened in again after another machine unscreened it ends screened in', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'a1@y.test');
+  await deliver(b, 'x@y.test', 'b1@y.test');
+  await hey(a, 'screen-in', 'a1@y.test');
+  await ok(a);
+  await ok(b);
+  await hey(a, 'unscreen', 'a1@y.test');
+  await new Promise((done) => setTimeout(done, 20));
+  await hey(b, 'screen-in', 'b1@y.test');
+  for (const m of [a, b, a]) await ok(m);
+  for (const m of [a, b]) assert.match(db(m, 'screened.db'), /^x@y\.test$/m, m.id);
+});
+
+// a's store lacks the thread's older mail, so a and b name one thread by different Message-IDs.
+test("a bubble on a thread retires b's older bubble line for the same thread under another Message-ID", async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'new@y.test', 'old@y.test');
+  await deliver(b, 'x@y.test', 'old@y.test');
+  await deliver(b, 'x@y.test', 'new@y.test', 'old@y.test');
+  writeFileSync(join(b.hey, 'bubble.db'), `id:old@y.test ${Math.floor(Date.now() / 1000) + 86400}\n`);
+  await ok(b);
+  const r = await kakMail(a, ['hey', 'bubble', '--arg', '2099-01-01 09:00', 'id:new@y.test']);
+  assert.equal(r.code, 0, r.stderr);
+  const due = bubbles(a);
+  assert.match(due, /^id:new@y\.test \d+\n$/);
+  for (const m of [a, b, a, b]) await ok(m);
+  assert.equal(bubbles(b), due);
+  assert.equal(bubbles(a), due);
+});
+
+test('a pulled decision whose re-filing failed is re-filed by the next round', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'a1@y.test');
+  await deliver(b, 'x@y.test', 'b1@y.test');
+  await hey(a, 'screen-out', 'a1@y.test');
+  await ok(a);
+  const stub = join(b.env.HOME, 'failing');
+  mkdirSync(stub);
+  writeFileSync(join(stub, 'notmuch'), '#!/bin/sh\n[ "$1" = tag ] && exit 1\nexec /usr/bin/notmuch "$@"\n', { mode: 0o755 });
+  const path = b.env.PATH;
+  b.env.PATH = stub + ':' + path;
+  const r = await sync(b);
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  b.env.PATH = path;
+  await ok(b);
+  assert.match(db(b, 'spam.db'), /^x@y\.test$/m);
+  assert.equal(await count(b, 'tag:spam and from:x@y.test'), 1);
 });

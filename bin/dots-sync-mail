@@ -31,14 +31,15 @@ import mail_engine as E
 DAY = 24 * 3600 * 1000
 SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db", "muted.db")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
-# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query; notmuch reads from:/.../ as a regex.
-ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@[^\s"*(){}\[\]\\/@]+')
-DAYS = re.compile(r"[0-9]{1,5}")
+# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it.
+ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@(?:[^\s"*(){}\[\]\\/@.]+\.)+[^\s"*(){}\[\]\\/@.]+')
+# The days the engine offers; post-new's recycle query has no tag:new, so 0 would delete all the sender's mail.
+DAYS = re.compile(r"30|90|730")
 # A Message-ID goes into a thread:{} query, so nothing in it may close the braces or widen the query.
 MSGID = re.compile(r'id:[^\s"(){}\[\]\\]+')
 THREAD = re.compile(r"[0-9a-f]{16}")
-# post-new puts the code in a subject: query with its quotes dropped.
-CODE = re.compile(r'[^\s"\\]{1,64}')
+# post-new puts the code in a subject: query with its quotes dropped, where /.../ is a regex.
+CODE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 def fail(msg, code):
@@ -229,6 +230,18 @@ def migrate_bubbles():
         write("bubble.db", out)
 
 
+def twin_bubbles(records):
+    """Live bubbles naming a thread another, newer live bubble names by a different Message-ID, as when one machine lacks the thread's older mail, with the newer one's stamp."""
+    live = sorted(((r["at"], k) for k, r in records.items() if k.startswith("bubble ") and r["v"] is not None), reverse=True)
+    twins = {}
+    for i, (at, key) in enumerate(live[:-1]):
+        if key in twins:
+            continue
+        thread = set(E.nm("search", "--exclude=false", "--output=messages", f"thread:{{{key[7:]}}}").split())
+        twins.update({other: at for _, other in live[i + 1:] if other not in twins and other[7:] in thread})
+    return twins
+
+
 def apply(changed, view, now_s):
     """Write each changed key's line where it now belongs and drop its old lines, touching only the files that change; a due bubble line stays for post-new to fire."""
     edits = {}
@@ -277,11 +290,13 @@ def main(path, pulled):
     stamps, taken = journal()
     records = dict(own)
     live = {k: r["v"] for k, r in own.items() if r["v"] is not None}
-    for key in sorted(set(live) | set(view)):
+    for key in sorted(set(live) | set(view) | set(stamps)):
         value = view.get(key)
-        if value == live.get(key) or (value is None and file_of(key, live[key]) in missing):
-            continue
         prev = own.get(key)
+        # A decision that leaves the files as they were still counts when the engine made it after the key's last stamp, or another machine's older one would win.
+        decided = stamps.get(key, 0) > (prev["at"] if prev else 0) and (prev is not None or value is not None)
+        if (value == live.get(key) and not decided) or (value is None and key in live and file_of(key, live[key]) in missing):
+            continue
         # Never at or below the key's last stamp, so a decision made after seeing another machine's wins on a slow clock too.
         floor = prev["at"] + 1 if prev else 0
         if key.startswith("bubble "):
@@ -296,6 +311,7 @@ def main(path, pulled):
             continue
         records[key] = {"v": value, "at": max(stamps.get(key, now), floor)}
 
+    detected = dict(records)
     before = {k: r["v"] for k, r in records.items()}
     left_out = False
     for f in pulled:
@@ -323,8 +339,13 @@ def main(path, pulled):
             said.append(f"mail: left out {plural(ahead, 'from ' + name + ', stamped more than a day ahead', 'from ' + name + ', stamped more than a day ahead')}")
         left_out = left_out or bool(bad or ahead)
 
+    try:
+        for key, at in twin_bubbles(records).items():
+            records[key] = {"v": None, "at": at}
+    except E.MailError as e:
+        said.append(f"mail: could not tell which bubbles share a thread: {e}")
+
     changed = {k: (before.get(k), r["v"]) for k, r in records.items() if r["v"] != before.get(k)}
-    apply(changed, view, now // 1000)
     refused = []
     for key, (old, new) in sorted(changed.items()):
         kind, _, rest = key.partition(" ")
@@ -340,6 +361,13 @@ def main(path, pulled):
                 E.tag("from:" + addr, ("+" if new else "-") + "label/" + label)
         except E.MailError as e:
             refused.append(f"mail: could not re-file {rest.split(' ')[0]}'s mail: {e}")
+            # Its line and record stay as they were, so the next round pulls the decision and re-files again.
+            del changed[key]
+            if key in detected:
+                records[key] = detected[key]
+            else:
+                records.pop(key)
+    apply(changed, view, now // 1000)
 
     out = json.dumps({"v": 1, "records": records}, sort_keys=True)
     if out != text:
