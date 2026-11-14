@@ -791,7 +791,8 @@ RX_SPECIAL = set(".^$|?*+()[]{}")
 def from_query(key):
     """The from: query for a sender key of the db files, as a regex in any case: an address key matches that From address exactly and an @domain key any address of that domain alone, since notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it."""
     rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else "\\" + c if c in RX_SPECIAL else c for c in key)
-    return f'from:"/{rx}>?$/"' if key.startswith("@") else f'from:"/(^|<){rx}>?$/"'
+    # An address starts the header, follows its <, or follows the comma of a list, whose last address its domain's line matches too.
+    return f'from:"/{rx}>?$/"' if key.startswith("@") else f'from:"/(^|<|,[[:space:]]*){rx}>?$/"'
 
 
 def domain_of(addr):
@@ -899,10 +900,14 @@ def decide(action, addr, arg=None, domain=False):
             raise MailError(f"{action} takes no domain; a domain is screened in, fed, filed in Paper Trail or screened out")
         addr = domain_of(addr)
         if not ADDR.fullmatch(addr):
-            raise MailError(f"{addr} is not one domain, and its line would match more senders than it")
+            e = MailError(f"{addr} is not one domain, and its line would match more senders than it")
+            e.hint = "name a domain with a dot in it, as @example.com"
+            raise e
         # One sender at a freemail domain never decides everyone there.
         if addr[1:] in FREEMAIL:
-            raise MailError(f"{addr[1:]} is freemail, so a domain line would decide every sender there; decide the address alone")
+            e = MailError(f"{addr[1:]} is freemail, so a domain line would decide every sender there; decide the address alone")
+            e.hint = "decide the address alone: the same action without --domain, or screen-out --sender ADDR"
+            raise e
     elif addr.startswith("@") or not ADDR.fullmatch(addr):
         raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
     # A decision writes a line for the address alone, which beats its domain's line; an unscreen of an address no line of its own decides undoes its domain's line.

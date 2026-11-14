@@ -258,3 +258,28 @@ test('kak-mail hey --domain takes the domain of each selected sender', (t) => {
   assert.equal(r.db('ledger.db'), 'receipts @mail.anthropic.test\n');
   assert.equal(r.db('spam.db'), '@bad.test\n');
 });
+
+// A From header holding two addresses is decided by its last one, by its own line or its domain's, however the list is spelled.
+test("an address with its own line is decided by that line when it ends a From header's list, in either spelling", (t) => {
+  const r = hooked(t);
+  r.setDb('thefeed.db', '@vendor.test\n');
+  r.setDb('screened.db', 'boss@vendor.test\n');
+  r.deliver({ From: 'evil@bad.test, boss@vendor.test', 'Message-ID': '<l1@x.test>' });
+  r.deliver({ From: 'Evil <e@bad.test>, <boss@vendor.test>', 'Message-ID': '<l2@x.test>' });
+  r.deliver({ From: 'boss@vendor.test, evil@bad.test', 'Message-ID': '<l3@x.test>' });
+  assert.deepEqual(tagsOf(r, 'l1@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'l2@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'l3@x.test'), ['inbox', 'unread']);
+});
+
+test('a refused domain decision says what to do instead, not that notmuch failed', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'x@gmail.com', 'Message-ID': '<gm@x.test>' });
+  for (const args of [['screen-in', 'gm@x.test', '--domain'], ['screen-out', '--sender', '@gmail.com'], ['screen-out', '--sender', '@test']]) {
+    const res = mailCli(r, 'hey', ...args);
+    assert.equal(res.status, 1, res.stdout);
+    assert.doesNotMatch(res.json.hint, /notmuch failed/, args.join(' '));
+  }
+  assert.match(mailCli(r, 'hey', 'screen-in', 'gm@x.test', '--domain').json.hint, /without --domain/);
+  assert.match(mailCli(r, 'hey', 'screen-out', '--sender', '@test').json.hint, /dot/);
+});

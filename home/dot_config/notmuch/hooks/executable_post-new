@@ -21,7 +21,7 @@ sanitize() { printf '%s' "${1//\"/}"; }
 # A sender line as mail_engine.ADDR holds a decision to, one address or one @domain; any other line could widen its query, so it is left out.
 ADDR_RE='^[^][[:space:]"*(){}\\/@]*@([^][[:space:]"*(){}\\/@.]+\.)+[^][[:space:]"*(){}\\/@.]+$'
 
-# notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it, so a sender line becomes a regex, each letter in either case: an address anchored to the whole From address, an @domain to the address's end; mail_engine.from_query writes the same.
+# notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it, so a sender line becomes a regex, each letter in either case: an address anchored to the whole last address of the From header, an @domain to its end; mail_engine.from_query writes the same.
 from_q() {
     local a="$1" c i rx=""
     [[ $a =~ $ADDR_RE ]] || return 1
@@ -35,7 +35,7 @@ from_q() {
     done
     case "$a" in
         @*) printf 'from:"/%s>?$/"' "$rx" ;;
-        *) printf 'from:"/(^|<)%s>?$/"' "$rx" ;;
+        *) printf 'from:"/(^|<|,[[:space:]]*)%s>?$/"' "$rx" ;;
     esac
 }
 
