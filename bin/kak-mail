@@ -520,7 +520,8 @@ def cmd_send(args):
                            input=raw, capture_output=True)
     if filed.returncode != 0:
         why = (filed.stderr.decode(errors="replace").strip().splitlines() or ["notmuch insert failed"])[-1]
-        die(f"sent, but not filed in Sent ({why}); {mark} holds the message as it went out")
+        # Kakoune's status line cuts a long message, so the file to look in comes before notmuch's reason.
+        die(f"sent, but not filed in Sent; {os.path.basename(mark)} beside the draft holds it: {why}")
     irt = msg.get("In-Reply-To", "").strip().strip("<>")
     if irt:
         subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])

@@ -160,7 +160,8 @@ test('a draft whose Sent copy could not be filed is never sent a second time', (
   writeFileSync(draft, 'From: Me <me@x.test>\nTo: a@x.test\nSubject: hi\n\nhello\n');
   const first = r.kakMail('send', draft);
   assert.notEqual(first.status, 0);
-  assert.match(first.stderr, /sent, but not filed in Sent/);
+  // Kakoune's status line cuts a long message, so the file to look in comes before notmuch's reason.
+  assert.match(first.stderr, /^kak-mail: sent, but not filed in Sent; once\.eml\.sent beside the draft holds it: /);
   assert.equal(r.sends().length, 1);
   assert.equal(existsSync(draft), true);
   const second = r.kakMail('send', draft);
