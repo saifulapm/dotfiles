@@ -31,8 +31,7 @@ import mail_engine as E
 DAY = 24 * 3600 * 1000
 SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db", "muted.db")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
-# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it.
-ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@(?:[^\s"*(){}\[\]\\/@.]+\.)+[^\s"*(){}\[\]\\/@.]+')
+ADDR = E.ADDR
 # The days the engine offers; post-new's recycle query has no tag:new, so 0 would delete all the sender's mail.
 DAYS = re.compile(r"30|90|730")
 # A Message-ID goes into a thread:{} query, so nothing in it may close the braces or widen the query.

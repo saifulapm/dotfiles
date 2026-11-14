@@ -720,6 +720,8 @@ def tag(query, *changes):
     nm("tag", *changes, "--", query)
 
 
+# An address or @domain rule goes into a from: query in post-new and dots sync, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it.
+ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@(?:[^\s"*(){}\[\]\\/@.]+\.)+[^\s"*(){}\[\]\\/@.]+')
 # Each sender class file and the class its lines give; a ledger.db line names its category first, and its class is "ledger CATEGORY".
 CLASS_FILES = {"screened.db": "screened", "thefeed.db": "thefeed", "spam.db": "spam", "ledger.db": "ledger"}
 # An address in two class files reads as post-new's tags leave its mail: spam over Paper Trail over The Feed over screened in.

@@ -149,9 +149,11 @@ def plan():
 
     def is_decided(addr):
         return addr in decided or "@" + addr.rpartition("@")[2] in decided
+    # A From the sender wrote that is not one plain address would become a line post-new reads as a wider query, so it is left alone.
+    odd = {a for a in by_sender if not E.ADDR.fullmatch(a)}
     classes = {a: classify(a, ms, mine, wrote_to, os.path.join(store, "Junk") + "/", now)
-               for a, ms in by_sender.items() if not is_decided(a)}
-    already = len(by_sender) - len(classes)
+               for a, ms in by_sender.items() if a not in odd and not is_decided(a)}
+    already = len(by_sender) - len(classes) - len(odd)
 
     # One @domain key for a company whose senders all land in one class; own addresses and freemail keep a key per address.
     by_domain = {}
@@ -204,7 +206,7 @@ def plan():
         to = next((f for f, terms in rules if holds(terms, tags)), None)
         if to in enabled and to != folder:
             moves[(folder, to)] += 1
-    return {"counts": counts, "already": already, "lines": lines, "screener": screener, "batch": batch, "moves": moves}
+    return {"counts": counts, "already": already, "odd": len(odd), "lines": lines, "screener": screener, "batch": batch, "moves": moves}
 
 
 def report(p, applied):
@@ -213,6 +215,7 @@ def report(p, applied):
     for label, kinds in LABELS:
         out.append(f"{label}: {sum(c[k][0] for k in kinds)} senders, {sum(c[k][1] for k in kinds)} messages")
     out.append(f"already decided: {p['already']} senders")
+    out.append(f"left alone, not one plain address: {p['odd']} senders")
     out += [f"{db} {line}" for db, line, _ in p["lines"]]
     out += [f"screener {s}" for s in p["screener"]]
     moves = sorted(p["moves"].items(), key=lambda kv: (-kv[1], kv[0]))

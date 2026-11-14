@@ -130,3 +130,17 @@ test('mail seed reads an Auto-Submitted value of raw 8-bit bytes', (t) => {
   assert.equal(res.status, 0, res.stdout + res.stderr);
   assert.ok(lines(res.stdout).includes('thefeed.db bot@raw.test'), res.stdout);
 });
+
+// post-new puts each line in a from: query, where /.../ is a regex and a dotless domain matches every address under it.
+test('mail seed --apply writes no line for a sender whose address could widen a from: query, and says it left it alone', (t) => {
+  const r = rig(t);
+  r.deliver({ From: '/.+@.+/', Subject: 'hi', 'Auto-Submitted': 'auto-generated', Date: ago(5), 'Message-ID': '<re@x.test>' });
+  r.deliver({ From: 'x <a@test>', Subject: 'Your receipt', Date: ago(5), 'Message-ID': '<dotless@x.test>' });
+  r.deliver({ From: 'News <news@list.test>', Subject: 'weekly', 'List-Id': '<weekly.list.test>', Date: ago(5), 'Message-ID': '<n1@x.test>' });
+  const res = r.seed('--apply');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.ok(lines(res.stdout).includes('left alone, not one plain address: 2 senders'), res.stdout);
+  assert.equal(r.db('thefeed.db'), 'news@list.test\n');
+  assert.equal(r.db('ledger.db'), '');
+  assert.ok(!r.tags('re@x.test').includes('thefeed'));
+});
