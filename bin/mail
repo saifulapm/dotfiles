@@ -11,6 +11,7 @@
              [--body-file F] [--attach FILE]...  write a draft where Kakoune keeps them; prints its id and path
   mail drafts                                  every draft, newest first
   mail draft show DRAFT                        what the draft sends, and the digest send takes
+  mail send DRAFT --yes --digest D             send the draft draft show gave digest D, only after Saiful's yes to it
 
 ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
 also takes thread:THREAD. Every command prints one JSON object,
@@ -36,9 +37,9 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MailError, NotFound, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+from mail_engine import (BOXES, MailError, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          drafts, identities, idq, line, matched_messages, nm, one_message, part_sizes, search_threads,
-                         set_unread, thread_messages, thread_of, write_draft)
+                         send_draft, set_unread, thread_messages, thread_of, write_draft)
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
 LIMIT_MAX = 500
@@ -338,6 +339,25 @@ def cmd_draft_show(a):
     }
 
 
+def cmd_send(a):
+    path = draft_file(a.draft)
+    if not a.yes:
+        raise Refused("refused: needs --yes", "send only after Saiful says yes to this draft in the chat, then pass --yes --digest D")
+    if not a.digest:
+        raise Refused("refused: needs --digest D from mail draft show", "show Saiful the draft with mail draft show, and pass its digest")
+    try:
+        to = send_draft(path, a.digest)
+    except Refusal as e:
+        raise Refused(f"refused: {e}", "show the draft again with mail draft show, and ask Saiful again") from None
+    except NotFound:
+        raise missing(f"no draft {a.draft}", "it was sent or discarded; list the drafts with mail drafts") from None
+    except MailError as e:
+        # msmtp may have taken the mail before the failure, so a retry could send it twice.
+        e.hint = "tell Saiful this error, and do not send again without asking him"
+        raise
+    return {"id": os.path.basename(path).removesuffix(".eml"), "to": to}
+
+
 def parser():
     p = Parser(prog="mail", description="Read mail as JSON.")
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
@@ -375,6 +395,11 @@ def parser():
     c.add_argument("draft", help="a draft id or path, as mail drafts gives it")
     c.set_defaults(fn=cmd_draft_show)
     sub.add_parser("drafts", help="every draft, newest first").set_defaults(fn=cmd_drafts)
+    c = sub.add_parser("send", help="send a draft, only after Saiful's yes to it")
+    c.add_argument("draft", help="a draft id or path, as mail drafts gives it")
+    c.add_argument("--yes", action="store_true", help="Saiful said yes to this draft in the chat")
+    c.add_argument("--digest", help="the digest mail draft show printed for the draft Saiful saw")
+    c.set_defaults(fn=cmd_send)
     for name, unread in (("read", False), ("unread", True)):
         c = sub.add_parser(name, help=f"mark a message {name}")
         c.add_argument("id", help="a message id")
@@ -405,7 +430,7 @@ def main():
     except Refused as e:
         emit({"ok": False, "error": str(e), "hint": e.hint}, 3)
     except MailError as e:
-        emit({"ok": False, "error": str(e), "hint": "notmuch failed; try again, or run mail boxes to see the store answers"}, 1)
+        emit({"ok": False, "error": str(e), "hint": getattr(e, "hint", "notmuch failed; try again, or run mail boxes to see the store answers")}, 1)
     except Exception as e:
         # Still one JSON object, so an agent reads the failure rather than a traceback.
         emit({"ok": False, "error": f"{type(e).__name__}: {e}", "hint": "a bug in bin/mail; tell Saiful the command and this error"}, 1)

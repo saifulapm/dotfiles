@@ -5,6 +5,7 @@ mail read as a side effect of reading. The box list lives here only.
 """
 
 import email.policy
+import fcntl
 import hashlib
 import json
 import mimetypes
@@ -51,6 +52,10 @@ class MailError(Exception):
 
 class NotFound(MailError):
     pass
+
+
+class Refusal(MailError):
+    """A send that must not go: the draft was sent already, or changed since it was shown."""
 
 
 def nm(*args, stdin=None):
@@ -557,14 +562,31 @@ def digest(raw, attach):
     return h.hexdigest()[:16]
 
 
-def send_draft(path):
-    """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses."""
+def send_draft(path, expect=None):
+    """Send the draft at PATH through msmtp, file it in Sent, delete it; return the To and Cc addresses.
+    With EXPECT, a draft whose digest is not EXPECT is refused. One send at a time holds the drafts folder's lock,
+    so two sends of one draft run msmtp once: the second finds the draft gone."""
+    folder = os.open(os.path.dirname(os.path.abspath(path)), os.O_RDONLY)
+    try:
+        fcntl.flock(folder, fcntl.LOCK_EX)
+        return locked_send(path, expect)
+    finally:
+        os.close(folder)
+
+
+def locked_send(path, expect):
     # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
     mark = path + ".sent"
     if os.path.exists(mark):
-        raise MailError(f"already sent; {mark} holds the message as it went out")
-    with open(path) as f:
-        msg, attach, body = draft_message(f.read())
+        raise Refusal(f"already sent; {mark} holds the message as it went out")
+    try:
+        with open(path, "rb") as f:
+            raw = f.read()
+    except FileNotFoundError:
+        raise NotFound(f"no draft {path}") from None
+    msg, attach, body = draft_message(raw.decode("utf-8", "replace"))
+    if expect is not None and digest(raw, attach) != expect:
+        raise Refusal("the draft changed since it was shown")
     if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):
         raise MailError("no recipients (To/Cc/Bcc all empty)")
     if not msg.get("From"):

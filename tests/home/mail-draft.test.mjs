@@ -159,3 +159,86 @@ test('mail draft show names only drafts', (t) => {
   const gone = r.mail('draft', 'show', '20260101-000000-abcdef');
   assert.equal(gone.status, 2, gone.stdout);
 });
+
+// A draft to Ann as an agent writes it, and its digest as draft show gives it.
+function shownDraft(r) {
+  const { id, path } = r.mail('draft', 'new', '--to', 'ann@people.test', '--subject', 'Hi', '--body-file', r.file('b.txt', 'hello\n')).json.data;
+  return { id, path, digest: r.mail('draft', 'show', id).json.data.digest };
+}
+const sentCount = (r) => Number(r.notmuch('count', 'tag:sent').trim());
+
+test('mail send without --yes is refused and runs no msmtp', (t) => {
+  const r = rig(t);
+  const { id, path, digest } = shownDraft(r);
+  const res = r.mail('send', id);
+  assert.equal(res.status, 3, res.stdout);
+  assert.equal(res.json.error, 'refused: needs --yes');
+  const noDigest = r.mail('send', id, '--yes');
+  assert.equal(noDigest.status, 3, noDigest.stdout);
+  assert.match(noDigest.json.error, /^refused: needs --digest/);
+  assert.equal(r.sends().length, 0);
+  assert.ok(existsSync(path));
+  assert.ok(digest);
+});
+
+test('mail send refuses a draft that changed since it was shown, and sends it with the new digest', (t) => {
+  const r = rig(t);
+  const { id, path, digest } = shownDraft(r);
+  // An edit in Kakoune after the agent showed the draft.
+  writeFileSync(path, readFileSync(path, 'utf8').replace('hello', 'hello, and more'));
+  const stale = r.mail('send', id, '--yes', '--digest', digest);
+  assert.equal(stale.status, 3, stale.stdout);
+  assert.equal(stale.json.error, 'refused: the draft changed since it was shown');
+  assert.equal(r.sends().length, 0);
+  const before = sentCount(r);
+  const fresh = r.mail('draft', 'show', id).json.data.digest;
+  const res = r.mail('send', id, '--yes', '--digest', fresh);
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.deepEqual(res.json.data, { id, to: ['ann@people.test'] });
+  assert.equal(r.sends().length, 1);
+  assert.match(r.sends()[0].eml, /\r\nhello, and more\r\n/);
+  assert.equal(sentCount(r), before + 1);
+  assert.ok(!existsSync(path), 'the draft is gone');
+  const again = r.mail('send', id, '--yes', '--digest', fresh);
+  assert.equal(again.status, 2, again.stdout);
+  assert.equal(r.sends().length, 1);
+});
+
+test('mail send names only drafts', (t) => {
+  const r = rig(t);
+  const res = r.mail('send', '../../etc/passwd', '--yes', '--digest', 'X');
+  assert.equal(res.status, 1, res.stdout);
+  assert.equal(res.json.error, 'not a draft: ../../etc/passwd');
+  assert.equal(r.sends().length, 0);
+});
+
+test('mail send of a draft whose attachment is gone fails and keeps the draft', (t) => {
+  const r = rig(t);
+  const att = r.file('a b.txt', 'x\n');
+  const { id, path } = r.mail('draft', 'new', '--to', 'ann@people.test', '--attach', att).json.data;
+  r.run('rm', [att]);
+  const res = r.mail('send', id, '--yes', '--digest', r.mail('draft', 'show', id).json.data.digest);
+  assert.equal(res.status, 1, res.stdout);
+  assert.equal(res.json.error, `attachment not found: ${att}`);
+  assert.match(res.json.hint, /do not send again without asking/);
+  assert.equal(r.sends().length, 0);
+  assert.ok(existsSync(path));
+});
+
+test('two sends of one draft at once run msmtp once', async (t) => {
+  const r = rig(t);
+  const { id, digest } = shownDraft(r);
+  // A slow msmtp holds the first send open while the second starts.
+  const msmtp = join(r.M, 'bin/msmtp');
+  writeFileSync(msmtp, readFileSync(msmtp, 'utf8').replace('#!/bin/sh\n', '#!/bin/sh\nsleep 1\n'));
+  const { spawn } = await import('node:child_process');
+  const once = () => new Promise((resolve) => {
+    const p = spawn(join(repo, 'bin/mail'), ['send', id, '--yes', '--digest', digest], { env: r.env });
+    let out = '';
+    p.stdout.on('data', (d) => { out += d; });
+    p.on('close', (code) => resolve({ code, out }));
+  });
+  const results = await Promise.all([once(), once()]);
+  assert.deepEqual(results.map((x) => x.code).sort(), [0, 2], JSON.stringify(results));
+  assert.equal(r.sends().length, 1);
+});
