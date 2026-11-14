@@ -79,8 +79,11 @@ def idq(msg_id):
 
 
 def target(query):
-    """A message or thread from a mail buffer as notmuch should read it; the buffers keep ids bare."""
-    return idq(query[3:]) if query.startswith("id:") else query
+    """A message or thread from a mail buffer as notmuch should read it; the buffers keep ids bare.
+    Notmuch drops a Message-Id's whitespace, so a query with a space, or an id already quoted, goes as written."""
+    rest = query[3:]
+    bare = query.startswith("id:") and rest and not rest.startswith('"') and not any(c.isspace() for c in rest)
+    return idq(rest) if bare else query
 
 
 def die(msg):
@@ -241,7 +244,8 @@ def body_text(parts, attachments, links=True):
         ct = p.get("content-type", "").lower()
         c = p.get("content")
         if p.get("filename") or (p.get("content-disposition") == "attachment"):
-            attachments.append((p["id"], p.get("filename") or "unnamed", ct))
+            # The name is the sender's text: one line, or it splits the thread and the A picker.
+            attachments.append((p["id"], line(p.get("filename") or "").strip() or "unnamed", ct))
         elif ct == "multipart/alternative" and isinstance(c, list):
             plain = [q for q in c if q.get("content-type", "").lower() == "text/plain" and (q.get("content") or "").strip()]
             html = [q for q in c if q.get("content-type", "").lower() == "text/html"]
@@ -512,14 +516,18 @@ def cmd_send(args):
     with open(mark, "wb") as f:
         f.write(raw)
     # File the sent copy in icloud/Sent Messages, tagged +sent -inbox -unread -new.
-    subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
-                   input=raw, check=True)
+    filed = subprocess.run(["notmuch", "insert", f"--folder={SENT_FOLDER}", "+sent", "-inbox", "-unread", "-new"],
+                           input=raw, capture_output=True)
+    if filed.returncode != 0:
+        why = (filed.stderr.decode(errors="replace").strip().splitlines() or ["notmuch insert failed"])[-1]
+        die(f"sent, but not filed in Sent ({why}); {mark} holds the message as it went out")
     irt = msg.get("In-Reply-To", "").strip().strip("<>")
     if irt:
         subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])
-        threads = nm("search", "--output=threads", idq(irt)).split()
+        # The mail is out and filed, so a busy database only leaves the thread's piles as they were.
+        threads = subprocess.run(["notmuch", "search", "--output=threads", idq(irt)], capture_output=True, text=True).stdout.split()
         if threads:
-            tag(" or ".join(threads), "-replylater", "-setaside")
+            subprocess.run(["notmuch", "tag", "-replylater", "-setaside", "--", " or ".join(threads)])
     for a in attach:
         if os.path.dirname(a) == DRAFTS:
             os.unlink(a)

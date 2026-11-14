@@ -24,7 +24,7 @@ function hostile(t) {
 
 const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '');
 
-// Opens the inbox list, runs mail-open (what <ret> maps to) on its one row, then COMMAND in the thread. Kakoune runs a prompt's candidates script in the background, so kak runs with the JSON UI: its menu_show message carries the candidates, and <tab><ret> sent back as keys picks the first one. url_open_cmd appends what mail-open-with opens to a file, so a picked link or saved attachment shows up there.
+// Opens the inbox as an unthreaded list, so its one row is the hostile id:<Message-ID>, runs mail-open (what <ret> maps to) on it, then COMMAND in the thread. Kakoune runs a prompt's candidates script in the background, so kak runs with the JSON UI: its menu_show message carries the candidates, and <tab><ret> sent back as keys picks the first one. url_open_cmd appends what mail-open-with opens to a file, so a picked link or saved attachment shows up there.
 async function kak(r, command) {
   const out = join(r.M, 'out');
   const opened = join(r.M, 'opened');
@@ -32,7 +32,7 @@ async function kak(r, command) {
   const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
   const script = [
     `set-option global url_open_cmd %{printf '%%s\\n' %s >>${opened}}`,
-    'mail-box tag:inbox',
+    'mail-list-open tag:inbox true',
     'mail-open',
     `eval -draft %{ execute-keys '%' ; echo -to-file ${out}.thread %val{selection} }`,
     command,

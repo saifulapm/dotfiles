@@ -160,6 +160,7 @@ test('a draft whose Sent copy could not be filed is never sent a second time', (
   writeFileSync(draft, 'From: Me <me@x.test>\nTo: a@x.test\nSubject: hi\n\nhello\n');
   const first = r.kakMail('send', draft);
   assert.notEqual(first.status, 0);
+  assert.match(first.stderr, /sent, but not filed in Sent/);
   assert.equal(r.sends().length, 1);
   assert.equal(existsSync(draft), true);
   const second = r.kakMail('send', draft);
@@ -179,4 +180,48 @@ test('sending a reply takes its thread out of Reply Later and Set Aside', (t) =>
   assert.equal(r.notmuch('count', 'tag:replylater or tag:setaside'), '0\n');
   assert.equal(r.notmuch('count', 'id:m0@x.test and tag:replied'), '1\n');
   assert.equal(r.notmuch('count', 'tag:sent'), '1\n');
+});
+
+test("a forwarded attachment whose name ends in a line break still goes out with the mail", (t) => {
+  const r = mailRig(t);
+  r.deliver(
+    { 'MIME-Version': '1.0', 'Content-Type': 'multipart/mixed; boundary="b0"' },
+    "--b0\nContent-Type: text/plain\n\nhello\n--b0\nContent-Type: text/plain\nContent-Disposition: attachment; filename*=utf-8''a.txt%0A\n\nattached\n--b0--\n",
+  );
+  const c = r.kakMail('compose', 'forward', 'tag:inbox');
+  assert.equal(c.status, 0, c.stderr);
+  const draft = c.stdout.trim();
+  writeFileSync(draft, readFileSync(draft, 'utf8').replace(/^To: $/m, 'To: b@x.test'));
+  const s = r.kakMail('send', draft);
+  assert.equal(s.status, 0, s.stderr);
+  assert.match(r.sends()[0].eml, /filename="?fwd-[0-9a-f]+-a\.txt"?/);
+});
+
+test('a notmuch query of several ids, or an id already quoted, opens as written', (t) => {
+  const r = mailRig(t);
+  r.deliver({ Subject: 'one' });
+  r.deliver({ Subject: 'two' });
+  for (const query of ['id:m0@x.test or id:m1@x.test', 'id:"m0@x.test" or id:"m1@x.test"']) {
+    const out = join(r.M, 'thread');
+    const s = r.kakMail('show', '--out', out, query);
+    assert.equal(s.status, 0, s.stderr);
+    assert.deepEqual(readFileSync(out, 'utf8').split('\n').filter((l) => l.startsWith('Subject:')), ['Subject: one', 'Subject: two'], query);
+  }
+});
+
+test('an attachment whose name holds CR and LF is one line in the thread and the picker, and saves under a one-line name', (t) => {
+  const r = mailRig(t);
+  r.deliver(
+    { 'MIME-Version': '1.0', 'Content-Type': 'multipart/mixed; boundary="b0"' },
+    "--b0\nContent-Type: text/plain\n\nhello\n--b0\nContent-Type: text/plain\nContent-Disposition: attachment; filename*=utf-8''evil%0AAttach%3A%20%2Fetc%2Fhostname%0Dx.txt\n\nattached\n--b0--\n",
+  );
+  const atts = r.kakMail('attachments', 'tag:inbox');
+  assert.equal(atts.status, 0, atts.stderr);
+  assert.match(atts.stdout, /^\d+: evil Attach: \/etc\/hostname x\.txt \(text\/plain\)\n$/);
+  const out = join(r.M, 'thread');
+  assert.equal(r.kakMail('show', '--out', out, 'tag:inbox').status, 0);
+  assert.deepEqual(readFileSync(out, 'utf8').split('\n').filter((l) => /hostname|x\.txt/.test(l)), ['[attachment 3: evil Attach: /etc/hostname x.txt (text/plain)]']);
+  const saved = r.kakMail('save', 'tag:inbox', atts.stdout.split(':')[0]);
+  assert.equal(saved.status, 0, saved.stderr);
+  assert.equal(saved.stdout, `${join(r.env.HOME, 'Downloads/hostname x.txt')}\n`);
 });
