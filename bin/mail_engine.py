@@ -630,3 +630,115 @@ def locked_send(path, expect, env):
     os.unlink(path)
     os.unlink(mark)
     return [a for _, a in getaddresses([msg.get('To', ''), msg.get('Cc', '')]) if a]
+
+
+# ───────────────────────────── HEY actions ─────────────────────────────
+
+# The post-new hook applies these .db files to every new message, so their tags and line formats are its own.
+
+def db_path(db):
+    os.makedirs(DB_DIR, exist_ok=True)
+    return os.path.join(DB_DIR, db)
+
+
+def db_add(db, line):
+    with open(db_path(db), "a") as f:
+        f.write(line + "\n")
+
+
+def db_drop(db, addr):
+    """Remove the lines naming ADDR as one whole field, so joann@ outlives ann@;
+    written via rename so the post-new hook never reads a half-written routing
+    table (suffix distinct from the hook's own `.tmp')."""
+    path = db_path(db)
+    if not os.path.exists(path):
+        return
+    with open(path) as f:
+        lines = f.readlines()
+    keep = [l for l in lines if addr.lower() not in (w.lower() for w in l.split())]
+    if len(keep) != len(lines):
+        with open(path + ".kak-tmp", "w") as f:
+            f.writelines(keep)
+        os.replace(path + ".kak-tmp", path)
+
+
+def sanitize(name, what):
+    clean = re.sub(r"[^A-Za-z0-9_-]", "", name or "")
+    if not clean:
+        raise MailError(f"{what} must contain a letter, digit, - or _")
+    return clean
+
+
+def sender(query):
+    """The sender to decide on: newest sender of QUERY that is not you."""
+    mine = {parseaddr(i)[1].lower() for i in identities()}
+    for a in nm("address", "--output=sender", "--output=address", query).split():
+        if a.lower() not in mine:
+            return a.lower()
+    raise MailError(f"no sender found for {query}")
+
+
+def tag(query, *changes):
+    nm("tag", *changes, "--", query)
+
+
+SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
+THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive")
+
+
+def decide(action, addr, arg=None):
+    """Apply a sender ACTION to ADDR: its decision line in the db the post-new hook reads, and the tags on its mail so far."""
+    frm = "from:" + addr
+    if action == "screen-in":
+        tag(frm, "+screened")
+        db_add("screened.db", addr)
+    elif action == "feed":
+        tag(frm, "+thefeed", "+archived", "-inbox")
+        db_add("thefeed.db", addr)
+    elif action == "papertrail":
+        cat = sanitize(arg, "Category")
+        tag(frm, f"+ledger/{cat}", "+archived", "-inbox", "-unread")
+        db_add("ledger.db", f"{cat} {addr}")
+    elif action == "screen-out":
+        tag(frm, "+spam", "+deleted", "+archived", "-inbox", "-unread", "-screened")
+        db_add("spam.db", addr)
+    elif action == "unscreen":
+        for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db", "autofile.db", "recycle.db"):
+            db_drop(db, addr)
+        tag(frm, "-screened", "-thefeed", "-spam", "-deleted", "-bubble", "+inbox")
+    elif action == "autofile":
+        label = sanitize(arg, "Label")
+        db_add("autofile.db", f"{addr} {label}")
+        tag(frm, f"+label/{label}")
+    elif action == "recycle":
+        if arg not in ("30", "90", "730"):
+            raise MailError("recycle days must be 30, 90 or 730")
+        db_add("recycle.db", f"{addr} {arg}")
+
+
+def pile(action, queries, arg=None):
+    """Apply a thread ACTION to every thread QUERIES match; return the thread count and, for bubble, when it comes back."""
+    threads = dict.fromkeys(t.removeprefix("thread:")
+                            for t in nm("search", "--output=threads", " or ".join(f"({q})" for q in queries)).split())
+    when = None
+    if action == "bubble":
+        r = subprocess.run(["date", "-d", arg or "", "+%s"], capture_output=True, text=True)
+        if r.returncode != 0 or not arg:
+            raise MailError(f"cannot read a time from {arg!r} (try: tomorrow 9am, next friday, 3 days)")
+        when = int(r.stdout)
+        if when <= time.time():
+            raise MailError("that time is already past")
+    for tid in threads:
+        q = "thread:" + tid
+        if action == "reply-later":
+            tag(q, "+replylater")
+        elif action == "set-aside":
+            tag(q, "+setaside")
+        elif action == "clear":
+            tag(q, "-replylater", "-setaside", "-bubbled")
+        elif action == "archive":
+            tag(q, "-inbox", "+archived")
+        elif action == "bubble":
+            db_add("bubble.db", f"{tid} {when}")
+            tag(q, "+bubble", "-inbox", "-unread", "-bubbled")
+    return len(threads), when

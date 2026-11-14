@@ -1,0 +1,88 @@
+// bin/mail hey on a scratch store (tests/home/mail-rig.mjs): an agent files mail only in ways that can be undone, on one message it names, and screens out only a sender Saiful names.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { join } from 'node:path';
+import { mailRig, repo } from './mail-rig.mjs';
+
+function rig(t) {
+  const r = mailRig(t);
+  const mail = (...args) => {
+    const res = r.run(join(repo, 'bin/mail'), args);
+    let json = null;
+    try {
+      json = JSON.parse(res.stdout);
+    } catch {}
+    return { ...res, json };
+  };
+  // A newsletter in the Imbox, and a person's mail beside it.
+  r.deliver({ From: 'Shop News <news@shop.test>', Subject: 'sale', 'Message-ID': '<h1@shop.test>' });
+  r.deliver({ From: 'Bob <bob@people.test>', Subject: 'lunch', 'Message-ID': '<b1@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', '*');
+  const tags = (id) => r.notmuch('search', '--output=tags', '--', `id:${id}`).split('\n').filter(Boolean);
+  const imbox = () => mail('search', '--box', 'Imbox').json.data.map((row) => row.id);
+  return { ...r, mail, tags, imbox };
+}
+
+test('mail hey feed moves the sender to The Feed, and the mail leaves the Imbox', (t) => {
+  const r = rig(t);
+  assert.ok(r.imbox().includes('h1@shop.test'));
+  const res = r.mail('hey', 'feed', 'id:h1@shop.test');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(r.db('thefeed.db'), /^news@shop\.test$/m);
+  assert.deepEqual(r.imbox(), ['b1@x.test']);
+  assert.ok(r.tags('h1@shop.test').includes('thefeed'));
+});
+
+test('mail hey replylater, setaside, archive and bubble each set their tag on the thread', (t) => {
+  const r = rig(t);
+  const day = new Date(Date.now() + 10 * 86400e3).toISOString().slice(0, 10);
+  for (const [action, extra, tag] of [['replylater', [], 'replylater'], ['setaside', [], 'setaside'], ['archive', [], 'archived'], ['bubble', ['--at', day], 'bubble']]) {
+    const res = r.mail('hey', action, 'b1@x.test', ...extra);
+    assert.equal(res.status, 0, `${action}: ${res.stdout}${res.stderr}`);
+    assert.ok(r.tags('b1@x.test').includes(tag), `${action} sets ${tag}`);
+  }
+  assert.ok(!r.tags('b1@x.test').includes('inbox'), 'archive and bubble take it out of the inbox');
+  assert.match(r.db('bubble.db'), /^[0-9a-f]+ \d+$/m);
+  const cleared = r.mail('hey', 'clear', 'b1@x.test');
+  assert.equal(cleared.status, 0, cleared.stdout);
+  assert.ok(!r.tags('b1@x.test').includes('replylater'));
+});
+
+test('mail hey screen-in and papertrail decide on the sender of the message', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Carol <carol@new.test>', Subject: 'hello', 'Message-ID': '<c1@x.test>' });
+  assert.equal(r.mail('hey', 'screen-in', 'c1@x.test').status, 0);
+  assert.match(r.db('screened.db'), /^carol@new\.test$/m);
+  const res = r.mail('hey', 'papertrail', 'h1@shop.test', '--category', 'receipts');
+  assert.equal(res.status, 0, res.stdout);
+  assert.match(r.db('ledger.db'), /^receipts news@shop\.test$/m);
+});
+
+test('mail hey screen-out takes only a sender, never a message', (t) => {
+  const r = rig(t);
+  const byId = r.mail('hey', 'screen-out', 'id:h1@shop.test');
+  assert.equal(byId.status, 1, byId.stdout);
+  assert.equal(byId.json.error, 'screen-out takes --sender ADDR');
+  assert.equal(r.db('spam.db'), '');
+  const res = r.mail('hey', 'screen-out', '--sender', 'news@shop.test');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.match(r.db('spam.db'), /^news@shop\.test$/m);
+  assert.ok(!r.imbox().includes('h1@shop.test'));
+  for (const bad of ['a b@x.test', 'news@shop.test or *', 'not-an-address']) {
+    const res2 = r.mail('hey', 'screen-out', '--sender', bad);
+    assert.equal(res2.status, 1, `${bad}: ${res2.stdout}`);
+  }
+});
+
+test('mail hey acts on one message it can find, never on a query', (t) => {
+  const r = rig(t);
+  for (const q of ['*', 'tag:inbox', 'from:bob@people.test']) {
+    const res = r.mail('hey', 'archive', q);
+    assert.equal(res.status, 2, `${q}: ${res.stdout}`);
+  }
+  assert.deepEqual(r.imbox().sort(), ['b1@x.test', 'h1@shop.test']);
+  const sender = r.mail('hey', 'archive', 'b1@x.test', '--sender', 'bob@people.test');
+  assert.equal(sender.status, 1, sender.stdout);
+  const unknown = r.mail('hey', 'mute', 'b1@x.test');
+  assert.equal(unknown.status, 1, unknown.stdout);
+});
