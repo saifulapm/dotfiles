@@ -790,9 +790,11 @@ RX_SPECIAL = set(".^$|?*+()[]{}")
 
 def from_query(key):
     """The from: query for a sender key of the db files, as a regex in any case: an address key matches that From address exactly and an @domain key any address of that domain alone, since notmuch reads from:"a@d" as a phrase that also matches a longer address ending in it and a display name spelling it."""
-    rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else "\\" + c if c in RX_SPECIAL else c for c in key)
-    # An address starts the header, follows its <, or follows the comma of a list, whose last address its domain's line matches too.
-    return f'from:"/{rx}>?$/"' if key.startswith("@") else f'from:"/(^|<|,[[:space:]]*){rx}>?$/"'
+    # notmuch matches a regex byte by byte, so only an ASCII letter gets its other case.
+    rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isascii() and c.isalpha() else "\\" + c if c in RX_SPECIAL else c for c in key)
+    # An address starts the header, follows its <, or follows the comma of a list, whose last address its domain's line matches too; an old-style (comment) may follow it.
+    end = r">?([[:space:]]*\([^()]*\))?$"
+    return f'from:"/{rx}{end}/"' if key.startswith("@") else f'from:"/(^|<|,[[:space:]]*){rx}{end}/"'
 
 
 def domain_of(addr):
@@ -891,6 +893,21 @@ def covering(addr):
     return addr
 
 
+def domain_key(addr):
+    """The @domain line a domain decision on ADDR writes, or a MailError when no such line may be written."""
+    key = domain_of(addr)
+    if not ADDR.fullmatch(key):
+        e = MailError(f"{key} is not one domain, and its line would match more senders than it")
+        e.hint = "name a domain with a dot in it, as @example.com"
+        raise e
+    # One sender at a freemail domain never decides everyone there.
+    if key[1:] in FREEMAIL:
+        e = MailError(f"{key[1:]} is freemail, so a domain line would decide every sender there; decide the address alone")
+        e.hint = "decide the address alone: the same action without --domain, or screen-out --sender ADDR"
+        raise e
+    return key
+
+
 def decide(action, addr, arg=None, domain=False):
     """Apply a sender ACTION to ADDR, to its @domain with DOMAIN, or to the @domain line that alone decides it for unscreen: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
     if "*" in addr:
@@ -898,16 +915,7 @@ def decide(action, addr, arg=None, domain=False):
     if domain:
         if action not in DECIDES_CLASS:
             raise MailError(f"{action} takes no domain; a domain is screened in, fed, filed in Paper Trail or screened out")
-        addr = domain_of(addr)
-        if not ADDR.fullmatch(addr):
-            e = MailError(f"{addr} is not one domain, and its line would match more senders than it")
-            e.hint = "name a domain with a dot in it, as @example.com"
-            raise e
-        # One sender at a freemail domain never decides everyone there.
-        if addr[1:] in FREEMAIL:
-            e = MailError(f"{addr[1:]} is freemail, so a domain line would decide every sender there; decide the address alone")
-            e.hint = "decide the address alone: the same action without --domain, or screen-out --sender ADDR"
-            raise e
+        addr = domain_key(addr)
     elif addr.startswith("@") or not ADDR.fullmatch(addr):
         raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
     # A decision writes a line for the address alone, which beats its domain's line; an unscreen of an address no line of its own decides undoes its domain's line.

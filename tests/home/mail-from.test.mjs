@@ -283,3 +283,31 @@ test('a refused domain decision says what to do instead, not that notmuch failed
   assert.match(mailCli(r, 'hey', 'screen-in', 'gm@x.test', '--domain').json.hint, /without --domain/);
   assert.match(mailCli(r, 'hey', 'screen-out', '--sender', '@test').json.hint, /dot/);
 });
+
+// An old-style From writes a comment after the address, and an address may hold a letter outside ASCII.
+test('a sender line matches its address before a trailing comment and with a non-ASCII letter, and a comment never stands in for it', (t) => {
+  const r = hooked(t);
+  r.setDb('screened.db', 'ann@people.test\n@vendor.test\njörg@firma.test\n');
+  r.deliver({ From: 'ann@people.test (Ann)', 'Message-ID': '<c1@x.test>' });
+  r.deliver({ From: 'evil@bad.test (ann@people.test)', 'Message-ID': '<c2@x.test>' });
+  r.deliver({ From: 'x@vendor.test (X)', 'Message-ID': '<c3@x.test>' });
+  r.deliver({ From: 'evil@bad.test (x@vendor.test)', 'Message-ID': '<c4@x.test>' });
+  r.deliver({ From: 'Jörg <jörg@firma.test>', 'Message-ID': '<c5@x.test>' });
+  assert.deepEqual(tagged(r, 'screened'), ['id:c1@x.test', 'id:c3@x.test', 'id:c5@x.test']);
+  r.deliver({ From: 'bob@people.test (Bob)', 'Message-ID': '<c6@x.test>' });
+  assert.equal(r.kakMail('hey', 'screen-in', 'id:c6@x.test').status, 0);
+  assert.deepEqual(tagged(r, 'screened'), ['id:c1@x.test', 'id:c3@x.test', 'id:c5@x.test', 'id:c6@x.test']);
+});
+
+test('a domain decision on several selected mails changes nothing when one of them is freemail', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'n@vendor.test', 'Message-ID': '<n@x.test>' });
+  r.deliver({ From: 'x@gmail.com', 'Message-ID': '<g@x.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  const before = r.notmuch('dump');
+  const res = r.kakMail('hey', 'screen-in', '--domain', 'id:n@x.test', 'id:g@x.test');
+  assert.notEqual(res.status, 0);
+  assert.match(res.stderr, /gmail\.com is freemail/);
+  assert.equal(r.db('screened.db'), '');
+  assert.equal(r.notmuch('dump'), before);
+});

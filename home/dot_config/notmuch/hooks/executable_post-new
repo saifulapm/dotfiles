@@ -28,14 +28,16 @@ from_q() {
     for ((i = 0; i < ${#a}; i++)); do
         c="${a:i:1}"
         case "$c" in
-            [[:alpha:]]) rx+="[${c,,}${c^^}]" ;;
+            [abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ]) rx+="[${c,,}${c^^}]" ;;
             [.^\$\|?*+\(\)\{\}\[\]]) rx+="\\$c" ;;
             *) rx+="$c" ;;
         esac
     done
+    # notmuch matches a regex byte by byte, so only an ASCII letter gets its other case; an old-style (comment) may follow the address.
+    local end='>?([[:space:]]*\([^()]*\))?$'
     case "$a" in
-        @*) printf 'from:"/%s>?$/"' "$rx" ;;
-        *) printf 'from:"/(^|<|,[[:space:]]*)%s>?$/"' "$rx" ;;
+        @*) printf 'from:"/%s%s/"' "$rx" "$end" ;;
+        *) printf 'from:"/(^|<|,[[:space:]]*)%s%s/"' "$rx" "$end" ;;
     esac
 }
 
