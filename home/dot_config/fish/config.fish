@@ -15,7 +15,7 @@ set -gx GOBIN $GOPATH/bin
 set -gx PNPM_HOME ~/.local/share/pnpm
 set -gx ANDROID_HOME ~/Android/Sdk
 # lazygit loads its own config, then the colorscheme's colours that dots colorscheme renders over it.
-set -gx LG_CONFIG_FILE ~/.config/lazygit/config.yml,~/.local/state/dots/theme-out/lazygit.yml
+set -gx LG_CONFIG_FILE ~/.config/lazygit/config.yml,$HOME/.local/state/dots/theme-out/lazygit.yml
 # A login over SSH never reads environment.d, whose 80-claude-presence.conf names the same file.
 set -gx CLAUDE_CLIENT_PRESENCE_FILE $XDG_RUNTIME_DIR/dots-present
 # workflow go --cloud starts this claude, which picks the active Claude account and its cloud environment; dots secrets gives the local hub the same line.
