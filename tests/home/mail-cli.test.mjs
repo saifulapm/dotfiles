@@ -243,3 +243,14 @@ test('an HTML mail naming windows-1252 only in its <meta> reads é, in mail show
   assert.equal(kak.status, 0, kak.stderr);
   assert.match(readFileSync(out, 'utf8'), /^un café$/m);
 });
+
+// notmuch reads a leading - alone as not, and inside `thread:T and (...)` as nothing, so a row has no matched message to name.
+test('a query starting with - after -- answers one JSON row per thread notmuch lists', (t) => {
+  const r = twoMails(t);
+  r.notmuch('tag', '-unread', '--', 'id:imbox@x.test');
+  const res = r.mail('search', '--', '-tag:unread');
+  assert.equal(res.status, 0, res.stderr);
+  const threads = r.notmuch('search', '--output=threads', '--', '-tag:unread').split('\n').filter(Boolean).map((s) => s.slice('thread:'.length));
+  assert.deepEqual(res.json.data.map((row) => row.thread).sort(), threads.sort());
+  assert.ok(res.json.data.every((row) => row.id && row.subject.startsWith(OPEN)), res.stdout);
+});
