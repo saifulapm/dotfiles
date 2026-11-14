@@ -1,7 +1,7 @@
 // bin/kak-mail on a scratch notmuch store (tests/home/mail-rig.mjs): what a sender writes into a mail reaches notmuch as data, never as query syntax or shell.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig } from './mail-rig.mjs';
 
@@ -95,4 +95,60 @@ test('the HEY dbs live in HEY_MAIL_DB_DIR, where the post-new hook reads them', 
   assert.equal(res.status, 0, res.stderr);
   assert.equal(readFileSync(join(r.M, 'elsewhere/screened.db'), 'utf8'), 'ann@people.test\n');
   assert.equal(r.db('screened.db'), '');
+});
+
+const headerLines = (draft) => readFileSync(draft, 'utf8').split('\n\n')[0].split('\n');
+
+test('a reply to a Subject holding CR LF and a Bcc keeps it on the Subject line and sends to the sender alone', (t) => {
+  const r = mailRig(t);
+  r.deliver({ Subject: '=?utf-8?b?aGkNCkJjYzogZXZpbEB4LnRlc3Q=?=' });
+  const c = r.kakMail('compose', 'reply', 'tag:inbox');
+  assert.equal(c.status, 0, c.stderr);
+  const draft = c.stdout.trim();
+  const head = headerLines(draft);
+  assert.ok(head.includes('Subject: Re: hi  Bcc: evil@x.test'), head.join('|'));
+  assert.deepEqual(head.filter((l) => /^bcc:/i.test(l)), []);
+  const s = r.kakMail('send', draft);
+  assert.equal(s.status, 0, s.stderr);
+  const [sent] = r.sends();
+  const recipients = sent.eml.split(/\r?\n\r?\n/)[0].split(/\r?\n/).filter((l) => /^(to|cc|bcc):/i.test(l));
+  assert.deepEqual(recipients, ['To: Ann <ann@people.test>']);
+  assert.deepEqual(sent.args, ['-a', 'icloud', '--read-envelope-from', '-t']);
+});
+
+test('every other line break a header value can hold becomes a space in the draft', (t) => {
+  const r = mailRig(t);
+  r.deliver({ Subject: '=?utf-8?b?YQtiDGPChWTigKhl4oCpZhxnDUJjYzogZXZpbEB4LnRlc3Q=?=' });
+  const c = r.kakMail('compose', 'reply', 'tag:inbox');
+  assert.equal(c.status, 0, c.stderr);
+  const head = headerLines(c.stdout.trim());
+  assert.ok(head.includes('Subject: Re: a b c d e f g Bcc: evil@x.test'), head.join('|'));
+  assert.deepEqual(head.filter((l) => /^bcc:/i.test(l)), []);
+});
+
+test("a forwarded attachment's name holding a line break adds no header to the draft", (t) => {
+  const r = mailRig(t);
+  r.deliver(
+    { 'MIME-Version': '1.0', 'Content-Type': 'multipart/mixed; boundary="b0"' },
+    "--b0\nContent-Type: text/plain\n\nhello\n--b0\nContent-Type: text/plain\nContent-Disposition: attachment; filename*=utf-8''a%0ABcc%3A%20evil%40x.test.txt\n\nattached\n--b0--\n",
+  );
+  const c = r.kakMail('compose', 'forward', 'tag:inbox');
+  assert.equal(c.status, 0, c.stderr);
+  const head = headerLines(c.stdout.trim());
+  assert.deepEqual(head.filter((l) => /^bcc:/i.test(l)), [], head.join('|'));
+  const attach = head.filter((l) => l.startsWith('Attach: '));
+  assert.equal(attach.length, 1, head.join('|'));
+  assert.ok(existsSync(attach[0].slice('Attach: '.length)), attach[0]);
+});
+
+test('a draft with two To lines sends to both', (t) => {
+  const r = mailRig(t);
+  const draft = join(r.M, 'two-to.eml');
+  writeFileSync(draft, 'From: Me <me@x.test>\nTo: a@x.test\nTo: b@x.test\nSubject: hi\n\nhello\n');
+  const s = r.kakMail('send', draft);
+  assert.equal(s.status, 0, s.stderr);
+  assert.doesNotMatch(s.stderr, /Traceback/);
+  const [sent] = r.sends();
+  const to = sent.eml.split(/\r?\n\r?\n/)[0].split(/\r?\n/).filter((l) => /^to:/i.test(l));
+  assert.deepEqual(to, ['To: a@x.test, b@x.test']);
 });

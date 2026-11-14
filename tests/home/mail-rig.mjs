@@ -37,6 +37,7 @@ export function mailRig(t) {
     if (r.status !== 0) throw new Error(`notmuch ${args.join(' ')}: ${r.stderr}`);
     return r.stdout;
   };
+  notmuch('new', '--quiet');
   let n = 0;
   // HEADERS is an object of header lines; the file lands in INBOX and notmuch indexes it.
   const deliver = (headers, body = 'hello\n') => {

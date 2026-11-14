@@ -382,6 +382,14 @@ def message_of(query):
     return ids[0].removeprefix("id:")
 
 
+# Every character str.splitlines() breaks on: a sender's header value holding one would start a header line of its own in the draft.
+LINE_BREAKS = re.compile("[\n\r\v\f\x1c\x1d\x1e\x85\u2028\u2029]")
+
+
+def oneline(value):
+    return LINE_BREAKS.sub(" ", value)
+
+
 def cmd_compose(args):
     kind = args[0]
     headers, body = [], ""
@@ -412,7 +420,7 @@ def cmd_compose(args):
         # The original's attachments ride along as Attach: pseudo-headers, like a hand-added one, so send has one path.
         os.makedirs(DRAFTS, exist_ok=True)
         for part_id, name, _ in atts:
-            path = os.path.join(DRAFTS, f"fwd-{secrets.token_hex(4)}-{os.path.basename(name)}")
+            path = os.path.join(DRAFTS, f"fwd-{secrets.token_hex(4)}-{oneline(os.path.basename(name))}")
             with open(path, "wb") as f:
                 f.write(subprocess.run(["notmuch", "show", f"--part={part_id}", idq(msg_id)],
                                        capture_output=True, check=True).stdout)
@@ -425,7 +433,7 @@ def cmd_compose(args):
     os.makedirs(DRAFTS, exist_ok=True)
     path = os.path.join(DRAFTS, time.strftime("%Y%m%d-%H%M%S-") + secrets.token_hex(3) + ".eml")
     with open(path, "w") as f:
-        f.write("".join(f"{k}: {v}\n" for k, v in headers) + body + nametag())
+        f.write("".join(f"{k}: {oneline(v)}\n" for k, v in headers) + body + nametag())
     print(path)
 
 
@@ -469,6 +477,11 @@ def cmd_send(args):
     for k, v in headers:
         if k.lower() == "attach":
             attach.append(os.path.expanduser(v))
+        elif v and k.lower() in ("to", "cc", "bcc") and msg.get(k):
+            # A second To line adds its people; the message can hold only one.
+            merged = f"{msg[k]}, {v}"
+            del msg[k]
+            msg[k] = merged
         elif v:
             msg[k] = v
     if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):
