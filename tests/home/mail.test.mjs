@@ -203,6 +203,24 @@ for (const [name, ignore] of [['pass is killed by SIGPIPE', false], ['SIGPIPE is
   });
 }
 
+test('imapnotify-wait cuts a head written without spaces too', () => {
+  const dir = join(root, 'wait-tight-head');
+  const yaml = fakeBrokenPipePass(dir, true);
+  writeFileSync(yaml, readFileSync(yaml, 'utf8').replace(' | head -n1', '|head -n1'));
+  const r = wait(dir, yaml, 5000, '0.02');
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(readFileSync(join(dir, 'calls'), 'utf8').trim(), '3');
+});
+
+test('imapnotify-wait keeps waiting on a locked agent behind a pipe that is not head', () => {
+  const dir = join(root, 'wait-locked-cat');
+  const yaml = fakePass(dir, 1000);
+  writeFileSync(yaml, readFileSync(yaml, 'utf8').replace(' | head -n1', ' | cat'));
+  const r = wait(dir, yaml, 1500);
+  assert.equal(r.signal, 'SIGTERM');
+  assert.ok(Number(readFileSync(join(dir, 'calls'), 'utf8')) >= 3);
+});
+
 test('imapnotify-wait returns once the password decrypts without a prompt, and prints nothing', () => {
   const dir = join(root, 'wait-ok');
   const r = wait(dir, fakePass(dir, 3), 10000);
