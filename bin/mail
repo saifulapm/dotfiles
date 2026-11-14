@@ -6,6 +6,7 @@
   mail show ID                                 one message; never marks it read
   mail thread ID                               every message of a thread, oldest first
   mail read ID / mail unread ID                mark a message read or unread
+  mail preview ID [--images]                   the HTML part as a file a browser opens with nothing remote loaded
 
 ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
 also takes thread:THREAD. Every command prints one JSON object,
@@ -18,9 +19,13 @@ becomes ‹‹‹, so a mail cannot close its own field.
 
 import argparse
 import email.policy
+import html
 import json
+import os
 import re
 import sys
+import tempfile
+import time
 from datetime import datetime
 from email.parser import BytesHeaderParser
 from email.utils import getaddresses, parseaddr
@@ -35,6 +40,10 @@ LIMIT_MAX = 500
 
 
 class Usage(Exception):
+    pass
+
+
+class Refused(Exception):
     pass
 
 
@@ -186,6 +195,63 @@ def cmd_search(a):
     return [row(m, thread, count, homes.get(m["id"])) for m, thread, count in rows]
 
 
+def html_part(parts):
+    """The first HTML part of a MIME tree that is not an attachment, or None."""
+    for p in parts:
+        c = p.get("content")
+        if p.get("filename") or p.get("content-disposition") == "attachment":
+            continue
+        if p.get("content-type", "").lower() == "text/html" and isinstance(c, str):
+            return c
+        if isinstance(c, list):
+            found = html_part([q for q in c if "content-type" in q] + [b for inner in c for b in inner.get("body", [])])
+            if found is not None:
+                return found
+    return None
+
+
+# A tag the mail could fetch or navigate with but CSP does not cover (a refresh, a dns-prefetch or preconnect, a base href) is renamed, so the browser reads it as an unknown element.
+INERT = re.compile(r"<(?=(?:meta|link|base)[\s/>])", re.I)
+PREVIEW_AGE = 3600
+
+
+def preview_page(mail_html, subject, images):
+    """An outer page whose CSP blocks every load (images over https too, with IMAGES) around the mail in a sandboxed srcdoc iframe, which takes the outer page's policy and runs no script."""
+    csp = "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'" + ("; img-src https: data:" if images else "")
+    return ('<!doctype html>\n<html><head><meta charset="utf-8">\n'
+            f'<meta http-equiv="Content-Security-Policy" content="{csp}">\n'
+            '<meta name="referrer" content="no-referrer">\n'
+            f"<title>{html.escape(line(subject))}</title>\n"
+            "<style>html, body, iframe { margin: 0; border: 0; width: 100%; height: 100%; display: block; }</style>\n"
+            f'</head><body><iframe sandbox srcdoc="{html.escape(INERT.sub("<x-", mail_html))}"></iframe></body></html>\n')
+
+
+def cmd_preview(a):
+    run = os.environ.get("XDG_RUNTIME_DIR")
+    if not run:
+        raise Refused("XDG_RUNTIME_DIR is not set, and a preview is written only there, never to a shared /tmp")
+    m = found(a.id)
+    mail_html = html_part(m.get("body", []))
+    if mail_html is None:
+        raise NotFound("no HTML part")
+    folder = os.path.join(run, "mail-preview")
+    os.makedirs(folder, mode=0o700, exist_ok=True)
+    os.chmod(folder, 0o700)
+    now = time.time()
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name)
+        try:
+            if now - os.lstat(path).st_mtime > PREVIEW_AGE:
+                os.unlink(path)
+        except OSError:
+            pass
+    # mkstemp makes a new 0600 file with a random name, so two previews of one mail never share one.
+    fd, path = tempfile.mkstemp(prefix="mail-", suffix=".html", dir=folder)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(preview_page(mail_html, m["headers"].get("Subject", ""), a.images))
+    return {"path": path}
+
+
 def parser():
     p = Parser(prog="mail", description="Read mail as JSON.")
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
@@ -201,6 +267,10 @@ def parser():
         c = sub.add_parser(name, help=doc)
         c.add_argument("id", help="a message id, or for thread a thread:THREAD")
         c.set_defaults(fn=fn)
+    v = sub.add_parser("preview", help="write the HTML part to a file under $XDG_RUNTIME_DIR/mail-preview that loads nothing remote")
+    v.add_argument("id", help="a message id")
+    v.add_argument("--images", action="store_true", help="let images over https load")
+    v.set_defaults(fn=cmd_preview)
     for name, unread in (("read", False), ("unread", True)):
         c = sub.add_parser(name, help=f"mark a message {name}")
         c.add_argument("id", help="a message id")
@@ -218,7 +288,7 @@ def main():
     p = parser()
     argv = sys.argv[1:]
     # A Message-ID may start with -, and argparse would read it as an option.
-    if len(argv) == 2 and argv[0] in ("show", "thread", "read", "unread") and argv[1].startswith("-") and argv[1] not in ("-h", "--help", "--"):
+    if len(argv) == 2 and argv[0] in ("show", "thread", "read", "unread", "preview") and argv[1].startswith("-") and argv[1] not in ("-h", "--help", "--"):
         argv.insert(1, "--")
     try:
         a = p.parse_args(argv)
@@ -226,7 +296,9 @@ def main():
     except Usage as e:
         emit({"ok": False, "error": str(e), "hint": p.format_usage().strip()}, 1)
     except NotFound as e:
-        emit({"ok": False, "error": str(e), "hint": "take ids from mail search"}, 2)
+        emit({"ok": False, "error": str(e), "hint": "take ids from mail search" if str(e) != "no HTML part" else "read it with mail show"}, 2)
+    except Refused as e:
+        emit({"ok": False, "error": str(e), "hint": "run it in a desktop session"}, 3)
     except MailError as e:
         emit({"ok": False, "error": str(e), "hint": "notmuch failed; try again, or run mail boxes to see the store answers"}, 1)
     except Exception as e:
