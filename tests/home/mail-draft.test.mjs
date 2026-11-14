@@ -286,3 +286,18 @@ test('mail send with the pass store open runs msmtp with pinentry off, so a lock
   assert.match(readFileSync(join(r.M, 'msmtp-gpg-opts'), 'utf8'), /--pinentry-mode=error/);
   assert.equal(r.sends().length, 1);
 });
+
+test('a draft hand-edited to two Subject lines still lists, shows and sends the later one', (t) => {
+  const r = rig(t);
+  const { id, path } = r.mail('draft', 'new', '--to', 'ann@people.test', '--subject', 'one').json.data;
+  writeFileSync(path, readFileSync(path, 'utf8').replace('Subject: one\n', 'Subject: one\nSubject: two\n'));
+  const listed = r.mail('drafts');
+  assert.equal(listed.status, 0, listed.stdout);
+  assert.equal(listed.json.data[0].subject, wrapped('two'));
+  const shown = r.mail('draft', 'show', id);
+  assert.equal(shown.json.data.subject, wrapped('two'));
+  const sent = r.mail('send', id, '--yes', '--digest', shown.json.data.digest);
+  assert.equal(sent.status, 0, sent.stdout);
+  assert.match(r.sends()[0].eml, /\r\nSubject: two\r\n/);
+  assert.doesNotMatch(r.sends()[0].eml, /Subject: one/);
+});

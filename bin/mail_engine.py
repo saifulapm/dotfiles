@@ -545,6 +545,8 @@ def draft_message(text):
             del msg[k]
             msg[k] = merged
         elif v:
+            # A message holds one Subject or From; a later line of a hand-edited draft replaces the earlier one.
+            del msg[k]
             msg[k] = v
     return msg, attach, body
 
