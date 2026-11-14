@@ -26,8 +26,8 @@ test('a running kak draws the new colorscheme\'s keywords without a key press', 
   const env = Object.assign(isolated(state), { XDG_CONFIG_HOME: join(state, 'config') });
   mkdirSync(join(state, 'config/kak/colors'), { recursive: true });
   symlinkSync(join(state, 'dots/theme-out/dots.kak'), join(state, 'config/kak/colors/dots.kak'));
-  // Kakoune's own runtime adds the tree-sitter highlighter to every window with a filetype; mail.kak declares the option dots.kak sets for the mail list.
-  writeFileSync(join(state, 'config/kak/kakrc'), 'declare-option str mail_keys\ncolorscheme dots\n');
+  // Kakoune's own runtime adds the tree-sitter highlighter to every window with a filetype; mail.kak declares the options dots.kak sets for the mail list and thread.
+  writeFileSync(join(state, 'config/kak/kakrc'), 'declare-option str mail_keys\ndeclare-option str mail_thread_keys\ncolorscheme dots\n');
   // The cursor starts on the first line and would split the word it sits on, so the keyword waits on the second.
   writeFileSync(join(state, 'probe.mjs'), "// probe\nimport { a } from './b.mjs';\n");
   assert.equal(spawnSync(dots, ['colorscheme', 'artboard'], { env }).status, 0);

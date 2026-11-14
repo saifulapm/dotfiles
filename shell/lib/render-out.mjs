@@ -10,13 +10,15 @@ import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, render
 const MAIL_BOARD = { artboard: { date: '#C2410C' } };
 const rgb = (s) => `rgb:${s.toLowerCase().slice(1)}`;
 
-// The kak-mail list's faces and key strip, which dots.kak carries so a `colorscheme dots` recolours an open list.
+// The kak-mail list's faces and the list's and thread view's key strips, which dots.kak carries so a `colorscheme dots` recolours an open list.
 function renderMailKak(t) {
   const c = t.color;
   const look = listLook(t);
   const board = MAIL_BOARD[t.name] ?? {};
   const strip = [['↵', 'open'], ['r', 'reply'], ['e', 'archive'], ['s', 'screener'], ['f', 'feed'], ['?', 'help']];
-  const keys = look.keys(strip).map((k) => `{MailKey}${k.key}{MailStrip} ${k.word}`).join(' · ');
+  const thread = [['V', 'preview'], ['r', 'reply'], ['o', 'links'], ['q', 'back'], ['?', 'help']];
+  const marked = (pairs) => look.keys(pairs).map((k) => `{MailKey}${k.key}{MailStrip} ${k.word}`).join(' · ');
+  const keys = marked(strip);
   const faces = [
     ['MailDate', rgb(board.date ?? c.muted)],
     ['MailSender', rgb(c.accent)],
@@ -26,7 +28,7 @@ function renderMailKak(t) {
     ['MailStrip', `${rgb(c.muted)},${rgb(c.surface)}`],
     ['MailKey', `${rgb(c.ink)},${rgb(c.surface)}`],
   ];
-  return faces.map(([n, v]) => `face global ${n} ${v}`).join('\n') + `\nset-option global mail_keys '${keys}'\ntry mail-strip-all\n`;
+  return faces.map(([n, v]) => `face global ${n} ${v}`).join('\n') + `\nset-option global mail_keys '${keys}'\nset-option global mail_thread_keys '${marked(thread)}'\ntry mail-strip-all\n`;
 }
 
 // `label` begins each error line, as `colorscheme artboard`; `list` is the picker's cards.

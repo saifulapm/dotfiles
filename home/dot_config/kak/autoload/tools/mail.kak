@@ -495,10 +495,11 @@ define-command -hidden mail-prompt-keys %{
     map buffer prompt <c-p> <s-tab>
 }
 
-# The list's faces and the strip under it. The theme's dots.kak redefines the
+# The list's faces and the strips under a list and a thread. The theme's dots.kak redefines the
 # faces and sets mail_keys in the theme's key idiom; these keep a list readable
 # before a theme is rendered, and a `colorscheme dots` recolours an open one.
 declare-option -hidden str mail_keys '{MailKey}↵{MailStrip} open · {MailKey}r{MailStrip} reply · {MailKey}e{MailStrip} archive · {MailKey}s{MailStrip} screener · {MailKey}f{MailStrip} feed · {MailKey}?{MailStrip} help'
+declare-option -hidden str mail_thread_keys '{MailKey}V{MailStrip} preview · {MailKey}r{MailStrip} reply · {MailKey}o{MailStrip} links · {MailKey}q{MailStrip} back · {MailKey}?{MailStrip} help'
 face global MailDate comment
 face global MailSender string
 face global MailSubject default
@@ -521,11 +522,15 @@ define-command -hidden mail-strip %{
     set-option window modelinefmt "{MailStrip} %%opt{mail_rows} · %opt{mail_keys}"
 }
 
+define-command -hidden mail-thread-strip %{
+    set-option window modelinefmt "{MailStrip} %opt{mail_thread_keys}"
+}
+
 define-command -hidden mail-strip-all %{
     evaluate-commands %sh{
         eval "set -- $kak_quoted_client_list"
         for c; do
-            printf 'evaluate-commands -client %s %%{ evaluate-commands %%sh{ [ "$kak_opt_filetype" = mail-list ] && echo mail-strip } }\n' "$c"
+            printf 'evaluate-commands -client %s %%{ evaluate-commands %%sh{ case $kak_opt_filetype in mail-list) echo mail-strip ;; mail-thread) echo mail-thread-strip ;; esac } }\n' "$c"
         done
     }
 }
@@ -598,7 +603,11 @@ hook global WinSetOption filetype=mail-thread %{
     add-highlighter window/mail-thread/ ref kak-mail
     add-highlighter window/mail-thread/ regex '^━+$' 0:comment
     add-highlighter window/mail-thread/ regex '^\[attachment \d+: [^\n]*\]$' 0:string
-    hook -once -always window WinSetOption filetype=.* %{ remove-highlighter window/mail-thread }
+    mail-thread-strip
+    hook -once -always window WinSetOption filetype=.* %{
+        remove-highlighter window/mail-thread
+        unset-option window modelinefmt
+    }
 }
 
 hook global WinSetOption filetype=mail %{

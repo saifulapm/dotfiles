@@ -94,6 +94,14 @@ test('github-light colours the kakoune keyword, a shade deeper so it reads on th
   assert.match(readFileSync(join(out, 'dots.kak'), 'utf8'), /^face global keyword rgb:b11d28\+b$/m);
 });
 
+test('dots.kak carries the thread view\'s key strip beside the list\'s, in the same key idiom', (t) => {
+  const kak = readFileSync(join(render(t, 'github-light'), 'dots.kak'), 'utf8');
+  const strip = kak.match(/^set-option global mail_thread_keys '(.*)'$/m)?.[1];
+  assert.ok(strip, kak);
+  for (const [key, word] of [['V', 'preview'], ['r', 'reply'], ['q', 'back']]) assert.ok(strip.includes(`{MailKey}${key}{MailStrip} ${word}`), strip);
+  assert.ok(kak.indexOf('mail_thread_keys') < kak.indexOf('try mail-strip-all'));
+});
+
 test('the licence file names each upstream project and its licence', () => {
   const text = readFileSync(join(repo, 'colorschemes/THIRD_PARTY_LICENSES'), 'utf8');
   for (const n of ['Catppuccin', 'Gruvbox', 'Rosé Pine', 'GitHub Primer']) assert.ok(text.includes(n), n);

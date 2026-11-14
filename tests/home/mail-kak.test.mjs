@@ -243,3 +243,39 @@ test('] and [ page a long list by 500, and its strip says which rows it shows', 
   assert.deepEqual(seen.map((m) => m.match(/rows [^·]*/)?.[0].trim()), ['rows 1–500 of 1200', 'rows 501–1000 of 1200', 'rows 1–500 of 1200']);
   assert.match(seen[0], /open/);
 });
+
+test("the thread view's bottom line is a key strip naming V preview, r reply and q back", async (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<one@x.test>' });
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = spawn('kak', ['-ui', 'json', '-e', 'mail-list-open tag:inbox true; mail-open'], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  let mode = [];
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') mode = m.params[3];
+    }
+  });
+  const text = () => mode.map((a) => a.contents).join('');
+  for (let i = 0; i < 100 && !text().includes('preview'); i++) await sleep(50);
+  const inThread = mode;
+  // q goes back to the list, which draws its own strip again.
+  k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params: ['q'] }) + '\n');
+  for (let i = 0; i < 100 && !text().includes('rows'); i++) await sleep(50);
+  const back = text();
+  k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params: ['<esc>', ':quit!<ret>'] }) + '\n');
+  assert.equal(await exited, 0);
+  const said = inThread.map((a) => a.contents).join('');
+  for (const words of ['V preview', 'r reply', 'q back']) assert.ok(said.includes(words), said);
+  // Each key is drawn in its own face, apart from the word after it, as the list's strip draws them.
+  const key = inThread.find((a) => a.contents === 'V');
+  const word = inThread.find((a) => a.contents.includes('preview'));
+  assert.ok(key && word && JSON.stringify(key.face) !== JSON.stringify(word.face), JSON.stringify(inThread));
+  assert.match(back, /rows 1–1 of 1 · ↵ open/);
+});
