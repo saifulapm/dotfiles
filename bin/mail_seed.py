@@ -150,7 +150,7 @@ def plan():
     def is_decided(addr):
         return addr in decided or "@" + addr.rpartition("@")[2] in decided
     # A From the sender wrote that is not one plain address would become a line post-new reads as a wider query, so it is left alone.
-    odd = {a for a in by_sender if not E.ADDR.fullmatch(a)}
+    odd = {a for a in by_sender if a.startswith("@") or not E.ADDR.fullmatch(a)}
     classes = {a: classify(a, ms, mine, wrote_to, os.path.join(store, "Junk") + "/", now)
                for a, ms in by_sender.items() if a not in odd and not is_decided(a)}
     already = len(by_sender) - len(classes) - len(odd)

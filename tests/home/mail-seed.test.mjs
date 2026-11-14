@@ -144,3 +144,22 @@ test('mail seed --apply writes no line for a sender whose address could widen a 
   assert.equal(r.db('ledger.db'), '');
   assert.ok(!r.tags('re@x.test').includes('thefeed'));
 });
+
+test('mail seed --apply puts a recent unclear mail in the inbox and archives an old one', (t) => {
+  const r = rig(t);
+  r.put('Archive', { From: 'carol@far.test', To: 'me@x.test', Subject: 'q', Date: ago(30), 'Message-ID': '<c2@x.test>' }, 'S');
+  r.put('INBOX', { From: 'old@stale.test', To: 'me@x.test', Subject: 'q', Date: ago(395), 'Message-ID': '<o2@x.test>' }, 'S');
+  r.notmuch('tag', '-inbox', '+archived', '--', 'id:c2@x.test');
+  assert.equal(r.seed('--apply').status, 0);
+  assert.deepEqual(r.tags('c2@x.test').filter((x) => ['inbox', 'archived'].includes(x)), ['inbox']);
+  assert.deepEqual(r.tags('o2@x.test').filter((x) => ['inbox', 'archived'].includes(x)), ['archived']);
+});
+
+test('mail seed leaves a sender with no local part alone, as its line would match a whole domain', (t) => {
+  const r = rig(t);
+  r.deliver({ From: '@gmail.com', Subject: 'Your receipt', Date: ago(5), 'Message-ID': '<g@x.test>' });
+  const res = r.seed();
+  assert.ok(lines(res.stdout).includes('left alone, not one plain address: 1 senders'), res.stdout);
+  assert.equal(r.seed('--apply').stdout, 'nothing to change\n');
+  assert.equal(r.db('ledger.db'), '');
+});

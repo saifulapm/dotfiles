@@ -781,25 +781,34 @@ def class_tags(cls):
     return CLASS_TAGS[cls]
 
 
+def from_query(key):
+    """The from: query for a sender key of the db files: an @domain key as a regex anchored to the address's end, in any case, since notmuch reads from:"@d" as a phrase that also matches a subdomain, another domain ending in it, and a display name."""
+    if not key.startswith("@"):
+        return "from:" + key
+    rx = "".join(f"[{c.lower()}{c.upper()}]" if c.isalpha() else "\\" + c if c in ".^$|?+" else c for c in key)
+    return f'from:"/{rx}>?$/"'
+
+
 # How far back an unscreened sender's mail waits in the Screener again; older mail stays archived.
 SCREENER_DAYS = 365
 
 
-def to_screener(addr):
-    """Put ADDR's mail of the last SCREENER_DAYS back in the Screener, unread and in no box, and archive the rest."""
-    frm = "from:" + addr
+def to_screener(addr, unread=True):
+    """Put ADDR's mail of the last SCREENER_DAYS back in the Screener, in no box and with UNREAD unread, and archive the rest."""
+    frm = from_query(addr)
     ledger = [t for t in nm("search", "--exclude=false", "--output=tags", "--", frm).split() if t.startswith("ledger/")]
     tag(frm, *LEFT_TAGS, *(f"-{t}" for t in ledger))
     since = int(time.time()) - SCREENER_DAYS * 86400
-    tag(f"{frm} and date:@{since}..", "+inbox", "-archived", "+unread")
+    tag(f"{frm} and date:@{since}..", "+inbox", "-archived", *(("+unread",) if unread else ()))
     tag(f"{frm} and date:..@{since}", "+archived", "-inbox")
 
 
 def refile(addr, old, new):
     """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would."""
-    frm = "from:" + addr
+    frm = from_query(addr)
+    # The machine that unscreened marked the mail unread, and iCloud carries that flag here.
     if old and not new:
-        to_screener(addr)
+        to_screener(addr, unread=False)
     elif old and old != new:
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
     if new:
@@ -853,10 +862,12 @@ def decide(action, addr, arg=None):
     """Apply a sender ACTION to ADDR, or to the @domain line that decides it: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
     if "*" in addr:
         raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
+    if addr.startswith("@") or not ADDR.fullmatch(addr):
+        raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
     # Screen-out stays on the address: its spam line outranks an @domain line, and the rest of the organisation keeps its class.
     if action in ("screen-in", "feed", "papertrail", "unscreen"):
         addr = covering(addr)
-    frm = "from:" + addr
+    frm = from_query(addr)
     if action in DECIDES_CLASS:
         # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
         new = "ledger " + sanitize(arg, "Category") if action == "papertrail" else DECIDES_CLASS[action]

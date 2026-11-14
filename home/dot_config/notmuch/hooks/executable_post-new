@@ -18,6 +18,22 @@ fi
 # A double quote from a mail header would break the query, so it is stripped: dropping a malformed sender's rule beats matching too much.
 sanitize() { printf '%s' "${1//\"/}"; }
 
+# notmuch reads from:"@d" as a phrase that also matches a subdomain, another domain ending in it and a display name, so an @domain line becomes a regex anchored to the address's end, each letter in either case; mail_engine.from_query writes the same.
+from_q() {
+    local a c i rx=""
+    a="$(sanitize "$1")"
+    case "$a" in @*) ;; *) printf 'from:"%s"' "$a"; return ;; esac
+    for ((i = 0; i < ${#a}; i++)); do
+        c="${a:i:1}"
+        case "$c" in
+            [[:alpha:]]) rx+="[${c,,}${c^^}]" ;;
+            [.^\$\|?+]) rx+="\\$c" ;;
+            *) rx+="$c" ;;
+        esac
+    done
+    printf 'from:"/%s>?$/"' "$rx"
+}
+
 # new.tags marks the copies from Sent/Drafts/Junk unread+inbox too, so those are fixed first and routing sees only incoming mail.
 notmuch tag --batch <<'EOF' 2>>"$LOG"
 -inbox -unread +sent -- tag:new and folder:"icloud/Sent Messages"
@@ -51,7 +67,7 @@ route_simple() {
     while IFS= read -r addr; do
         addr="$(printf '%s' "$addr" | tr -d '[:space:]')"
         case "$addr" in ''|'#'*) continue ;; esac
-        printf '%s -- tag:new and from:"%s"\n' "$ops" "$(sanitize "$addr")"
+        printf '%s -- tag:new and %s\n' "$ops" "$(from_q "$addr")"
     done <"$db" | notmuch tag --batch 2>>"$LOG"
     [ "${count:-0}" -gt 0 ] && log "routed via $(basename "$db"): $count rules"
     return 0
@@ -67,8 +83,8 @@ if [ -s "$DB_DIR/ledger.db" ]; then
         cat="$(printf '%s' "$line" | awk '{print $1}' | tr -cd '[:alnum:]_-')"
         addr="$(printf '%s' "$line" | awk '{print $2}' | tr -d '[:space:]')"
         [ -n "$cat" ] && [ -n "$addr" ] || continue
-        printf '+ledger/%s +archived -inbox -unread -- tag:new and from:"%s"\n' \
-            "$cat" "$(sanitize "$addr")"
+        printf '+ledger/%s +archived -inbox -unread -- tag:new and %s\n' \
+            "$cat" "$(from_q "$addr")"
     done <"$DB_DIR/ledger.db" | notmuch tag --batch 2>>"$LOG"
 fi
 
