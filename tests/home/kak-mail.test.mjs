@@ -382,3 +382,10 @@ test('a link whose host cannot be read, or that holds control characters, still 
   assert.equal(rows.length, 3, links.stdout);
   assert.ok(rows.every((l) => !/[\x00-\x1f‪-‮⁦-⁩]/.test(l)), links.stdout);
 });
+
+test('a url linked first from an image and then from text lists under the text', (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<img@x.test>', 'MIME-Version': '1.0', 'Content-Type': 'text/html; charset=utf-8' },
+    '<p><a href="https://shop.test/"><img src="https://shop.test/i.png"></a></p><p><a href="https://shop.test/">Shop now</a></p>\n');
+  assert.equal(r.kakMail('links', 'id:img@x.test').stdout, '1 Shop now — shop.test\n');
+});

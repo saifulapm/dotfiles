@@ -223,20 +223,24 @@ def gathered(query):
 
 
 def link_rows(query):
-    """(picker text, url) for each http and https link of QUERY's messages, in reading order, a url once under its first label."""
-    rows = {}
+    """(picker text, url) for each http and https link of QUERY's messages, in reading order, a url once under its first label;
+    a url first linked from an image takes the text of a later link to it."""
+    rows, labelled = {}, set()
     for m, who in gathered(query):
         found = []
         text = body_text(html_first(m.get("body", [])), [], found=found)
         # A body lynx's link list did not parse keeps its URLs in the text.
         found += [(u, u) for u in (u.rstrip(".,;:!?") for u in URL.findall(text))]
         for label, url in found:
-            if not re.match(r"https?://", url, re.I) or url in rows:
-                continue
             # The anchor text is the sender's: one line, and cut short.
             label = " ".join(line(label).split())
             label = label if len(label) <= 60 else label[:59] + "…"
-            rows[url] = (f"{label} — {shown(url)}" if label and label != url else shown(url)) + who
+            has = bool(label) and label != url
+            if not re.match(r"https?://", url, re.I) or url in labelled or (url in rows and not has):
+                continue
+            rows[url] = (f"{label} — {shown(url)}" if has else shown(url)) + who
+            if has:
+                labelled.add(url)
     return [(text, url) for url, text in rows.items()]
 
 
