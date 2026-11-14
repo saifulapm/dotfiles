@@ -686,10 +686,11 @@ def db_add(db, line):
 def db_drop(db, addr):
     """Remove the lines naming ADDR as one whole field, so joann@ outlives ann@;
     written via rename so the post-new hook never reads a half-written routing
-    table (suffix distinct from the hook's own `.tmp')."""
+    table (suffix distinct from the hook's own `.tmp'); returns the lines it
+    removed, split into words."""
     path = db_path(db)
     if not os.path.exists(path):
-        return
+        return []
     with open(path) as f:
         lines = f.readlines()
     keep = [l for l in lines if addr.lower() not in (w.lower() for w in l.split())]
@@ -697,6 +698,7 @@ def db_drop(db, addr):
         with open(path + ".kak-tmp", "w") as f:
             f.writelines(keep)
         os.replace(path + ".kak-tmp", path)
+    return [l.split() for l in lines if l not in keep]
 
 
 def sanitize(name, what):
@@ -805,18 +807,25 @@ def decide(action, addr, arg=None):
         db_add(new.split(" ")[0] + ".db", f"{new[7:]} {addr}" if action == "papertrail" else addr)
         stamp("sender " + addr.lower())
     elif action == "unscreen":
-        for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db", "autofile.db", "recycle.db"):
+        for db in ("screened.db", "thefeed.db", "spam.db", "ledger.db"):
             db_drop(db, addr)
+        for w in db_drop("autofile.db", addr):
+            if len(w) > 1:
+                stamp(f"autofile {addr.lower()} {w[1]}")
+        if db_drop("recycle.db", addr):
+            stamp("recycle " + addr.lower())
         tag(frm, *UNSCREEN_TAGS)
         stamp("sender " + addr.lower())
     elif action == "autofile":
         label = sanitize(arg, "Label")
         db_add("autofile.db", f"{addr} {label}")
         tag(frm, f"+label/{label}")
+        stamp(f"autofile {addr.lower()} {label}")
     elif action == "recycle":
         if arg not in ("30", "90", "730"):
             raise MailError("recycle days must be 30, 90 or 730")
         db_add("recycle.db", f"{addr} {arg}")
+        stamp("recycle " + addr.lower())
 
 
 def pile(action, queries, arg=None):

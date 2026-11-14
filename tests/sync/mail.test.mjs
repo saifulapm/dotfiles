@@ -155,3 +155,28 @@ test('a pulled record naming a sender notmuch would read as a query is left out,
   assert.equal(db(b, 'screened.db'), 'ok@y.test\n');
   assert.equal(db(b, 'spam.db'), '');
 });
+
+test("autofile, notify, recycle and speakeasy travel with the sender's label, and so do their removals", async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'a1@y.test');
+  await deliver(b, 'x@y.test', 'b1@y.test');
+  for (const [action, arg] of [['autofile', 'Work'], ['recycle', '30']]) {
+    const r = await kakMail(a, ['hey', action, '--arg', arg, 'id:a1@y.test']);
+    assert.equal(r.code, 0, r.stderr);
+  }
+  writeFileSync(join(a.hey, 'notify.db'), 'x@y.test\n');
+  writeFileSync(join(a.hey, 'speakeasy'), 'open-sesame\n');
+  await ok(a);
+  await ok(b);
+  assert.deepEqual(['autofile.db', 'recycle.db', 'notify.db', 'speakeasy'].map((f) => db(b, f)), ['x@y.test Work\n', 'x@y.test 30\n', 'x@y.test\n', 'open-sesame\n']);
+  assert.equal(await count(b, 'tag:label/Work'), 1);
+
+  const r = await kakMail(a, ['hey', 'unscreen', 'id:a1@y.test']);
+  assert.equal(r.code, 0, r.stderr);
+  writeFileSync(join(a.hey, 'notify.db'), '');
+  writeFileSync(join(a.hey, 'speakeasy'), '');
+  await ok(a);
+  await ok(b);
+  assert.deepEqual(['autofile.db', 'recycle.db', 'notify.db', 'speakeasy'].map((f) => db(b, f)), ['', '', '', '']);
+  assert.equal(await count(b, 'tag:label/Work'), 0);
+});

@@ -5,9 +5,11 @@ This machine's HEY decisions, read from the hey-mail files, are stamped
 records in STORE; every machine's pulled file merges in, the newest stamp
 winning per key, and what the merge changed is written back to those files
 and its mail re-filed on this machine. A record's key is "sender ADDR"
-(value screened, thefeed, spam or "ledger CATEGORY") or "folder NAME"
-(foldersync.db); a value of null is a removal. The away message and its
-replied list are never read, so only the machine that holds them replies.
+(value screened, thefeed, spam or "ledger CATEGORY"), "folder NAME"
+(foldersync.db), "autofile ADDR LABEL", "notify ADDR", "recycle ADDR" (value
+its days) or "speakeasy" (value the code); a value of null is a removal. The
+away message and its replied list are never read, so only the machine that
+holds them replies.
 
 Exits 0; 4 when STORE does not parse; 5 when a pulled file or some of its
 records were left out, the rest still merged; 1 when mail-sync's lock stays
@@ -25,10 +27,13 @@ sys.dont_write_bytecode = True
 import mail_engine as E
 
 DAY = 24 * 3600 * 1000
-SYNCED = (*E.CLASS_FILES, "foldersync.db")
+SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
 # An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query.
 ADDR = re.compile(r'[^\s"*(){}\[\]\\@]*@[^\s"*(){}\[\]\\@]+')
+DAYS = re.compile(r"[0-9]{1,5}")
+# post-new puts the code in a subject: query with its quotes dropped.
+CODE = re.compile(r'[^\s"\\]{1,64}')
 
 
 def fail(msg, code):
@@ -44,6 +49,15 @@ def valid(key, value):
                      or (isinstance(value, str) and value.startswith("ledger ") and E.CATEGORY.fullmatch(value[7:]) is not None)))
     if kind == "folder":
         return rest in FOLDERS and value in (None, True)
+    if kind == "autofile":
+        addr, _, label = rest.partition(" ")
+        return ADDR.fullmatch(addr) is not None and addr == addr.lower() and E.CATEGORY.fullmatch(label) is not None and value in (None, True)
+    if kind == "notify":
+        return ADDR.fullmatch(rest) is not None and rest == rest.lower() and value in (None, True)
+    if kind == "recycle":
+        return ADDR.fullmatch(rest) is not None and rest == rest.lower() and (value is None or (isinstance(value, str) and DAYS.fullmatch(value) is not None))
+    if key == "speakeasy":
+        return value is None or (isinstance(value, str) and CODE.fullmatch(value) is not None)
     return False
 
 
@@ -83,18 +97,45 @@ def line_record(name, line):
     """The (key, value) one line of a hey-mail file holds, or None for a comment or a line no decision reads."""
     if name == "foldersync.db":
         return (f"folder {line}", True) if line in FOLDERS else None
-    got = E.class_line(name, line)
-    return (f"sender {got[0]}", got[1]) if got and ADDR.fullmatch(got[0]) else None
+    if name == "speakeasy":
+        code = "".join(line.split())
+        return ("speakeasy", code) if CODE.fullmatch(code) else None
+    if name in E.CLASS_FILES:
+        got = E.class_line(name, line)
+        return (f"sender {got[0]}", got[1]) if got and ADDR.fullmatch(got[0]) else None
+    w = line.split()
+    if not w or w[0].startswith("#") or not ADDR.fullmatch(w[0].lower()):
+        return None
+    addr = w[0].lower()
+    if name == "notify.db":
+        return f"notify {addr}", True
+    if len(w) < 2:
+        return None
+    if name == "autofile.db":
+        return (f"autofile {addr} {w[1]}", True) if E.CATEGORY.fullmatch(w[1]) else None
+    return (f"recycle {addr}", w[1]) if DAYS.fullmatch(w[1]) else None
 
 
 def file_of(key, value):
     """The file a live record of KEY is a line of."""
-    return value.split(" ")[0] + ".db" if key.startswith("sender ") else "foldersync.db"
+    kind = key.split(" ")[0]
+    if kind == "sender":
+        return value.split(" ")[0] + ".db"
+    return {"folder": "foldersync.db", "speakeasy": "speakeasy"}.get(kind, kind + ".db")
+
+
+def files_of(key):
+    """Every file a line of KEY may sit in."""
+    return E.CLASS_FILES if key.startswith("sender ") else (file_of(key, None),)
 
 
 def render(key, value):
-    rest = key.split(" ", 1)[1]
-    return f"{value[7:]} {rest}" if value is not True and value.startswith("ledger ") else rest
+    kind, _, rest = key.partition(" ")
+    if kind == "sender" and value.startswith("ledger "):
+        return f"{value[7:]} {rest}"
+    if kind in ("recycle", "speakeasy"):
+        return f"{rest} {value}".strip()
+    return rest
 
 
 def rank(value):
@@ -102,16 +143,17 @@ def rank(value):
 
 
 def local_view():
-    """Every decision the hey-mail files hold now, and which of the files are missing."""
+    """Every decision the hey-mail files hold now, and which of the files are missing; a later line of one key wins, but a sender's highest class does."""
     view, missing = {}, set()
     for name in SYNCED:
         lines = read(name)
         if lines is None:
             missing.add(name)
             continue
-        for line in lines:
+        # post-new reads the speakeasy code from the first line only.
+        for line in lines[:1] if name == "speakeasy" else lines:
             kv = line_record(name, line)
-            if kv and (kv[0] not in view or rank(kv[1]) > rank(view[kv[0]])):
+            if kv and (kv[0] not in view or not kv[0].startswith("sender ") or rank(kv[1]) > rank(view[kv[0]])):
                 view[kv[0]] = kv[1]
     return view, missing
 
@@ -161,7 +203,7 @@ def apply(changed):
     """Write each changed key's line where it now belongs and drop its old lines, touching only the files that change."""
     edits = {}
     for key, (_, new) in changed.items():
-        for name in (E.CLASS_FILES if key.startswith("sender ") else ("foldersync.db",)):
+        for name in files_of(key):
             edits.setdefault(name, (set(), []))[0].add(key)
         if new is not None:
             edits[file_of(key, new)][1].append(render(key, new))
@@ -238,11 +280,15 @@ def main(path, pulled):
     apply(changed)
     refused = []
     for key, (old, new) in sorted(changed.items()):
-        if key.startswith("sender "):
-            try:
-                E.refile(key[7:], old, new)
-            except E.MailError as e:
-                refused.append(f"mail: could not re-file {key[7:]}'s mail: {e}")
+        kind, _, rest = key.partition(" ")
+        try:
+            if kind == "sender":
+                E.refile(rest, old, new)
+            elif kind == "autofile":
+                addr, label = rest.split(" ")
+                E.tag("from:" + addr, ("+" if new else "-") + "label/" + label)
+        except E.MailError as e:
+            refused.append(f"mail: could not re-file {rest.split(' ')[0]}'s mail: {e}")
 
     out = json.dumps({"v": 1, "records": records}, sort_keys=True)
     if out != text:
