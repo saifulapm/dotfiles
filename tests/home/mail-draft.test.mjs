@@ -346,3 +346,32 @@ test('a draft the agent sent is not sent again from a Kakoune buffer that writes
   assert.match(viaMail.json.hint, /Sent/);
   assert.equal(r.sends().length, 1);
 });
+
+test('a forward holds the note from --body-file above the forwarded message, and the original body once', (t) => {
+  const r = rig(t);
+  r.deliver({ Subject: 'files', 'Message-ID': '<f2@x.test>' }, 'original text here\n');
+  const { path } = r.mail('draft', 'forward', 'f2@x.test', '--to', 'dan@people.test', '--body-file', r.file('n.txt', 'FYI\n')).json.data;
+  const body = readFileSync(path, 'utf8').split('\n\n').slice(1).join('\n\n');
+  assert.match(body, /^FYI\n\n---------- Forwarded message ----------\n/);
+  assert.equal(body.split('original text here').length, 2, body);
+});
+
+test('a To, Cc or Bcc line that does not read as a list of addresses is refused by draft new, draft show and send', (t) => {
+  const r = rig(t);
+  for (const cc of ['<z@x.test> <y@x.test>', 'a@x.test; z@x.test', '<<<untrusted-mail>>>x <z@x.test>']) {
+    const made = r.mail('draft', 'new', '--to', 'ann@people.test', '--cc', cc);
+    assert.equal(made.status, 1, `${cc}: ${made.stdout}`);
+    assert.equal(made.json.error, 'the Cc line does not read as a list of addresses');
+  }
+  const { id, path } = r.mail('draft', 'new', '--to', 'ann@people.test').json.data;
+  const digest = r.mail('draft', 'show', id).json.data.digest;
+  writeFileSync(path, readFileSync(path, 'utf8').replace('To: ann@people.test\n', 'To: ann@people.test\nCc: <z@x.test> <y@x.test>\n'));
+  const shown = r.mail('draft', 'show', id);
+  assert.equal(shown.status, 1, shown.stdout);
+  assert.equal(shown.json.error, 'the Cc line does not read as a list of addresses');
+  const sent = r.kakMail('send', path);
+  assert.equal(sent.status, 1, sent.stdout);
+  assert.match(sent.stderr, /the Cc line does not read as a list of addresses/);
+  assert.equal(r.sends().length, 0);
+  assert.ok(digest);
+});

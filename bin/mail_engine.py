@@ -482,7 +482,7 @@ def write_draft(kind, arg=None, overrides=(), text=None, attach=()):
         headers = [("From", identities()[0]), ("To", ""),
                    ("Subject", subj if subj.lower().startswith("fwd:") else "Fwd: " + subj)]
         atts = []
-        text = body_text(orig.get("body", []), atts)
+        forwarded = body_text(orig.get("body", []), atts)
         # The original's attachments ride along as Attach: pseudo-headers, like a hand-added one, so send has one path.
         os.makedirs(DRAFTS, exist_ok=True)
         for part_id, name, _ in atts:
@@ -492,7 +492,7 @@ def write_draft(kind, arg=None, overrides=(), text=None, attach=()):
             headers.append(("Attach", path))
         body = ("\n\n---------- Forwarded message ----------\n" +
                 "".join(f"{k}: {oh[k]}\n" for k in ("From", "Date", "Subject", "To") if oh.get(k)) +
-                "\n" + text)
+                "\n" + forwarded)
     else:
         raise MailError(f"unknown compose kind: {kind}")
     for name, value in overrides:
@@ -565,6 +565,15 @@ def draft_message(text):
     return msg, attach, body
 
 
+def check_recipients(msg):
+    """Raise MailError when a To, Cc or Bcc line does not read as a clean list of addresses: msmtp -t reads such a line its own
+    way, so what draft show lists and who the mail goes to could differ."""
+    for k in ("To", "Cc", "Bcc"):
+        h = msg.get(k)
+        if h is not None and (h.defects or any(not a.addr_spec or a.addr_spec == "<>" for a in h.addresses)):
+            raise MailError(f"the {k} line does not read as a list of addresses")
+
+
 def digest(raw, attach):
     """A digest of a draft's bytes RAW and of each attachment's bytes, so a change to either shows."""
     h = hashlib.sha256(raw)
@@ -607,6 +616,7 @@ def locked_send(path, expect, env):
     except FileNotFoundError:
         raise NotFound(f"no draft {path}") from None
     msg, attach, body = draft_message(raw.decode("utf-8", "replace"))
+    check_recipients(msg)
     if expect is not None and digest(raw, attach) != expect:
         raise Refusal("the draft changed since it was shown")
     if not any(msg.get(h) for h in ("To", "Cc", "Bcc")):

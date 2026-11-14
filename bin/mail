@@ -41,7 +41,7 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, check_recipients, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, write_draft)
 
@@ -284,6 +284,10 @@ def cmd_draft_write(a):
             raise Usage(f"{a.sender} is not one of your addresses")
         fields.append(("From", mine))
     fields += [(name, v) for name, v in (("To", a.to), ("Cc", a.cc), ("Bcc", a.bcc), ("Subject", a.subject)) if v is not None]
+    try:
+        check_recipients(draft_message("".join(f"{k}: {v}\n" for k, v in fields if k in ("To", "Cc", "Bcc")))[0])
+    except MailError as e:
+        raise Usage(str(e)) from None
     attach = []
     for p in a.attach:
         p = os.path.abspath(os.path.expanduser(p))
@@ -332,6 +336,11 @@ def cmd_draft_show(a):
         raw = f.read()
     # A reply quotes the sender and takes To and Cc from their headers, so the draft's text is wrapped as mail text is.
     msg, attach, body = draft_message(raw.decode("utf-8", "replace"))
+    try:
+        check_recipients(msg)
+    except MailError as e:
+        e.hint = "fix that line in the draft (Kakoune: b d, then the draft), then show it again"
+        raise
     return {
         "id": os.path.basename(path).removesuffix(".eml"),
         "path": path,
