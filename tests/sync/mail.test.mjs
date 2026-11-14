@@ -147,11 +147,19 @@ test('a pulled record naming a sender notmuch would read as a query is left out,
   const { w, b } = await pair();
   mkdirSync(dirname(remote(w, 'a')), { recursive: true });
   const at = Date.now();
-  const records = { 'sender *': { v: 'screened', at }, 'sender a@b.test or tag:inbox': { v: 'spam', at }, 'sender ok@y.test': { v: 'screened', at } };
+  // notmuch reads from:/re/ as a regex over every sender, and a list value is no class.
+  const records = {
+    'sender *': { v: 'screened', at },
+    'sender a@b.test or tag:inbox': { v: 'spam', at },
+    'sender /.+@.+/': { v: 'spam', at },
+    'sender l@y.test': { v: ['screened'], at },
+    'mute id:m@y.test': { v: { x: 1 }, at },
+    'sender ok@y.test': { v: 'screened', at },
+  };
   writeFileSync(remote(w, 'a'), JSON.stringify({ v: 1, records }));
   const r = await sync(b, ['--only', 'mail']);
   assert.equal(r.code, 5, r.stdout + r.stderr);
-  assert.match(r.stderr, /^dots sync: mail: left out 2 records from a\.json, which are not HEY decisions$/m);
+  assert.match(r.stderr, /^dots sync: mail: left out 5 records from a\.json, which are not HEY decisions$/m);
   assert.equal(db(b, 'screened.db'), 'ok@y.test\n');
   assert.equal(db(b, 'spam.db'), '');
 });

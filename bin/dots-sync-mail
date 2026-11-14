@@ -31,8 +31,8 @@ import mail_engine as E
 DAY = 24 * 3600 * 1000
 SYNCED = (*E.CLASS_FILES, "foldersync.db", "autofile.db", "notify.db", "recycle.db", "speakeasy", "bubble.db", "muted.db")
 FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
-# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query.
-ADDR = re.compile(r'[^\s"*(){}\[\]\\@]*@[^\s"*(){}\[\]\\@]+')
+# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query; notmuch reads from:/.../ as a regex.
+ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@[^\s"*(){}\[\]\\/@]+')
 DAYS = re.compile(r"[0-9]{1,5}")
 # A Message-ID goes into a thread:{} query, so nothing in it may close the braces or widen the query.
 MSGID = re.compile(r'id:[^\s"(){}\[\]\\]+')
@@ -47,6 +47,8 @@ def fail(msg, code):
 
 
 def valid(key, value):
+    if not (value is None or value is True or type(value) in (str, int)):
+        return False
     kind, _, rest = key.partition(" ")
     if kind == "sender":
         return (ADDR.fullmatch(rest) is not None and rest == rest.lower()
