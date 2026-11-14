@@ -766,7 +766,9 @@ CLASS_TAGS = {
     "thefeed": ("+thefeed", "+archived", "-inbox"),
     "spam": ("+spam", "+deleted", "+archived", "-inbox", "-unread", "-screened"),
 }
-UNSCREEN_TAGS = ("-screened", "-thefeed", "-spam", "-deleted", "-bubble", "+inbox")
+# What leaving every class takes off a sender's mail.
+LEFT_TAGS = ("-screened", "-thefeed", "-spam", "-deleted", "-bubble")
+UNSCREEN_TAGS = (*LEFT_TAGS, "+inbox")
 
 
 def class_tags(cls):
@@ -775,10 +777,26 @@ def class_tags(cls):
     return CLASS_TAGS[cls]
 
 
+# How far back an unscreened sender's mail waits in the Screener again; older mail stays archived.
+SCREENER_DAYS = 365
+
+
+def to_screener(addr):
+    """Put ADDR's mail of the last SCREENER_DAYS back in the Screener, unread and in no box, and archive the rest."""
+    frm = "from:" + addr
+    ledger = [t for t in nm("search", "--exclude=false", "--output=tags", "--", frm).split() if t.startswith("ledger/")]
+    tag(frm, *LEFT_TAGS, *(f"-{t}" for t in ledger))
+    since = int(time.time()) - SCREENER_DAYS * 86400
+    tag(f"{frm} and date:@{since}..", "+inbox", "-archived", "+unread")
+    tag(f"{frm} and date:..@{since}", "+archived", "-inbox")
+
+
 def refile(addr, old, new):
     """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would."""
     frm = "from:" + addr
-    if old and old != new:
+    if old and not new:
+        to_screener(addr)
+    elif old and old != new:
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
     if new:
         tag(frm, *class_tags(new))
@@ -812,7 +830,7 @@ def decide(action, addr, arg=None):
                 stamp(f"autofile {addr.lower()} {w[1]}")
         if db_drop("recycle.db", addr):
             stamp("recycle " + addr.lower())
-        tag(frm, *UNSCREEN_TAGS)
+        to_screener(addr)
         stamp("sender " + addr.lower())
     elif action == "autofile":
         label = sanitize(arg, "Label")

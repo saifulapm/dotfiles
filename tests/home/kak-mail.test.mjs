@@ -507,3 +507,21 @@ test('M is mapped in a list and a thread, and the help names it', () => {
   assert.match(both.slice(0, both.indexOf('\n}')), /map buffer normal M ':mail-hey mute<ret>'/);
   assert.match(kak, /^M +mute this thread/m);
 });
+
+test('unscreening a Paper Trail sender returns its last 12 months to the Screener unread, without ledger tags, and leaves older mail archived', (t) => {
+  const r = mailRig(t);
+  const day = (n) => new Date(Date.now() - n * 86400e3).toUTCString();
+  r.deliver({ From: 'Shop <bills@shop.test>', 'Message-ID': '<new@shop.test>', Date: day(30) });
+  r.deliver({ From: 'Shop <bills@shop.test>', 'Message-ID': '<old@shop.test>', Date: day(400) });
+  r.notmuch('tag', '-new', '--', '*');
+  assert.equal(r.kakMail('hey', 'papertrail', '--arg', 'receipts', 'id:new@shop.test').status, 0);
+  // A phone drag into HEY/PaperTrail files under ledger/unfiled, and unscreen drops that too.
+  r.notmuch('tag', '+ledger/unfiled', '--', 'id:new@shop.test');
+  const res = r.kakMail('hey', 'unscreen', 'id:new@shop.test');
+  assert.equal(res.status, 0, res.stderr);
+  const tags = (id) => r.notmuch('search', '--output=tags', '--', `id:${id}`).split('\n').filter(Boolean);
+  assert.deepEqual(tags('new@shop.test'), ['inbox', 'unread']);
+  assert.deepEqual(tags('old@shop.test'), ['archived']);
+  const out = join(r.M, 'list');
+  assert.match(r.kakMail('list', '--out', out, 'Screener').stdout, /mail_ids 'id:new@shop\.test'$/m);
+});
