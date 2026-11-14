@@ -50,8 +50,9 @@ Aside, Bubbled Up, Read, Notes, Muted, Sent, Everything.
 **search.** A row is `{thread, id, date, from:{name,address}, subject, tags,
 box, screened, unread, count}`. QUERY is notmuch syntax: `from:bob@x.test`,
 `subject:invoice`, `date:7d..`. `--box Imbox` limits to one box. You get 50 rows;
-`--limit` takes 1 to 500 and `--offset` pages. A query that starts with `-`
-goes after `--`. The Screener lists one row per mail.
+`--limit` takes 1 to 500 and `--offset` pages. Negate with `not`, as in
+`not tag:unread`: notmuch reads a leading `-tag:unread` as every mail. A query
+that starts with `-` goes after `--`. The Screener lists one row per mail.
 
 **show.** ID is a row's `id`, bare or as `id:<id>`. The message holds `from`,
 `to`, `cc`, `subject`, `date`, `body`, `links` (`{label,url}`), `attachments`
