@@ -837,10 +837,21 @@ def undo_last():
     return f"feed of {addr}" if addr else "archive"
 
 
+def covering(addr):
+    """The key a decision on ADDR acts on: ADDR, or the @domain line that alone decides it, as an organisation moves as one."""
+    domain = "@" + addr.rpartition("@")[2]
+    if sender_class(addr) is None and sender_class(domain) is not None:
+        return domain
+    return addr
+
+
 def decide(action, addr, arg=None):
-    """Apply a sender ACTION to ADDR: its decision line in the db the post-new hook reads, and the tags on its mail so far."""
+    """Apply a sender ACTION to ADDR, or to the @domain line that decides it: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
     if "*" in addr:
         raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
+    # Screen-out stays on the address: its spam line outranks an @domain line, and the rest of the organisation keeps its class.
+    if action in ("screen-in", "feed", "papertrail", "unscreen"):
+        addr = covering(addr)
     frm = "from:" + addr
     if action in DECIDES_CLASS:
         # A sender has one class, so one moved from another loses its line there, and that class's tags, first.
@@ -874,6 +885,7 @@ def decide(action, addr, arg=None):
             raise MailError("recycle days must be 30, 90 or 730")
         db_add("recycle.db", f"{addr} {arg}")
         stamp("recycle " + addr.lower())
+    return addr
 
 
 def pile(action, queries, arg=None):

@@ -351,8 +351,7 @@ def cmd_hey(args):
     done = []
     if action in SENDER_ACTIONS:
         for addr in dict.fromkeys(sender(q) for q in queries):
-            decide(action, addr, arg)
-            done.append(addr)
+            done.append(decide(action, addr, arg))
     elif action in THREAD_ACTIONS:
         n, when = pile(action, queries, arg)
         done = [f"{n} thread(s)"]

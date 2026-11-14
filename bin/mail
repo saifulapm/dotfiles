@@ -464,8 +464,7 @@ def cmd_hey(a):
     msg_id = found(a.id)["id"]
     action = HEY[a.action]
     if action in SENDER_ACTIONS:
-        addr = sender(idq(msg_id))
-        decide(action, addr, a.category)
+        addr = decide(action, sender(idq(msg_id)), a.category)
         refresh_count()
         return {"action": a.action, "id": msg_id, "sender": addr}
     n, when = pile(action, [idq(msg_id)], a.at)
