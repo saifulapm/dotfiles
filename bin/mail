@@ -41,7 +41,7 @@ from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MSMTP_ACCOUNT, MailError, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
+from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, write_draft)
 
@@ -398,6 +398,8 @@ def cmd_send(a):
         raise Refused("refused: needs --digest D from mail draft show", "show Saiful the draft with mail draft show, and pass its digest")
     try:
         to = send_draft(path, a.digest, unlocked_env())
+    except AlreadySent as e:
+        raise Refused(f"refused: {e}", "the mail went out already and is in Sent (mail search --box Sent); tell Saiful, and send nothing again") from None
     except Refusal as e:
         raise Refused(f"refused: {e}", "show the draft again with mail draft show, and ask Saiful again") from None
     except NotFound:

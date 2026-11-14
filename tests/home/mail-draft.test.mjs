@@ -341,5 +341,8 @@ test('a draft the agent sent is not sent again from a Kakoune buffer that writes
   const viaMail = r.mail('send', id, '--yes', '--digest', digest);
   assert.equal(viaMail.status, 3, viaMail.stdout);
   assert.match(viaMail.json.error, /^refused: already sent/);
+  // The mail went out, so the hint points at Sent rather than at a new yes.
+  assert.doesNotMatch(viaMail.json.hint, /ask Saiful again/);
+  assert.match(viaMail.json.hint, /Sent/);
   assert.equal(r.sends().length, 1);
 });

@@ -60,6 +60,10 @@ class Refusal(MailError):
     """A send that must not go: the draft was sent already, or changed since it was shown."""
 
 
+class AlreadySent(Refusal):
+    """A draft send has sent before."""
+
+
 class MissingAttachment(MailError):
     """A draft's Attach: file is gone; PATH may hold a sender's file name, from a forward."""
 
@@ -590,11 +594,11 @@ def locked_send(path, expect, env):
     # Kakoune writes the buffer back over the draft before each send, so the mark lives beside it.
     mark = path + ".sent"
     if os.path.exists(mark):
-        raise Refusal(f"already sent; {mark} holds the message as it went out")
+        raise AlreadySent(f"already sent; {mark} holds the message as it went out")
     try:
         with open(SENT_DRAFTS) as f:
             if os.path.basename(path) in f.read().split():
-                raise Refusal("already sent; this draft went out before, so discard it")
+                raise AlreadySent("already sent; this draft went out before, so discard it")
     except FileNotFoundError:
         pass
     try:
