@@ -50,7 +50,9 @@ def untrusted(text):
 def person(header):
     name, address = parseaddr(header)
     name = line(name).strip()
-    return {"name": untrusted(name) if name else None, "address": address}
+    # An address is a short token; one holding spaces, quotes or <> is a sentence the sender wrote.
+    plain = re.fullmatch(r'[^\s<>"]*', address)
+    return {"name": untrusted(name) if name else None, "address": address if plain else untrusted(line(address))}
 
 
 def row(m, thread, count, home):
@@ -86,7 +88,10 @@ def list_headers(m):
                 h = BytesHeaderParser(policy=email.policy.default).parse(f)
         except OSError:
             continue
-        return {k: line(h[name]) if h[name] is not None else None for k, name in (("list_id", "List-Id"), ("list_unsubscribe", "List-Unsubscribe"))}
+        # List-Id is a phrase the sender wrote; of List-Unsubscribe only its <URI>s are kept, without the words around them.
+        uris = re.findall(r"<([^<>\s]+)>", str(h["List-Unsubscribe"] or ""))
+        return {"list_id": untrusted(line(h["List-Id"])) if h["List-Id"] is not None else None,
+                "list_unsubscribe": ", ".join(f"<{u}>" for u in uris) or None}
     return {"list_id": None, "list_unsubscribe": None}
 
 
@@ -211,8 +216,12 @@ def emit(obj, code):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     p = parser()
+    argv = sys.argv[1:]
+    # A Message-ID may start with -, and argparse would read it as an option.
+    if len(argv) == 2 and argv[0] in ("show", "thread", "read", "unread") and argv[1].startswith("-") and argv[1] not in ("-h", "--help", "--"):
+        argv.insert(1, "--")
     try:
-        a = p.parse_args()
+        a = p.parse_args(argv)
         data = a.fn(a)
     except Usage as e:
         emit({"ok": False, "error": str(e), "hint": p.format_usage().strip()}, 1)

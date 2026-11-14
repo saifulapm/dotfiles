@@ -225,7 +225,7 @@ class Anchors(HTMLParser):
             self.open = None
 
 
-LYNX_REF = re.compile(r"^\s*(\d+)\. (\S+)$")
+LYNX_REF = re.compile(r"^\s*(\d+)\. (\S.*)$")
 
 
 def html_with_links(html, found):
