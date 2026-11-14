@@ -525,3 +525,19 @@ test('unscreening a Paper Trail sender returns its last 12 months to the Screene
   const out = join(r.M, 'list');
   assert.match(r.kakMail('list', '--out', out, 'Screener').stdout, /mail_ids 'id:new@shop\.test'$/m);
 });
+
+test('H c on a thread with a pending bubble cancels it: no bubble.db line, no bubble tag, back in the inbox', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Bob <bob@people.test>', 'Message-ID': '<z1@x.test>' });
+  r.deliver({ From: 'Bob <bob@people.test>', 'Message-ID': '<z2@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', '*');
+  assert.equal(r.kakMail('hey', 'bubble', '--arg', 'tomorrow 9am', 'id:z1@x.test').status, 0);
+  assert.equal(r.kakMail('hey', 'bubble', '--arg', 'tomorrow 9am', 'id:z2@x.test').status, 0);
+  const res = r.kakMail('hey', 'clear', 'id:z1@x.test');
+  assert.equal(res.status, 0, res.stderr);
+  assert.doesNotMatch(r.db('bubble.db'), /z1@x\.test/);
+  assert.match(r.db('bubble.db'), /^id:z2@x\.test \d+$/m, "another thread's bubble stays");
+  const tags = r.notmuch('search', '--output=tags', '--', 'id:z1@x.test').split('\n').filter(Boolean);
+  assert.ok(!tags.includes('bubble') && tags.includes('inbox'), tags.join(' '));
+  assert.match(readFileSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), /\d+ bubble id:z1@x\.test\n.*\n\d+ bubble id:z1@x\.test\n$/s);
+});

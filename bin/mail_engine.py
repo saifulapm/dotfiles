@@ -864,6 +864,17 @@ def pile(action, queries, arg=None):
             tag(q, "+setaside")
         elif action == "clear":
             tag(q, "-replylater", "-setaside", "-bubbled")
+            # A pending bubble is cancelled too: its line goes, stamped so dots sync takes the removal, and the thread is back in the inbox.
+            try:
+                with open(db_path("bubble.db")) as f:
+                    named = {l.split()[0] for l in f if l.split()}
+            except FileNotFoundError:
+                named = set()
+            for mid in named & set(nm("search", "--exclude=false", "--output=messages", q).split()):
+                db_drop("bubble.db", mid)
+                stamp("bubble " + mid)
+            if nm("count", "--exclude=false", "--", f"({q}) and tag:bubble").strip() != "0":
+                tag(q, "-bubble", "+inbox")
         elif action == "archive":
             tag(q, "-inbox", "+archived")
         elif action == "mute":
