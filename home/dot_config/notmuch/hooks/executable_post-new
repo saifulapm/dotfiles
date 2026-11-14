@@ -263,7 +263,7 @@ if [ -x "$kak_mail" ]; then
 else
     imbox=$(count tag:inbox and tag:screened and tag:unread)
 fi
-screener=$(count tag:inbox and tag:unread and not tag:screened)
+screener=$(count tag:inbox and not tag:screened)
 
 # Only screened-in mail notifies: an unscreened stranger must never buzz you.
 if [ "${fresh:-0}" -gt 0 ] && command -v notify-send >/dev/null 2>&1; then

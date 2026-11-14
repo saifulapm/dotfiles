@@ -296,3 +296,13 @@ test('a link whose URL holds a space still leaves the References list out of the
   assert.equal(m.links.length, 2, JSON.stringify(m.links));
   assert.equal(m.links[1].label, wrapped('two'));
 });
+
+// Saiful's store holds no unread mail, so a box that needed unread would stay empty after the seed, so he chose boxes that hold read mail too.
+test('the Screener holds read mail of an undecided sender in the inbox, and The Feed box holds read Feed mail', (t) => {
+  const r = twoMails(t);
+  r.deliver({ From: 'News <news@feed.test>', Subject: 'weekly', 'Message-ID': '<feed@x.test>' });
+  r.notmuch('tag', '-unread', '--', '*');
+  r.notmuch('tag', '+thefeed', '+archived', '-inbox', '--', 'id:feed@x.test');
+  assert.deepEqual(r.mail('search', '--box', 'Screener').json.data.map((row) => row.id), ['new@x.test']);
+  assert.deepEqual(r.mail('search', '--box', 'The Feed').json.data.map((row) => row.id), ['feed@x.test']);
+});

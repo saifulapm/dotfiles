@@ -18,9 +18,7 @@ function engineBoxes() {
 test("the engine's boxes select what hey-folder-sync files into each HEY folder", () => {
   const rules = Object.fromEntries([...readFileSync(join(repo, 'bin/hey-folder-sync'), 'utf8').matchAll(/^rule "[^"]+"\s+"([^"]+)"\s+'([^']+)'$/gm)].map((m) => [m[1], m[2]]));
   const boxes = engineBoxes();
-  for (const name of ['Screener', 'Paper Trail', 'Reply Later', 'Set Aside', 'Read']) assert.equal(boxes[name], rules[name], name);
-  // HEY/Feed holds all of the Feed, and the box shows what is new in it.
-  assert.equal(boxes['The Feed'], `${rules['The Feed']} and tag:unread`);
+  for (const name of ['Screener', 'The Feed', 'Paper Trail', 'Reply Later', 'Set Aside', 'Read']) assert.equal(boxes[name], rules[name], name);
 });
 
 test("the post-new hook counts the engine's Imbox and Screener", () => {

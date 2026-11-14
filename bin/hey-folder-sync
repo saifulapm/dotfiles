@@ -34,7 +34,7 @@ rule "HEY/ReplyLater" "Reply Later" 'tag:replylater'
 rule "HEY/SetAside"   "Set Aside"   'tag:setaside'
 rule "HEY/Feed"       "The Feed"    'tag:thefeed'
 rule "HEY/PaperTrail" "Paper Trail" 'tag:/^ledger\//'
-rule "HEY/Screener"   "Screener"    'tag:inbox and tag:unread and not tag:screened'
+rule "HEY/Screener"   "Screener"    'tag:inbox and not tag:screened'
 # Read before INBOX, so INBOX holds only unread Imbox mail, like the desktop Imbox; read state comes from iCloud, so mail read on the phone leaves INBOX on the next sync.
 rule "HEY/Read"       "Read"        'tag:inbox and tag:screened and not tag:unread'
 rule "INBOX"          "Imbox"       'tag:inbox and tag:screened'

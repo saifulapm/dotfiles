@@ -37,8 +37,8 @@ COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state
 BOXES = [
     ("i", "Imbox", "tag:inbox and tag:screened and tag:unread", False),
     # Unthreaded, alone among the boxes: the Screener decides on people, and one sender's year of notifications would thread into one row.
-    ("s", "Screener", "tag:inbox and tag:unread and not tag:screened", True),
-    ("f", "The Feed", "tag:thefeed and tag:unread", False),
+    ("s", "Screener", "tag:inbox and not tag:screened", True),
+    ("f", "The Feed", "tag:thefeed", False),
     ("p", "Paper Trail", "tag:/^ledger\\//", False),
     ("l", "Reply Later", "tag:replylater", False),
     ("a", "Set Aside", "tag:setaside", False),

@@ -1,7 +1,7 @@
 == boxes
  i  Imbox            9
  s  Screener         2
- f  The Feed         1
+ f  The Feed         2
  p  Paper Trail      1
  l  Reply Later      1
  a  Set Aside        1
@@ -46,12 +46,13 @@ set-option buffer mail_offset 0
 set-option buffer mail_total 2
 set-option buffer mail_rows 'rows 1–2 of 2'
 == list The Feed
+2020-01-07 News                   last week  [archived thefeed]
 2020-01-06 News                   weekly digest  [archived thefeed unread]
 -- kak
-set-option buffer mail_ids 'thread:0000000000000004'
+set-option buffer mail_ids 'thread:0000000000000005' 'thread:0000000000000004'
 set-option buffer mail_offset 0
-set-option buffer mail_total 1
-set-option buffer mail_rows 'rows 1–1 of 1'
+set-option buffer mail_total 2
+set-option buffer mail_rows 'rows 1–2 of 2'
 == list Paper Trail
 2020-01-08 Shop                   your receipt  [archived ledger/receipts]
 -- kak
