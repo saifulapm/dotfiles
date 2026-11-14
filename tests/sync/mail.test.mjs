@@ -1,0 +1,123 @@
+// Two machines, a and b, carry HEY decisions through dots sync's mail unit, each with its own scratch notmuch store.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { deliver, kakMail, machine, mailbox, notmuch, sync, world } from './lib.mjs';
+
+const db = (m, name) => (existsSync(join(m.hey, name)) ? readFileSync(join(m.hey, name), 'utf8') : '');
+const remote = (w, id) => join(w.remote, 'dots-sync/mail', id + '.json');
+
+async function ok(m, args) {
+  const r = await sync(m, args);
+  assert.equal(r.code, 0, `dots sync on ${m.id} exited ${r.code}: ${r.stdout}${r.stderr}`);
+  return r;
+}
+
+// Two machines with mail, each started once, as Saiful starts each after his go.
+async function pair() {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  for (const m of [a, b]) {
+    await mailbox(m);
+    await ok(m, ['--only', 'mail']);
+  }
+  return { w, a, b };
+}
+
+async function hey(m, action, id) {
+  const r = await kakMail(m, ['hey', action, 'id:' + id]);
+  assert.equal(r.code, 0, r.stderr);
+}
+
+const count = async (m, q) => Number((await notmuch(m, ['count', q])).stdout.trim());
+
+test('a full round leaves mail alone on a machine not started, and --only mail starts it', async () => {
+  const w = world();
+  const a = machine(w, 'a');
+  await mailbox(a);
+  writeFileSync(join(a.hey, 'screened.db'), 'x@y.test\n');
+  const r = await ok(a);
+  assert.match(r.stdout, /^dots sync: mail skipped, not started here; dots sync --only mail starts it$/m);
+  assert.equal(existsSync(remote(w, 'a')), false);
+  await ok(a, ['--only', 'mail']);
+  assert.ok(existsSync(remote(w, 'a')));
+  // Once started, the full round carries mail too.
+  writeFileSync(join(a.hey, 'screened.db'), 'x@y.test\nz@y.test\n');
+  await ok(a);
+  assert.match(readFileSync(remote(w, 'a'), 'utf8'), /z@y\.test/);
+});
+
+test('a sender screened in on a reaches b, and b files its older mail from it as screened', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'X <x@y.test>', 'a1@y.test');
+  for (const n of [1, 2, 3]) await deliver(b, 'X <x@y.test>', `b${n}@y.test`);
+  await hey(a, 'screen-in', 'a1@y.test');
+  await ok(a);
+  await ok(b);
+  assert.match(db(b, 'screened.db'), /^x@y\.test$/m);
+  assert.equal(await count(b, 'from:x@y.test and tag:screened'), 3);
+});
+
+test('a sender unscreened on b is gone from a after b then a sync', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'x@y.test', 'a1@y.test');
+  await deliver(b, 'x@y.test', 'b1@y.test');
+  await hey(a, 'screen-in', 'a1@y.test');
+  await ok(a);
+  await ok(b);
+  await hey(b, 'unscreen', 'b1@y.test');
+  await ok(b);
+  await ok(a);
+  assert.doesNotMatch(db(a, 'screened.db'), /x@y\.test/);
+  assert.equal(await count(a, 'tag:screened'), 0);
+});
+
+test("another machine's mail file that does not parse fails the unit with 5 and leaves the local files as they were", async () => {
+  const { w, b } = await pair();
+  writeFileSync(join(b.hey, 'screened.db'), 'x@y.test\n');
+  writeFileSync(join(b.hey, 'foldersync.db'), '# boxes\nHEY/Feed\n');
+  await ok(b);
+  const before = ['screened.db', 'foldersync.db'].map((f) => db(b, f));
+  writeFileSync(remote(w, 'a'), '{"v":1,"records":');
+  const r = await sync(b, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  assert.match(r.stderr, /^dots sync: mail: skipped a\.json, which does not parse$/m);
+  assert.deepEqual(['screened.db', 'foldersync.db'].map((f) => db(b, f)), before);
+});
+
+test('the boxes enabled on either machine end enabled on both, each keeping its own header', async () => {
+  const { a, b } = await pair();
+  writeFileSync(join(a.hey, 'foldersync.db'), '# a header\nHEY/Feed\nHEY/ReplyLater\n');
+  writeFileSync(join(b.hey, 'foldersync.db'), '# b header\nHEY/Read\n');
+  await ok(a);
+  await ok(b);
+  await ok(a);
+  assert.equal(db(a, 'foldersync.db'), '# a header\nHEY/Feed\nHEY/ReplyLater\nHEY/Read\n');
+  assert.equal(db(b, 'foldersync.db'), '# b header\nHEY/Read\nHEY/Feed\nHEY/ReplyLater\n');
+});
+
+test("the away message and its replied list stay on a's machine", async () => {
+  const { w, a, b } = await pair();
+  writeFileSync(join(a.hey, 'away'), 'until: 2099-01-01\n\nback soon\n');
+  writeFileSync(join(a.hey, 'away-replied.db'), 'x@y.test\n');
+  writeFileSync(join(a.hey, 'screened.db'), 'x@y.test\n');
+  await ok(a);
+  await ok(b);
+  assert.equal(existsSync(join(b.hey, 'away')), false);
+  assert.equal(existsSync(join(b.hey, 'away-replied.db')), false);
+  assert.doesNotMatch(readFileSync(remote(w, 'a'), 'utf8'), /away|back soon/);
+});
+
+test('a pulled record naming a sender notmuch would read as a query is left out, and the unit says so', async () => {
+  const { w, b } = await pair();
+  mkdirSync(dirname(remote(w, 'a')), { recursive: true });
+  const at = Date.now();
+  const records = { 'sender *': { v: 'screened', at }, 'sender a@b.test or tag:inbox': { v: 'spam', at }, 'sender ok@y.test': { v: 'screened', at } };
+  writeFileSync(remote(w, 'a'), JSON.stringify({ v: 1, records }));
+  const r = await sync(b, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  assert.match(r.stderr, /^dots sync: mail: left out 2 records from a\.json, which are not HEY decisions$/m);
+  assert.equal(db(b, 'screened.db'), 'ok@y.test\n');
+  assert.equal(db(b, 'spam.db'), '');
+});

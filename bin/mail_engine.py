@@ -717,6 +717,30 @@ def tag(query, *changes):
     nm("tag", *changes, "--", query)
 
 
+# What each sender class puts on the sender's mail, as post-new does for new mail; a Paper Trail class is "ledger CATEGORY".
+CLASS_TAGS = {
+    "screened": ("+screened",),
+    "thefeed": ("+thefeed", "+archived", "-inbox"),
+    "spam": ("+spam", "+deleted", "+archived", "-inbox", "-unread", "-screened"),
+}
+UNSCREEN_TAGS = ("-screened", "-thefeed", "-spam", "-deleted", "-bubble", "+inbox")
+
+
+def class_tags(cls):
+    if cls.startswith("ledger "):
+        return (f"+ledger/{cls[7:]}", "+archived", "-inbox", "-unread")
+    return CLASS_TAGS[cls]
+
+
+def refile(addr, old, new):
+    """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would."""
+    frm = "from:" + addr
+    if old and old != new:
+        tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
+    if new and new != old:
+        tag(frm, *class_tags(new))
+
+
 SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
 THREAD_ACTIONS = ("reply-later", "set-aside", "clear", "bubble", "archive")
 

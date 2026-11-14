@@ -1,0 +1,258 @@
+#!/usr/bin/env python3
+"""dots-sync-mail STORE PULLED...: dots sync's mail unit, run through dots-sync-merge mail.
+
+This machine's HEY decisions, read from the hey-mail files, are stamped
+records in STORE; every machine's pulled file merges in, the newest stamp
+winning per key, and what the merge changed is written back to those files
+and its mail re-filed on this machine. A record's key is "sender ADDR"
+(value screened, thefeed, spam or "ledger CATEGORY") or "folder NAME"
+(foldersync.db); a value of null is a removal. The away message and its
+replied list are never read, so only the machine that holds them replies.
+
+Exits 0; 4 when STORE does not parse; 5 when a pulled file or some of its
+records were left out, the rest still merged; 1 when mail-sync's lock stays
+held or re-filing failed.
+"""
+
+import fcntl
+import json
+import os
+import re
+import sys
+import time
+
+import mail_engine as E
+
+DAY = 24 * 3600 * 1000
+# Each sender file and the class its lines give; a ledger.db line names its category first.
+CLASS_FILES = {"screened.db": "screened", "thefeed.db": "thefeed", "spam.db": "spam", "ledger.db": "ledger"}
+SYNCED = (*CLASS_FILES, "foldersync.db")
+# An address in two class files reads as post-new's tags leave its mail: spam over Paper Trail over The Feed over screened in.
+RANK = ("screened", "thefeed", "ledger", "spam")
+FOLDERS = ("HEY/Screener", "HEY/Feed", "HEY/PaperTrail", "HEY/ReplyLater", "HEY/SetAside", "HEY/Bubbled", "HEY/Read", "Archive")
+# An address or @domain rule goes into a from: query here and in post-new, so nothing in it may widen the query.
+ADDR = re.compile(r'[^\s"*(){}\[\]\\@]*@[^\s"*(){}\[\]\\@]+')
+CATEGORY = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def fail(msg, code):
+    print(msg, file=sys.stderr)
+    sys.exit(code)
+
+
+def valid(key, value):
+    kind, _, rest = key.partition(" ")
+    if kind == "sender":
+        return (ADDR.fullmatch(rest) is not None and rest == rest.lower()
+                and (value is None or value in E.CLASS_TAGS
+                     or (isinstance(value, str) and value.startswith("ledger ") and CATEGORY.fullmatch(value[7:]) is not None)))
+    if kind == "folder":
+        return rest in FOLDERS and value in (None, True)
+    return False
+
+
+def ok_record(key, r):
+    return (isinstance(r, dict) and "v" in r and isinstance(r.get("at"), (int, float)) and not isinstance(r["at"], bool)
+            and r["at"] >= 0 and valid(key, r["v"]))
+
+
+def parse(text):
+    """The records of a store's text, or None when it is not one."""
+    try:
+        store = json.loads(text)
+    except ValueError:
+        return None
+    if not isinstance(store, dict) or not isinstance(store.get("records"), dict):
+        return None
+    return store["records"]
+
+
+def read(name):
+    try:
+        with open(os.path.join(E.DB_DIR, name)) as f:
+            return f.read().splitlines()
+    except FileNotFoundError:
+        return None
+
+
+def write(name, lines):
+    path = os.path.join(E.DB_DIR, name)
+    os.makedirs(E.DB_DIR, exist_ok=True)
+    with open(path + ".sync-tmp", "w") as f:
+        f.write("".join(line + "\n" for line in lines))
+    os.replace(path + ".sync-tmp", path)
+
+
+def line_record(name, line):
+    """The (key, value) one line of a hey-mail file holds, or None for a comment or a line no decision reads."""
+    if name == "foldersync.db":
+        return (f"folder {line}", True) if line in FOLDERS else None
+    w = line.split()
+    if not w or w[0].startswith("#"):
+        return None
+    if name == "ledger.db":
+        if len(w) < 2 or not CATEGORY.fullmatch(w[0]):
+            return None
+        addr, value = w[1].lower(), "ledger " + w[0]
+    else:
+        addr, value = w[0].lower(), CLASS_FILES[name]
+    return (f"sender {addr}", value) if ADDR.fullmatch(addr) else None
+
+
+def file_of(key, value):
+    """The file a live record of KEY is a line of."""
+    return value.split(" ")[0] + ".db" if key.startswith("sender ") else "foldersync.db"
+
+
+def render(key, value):
+    rest = key.split(" ", 1)[1]
+    return f"{value[7:]} {rest}" if value is not True and value.startswith("ledger ") else rest
+
+
+def rank(value):
+    return RANK.index(value.split(" ")[0]) if isinstance(value, str) else 0
+
+
+def local_view():
+    """Every decision the hey-mail files hold now, and which of the files are missing."""
+    view, missing = {}, set()
+    for name in SYNCED:
+        lines = read(name)
+        if lines is None:
+            missing.add(name)
+            continue
+        for line in lines:
+            kv = line_record(name, line)
+            if kv and (kv[0] not in view or rank(kv[1]) > rank(view[kv[0]])):
+                view[kv[0]] = kv[1]
+    return view, missing
+
+
+def newer(a, b):
+    # Equal stamps fall to the value, so every machine picks the same one.
+    return (a["at"], json.dumps(a["v"])) > (b["at"], json.dumps(b["v"]))
+
+
+def plural(n, one, many):
+    return f"{n} record{'' if n == 1 else 's'} " + (one if n == 1 else many)
+
+
+def lock():
+    """Hold mail-sync's lock, so neither post-new nor hey-folder-sync reads a file or tags mail while this round changes them."""
+    state = os.path.join(os.environ.get("XDG_STATE_HOME") or E.HOME + "/.local/state", "hey-mail")
+    os.makedirs(state, exist_ok=True)
+    fd = os.open(os.path.join(state, "sync.lock"), os.O_WRONLY | os.O_CREAT, 0o644)
+    for _ in range(300):
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd
+        except BlockingIOError:
+            time.sleep(1)
+    fail("mail: a mail sync held its lock for 5 minutes, so this round changed nothing", 1)
+
+
+def apply(changed):
+    """Write each changed key's line where it now belongs and drop its old lines, touching only the files that change."""
+    edits = {}
+    for key, (_, new) in changed.items():
+        for name in (CLASS_FILES if key.startswith("sender ") else ("foldersync.db",)):
+            edits.setdefault(name, (set(), []))[0].add(key)
+        if new is not None:
+            edits[file_of(key, new)][1].append(render(key, new))
+    for name, (strip, add) in edits.items():
+        lines = read(name)
+        if lines is None and not add:
+            continue
+        out = [line for line in lines or [] if (line_record(name, line) or (None,))[0] not in strip] + add
+        if out != lines:
+            write(name, out)
+
+
+def main(path, pulled):
+    now = int(time.time() * 1000)
+    text = None
+    own = {}
+    if os.path.exists(path):
+        with open(path) as f:
+            text = f.read()
+        own = parse(text)
+        if own is None or not all(ok_record(k, r) for k, r in own.items()):
+            fail(f"{os.path.basename(path)}: the local store is broken, so it is left as it is", 4)
+    held = lock()
+    said = []
+
+    # This machine's own records stamped far ahead come from a clock that ran fast, and every other machine leaves them out.
+    fixed = [r for r in own.values() if r["at"] > now + DAY]
+    for r in fixed:
+        r["at"] = now
+    if fixed:
+        said.append(f"mail: re-stamped {plural(len(fixed), 'stamped more than a day ahead', 'stamped more than a day ahead')}")
+
+    # A file's change since the last round is a decision made here; a missing file is not every line of it removed.
+    view, missing = local_view()
+    records = dict(own)
+    live = {k: r["v"] for k, r in own.items() if r["v"] is not None}
+    for key in sorted(set(live) | set(view)):
+        value = view.get(key)
+        if value == live.get(key) or (value is None and file_of(key, live[key]) in missing):
+            continue
+        prev = own.get(key)
+        records[key] = {"v": value, "at": max(now, prev["at"] + 1) if prev else now}
+
+    before = {k: r["v"] for k, r in records.items()}
+    left_out = False
+    for f in pulled:
+        name = os.path.basename(f)
+        try:
+            with open(f) as fh:
+                theirs = parse(fh.read())
+        except OSError:
+            theirs = None
+        if theirs is None:
+            said.append(f"mail: skipped {name}, which does not parse")
+            left_out = True
+            continue
+        bad = ahead = 0
+        for key, r in theirs.items():
+            if not ok_record(key, r):
+                bad += 1
+            elif r["at"] > now + DAY:
+                ahead += 1
+            elif key not in records or newer(r, records[key]):
+                records[key] = {"v": r["v"], "at": r["at"]}
+        if bad:
+            said.append(f"mail: left out {plural(bad, 'from ' + name + ', which is not a HEY decision', 'from ' + name + ', which are not HEY decisions')}")
+        if ahead:
+            said.append(f"mail: left out {plural(ahead, 'from ' + name + ', stamped more than a day ahead', 'from ' + name + ', stamped more than a day ahead')}")
+        left_out = left_out or bool(bad or ahead)
+
+    changed = {k: (before.get(k), r["v"]) for k, r in records.items() if r["v"] != before.get(k)}
+    apply(changed)
+    refused = []
+    for key, (old, new) in sorted(changed.items()):
+        if key.startswith("sender "):
+            try:
+                E.refile(key[7:], old, new)
+            except E.MailError as e:
+                refused.append(f"mail: could not re-file {key[7:]}'s mail: {e}")
+
+    out = json.dumps({"v": 1, "records": records}, sort_keys=True)
+    if out != text:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        tmp = f"{path}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
+            f.write(out)
+        os.replace(tmp, path)
+    os.close(held)
+    for line in said + refused:
+        print(line, file=sys.stderr)
+    if refused:
+        sys.exit(1)
+    if left_out:
+        sys.exit(5)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        fail("usage: dots-sync-mail STORE [PULLED...]", 2)
+    main(sys.argv[1], sys.argv[2:])

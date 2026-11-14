@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals|youtube> <store> <pulled>...` merges the pulled files into the local store.
-import { execFileSync } from 'node:child_process';
+// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals|youtube> <store> <pulled>...` merges the pulled files into the local store, and `mail` hands its files to dots-sync-mail beside it.
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import * as goals from '../shell/lib/goals.mjs';
@@ -189,5 +189,6 @@ function fixList(l, limit, now, count) {
 
 const [cmd, path, ...files] = process.argv.slice(2);
 if (cmd === 'machine') process.stdout.write(machine() + '\n');
+else if (cmd === 'mail' && path) process.exit(spawnSync(new URL('dots-sync-mail', import.meta.url).pathname, [path, ...files], { stdio: 'inherit' }).status ?? 1);
 else if ((cmd === 'notes' || cmd === 'goals' || cmd === 'youtube') && path) merge(cmd, path, files);
-else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals|youtube> <store> <other>...', 2);
+else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals|youtube|mail> <store> <other>...', 2);

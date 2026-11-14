@@ -75,6 +75,30 @@ export const tarList = (m, path) => run(m, 'tar', ['tzf', path]);
 // What `history` prints in fish run as m, newest command first.
 export const fishHistory = (m) => run(m, 'fish', ['-c', 'history']);
 
+const bin = new URL('../../bin/', import.meta.url).pathname;
+
+// A notmuch store in m's scratch home, found through $HOME/.notmuch-config; m.db names a file in its hey-mail folder.
+export function mailbox(m) {
+  const mail = join(m.env.HOME, 'Mail');
+  for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(mail, 'icloud/INBOX', s), { recursive: true });
+  writeFileSync(join(m.env.HOME, '.notmuch-config'), `[database]\npath=${mail}\n[user]\nname=Me\nprimary_email=me@x.test\n[new]\ntags=unread;inbox;new\n`);
+  m.mail = mail;
+  m.hey = join(m.env.XDG_DATA_HOME, 'hey-mail');
+  mkdirSync(m.hey, { recursive: true });
+  return run(m, 'notmuch', ['new', '--quiet']);
+}
+
+// Puts one mail from FROM with Message-ID ID in m's INBOX and indexes it.
+export function deliver(m, from, id) {
+  writeFileSync(join(m.mail, 'icloud/INBOX/new', id.replace(/[^\w.-]/g, '_') + '.eml'), `From: ${from}\nTo: me@x.test\nSubject: hi\nMessage-ID: <${id}>\n\nhello\n`);
+  return run(m, 'notmuch', ['new', '--quiet']);
+}
+
+export const notmuch = (m, args) => run(m, 'notmuch', args);
+
+// Kakoune's mail commands, run as m.
+export const kakMail = (m, args) => run(m, bin + 'kak-mail', args);
+
 // The age identity the ssh unit reads, made for m, or copied from another machine so both open one blob.
 export async function identity(m, from) {
   const path = join(m.env.XDG_CONFIG_HOME, 'chezmoi/key.txt');

@@ -9,7 +9,7 @@ root=Dropbox:dots-sync
 data=${XDG_DATA_HOME:-$HOME/.local/share}/dots
 state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 status=$state/sync.json
-units=(notes goals youtube fish ssh)
+units=(notes goals youtube fish ssh mail)
 # auto, or push or pull when --adopt picks a side of an ssh conflict.
 adopt=auto
 machine=
@@ -86,6 +86,15 @@ sync_fish() {
   fi
   [[ ! -f $list ]] || rc copyto "$list" "$root/fish/$machine.forgotten" --checksum || return
   [[ ! -f $live ]] || rc copyto "$live" "$root/fish/$machine.history" --checksum
+}
+
+# A machine takes part once --only mail made its store: its first round merges every machine's decisions and can move mail, so a person starts it.
+sync_mail() {
+  if [[ ! -f $data/mail/$machine.json && ${units[*]} != mail ]]; then
+    echo "dots sync: mail skipped, not started here; dots sync --only mail starts it"
+    return 0
+  fi
+  store_unit mail
 }
 
 # The ssh unit keeps v1's blob (ssh.age, ssh.meta.json) and manifest hash, so a v1 and a v2 machine share one ~/.ssh.
@@ -267,7 +276,7 @@ record() {
 }
 
 usage() {
-  echo "usage: dots sync [--only notes|goals|youtube|fish|ssh | --adopt local|remote]" >&2
+  echo "usage: dots sync [--only notes|goals|youtube|fish|ssh|mail | --adopt local|remote]" >&2
   exit 2
 }
 
@@ -275,7 +284,7 @@ main() {
   case "${1:-}" in
     '') ;;
     --only)
-      [[ ${2:-} =~ ^(notes|goals|youtube|fish|ssh)$ ]] || usage
+      [[ ${2:-} =~ ^(notes|goals|youtube|fish|ssh|mail)$ ]] || usage
       units=("$2")
       ;;
     --adopt)
@@ -300,9 +309,9 @@ main() {
   # The lock sits beside the state it guards, so a just dev session and the live timer never meet on it.
   mkdir -p "$state"
   exec 9>"$state/dots-sync.lock"
-  # A notes, goals or youtube round comes from a store change that would otherwise wait for the next timer round, and an ssh round from dots secrets, which checks ~/.ssh right after, so each waits its turn.
+  # A notes, goals or youtube round comes from a store change that would otherwise wait for the next timer round, an ssh round from dots secrets, which checks ~/.ssh right after, and a mail round from a person starting it, so each waits its turn.
   local wait=-n
-  [[ ${units[*]} == notes || ${units[*]} == goals || ${units[*]} == youtube || ${units[*]} == ssh ]] && wait='-w 600'
+  [[ ${units[*]} == notes || ${units[*]} == goals || ${units[*]} == youtube || ${units[*]} == ssh || ${units[*]} == mail ]] && wait='-w 600'
   # shellcheck disable=SC2086 # $wait is one flag, or a flag and its seconds
   if ! flock $wait 9; then
     echo "already running"
