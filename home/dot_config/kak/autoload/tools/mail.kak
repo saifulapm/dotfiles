@@ -184,15 +184,20 @@ define-command -hidden -params 1 mail-thread-jump %{
 # Links and attachments of the message under the cursor (in a list: the
 # thread's newest). Both open through url_open_cmd (commands.kak), the same
 # opener `gu` uses.
+# The message id is the sender's text, so it goes into mail_target with kq
+# and the prompt reads it back as $kak_opt_mail_target and %opt{mail_target}:
+# spliced into the candidates script or a %{ } body, a ' or } in it would end
+# the quote or the block.
+declare-option -hidden str mail_target
 define-command mail-links -docstring 'pick a link in this message and open it' %{
     evaluate-commands %sh{
         # $kak_quoted_opt_mail_ids $kak_selections_desc $kak_cursor_line $kak_quoted_opt_mail_msgs $kak_opt_filetype
         eval "$kak_opt_mail_sh"
         t=$(mail_targets | head -1)
         [ -z "$t" ] && { echo "fail 'mail: no message here'"; exit; }
-        printf 'prompt -menu -shell-script-candidates %s %s %%{ mail-open-with %%val{text} }\n' \
-            "$(kq "kak-mail links '$t'")" "$(kq 'link: ')"
+        printf 'set-option window mail_target %s\n' "$(kq "$t")"
     }
+    prompt -menu -shell-script-candidates %{ kak-mail links "$kak_opt_mail_target" } 'link: ' %{ mail-open-with %val{text} }
 }
 
 define-command mail-attachments -docstring 'pick an attachment: save to ~/Downloads and open it' %{
@@ -202,9 +207,9 @@ define-command mail-attachments -docstring 'pick an attachment: save to ~/Downlo
         t=$(mail_targets | head -1)
         [ -z "$t" ] && { echo "fail 'mail: no message here'"; exit; }
         [ -z "$(kak-mail attachments "$t" 2>/dev/null)" ] && { echo "fail 'mail: no attachments'"; exit; }
-        printf 'prompt -menu -shell-script-candidates %s %s %%{ mail-attachment-get %s %%val{text} }\n' \
-            "$(kq "kak-mail attachments '$t'")" "$(kq 'attachment: ')" "$(kq "$t")"
+        printf 'set-option window mail_target %s\n' "$(kq "$t")"
     }
+    prompt -menu -shell-script-candidates %{ kak-mail attachments "$kak_opt_mail_target" } 'attachment: ' %{ mail-attachment-get %opt{mail_target} %val{text} }
 }
 
 define-command -hidden -params 2 mail-attachment-get %{
