@@ -15,6 +15,7 @@
   mail hey ACTION ID [--category C] [--at DATE]   file a message HEY's way, in ways that can be undone:
                                                screen-in, feed, papertrail, replylater, setaside, bubble, archive, clear
   mail hey screen-out --sender ADDR            screen out a sender Saiful named
+  mail seed                                    sort the senders already in the store into HEY classes, as plain text; changes nothing
 
 ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
 also takes thread:THREAD. Every command prints one JSON object,
@@ -44,6 +45,7 @@ sys.dont_write_bytecode = True
 from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, check_recipients, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, undo_last, write_draft)
+import mail_seed
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
 LIMIT_MAX = 500
@@ -471,6 +473,12 @@ def cmd_hey(a):
             "until": datetime.fromtimestamp(when).astimezone().isoformat() if when else None}
 
 
+def cmd_seed(a):
+    # Saiful reads the report before he says go, so it is plain text; a failure still comes back as main()'s JSON.
+    sys.stdout.write(mail_seed.run())
+    sys.exit(0)
+
+
 def parser():
     p = Parser(prog="mail", description="Read mail as JSON.")
     sub = p.add_subparsers(dest="cmd", required=True, parser_class=Parser)
@@ -520,6 +528,7 @@ def parser():
     c.add_argument("--category", help="for papertrail: letters, digits, - or _")
     c.add_argument("--at", help="for bubble: when it comes back, as date -d reads it")
     c.set_defaults(fn=cmd_hey)
+    sub.add_parser("seed", help="sort the senders already in the store into HEY classes; prints what it would do").set_defaults(fn=cmd_seed)
     for name, unread in (("read", False), ("unread", True)):
         c = sub.add_parser(name, help=f"mark a message {name}")
         c.add_argument("id", help="a message id")
