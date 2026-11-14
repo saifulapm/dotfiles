@@ -722,6 +722,9 @@ def tag(query, *changes):
 
 # An address or @domain rule goes into a from: query in post-new and dots sync, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it.
 ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@(?:[^\s"*(){}\[\]\\/@.]+\.)+[^\s"*(){}\[\]\\/@.]+')
+# Domains anyone can sign up at, which never get an @domain line.
+FREEMAIL = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "me.com",
+            "mac.com", "proton.me", "protonmail.com", "aol.com"}
 # Each sender class file and the class its lines give; a ledger.db line names its category first, and its class is "ledger CATEGORY".
 CLASS_FILES = {"screened.db": "screened", "thefeed.db": "thefeed", "spam.db": "spam", "ledger.db": "ledger"}
 # An address in two class files reads as post-new's tags leave its mail: spam over Paper Trail over The Feed over screened in.
@@ -887,11 +890,20 @@ def covering(addr):
     return addr
 
 
-def decide(action, addr, arg=None):
-    """Apply a sender ACTION to ADDR, or to the @domain line that decides it: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
+def decide(action, addr, arg=None, domain=False):
+    """Apply a sender ACTION to ADDR, to its @domain with DOMAIN, or to the @domain line that alone decides it for unscreen: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
     if "*" in addr:
         raise MailError(f"{addr} holds a *, which notmuch reads as any sender")
-    if addr.startswith("@") or not ADDR.fullmatch(addr):
+    if domain:
+        if action not in DECIDES_CLASS:
+            raise MailError(f"{action} takes no domain; a domain is screened in, fed, filed in Paper Trail or screened out")
+        addr = domain_of(addr)
+        if not ADDR.fullmatch(addr):
+            raise MailError(f"{addr} is not one domain, and its line would match more senders than it")
+        # One sender at a freemail domain never decides everyone there.
+        if addr[1:] in FREEMAIL:
+            raise MailError(f"{addr[1:]} is freemail, so a domain line would decide every sender there; decide the address alone")
+    elif addr.startswith("@") or not ADDR.fullmatch(addr):
         raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
     # A decision writes a line for the address alone, which beats its domain's line; an unscreen of an address no line of its own decides undoes its domain's line.
     if action == "unscreen":

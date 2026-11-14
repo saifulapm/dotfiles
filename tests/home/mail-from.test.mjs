@@ -166,3 +166,95 @@ test("a domain's re-filing leaves alone every address with its own line, in eith
   assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
   assert.deepEqual(tagsOf(r, 'news@x.test'), ['inbox', 'unread']);
 });
+
+// A domain decision: mail hey <screen-in|feed|papertrail> <id> --domain, and screen-out --sender @domain.
+const mailCli = (r, ...args) => {
+  const res = r.run(join(repo, 'bin/mail'), args);
+  let json = null;
+  try {
+    json = JSON.parse(res.stdout);
+  } catch {}
+  return { ...res, json };
+};
+const dbFiles = (r) => ['screened.db', 'thefeed.db', 'spam.db', 'ledger.db'].map((f) => r.db(f));
+
+test('mail hey screen-in --domain screens in every sender of that domain alone', (t) => {
+  const r = hooked(t);
+  r.deliver({ From: 'Anthropic <no-reply-abc123@mail.anthropic.test>', 'Message-ID': '<nr1@x.test>' });
+  const res = mailCli(r, 'hey', 'screen-in', 'nr1@x.test', '--domain');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.equal(res.json.data.sender, '@mail.anthropic.test');
+  assert.equal(r.db('screened.db'), '@mail.anthropic.test\n');
+  assert.deepEqual(tagsOf(r, 'nr1@x.test'), ['inbox', 'screened', 'unread']);
+  r.deliver({ From: 'no-reply-xyz789@mail.anthropic.test', 'Message-ID': '<nr2@x.test>' });
+  r.deliver({ From: 'someone@anthropic.test', 'Message-ID': '<so@x.test>' });
+  assert.deepEqual(tagsOf(r, 'nr2@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'so@x.test'), ['inbox', 'unread']);
+});
+
+test('a domain decision on a freemail sender is refused and changes nothing', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'X <x@Gmail.com>', 'Message-ID': '<gm@x.test>' });
+  r.setDb('screened.db', 'bob@people.test\n');
+  const before = r.notmuch('dump');
+  for (const action of ['screen-in', 'feed']) {
+    const res = mailCli(r, 'hey', action, 'gm@x.test', '--domain');
+    assert.equal(res.status, 1, res.stdout);
+    assert.match(res.json.error, /gmail\.com is freemail/);
+  }
+  const p = mailCli(r, 'hey', 'papertrail', 'gm@x.test', '--domain', '--category', 'receipts');
+  assert.equal(p.status, 1, p.stdout);
+  const out = mailCli(r, 'hey', 'screen-out', '--sender', '@gmail.com');
+  assert.equal(out.status, 1, out.stdout);
+  assert.match(out.json.error, /gmail\.com is freemail/);
+  assert.deepEqual(dbFiles(r), ['bob@people.test\n', '', '', '']);
+  assert.equal(r.notmuch('dump'), before);
+});
+
+test('mail hey screen-out --sender @domain spams that domain, and --domain is only for the deciding actions', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'x@bad.test', 'Message-ID': '<b1@x.test>' });
+  r.deliver({ From: 'y@sub.bad.test', 'Message-ID': '<b2@x.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  const res = mailCli(r, 'hey', 'screen-out', '--sender', '@Bad.test');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.equal(r.db('spam.db'), '@bad.test\n');
+  assert.deepEqual(tagged(r, 'spam'), ['id:b1@x.test']);
+  for (const args of [['screen-out', '--sender', '@test'], ['screen-out', '--sender', '@bad.test', '--domain'], ['archive', 'b2@x.test', '--domain']]) {
+    const bad = mailCli(r, 'hey', ...args);
+    assert.equal(bad.status, 1, `${args.join(' ')}: ${bad.stdout}`);
+  }
+  assert.equal(r.db('spam.db'), '@bad.test\n');
+});
+
+test("a domain decision leaves an address with its own line as it was, and so does unscreening the domain", (t) => {
+  const r = hooked(t);
+  r.setDb('screened.db', 'boss@vendor.test\n');
+  r.deliver({ From: 'boss@vendor.test', 'Message-ID': '<boss@x.test>' });
+  r.deliver({ From: 'news@vendor.test', 'Message-ID': '<news@x.test>' });
+  const res = mailCli(r, 'hey', 'feed', 'news@x.test', '--domain');
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.equal(r.db('thefeed.db'), '@vendor.test\n');
+  assert.equal(r.db('screened.db'), 'boss@vendor.test\n');
+  assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['archived', 'thefeed', 'unread']);
+  // Kakoune's unscreen on a sender only the domain line decides undoes that line.
+  const u = r.kakMail('hey', 'unscreen', 'id:news@x.test');
+  assert.equal(u.stdout, 'unscreen: @vendor.test\n', u.stderr);
+  assert.equal(r.db('thefeed.db'), '');
+  assert.deepEqual(tagsOf(r, 'news@x.test'), ['inbox', 'unread']);
+  assert.deepEqual(tagsOf(r, 'boss@x.test'), ['inbox', 'screened', 'unread']);
+});
+
+test('kak-mail hey --domain takes the domain of each selected sender', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'no-reply-abc123@mail.anthropic.test', 'Message-ID': '<nr1@x.test>' });
+  r.deliver({ From: 'x@bad.test', 'Message-ID': '<b1@x.test>' });
+  r.notmuch('tag', '-new', '--', '*');
+  assert.equal(r.kakMail('hey', 'screen-in', '--domain', 'id:nr1@x.test').stdout, 'screen-in: @mail.anthropic.test\n');
+  assert.equal(r.kakMail('hey', 'screen-out', '--domain', 'id:b1@x.test').stdout, 'screen-out: @bad.test\n');
+  assert.equal(r.kakMail('hey', 'papertrail', '--arg', 'receipts', '--domain', 'id:nr1@x.test').stdout, 'papertrail: @mail.anthropic.test\n');
+  assert.equal(r.db('screened.db'), '');
+  assert.equal(r.db('ledger.db'), 'receipts @mail.anthropic.test\n');
+  assert.equal(r.db('spam.db'), '@bad.test\n');
+});

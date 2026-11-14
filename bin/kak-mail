@@ -36,7 +36,7 @@ from urllib.parse import urlsplit
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, both, box, box_counts, decide,
-                         draft_message, drafts, from_query, identities, line, matched_messages, message_of, nm, one_message,
+                         domain_of, draft_message, drafts, from_query, identities, line, matched_messages, message_of, nm, one_message,
                          part_bytes, pile, refresh_count, search_threads, send_draft, sender, set_unread, target,
                          thread_messages, undo_last, write_count, write_draft)
 
@@ -345,13 +345,19 @@ def cmd_hey(args):
     rest = args[1:]
     if rest[:1] == ["--arg"]:
         arg, rest = rest[1], rest[2:]
+    domain = rest[:1] == ["--domain"]
+    if domain:
+        rest = rest[1:]
     queries = [target(q) for q in rest]
     if not queries:
         die("no message selected")
     done = []
     if action in SENDER_ACTIONS:
-        for addr in dict.fromkeys(sender(q) for q in queries):
-            done.append(decide(action, addr, arg))
+        # Two selected senders of one domain make one domain decision.
+        for addr in dict.fromkeys((domain_of if domain else str)(sender(q)) for q in queries):
+            done.append(decide(action, addr, arg, domain))
+    elif domain:
+        die(f"{action} takes no domain")
     elif action in THREAD_ACTIONS:
         n, when = pile(action, queries, arg)
         done = [f"{n} thread(s)"]

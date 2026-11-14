@@ -444,11 +444,19 @@ def cmd_hey(a):
         # An agent screens out only a sender Saiful named, never one it read off a mail.
         if a.id is not None or not a.sender:
             raise Usage("screen-out takes --sender ADDR")
+        if a.domain:
+            raise Usage("a domain screen-out is --sender @DOMAIN")
+        if a.sender.startswith("@"):
+            key = decide("screen-out", a.sender, domain=True)
+            refresh_count()
+            return {"action": a.action, "sender": key}
         if not ADDRESS.fullmatch(a.sender):
             raise Usage(f"{a.sender} is not one address")
         decide("screen-out", a.sender.lower())
         refresh_count()
         return {"action": a.action, "sender": a.sender.lower()}
+    if a.domain and a.action not in ("screen-in", "feed", "papertrail"):
+        raise Usage("--domain is only for screen-in, feed and papertrail")
     if a.sender is not None:
         raise Usage("--sender is only for screen-out")
     if a.id is None:
@@ -464,7 +472,7 @@ def cmd_hey(a):
     msg_id = found(a.id)["id"]
     action = HEY[a.action]
     if action in SENDER_ACTIONS:
-        addr = decide(action, sender(idq(msg_id)), a.category)
+        addr = decide(action, sender(idq(msg_id)), a.category, domain=a.domain)
         refresh_count()
         return {"action": a.action, "id": msg_id, "sender": addr}
     n, when = pile(action, [idq(msg_id)], a.at)
@@ -524,7 +532,8 @@ def parser():
     c = sub.add_parser("hey", help="file a message HEY's way; screen-out takes only --sender")
     c.add_argument("action", choices=list(HEY))
     c.add_argument("id", nargs="?", help="a message id")
-    c.add_argument("--sender", help="for screen-out: the address Saiful named")
+    c.add_argument("--sender", help="for screen-out: the address, or @domain, Saiful named")
+    c.add_argument("--domain", action="store_true", help="for screen-in, feed and papertrail: decide the sender's whole domain")
     c.add_argument("--category", help="for papertrail: letters, digits, - or _")
     c.add_argument("--at", help="for bubble: when it comes back, as date -d reads it")
     c.set_defaults(fn=cmd_hey)

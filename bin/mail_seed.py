@@ -16,8 +16,6 @@ from email.utils import parseaddr
 sys.dont_write_bytecode = True
 import mail_engine as E
 
-FREEMAIL = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "me.com",
-            "mac.com", "proton.me", "protonmail.com", "aol.com"}
 NOTIFY_DOMAINS = ("github.com", "gitlab.com", "linkedin.com", "facebookmail.com", "x.com", "twitter.com", "slack.com",
                   "discord.com", "atlassian.net")
 NOREPLY = {"noreply", "no-reply", "donotreply", "do-not-reply"}
@@ -162,7 +160,7 @@ def plan():
     keys = {}
     for domain, addrs in by_domain.items():
         kinds = {classes.get(a) for a in addrs}
-        if domain not in FREEMAIL and len(addrs) >= 2 and len(kinds) == 1 and None not in kinds and "own" not in kinds:
+        if domain not in E.FREEMAIL and len(addrs) >= 2 and len(kinds) == 1 and None not in kinds and "own" not in kinds:
             keys["@" + domain] = addrs
         else:
             keys.update((a, [a]) for a in addrs if a in classes)
