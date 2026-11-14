@@ -3,24 +3,32 @@
 
   mail boxes                                   each box: key, name, total, unread
   mail search [QUERY] [--box NAME] [--limit N] [--offset N]
+  mail show ID                                 one message; never marks it read
+  mail thread ID                               every message of a thread, oldest first
+  mail read ID / mail unread ID                mark a message read or unread
 
-Every command prints one JSON object, {"ok":true,"data":...} or
-{"ok":false,"error":...,"hint":...}, and exits 0 ok, 1 usage, 2 not found,
-3 refused. Mail text (subjects, names, bodies) sits between
+ID is a message id as search gives it, bare, as id:ID or as <ID>; thread
+also takes thread:THREAD. Every command prints one JSON object,
+{"ok":true,"data":...} or {"ok":false,"error":...,"hint":...}, and exits
+0 ok, 1 usage, 2 not found, 3 refused. Mail text (subjects, names, bodies,
+link labels, attachment names) sits between
 <<<untrusted-mail>>> and <<<end-untrusted-mail>>>, and any <<< inside it
 becomes ‹‹‹, so a mail cannot close its own field.
 """
 
 import argparse
+import email.policy
 import json
+import re
 import sys
 from datetime import datetime
-from email.utils import parseaddr
+from email.parser import BytesHeaderParser
+from email.utils import getaddresses, parseaddr
 
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
-from mail_engine import (BOXES, MailError, NotFound, both, box_counts, boxes_of, line, matched_messages, nm, search_threads,
-                         thread_of)
+from mail_engine import (BOXES, MailError, NotFound, body_text, both, box_counts, boxes_of, idq, line, matched_messages, nm,
+                         one_message, part_sizes, search_threads, set_unread, thread_messages, thread_of)
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
 LIMIT_MAX = 500
@@ -59,6 +67,87 @@ def row(m, thread, count, home):
         "unread": "unread" in tags,
         "count": count,
     }
+
+
+def message_id(arg):
+    """The Message-ID notmuch keeps for ARG: notmuch drops a Message-ID's whitespace, so the sender's own spelling finds it too."""
+    s = arg[3:] if arg.startswith("id:") else arg
+    if len(s) > 1 and s[0] == s[-1] == '"':
+        s = s[1:-1].replace('""', '"')
+    s = re.sub(r"\s", "", s)
+    return s[1:-1] if s.startswith("<") and s.endswith(">") else s
+
+
+def list_headers(m):
+    """List-Id and List-Unsubscribe from the raw file, which notmuch's JSON leaves out."""
+    for path in m.get("filename") or []:
+        try:
+            with open(path, "rb") as f:
+                h = BytesHeaderParser(policy=email.policy.default).parse(f)
+        except OSError:
+            continue
+        return {k: line(h[name]) if h[name] is not None else None for k, name in (("list_id", "List-Id"), ("list_unsubscribe", "List-Unsubscribe"))}
+    return {"list_id": None, "list_unsubscribe": None}
+
+
+def message(m, thread, home):
+    """A message from notmuch's JSON as show gives it."""
+    h, tags = m["headers"], m["tags"]
+    atts, links = [], []
+    body = body_text(m.get("body", []), atts, found=links)
+    sizes = part_sizes(m.get("body", []))
+    people = lambda k: [person(f'"{n}" <{a}>' if n else a) for n, a in getaddresses([h[k]])] if h.get(k) else []
+    return {
+        "id": m["id"],
+        "thread": thread,
+        "date": datetime.fromtimestamp(m["timestamp"]).astimezone().isoformat(),
+        "from": person(h.get("From", "")),
+        "to": people("To"),
+        "cc": people("Cc"),
+        "subject": untrusted(line(h.get("Subject", ""))),
+        "tags": tags,
+        "box": home,
+        "screened": "screened" in tags,
+        "unread": "unread" in tags,
+        "body": untrusted(body.rstrip("\n")),
+        "links": [{"label": untrusted(line(label)), "url": url} for label, url in links],
+        "attachments": [{"part": part, "name": untrusted(name), "type": ct, "size": sizes.get(part)} for part, name, ct in atts],
+        **list_headers(m),
+    }
+
+
+def found(arg):
+    """The message ARG names, or NotFound naming ARG as it was given."""
+    msg_id = message_id(arg)
+    try:
+        return one_message(msg_id)
+    except NotFound:
+        raise NotFound(f"no message {arg}") from None
+
+
+def cmd_show(a):
+    m = found(a.id)
+    return message(m, thread_of(m["id"]), boxes_of([m["id"]]).get(m["id"]))
+
+
+def cmd_thread(a):
+    if a.id.startswith("thread:"):
+        if not re.fullmatch(r"thread:[0-9a-f]+", a.id):
+            raise Usage(f"{a.id} is not a thread id; take one from a search row's thread")
+        thread = a.id.removeprefix("thread:")
+    else:
+        thread = thread_of(found(a.id)["id"])
+    msgs = sorted(thread_messages(f"thread:{thread}"), key=lambda m: m["timestamp"])
+    if not msgs:
+        raise NotFound(f"no thread {thread}")
+    homes = boxes_of([m["id"] for m in msgs])
+    return [message(m, thread, homes.get(m["id"])) for m in msgs]
+
+
+def cmd_mark(a):
+    msg_id = found(a.id)["id"]
+    set_unread(idq(msg_id), a.unread)
+    return {"id": msg_id, "unread": a.unread}
 
 
 def cmd_boxes(a):
@@ -101,6 +190,15 @@ def parser():
     s.add_argument("--limit", type=int, default=50, help=f"rows to return, 1 to {LIMIT_MAX}")
     s.add_argument("--offset", type=int, default=0, help="rows to skip")
     s.set_defaults(fn=cmd_search)
+    for name, fn, doc in (("show", cmd_show, "one message, without marking it read"),
+                          ("thread", cmd_thread, "every message of a thread, oldest first")):
+        c = sub.add_parser(name, help=doc)
+        c.add_argument("id", help="a message id, or for thread a thread:THREAD")
+        c.set_defaults(fn=fn)
+    for name, unread in (("read", False), ("unread", True)):
+        c = sub.add_parser(name, help=f"mark a message {name}")
+        c.add_argument("id", help="a message id")
+        c.set_defaults(fn=cmd_mark, unread=unread)
     return p
 
 

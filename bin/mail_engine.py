@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+from html.parser import HTMLParser
 
 HOME = os.path.expanduser("~")
 # The shell's margin watches this file for the Imbox unread count.
@@ -163,8 +164,13 @@ def set_unread(query, unread):
     refresh_count()
 
 
+# notmuch hands over HTML already decoded to UTF-8, and lynx would believe a <meta> naming the sender's charset over -assume_charset.
+META_CHARSET = re.compile(r"<meta\b[^>]*charset[^>]*>", re.I)
+
+
 def html_to_text(html, links=True):
     # lynx never fetches, so remote images and trackers stay blocked; a quoted reply drops the link list (links=False).
+    html = META_CHARSET.sub("", html)
     r = subprocess.run(["lynx", "-dump", "-stdin", "-force_html", "-nomargins",
                         "-display_charset=utf-8", "-assume_charset=utf-8", "-width=100",
                         *([] if links else ["-nolist"])],
@@ -172,9 +178,68 @@ def html_to_text(html, links=True):
     return r.stdout
 
 
-def body_text(parts, attachments, links=True):
-    """Readable text of a MIME tree; attachments collected as (id, name, type)."""
+class Anchors(HTMLParser):
+    """Each <a href>'s text, in document order."""
+
+    def __init__(self):
+        super().__init__()
+        self.found, self.open = [], None
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "a" and dict(attrs).get("href"):
+            self.open = [dict(attrs)["href"], ""]
+
+    def handle_data(self, data):
+        if self.open:
+            self.open[1] += data
+
+    def handle_endtag(self, tag):
+        if tag == "a" and self.open:
+            self.found.append((self.open[0], " ".join(self.open[1].split())))
+            self.open = None
+
+
+LYNX_REF = re.compile(r"^\s*(\d+)\. (\S+)$")
+
+
+def html_with_links(html, found):
+    """lynx's text of HTML, its [n] link numbers kept and its References list cut; each numbered link goes on FOUND as (label, url)."""
+    text = html_to_text(html)
+    head, sep, refs = text.rpartition("\nReferences\n")
+    rows = refs.split("\n")
+    if not sep or not all(not r.strip() or r.strip() in ("Visible links:", "Hidden links:") or LYNX_REF.match(r) for r in rows):
+        return text
+    parser = Anchors()
+    parser.feed(META_CHARSET.sub("", html))
+    anchors = parser.found
+    for r in rows:
+        if r.strip() == "Hidden links:":
+            break
+        m = LYNX_REF.match(r)
+        if m:
+            url = m.group(2)
+            label = next((a for a in anchors if a[0] == url), None)
+            if label:
+                anchors.remove(label)
+            found.append((label[1] if label else url, url))
+    return head.rstrip("\n") + "\n"
+
+
+URL = re.compile(r"https?://[^\s<>\"')\]]+")
+
+
+def body_text(parts, attachments, links=True, found=None):
+    """Readable text of a MIME tree; attachments collected as (id, name, type).
+    With FOUND, a list, HTML keeps its link numbers without lynx's list, and every link goes on FOUND as (label, url) instead."""
     out = []
+
+    def html(content):
+        return html_to_text(content, links) if found is None else html_with_links(content, found)
+
+    def plain(content):
+        if found is not None:
+            found.extend((u, u) for u in dict.fromkeys(u.rstrip(".,;:!?") for u in URL.findall(content)))
+        return content
     for p in parts:
         ct = p.get("content-type", "").lower()
         c = p.get("content")
@@ -182,28 +247,28 @@ def body_text(parts, attachments, links=True):
             # The name is the sender's text: one line, or it splits the thread and the A picker.
             attachments.append((p["id"], line(p.get("filename") or "").strip() or "unnamed", ct))
         elif ct == "multipart/alternative" and isinstance(c, list):
-            plain = [q for q in c if q.get("content-type", "").lower() == "text/plain" and (q.get("content") or "").strip()]
-            html = [q for q in c if q.get("content-type", "").lower() == "text/html"]
-            if plain:
-                out.append(plain[0]["content"])
-            elif html:
-                out.append(html_to_text(html[0].get("content") or "", links))
+            plain_parts = [q for q in c if q.get("content-type", "").lower() == "text/plain" and (q.get("content") or "").strip()]
+            html_parts = [q for q in c if q.get("content-type", "").lower() == "text/html"]
+            if plain_parts:
+                out.append(plain(plain_parts[0]["content"]))
+            elif html_parts:
+                out.append(html(html_parts[0].get("content") or ""))
             else:
-                out.append(body_text(c, attachments, links))
+                out.append(body_text(c, attachments, links, found))
         elif ct.startswith("multipart/") and isinstance(c, list):
-            out.append(body_text(c, attachments, links))
+            out.append(body_text(c, attachments, links, found))
         elif ct == "message/rfc822" and isinstance(c, list):
             for inner in c:
                 h = inner.get("headers", {})
                 out.append("---------- attached message ----------\n" +
                            "".join(f"{k}: {line(h[k])}\n" for k in ("From", "Date", "Subject") if k in h) + "\n" +
-                           body_text(inner.get("body", []), attachments, links))
+                           body_text(inner.get("body", []), attachments, links, found))
         elif ct == "text/plain":
-            out.append(c or "")
+            out.append(plain(c or ""))
         elif ct == "text/html":
-            out.append(html_to_text(c or "", links))
+            out.append(html(c or ""))
         elif ct.startswith("text/") and isinstance(c, str):
-            out.append(c)
+            out.append(plain(c))
     return "\n".join(s.rstrip("\n") + "\n" for s in out if s)
 
 
@@ -237,6 +302,20 @@ def message_of(query):
     if not ids:
         raise NotFound(f"no message for {query}")
     return ids[0].removeprefix("id:")
+
+
+def part_sizes(parts):
+    """Each MIME part's decoded size by part id; notmuch hands a text part over as its UTF-8 text instead of a length."""
+    sizes = {}
+    for p in parts:
+        c = p.get("content")
+        if "content-length" in p:
+            sizes[p["id"]] = p["content-length"]
+        elif isinstance(c, str):
+            sizes[p["id"]] = len(c.encode())
+        if isinstance(c, list):
+            sizes.update(part_sizes([q for q in c if "id" in q] + [b for inner in c for b in inner.get("body", [])]))
+    return sizes
 
 
 def part_bytes(msg_id, part):
