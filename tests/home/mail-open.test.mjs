@@ -13,15 +13,13 @@ function rig(t) {
   const shown = join(r.M, 'shown');
   const fake = join(r.M, 'fake');
   mkdirSync(fake);
-  // dots-foot --app-id=kak-mail kak -c mail -e CMD: run CMD ($6) in a dummy client, then write the buffer's name and text.
+  // dots-foot --app-id=kak-mail kak -c mail -e CMD: run CMD ($6) in a dummy client, write the buffer's name and text, then kill the scratch session, whose socket dir the rig deletes.
   writeFileSync(join(fake, 'dots-foot'), `#!/bin/sh
 printf '%s\\n' "$@" > ${shown}.args
-exec kak -ui dummy -c mail -e "$6; echo -to-file ${shown}.name %val{bufname}; eval -draft %{ execute-keys '%'; echo -to-file ${shown}.text %val{selection} }; quit!"
+exec kak -ui dummy -c mail -e "$6; echo -to-file ${shown}.name %val{bufname}; eval -draft %{ execute-keys '%'; echo -to-file ${shown}.text %val{selection} }; kill!"
 `, { mode: 0o755 });
   const env = { ...r.env, PATH: `${fake}:${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
   const open = (...args) => r.run(join(repo, 'bin/mail-open'), args, { env, timeout: 20000 });
-  // The session mail-open started lives in the scratch XDG_RUNTIME_DIR; it goes when the test ends.
-  t.after(() => r.run('kak', ['-p', 'mail'], { env, input: 'kill!\n' }));
   const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '');
   return { ...r, open, shown: () => ({ args: read(`${shown}.args`), name: read(`${shown}.name`), text: read(`${shown}.text`) }) };
 }
