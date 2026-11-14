@@ -1,0 +1,363 @@
+== boxes
+ i  Imbox            8
+ y  Prev. Seen       1
+ s  Screener         2
+ f  The Feed         1
+ p  Paper Trail      1
+ l  Reply Later      1
+ a  Set Aside        1
+ b  Bubbled Up       1
+ I  Read             3
+ n  Notes            1
+ m  Muted            1
+ t  Sent             1
+ e  Everything      21
+== boxes --maps
+map global mail-jump 'i' ':mail-box %{Imbox}<ret>' -docstring 'Imbox'
+map global mail-jump 'y' ':mail-box %{Prev. Seen}<ret>' -docstring 'Prev. Seen'
+map global mail-jump 's' ':mail-box %{Screener}<ret>' -docstring 'Screener'
+map global mail-jump 'f' ':mail-box %{The Feed}<ret>' -docstring 'The Feed'
+map global mail-jump 'p' ':mail-box %{Paper Trail}<ret>' -docstring 'Paper Trail'
+map global mail-jump 'l' ':mail-box %{Reply Later}<ret>' -docstring 'Reply Later'
+map global mail-jump 'a' ':mail-box %{Set Aside}<ret>' -docstring 'Set Aside'
+map global mail-jump 'b' ':mail-box %{Bubbled Up}<ret>' -docstring 'Bubbled Up'
+map global mail-jump 'I' ':mail-box %{Read}<ret>' -docstring 'Read'
+map global mail-jump 'n' ':mail-box %{Notes}<ret>' -docstring 'Notes'
+map global mail-jump 'm' ':mail-box %{Muted}<ret>' -docstring 'Muted'
+map global mail-jump 't' ':mail-box %{Sent}<ret>' -docstring 'Sent'
+map global mail-jump 'e' ':mail-box %{Everything}<ret>' -docstring 'Everything'
+== list Imbox
+2020-01-22 Lee                    Fwd: old mail  [inbox screened unread]
+2020-01-21 Kim                    the file  [attachment inbox screened unread]
+2020-01-20 Jo                     café  [inbox screened unread]
+2020-01-19 Ivy                    both parts  [inbox screened unread]
+2020-01-02 Bob                    lunch on friday  [inbox screened unread]
+2020-01-01 Hal, Me                plan (3/3)  [inbox screened unread]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000012' 'thread:0000000000000011' 'thread:0000000000000010' 'thread:000000000000000f' 'thread:0000000000000001' 'thread:000000000000000e'
+== list Prev. Seen
+2020-01-03 Bob                    seen before  [inbox screened seen unread]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000002'
+== list Screener
+2020-01-05 Carol                  Re: first note  [inbox unread]
+2020-01-04 Carol                  first note  [inbox unread]
+-- kak
+set-option buffer mail_ids 'id:scr2@x.test' 'id:scr1@x.test'
+== list The Feed
+2020-01-06 News                   weekly digest  [archived thefeed unread]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000004'
+== list Paper Trail
+2020-01-08 Shop                   your receipt  [archived ledger/receipts]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000006'
+== list Reply Later
+2020-01-09 Dee                    can you review  [inbox replylater screened]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000007'
+== list Set Aside
+2020-01-10 Eve                    tickets  [inbox screened setaside]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000008'
+== list Bubbled Up
+2020-01-11 Fay                    ping me  [bubbled unread]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000009'
+== list Read
+2020-01-12 Gus                    already read  [inbox screened]
+2020-01-10 Eve                    tickets  [inbox screened setaside]
+2020-01-09 Dee                    can you review  [inbox replylater screened]
+-- kak
+set-option buffer mail_ids 'thread:000000000000000a' 'thread:0000000000000008' 'thread:0000000000000007'
+== list Notes
+2020-01-13 Me                     a note  [note]
+-- kak
+set-option buffer mail_ids 'thread:000000000000000b'
+== list Muted
+2020-01-14 List                   noisy thread  [muted unread]
+-- kak
+set-option buffer mail_ids 'thread:000000000000000c'
+== list Sent
+2020-01-15 Me                     lunch on friday  [sent]
+-- kak
+set-option buffer mail_ids 'thread:000000000000000d'
+== list Everything
+2020-01-22 Lee                    Fwd: old mail  [inbox screened unread]
+2020-01-21 Kim                    the file  [attachment inbox screened unread]
+2020-01-20 Jo                     café  [inbox screened unread]
+2020-01-19 Ivy                    both parts  [inbox screened unread]
+2020-01-15 Me                     lunch on friday  [sent]
+2020-01-14 List                   noisy thread  [muted unread]
+2020-01-13 Me                     a note  [note]
+2020-01-12 Gus                    already read  [inbox screened]
+2020-01-11 Fay                    ping me  [bubbled unread]
+2020-01-10 Eve                    tickets  [inbox screened setaside]
+2020-01-09 Dee                    can you review  [inbox replylater screened]
+2020-01-08 Shop                   your receipt  [archived ledger/receipts]
+2020-01-07 News                   last week  [archived thefeed]
+2020-01-06 News                   weekly digest  [archived thefeed unread]
+2020-01-05 Carol                  first note (2/2)  [inbox unread]
+2020-01-03 Bob                    seen before  [inbox screened seen unread]
+2020-01-02 Bob                    lunch on friday  [inbox screened unread]
+2020-01-01 Hal, Me                plan (3/3)  [inbox screened unread]
+-- kak
+set-option buffer mail_ids 'thread:0000000000000012' 'thread:0000000000000011' 'thread:0000000000000010' 'thread:000000000000000f' 'thread:000000000000000d' 'thread:000000000000000c' 'thread:000000000000000b' 'thread:000000000000000a' 'thread:0000000000000009' 'thread:0000000000000008' 'thread:0000000000000007' 'thread:0000000000000006' 'thread:0000000000000005' 'thread:0000000000000004' 'thread:0000000000000003' 'thread:0000000000000002' 'thread:0000000000000001' 'thread:000000000000000e'
+== show thread:000000000000000e
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Hal <hal@people.test>
+To: me@x.test
+Date: Wed, 01 Jan 2020 09:00:00 +0000
+Subject: plan
+Tags: inbox screened unread
+
+one
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Me <me@x.test>
+To: me@x.test
+Date: Wed, 01 Jan 2020 10:00:00 +0000
+Subject: Re: plan
+Tags: inbox screened unread
+
+two
+
+> one
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Hal <hal@people.test>
+To: me@x.test
+Date: Wed, 01 Jan 2020 11:00:00 +0000
+Subject: Re: plan
+Tags: inbox screened unread
+
+three
+
+-- kak
+set-option buffer mail_msgs '1:t1@x.test' '10:t2@x.test' '21:t3@x.test'
+== show thread:0000000000000001
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Bob <bob@people.test>
+To: me@x.test
+Date: Thu, 02 Jan 2020 12:00:00 +0000
+Subject: lunch on friday
+Tags: inbox screened unread
+
+Friday at one?
+
+-- kak
+set-option buffer mail_msgs '1:imbox@x.test'
+== show thread:0000000000000002
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Bob <bob@people.test>
+To: me@x.test
+Date: Fri, 03 Jan 2020 12:00:00 +0000
+Subject: seen before
+Tags: inbox screened seen unread
+
+old news
+
+-- kak
+set-option buffer mail_msgs '1:seen@x.test'
+== show thread:0000000000000003
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Carol <carol@new.test>
+To: me@x.test
+Date: Sat, 04 Jan 2020 12:00:00 +0000
+Subject: first note
+Tags: inbox unread
+
+hello from carol
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Carol <carol@new.test>
+To: me@x.test
+Date: Sun, 05 Jan 2020 12:00:00 +0000
+Subject: Re: first note
+Tags: inbox unread
+
+again
+
+-- kak
+set-option buffer mail_msgs '1:scr1@x.test' '10:scr2@x.test'
+== show thread:0000000000000004
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: News <news@feed.test>
+To: me@x.test
+Date: Mon, 06 Jan 2020 12:00:00 +0000
+Subject: weekly digest
+Tags: archived thefeed unread
+
+this week
+
+-- kak
+set-option buffer mail_msgs '1:feed1@x.test'
+== show thread:0000000000000005
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: News <news@feed.test>
+To: me@x.test
+Date: Tue, 07 Jan 2020 12:00:00 +0000
+Subject: last week
+Tags: archived thefeed
+
+that week
+
+-- kak
+set-option buffer mail_msgs '1:feed2@x.test'
+== show thread:0000000000000006
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Shop <hi@shop.test>
+To: me@x.test
+Date: Wed, 08 Jan 2020 12:00:00 +0000
+Subject: your receipt
+Tags: archived ledger/receipts
+
+Hello [1]Shop now
+
+References
+
+   1. https://shop.test/x?utm=1
+
+-- kak
+set-option buffer mail_msgs '1:h1@shop.test'
+== show thread:0000000000000007
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Dee <dee@people.test>
+To: me@x.test
+Date: Thu, 09 Jan 2020 12:00:00 +0000
+Subject: can you review
+Tags: inbox replylater screened
+
+when you can
+
+-- kak
+set-option buffer mail_msgs '1:later@x.test'
+== show thread:0000000000000008
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Eve <eve@people.test>
+To: me@x.test
+Date: Fri, 10 Jan 2020 12:00:00 +0000
+Subject: tickets
+Tags: inbox screened setaside
+
+keep these
+
+-- kak
+set-option buffer mail_msgs '1:aside@x.test'
+== show thread:0000000000000009
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Fay <fay@people.test>
+To: me@x.test
+Date: Sat, 11 Jan 2020 12:00:00 +0000
+Subject: ping me
+Tags: bubbled unread
+
+bubble up
+
+-- kak
+set-option buffer mail_msgs '1:bubble@x.test'
+== show thread:000000000000000a
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Gus <gus@people.test>
+To: me@x.test
+Date: Sun, 12 Jan 2020 12:00:00 +0000
+Subject: already read
+Tags: inbox screened
+
+read it
+
+-- kak
+set-option buffer mail_msgs '1:read@x.test'
+== show thread:000000000000000b
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Me <me@x.test>
+To: me@x.test
+Date: Mon, 13 Jan 2020 12:00:00 +0000
+Subject: a note
+Tags: note
+
+remember
+
+-- kak
+set-option buffer mail_msgs '1:note@x.test'
+== show thread:000000000000000c
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: List <l@lists.test>
+To: me@x.test
+Date: Tue, 14 Jan 2020 12:00:00 +0000
+Subject: noisy thread
+Tags: muted unread
+
+noise
+
+-- kak
+set-option buffer mail_msgs '1:muted@x.test'
+== show thread:000000000000000d
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Me <me@x.test>
+To: Bob <bob@people.test>
+Date: Wed, 15 Jan 2020 12:00:00 +0000
+Subject: Re: lunch on friday
+Tags: sent
+
+yes
+
+-- kak
+set-option buffer mail_msgs '1:sent@x.test'
+== show thread:000000000000000f
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Ivy <ivy@people.test>
+To: me@x.test
+Date: Sun, 19 Jan 2020 12:00:00 +0000
+Subject: both parts
+Tags: inbox screened unread
+
+plain wins
+
+-- kak
+set-option buffer mail_msgs '1:alt@x.test'
+== show thread:0000000000000010
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Jo <jo@people.test>
+To: me@x.test
+Date: Mon, 20 Jan 2020 12:00:00 +0000
+Subject: café
+Tags: inbox screened unread
+
+un café crème
+
+-- kak
+set-option buffer mail_msgs '1:cp1252@x.test'
+== show thread:0000000000000011
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Kim <kim@people.test>
+To: me@x.test
+Date: Tue, 21 Jan 2020 12:00:00 +0000
+Subject: the file
+Tags: attachment inbox screened unread
+
+see attached, and https://x.test/doc
+
+[attachment 3: report.pdf (application/pdf)]
+
+-- kak
+set-option buffer mail_msgs '1:att@x.test'
+== show thread:0000000000000012
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+From: Lee <lee@people.test>
+To: me@x.test
+Date: Wed, 22 Jan 2020 12:00:00 +0000
+Subject: Fwd: old mail
+Tags: inbox screened unread
+
+forwarding this
+
+---------- attached message ----------
+From: Old <old@people.test>
+Date: Tue, 31 Dec 2019 08:00:00 +0000
+Subject: inner
+
+inner body
+
+-- kak
+set-option buffer mail_msgs '1:fwd@x.test'
