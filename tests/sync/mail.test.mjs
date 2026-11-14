@@ -172,6 +172,8 @@ test("autofile, notify, recycle and speakeasy travel with the sender's label, an
   const { a, b } = await pair();
   await deliver(a, 'x@y.test', 'a1@y.test');
   await deliver(b, 'x@y.test', 'b1@y.test');
+  // A longer address ending in the sender's is another sender.
+  await deliver(b, 'x.x@y.test', 'b2@y.test');
   for (const [action, arg] of [['autofile', 'Work'], ['recycle', '30']]) {
     const r = await kakMail(a, ['hey', action, '--arg', arg, 'id:a1@y.test']);
     assert.equal(r.code, 0, r.stderr);

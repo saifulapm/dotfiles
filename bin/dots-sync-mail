@@ -357,7 +357,7 @@ def main(path, pulled):
                 E.tag(f"thread:{{{rest}}}", "+bubble", "-inbox", "-unread", "-bubbled")
             elif kind == "autofile":
                 addr, label = rest.split(" ")
-                E.tag("from:" + addr, ("+" if new else "-") + "label/" + label)
+                E.tag(E.from_query(addr), ("+" if new else "-") + "label/" + label)
         except E.MailError as e:
             refused.append(f"mail: could not re-file {rest.split(' ')[0]}'s mail: {e}")
             # Its line and record stay as they were, so the next round pulls the decision and re-files again.

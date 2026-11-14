@@ -100,3 +100,11 @@ test('mail hey screen-out --sender spams that address alone', (t) => {
   assert.equal(res.status, 0, res.stderr);
   assert.deepEqual(tagged(r, 'spam'), ['id:a0@x.test']);
 });
+
+test("Kakoune's everything-from-this-sender list holds that address's mail alone", (t) => {
+  const r = mailRig(t);
+  ['Ann <ann@people.test>', 'x.ann@people.test', '"ann@people.test" <evil@bad.test>'].forEach((from, i) => r.deliver({ From: from, 'Message-ID': `<a${i}@x.test>` }));
+  const res = r.kakMail('hey', 'sender', 'id:a0@x.test');
+  assert.equal(res.status, 0, res.stderr);
+  assert.deepEqual(r.notmuch('search', '--output=messages', '--', res.stdout.trim()).split('\n').filter(Boolean), ['id:a0@x.test']);
+});

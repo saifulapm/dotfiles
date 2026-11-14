@@ -353,8 +353,8 @@ define-command -hidden mail-sender %{
         eval "$kak_opt_mail_sh"
         t=$(mail_targets | head -1)
         [ -z "$t" ] && { echo "fail 'mail: nothing selected'"; exit; }
-        if a=$(kak-mail hey sender "$t" 2>&1); then printf 'mail-list-open %s true\n' "$(kq "from:$a")"
-        else printf 'fail %s\n' "$(kq "$a")"; fi
+        if q=$(kak-mail hey sender "$t" 2>&1); then printf 'mail-list-open %s true\n' "$(kq "$q")"
+        else printf 'fail %s\n' "$(kq "$q")"; fi
     }
 }
 

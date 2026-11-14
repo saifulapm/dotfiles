@@ -36,7 +36,7 @@ from urllib.parse import urlsplit
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, both, box, box_counts, decide,
-                         draft_message, drafts, identities, line, matched_messages, message_of, nm, one_message,
+                         draft_message, drafts, from_query, identities, line, matched_messages, message_of, nm, one_message,
                          part_bytes, pile, refresh_count, search_threads, send_draft, sender, set_unread, target,
                          thread_messages, undo_last, write_count, write_draft)
 
@@ -358,7 +358,7 @@ def cmd_hey(args):
         if when:
             done.append(time.strftime("until %a %d %b %H:%M", time.localtime(when)))
     elif action == "sender":
-        print(sender(queries[0]))
+        print(from_query(sender(queries[0])))
         return
     else:
         die(f"unknown action: {action}")
