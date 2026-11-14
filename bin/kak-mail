@@ -73,6 +73,16 @@ def kq(s):
     return "'" + s.replace("'", "''") + "'"
 
 
+def idq(msg_id):
+    """An id: term notmuch reads whole: a Message-Id is the sender's text, and its ' ( ) " break an unquoted term."""
+    return 'id:"' + msg_id.replace('"', '""') + '"'
+
+
+def target(query):
+    """A message or thread from a mail buffer as notmuch should read it; the buffers keep ids bare."""
+    return idq(query[3:]) if query.startswith("id:") else query
+
+
 def die(msg):
     print(f"kak-mail: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -282,7 +292,7 @@ def render_message(m):
 
 
 def cmd_show(args):
-    out, query = args[1], " ".join(args[2:])
+    out, query = args[1], target(" ".join(args[2:]))
     msgs = thread_messages(query)
     lines, marks = [], []
     for m in msgs:
@@ -328,7 +338,7 @@ def cmd_save(args):
     path, n = os.path.join(folder, stem + ext), 1
     while os.path.exists(path):
         path, n = os.path.join(folder, f"{stem} ({n}){ext}"), n + 1
-    data = subprocess.run(["notmuch", "show", f"--part={part}", "id:" + msg_id],
+    data = subprocess.run(["notmuch", "show", f"--part={part}", idq(msg_id)],
                           capture_output=True, check=True).stdout
     with open(path, "wb") as f:
         f.write(data)
@@ -358,7 +368,7 @@ def quote(text):
 
 
 def one_message(msg_id):
-    return next(m for m in thread_messages("id:" + msg_id) if m["id"] == msg_id)
+    return next(m for m in thread_messages(idq(msg_id)) if m["id"] == msg_id)
 
 
 def message_of(query):
@@ -380,7 +390,7 @@ def cmd_compose(args):
     elif kind in ("reply", "replyall"):
         msg_id = message_of(args[1])
         r = json.loads(nm("reply", "--format=json",
-                          "--reply-to=" + ("all" if kind == "replyall" else "sender"), "id:" + msg_id))
+                          "--reply-to=" + ("all" if kind == "replyall" else "sender"), idq(msg_id)))
         rh = r["reply-headers"]
         # notmuch spells it "In-reply-to"; send keys off the canonical name.
         rh = {k.lower(): v for k, v in rh.items()}
@@ -404,7 +414,7 @@ def cmd_compose(args):
         for part_id, name, _ in atts:
             path = os.path.join(DRAFTS, f"fwd-{secrets.token_hex(4)}-{os.path.basename(name)}")
             with open(path, "wb") as f:
-                f.write(subprocess.run(["notmuch", "show", f"--part={part_id}", "id:" + msg_id],
+                f.write(subprocess.run(["notmuch", "show", f"--part={part_id}", idq(msg_id)],
                                        capture_output=True, check=True).stdout)
             headers.append(("Attach", path))
         body = ("\n\n---------- Forwarded message ----------\n" +
@@ -487,7 +497,7 @@ def cmd_send(args):
                    input=raw, check=True)
     irt = msg.get("In-Reply-To", "").strip().strip("<>")
     if irt:
-        subprocess.run(["notmuch", "tag", "+replied", "--", "id:" + irt])
+        subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])
     for a in attach:
         if os.path.dirname(a) == DRAFTS:
             os.unlink(a)
@@ -550,7 +560,7 @@ def cmd_hey(args):
     rest = args[1:]
     if rest[:1] == ["--arg"]:
         arg, rest = rest[1], rest[2:]
-    queries = rest
+    queries = [target(q) for q in rest]
     if not queries:
         die("no message selected")
     done = []
