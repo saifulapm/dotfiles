@@ -112,3 +112,21 @@ test('mail seed --apply writes each decision once and leaves unread as it was', 
   assert.equal(again.stdout, 'nothing to change\n');
   assert.deepEqual(r.snapshot(), before);
 });
+
+test('mail seed counts a move hey-folder-sync would make for a mail with no From address too', (t) => {
+  const r = rig(t);
+  r.setDb('foldersync.db', 'HEY/Read\n');
+  r.put('Archive', { To: 'me@x.test', Subject: 'no sender', Date: ago(5), 'Message-ID': '<nofrom@x.test>' }, 'S');
+  r.notmuch('tag', '+screened', '+inbox', '--', 'id:nofrom@x.test');
+  const res = r.seed();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.ok(lines(res.stdout).includes('  1  Archive -> HEY/Read'), res.stdout);
+});
+
+test('mail seed reads an Auto-Submitted value of raw 8-bit bytes', (t) => {
+  const r = rig(t);
+  r.put('INBOX', { From: 'bot@raw.test', To: 'me@x.test', Subject: 'hi', 'Auto-Submitted': 'auto-g\xe9n\xe9r\xe9', Date: ago(5), 'Message-ID': '<raw@x.test>' });
+  const res = r.seed();
+  assert.equal(res.status, 0, res.stdout + res.stderr);
+  assert.ok(lines(res.stdout).includes('thefeed.db bot@raw.test'), res.stdout);
+});

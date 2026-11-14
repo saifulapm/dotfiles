@@ -95,13 +95,13 @@ def classify(addr, msgs, mine, wrote_to, junk_dir, now):
         return "junk"
     local, _, domain = addr.rpartition("@")
     heads = [file_headers(m) for m in msgs]
-    if any(v.strip().lower() != "no" for h in heads for v in h.get_all("Auto-Submitted", [])) \
+    if any(str(v).strip().lower() != "no" for h in heads for v in h.get_all("Auto-Submitted", [])) \
             or any(domain == d or domain.endswith("." + d) for d in NOTIFY_DOMAINS):
         return "feed"
     if local in NOREPLY or any(RECEIPT.search(m["headers"].get("Subject", "")) for m in msgs):
         return "paper"
     if any(h.get("List-Id") is not None or h.get("List-Unsubscribe") is not None
-           or (h.get("Precedence") or "").strip().lower() in ("bulk", "list") for h in heads):
+           or str(h.get("Precedence") or "").strip().lower() in ("bulk", "list") for h in heads):
         return "feed"
     return "screener" if max(m["timestamp"] for m in msgs) >= now - YEAR else "archived"
 
@@ -141,8 +141,8 @@ def plan():
     mine = {parseaddr(i)[1].lower() for i in E.identities()}
     wrote_to = {a.lower() for a in E.nm("address", "--output=recipients", "--output=address", "--exclude=false", "tag:sent").split()}
     decided = decided_keys()
-    by_sender = {}
-    for m in messages():
+    by_sender, every = {}, messages()
+    for m in every:
         addr = parseaddr(m["headers"].get("From", ""))[1].lower()
         if "@" in addr:
             by_sender.setdefault(addr, []).append(m)
@@ -192,18 +192,18 @@ def plan():
     rules, movable = folder_rules()
     enabled = {"INBOX", *read_lines("foldersync.db")}
     moves = Counter()
-    for ms in by_sender.values():
-        for m in ms:
-            files = [p for p in m.get("filename", []) if p.startswith(store + "/")]
-            if len(files) != 1:
-                continue
-            folder = os.path.dirname(os.path.dirname(os.path.relpath(files[0], store)))
-            if folder not in movable:
-                continue
-            tags = after.get(m["id"], set(m["tags"]))
-            to = next((f for f, terms in rules if holds(terms, tags)), None)
-            if to in enabled and to != folder:
-                moves[(folder, to)] += 1
+    # Every message, as hey-folder-sync files mail with no From address too.
+    for m in every:
+        files = [p for p in m.get("filename", []) if p.startswith(store + "/")]
+        if len(files) != 1:
+            continue
+        folder = os.path.dirname(os.path.dirname(os.path.relpath(files[0], store)))
+        if folder not in movable:
+            continue
+        tags = after.get(m["id"], set(m["tags"]))
+        to = next((f for f, terms in rules if holds(terms, tags)), None)
+        if to in enabled and to != folder:
+            moves[(folder, to)] += 1
     return {"counts": counts, "already": already, "lines": lines, "screener": screener, "batch": batch, "moves": moves}
 
 
