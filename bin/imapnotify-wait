@@ -6,8 +6,9 @@ cmd=$(sed -n 's/^ *passwordCMD: *"\(.*\)" *$/\1/p' "$1")
 [[ -n $cmd ]] || { echo "imapnotify-wait: no passwordCMD in $1" >&2; exit 1; }
 # pass hands these to gpg, which then fails on an uncached passphrase instead of asking for it.
 export PASSWORD_STORE_GPG_OPTS=--pinentry-mode=error
-# The password goes to /dev/null, since this unit's output lands in the journal. Status 141 is pass hit by SIGPIPE after head took line one, so it had decrypted.
-until bash -o pipefail -c "$cmd" >/dev/null 2>&1 || [[ $? -eq 141 ]]; do
+# The command's `| head` is cut off so nothing closes pass's stdout early: a writer that dies of SIGPIPE, or under systemd (SIGPIPE ignored) fails on EPIPE with a status of its own, and either would read as a failed decrypt. Pass's own status says it. The password goes to /dev/null, since this unit's output lands in the journal.
+cmd=${cmd%% | head *}
+until bash -c "$cmd" >/dev/null 2>&1; do
   sleep "${IMAPNOTIFY_WAIT_SECONDS:-30}"
 done
 exit 0

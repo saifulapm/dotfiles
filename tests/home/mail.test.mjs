@@ -167,11 +167,41 @@ echo "host: imap.mail.me.com"
   return yaml;
 }
 
-const wait = (dir, yaml, timeout) =>
+const wait = (dir, yaml, timeout, seconds = '0.1') =>
   run(join(repo, 'bin/imapnotify-wait'), [yaml], {
-    env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, IMAPNOTIFY_WAIT_SECONDS: '0.1' },
+    env: { PATH: `${dir}:/usr/bin:/bin`, HOME: dir, IMAPNOTIFY_WAIT_SECONDS: seconds },
     timeout,
   });
+
+// A pass that decrypts on its 3rd call, writes line one, then writes line two after head has gone: SIGPIPE kills it, or with SIGPIPE ignored (as systemd runs a service) the write fails with EPIPE and it exits 1.
+function fakeBrokenPipePass(dir, ignoreSigpipe) {
+  const yaml = fakePass(dir, 3);
+  const real = join(dir, 'pass-real');
+  writeFileSync(real, `#!/bin/bash
+n=$(( $(cat "${dir}/calls" 2>/dev/null || echo 0) + 1 ))
+echo $n > "${dir}/calls"
+[ $n -ge 3 ] || exit 2
+echo hunter2
+sleep 0.05
+echo "host: imap.mail.me.com" || exit 1
+`);
+  chmodSync(real, 0o755);
+  const exec = ignoreSigpipe ? `trap '' PIPE; exec ${real}` : `exec ${real}`;
+  writeFileSync(join(dir, 'pass'), `#!/bin/bash\nbash -c "${exec}"\n`);
+  return yaml;
+}
+
+for (const [name, ignore] of [['pass is killed by SIGPIPE', false], ['SIGPIPE is ignored and pass gets EPIPE', true]]) {
+  test(`imapnotify-wait calls pass exactly until it decrypts when ${name} after line one`, () => {
+    for (let i = 0; i < 20; i++) {
+      const dir = join(root, `wait-pipe-${ignore}-${i}`);
+      const r = wait(dir, fakeBrokenPipePass(dir, ignore), 5000, '0.02');
+      assert.equal(r.status, 0, r.stderr);
+      assert.equal(r.stdout, '');
+      assert.equal(readFileSync(join(dir, 'calls'), 'utf8').trim(), '3', `run ${i}`);
+    }
+  });
+}
 
 test('imapnotify-wait returns once the password decrypts without a prompt, and prints nothing', () => {
   const dir = join(root, 'wait-ok');
