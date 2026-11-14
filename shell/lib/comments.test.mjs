@@ -19,9 +19,11 @@ test('no file has two comment lines in a row', () => {
 test('dots-pre-commit refuses a staged file with two comment lines in a row, and passes one with none', (t) => {
   const dir = mkdtempSync(join(tmpdir(), 'pre-commit-'));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const git = (...args) => execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], { cwd: dir, encoding: 'utf8' });
+  // An empty global config, so the machine's hooks and settings stay out of the fixture repo.
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env });
   git('init', '-q');
-  const hook = () => spawnSync(join(root, 'bin/dots-pre-commit'), [], { cwd: dir, encoding: 'utf8' });
+  const hook = () => spawnSync(join(root, 'bin/dots-pre-commit'), [], { cwd: dir, encoding: 'utf8', env });
   writeFileSync(join(dir, 'a.sh'), '#!/bin/sh\n# one line\necho a\n');
   git('add', 'a.sh');
   assert.equal(hook().status, 0, hook().stderr);

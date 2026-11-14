@@ -7,5 +7,7 @@ const isComment = (f, line) => (f.endsWith('.c') ? /^\s*\/\//.test(line) : /^\s*
 // The 1-based numbers of each line of TEXT that is a comment right after another.
 export function doubled(f, text) {
   const lines = text.split('\n');
-  return lines.flatMap((line, i) => (i > 0 && isComment(f, line) && isComment(f, lines[i - 1]) ? [i + 1] : []));
+  const found = [];
+  for (let i = 1; i < lines.length; i++) if (isComment(f, lines[i]) && isComment(f, lines[i - 1])) found.push(i + 1);
+  return found;
 }
