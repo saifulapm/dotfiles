@@ -210,8 +210,10 @@ def html_part(parts):
     return None
 
 
-# A tag the mail could fetch or navigate with but CSP does not cover (a refresh, a dns-prefetch or preconnect, a base href) is renamed, so the browser reads it as an unknown element.
-INERT = re.compile(r"<(?=(?:meta|link|base)[\s/>])", re.I)
+# A tag the mail could fetch or navigate with but CSP does not cover (a refresh, a dns-prefetch or preconnect, a base href)
+# is renamed, so the browser reads it as an unknown element; so is a frame, object or embed, which Chromium connects to
+# before CSP refuses the load, and whose own srcdoc this pass would never read.
+INERT = re.compile(r"<(?=(?:meta|link|base|i?frame|frameset|object|embed)[\s/>])", re.I)
 PREVIEW_AGE = 3600
 
 

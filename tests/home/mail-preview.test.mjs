@@ -67,7 +67,7 @@ async function chromium(r, file) {
   return dom;
 }
 
-// Every way a mail can fetch while it is drawn, at the listener: an image, a stylesheet, an @import, a font, a refresh, a dns-prefetch, a preconnect, a base href and a quote that tries to leave srcdoc.
+// Every way a mail can fetch while it is drawn, at the listener: an image, a stylesheet, an @import, a font, a refresh, a dns-prefetch, a preconnect, a base href, a quote that tries to leave srcdoc, frames of its own (one holding a preconnect of its own), an object and an embed.
 const fetching = (o) => `<html><head>
 <meta http-equiv="refresh" content="0;url=${o}/refresh">
 <META HTTP-EQUIV=Refresh CONTENT="0;url=${o}/refresh2">
@@ -77,7 +77,11 @@ const fetching = (o) => `<html><head>
 <link rel="preconnect" href="${o}/">
 <link rel="stylesheet" href="${o}/sheet.css">
 <style>@import url(${o}/import.css); @font-face { font-family: X; src: url(${o}/font.woff); } body { font-family: X; }</style>
-</head><body><p>Hello</p><img src="${o}/img.gif">"></iframe><p id="outside">left srcdoc</p></body></html>
+</head><body><p>Hello</p><img src="${o}/img.gif">"></iframe><p id="outside">left srcdoc</p>
+<iframe src="${o}/frame"></iframe><iframe loading="lazy" src="${o}/lazy"></iframe>
+<iframe srcdoc="&lt;link rel=preconnect href=${o}/nested&gt;"></iframe>
+<object data="${o}/object"></object><embed src="${o}/embed">
+</body></html>
 `;
 
 // The srcdoc attribute of the written file, read back as the mail's HTML.
@@ -111,7 +115,7 @@ test('headless Chromium opening a preview makes no request, and the mail keeps n
   // Chromium writes attributes with < as &lt;, so a raw tag in its DOM dump is one the mail put outside the iframe.
   assert.doesNotMatch(dom, /<p id="outside"/);
   // A dns-prefetch at an IP never reaches a listener, so the tags themselves must be gone.
-  assert.doesNotMatch(srcdoc(res.json.data.path), /<(link|base|meta)[\s/>]/i);
+  assert.doesNotMatch(srcdoc(res.json.data.path), /<(link|base|meta|i?frame|object|embed)[\s/>]/i);
 });
 
 test('with --images, the same mail makes one request, for the img', async (t) => {
