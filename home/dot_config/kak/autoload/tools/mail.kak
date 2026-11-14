@@ -317,16 +317,20 @@ define-command mail-sync -docstring 'fetch mail now (mbsync + notmuch new)' %{
 
 # ─────────────────────────────── HEY actions ───────────────────────────────
 
-define-command -hidden -params 1..2 mail-hey %{
+# mail-hey [-domain] ACTION [ARG]: -domain decides the whole domain of each selected sender.
+define-command -hidden -params 1..3 mail-hey %{
     evaluate-commands %sh{
         # $kak_quoted_opt_mail_ids $kak_selections_desc $kak_cursor_line $kak_quoted_opt_mail_msgs $kak_opt_filetype
         eval "$kak_opt_mail_sh"
         targets=$(mail_targets)
         [ -z "$targets" ] && { echo "fail 'mail: nothing selected'"; exit; }
         first=$(printf '%s\n' "$targets" | head -1)
+        domain=
+        [ "$1" = -domain ] && { domain=--domain; shift; }
         action=$1 arg=$2
         set --
         [ -n "$arg" ] && set -- --arg "$arg"
+        [ -n "$domain" ] && set -- "$@" --domain
         if out=$(printf '%s\n' "$targets" | xargs -d '\n' kak-mail hey "$action" "$@" 2>&1); then
             printf 'mail-refresh-all\n'
             if [ "$kak_opt_filetype" = mail-list ]; then
@@ -371,6 +375,10 @@ map global hey i ':mail-hey screen-in<ret>'   -docstring 'screen in → Imbox'
 map global hey f ':mail-hey feed<ret>'        -docstring 'move sender to The Feed'
 map global hey p ':prompt "Paper Trail category: " %{ mail-hey papertrail %val{text} }<ret>' -docstring 'move sender to Paper Trail'
 map global hey o ':mail-hey screen-out<ret>'  -docstring 'screen out (trash, forever)'
+map global hey I ':mail-hey -domain screen-in<ret>' -docstring 'screen in the whole domain → Imbox'
+map global hey F ':mail-hey -domain feed<ret>'      -docstring 'move the whole domain to The Feed'
+map global hey P ':prompt "Paper Trail category (whole domain): " %{ mail-hey -domain papertrail %val{text} }<ret>' -docstring 'move the whole domain to Paper Trail'
+map global hey O ':mail-hey -domain screen-out<ret>' -docstring 'screen out the whole domain (trash, forever)'
 map global hey u ':mail-hey unscreen<ret>'    -docstring 'undo screening (back to Screener)'
 map global hey s ':mail-sender<ret>'          -docstring 'everything from this sender'
 map global hey l ':mail-hey reply-later<ret>' -docstring 'reply later'

@@ -317,3 +317,18 @@ test("<ret> on a Drafts row opens an agent's draft with the draft keys, and ' k 
   assert.equal(existsSync(byAgent), false, read(`${out}.debug`));
   assert.equal(read(`${out}.list`), '2020-01-02 (no recipient)           []\n', read(`${out}.debug`));
 });
+
+// H I, H F, H P and H O decide the whole domain of the sender under the cursor, where the small keys decide the address alone.
+for (const [keys, file, from, line] of [
+  [['H', 'I'], 'screened.db', 'no-reply-abc123@mail.anthropic.test', '@mail.anthropic.test'],
+  [['H', 'F'], 'thefeed.db', 'news@vendor.test', '@vendor.test'],
+  [['H', 'P', 'b', 'i', 'l', 'l', 's', '<ret>'], 'ledger.db', 'invoice@shop.test', 'bills @shop.test'],
+  [['H', 'O'], 'spam.db', 'x@bad.test', '@bad.test'],
+]) {
+  test(`${keys.slice(0, 2).join(' ')} in a thread writes ${line} to ${file}`, async (t) => {
+    const r = mailRig(t);
+    r.deliver({ From: from, 'Message-ID': '<d@x.test>' });
+    const k = await pressInThread(r, keys);
+    assert.equal(r.db(file), `${line}\n`, k.status);
+  });
+}
