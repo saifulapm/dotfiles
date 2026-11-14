@@ -1,0 +1,12 @@
+#!/usr/bin/env node
+// The repo's own pre-commit hook, which .git/hooks/pre-commit links to: refuses a commit whose staged text holds two comment lines in a row.
+import { execFileSync } from 'node:child_process';
+import { covered, doubled } from '../shell/lib/comments.mjs';
+
+const git = (...args) => execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 << 20 });
+const staged = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z').split('\0').filter((f) => f && covered(f));
+const found = staged.flatMap((f) => doubled(f, git('show', `:${f}`)).map((n) => `${f}:${n}`));
+if (found.length) {
+  process.stderr.write(`pre-commit: two comment lines in a row; keep each comment to one line:\n${found.map((f) => `  ${f}\n`).join('')}`);
+  process.exit(1);
+}

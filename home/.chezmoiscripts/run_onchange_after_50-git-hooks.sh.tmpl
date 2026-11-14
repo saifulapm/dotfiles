@@ -1,0 +1,10 @@
+#!/bin/bash
+{{ template "lib.sh" . }}
+tree={{ .chezmoi.workingTree | quote }}
+hooks="$(git -C "$tree" rev-parse --path-format=absolute --git-common-dir)/hooks"
+# The global workflow hook chains to this one after its hygiene check; a hook of another kind already there is left alone.
+if [ -e "$hooks/pre-commit" ] && [ "$(readlink "$hooks/pre-commit")" != "$tree/bin/dots-pre-commit" ]; then
+  log "left $hooks/pre-commit as it is, so the comment-line check does not run on commits"
+else
+  mkdir -p "$hooks" && ln -sfn "$tree/bin/dots-pre-commit" "$hooks/pre-commit" || die "could not link the repo's pre-commit hook"
+fi
