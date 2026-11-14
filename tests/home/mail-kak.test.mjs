@@ -127,3 +127,18 @@ for (const [code, said] of [
     assert.equal(await syncStatus(t, code), said);
   });
 }
+
+test("' k discards a draft along with the mark a sent draft keeps beside it", (t) => {
+  const r = mailRig(t);
+  mkdirSync(join(r.M, 'run'), { mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const draft = join(r.M, 'gone.eml');
+  writeFileSync(draft, 'From: Me <me@x.test>\nTo: a@x.test\nSubject: hi\n\nhello\n');
+  writeFileSync(`${draft}.sent`, 'sent copy\n');
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = r.run('kak', ['-ui', 'dummy', '-e', `edit ${draft}; mail-discard; quit!`], { env, timeout: 20000 });
+  assert.equal(k.status, 0, k.stderr);
+  assert.equal(existsSync(draft), false);
+  assert.equal(existsSync(`${draft}.sent`), false);
+});

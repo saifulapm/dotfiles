@@ -5,13 +5,13 @@ import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig } from './mail-rig.mjs';
 
-// A Message-ID is the sender's text: quotes, $( ), %{ } and braces all have to come back as the one message.
+// A Message-ID is the sender's text: quotes, $( ), %{ } and braces all have to come back as the one message; notmuch drops a Message-ID's spaces, so ${IFS} stands in for touch's.
 function hostile(t) {
   const r = mailRig(t);
   const pwned = join(r.M, 'PWNED');
   const boundary = 'b0';
   r.deliver(
-    { 'Message-ID': `<a'$(touch ${pwned})'%{x}}@x.test>`, 'MIME-Version': '1.0', 'Content-Type': `multipart/mixed; boundary="${boundary}"` },
+    { 'Message-ID': `<a'$(touch\${IFS}${pwned})'%{x}}@x.test>`, 'MIME-Version': '1.0', 'Content-Type': `multipart/mixed; boundary="${boundary}"` },
     `--${boundary}\nContent-Type: text/plain\n\nsee https://x.test/a\n--${boundary}\nContent-Type: text/plain\nContent-Disposition: attachment; filename="a.txt"\n\nattached\n--${boundary}--\n`,
   );
   const id = r.notmuch('search', '--output=messages', '*').trim();

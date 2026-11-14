@@ -363,7 +363,8 @@ define-command mail-send -docstring 'send this draft' %{
 }
 
 define-command mail-discard -docstring 'delete this draft' %{
-    nop %sh{ rm -f "$kak_buffile" }
+    # kak-mail send leaves DRAFT.sent beside a draft msmtp took, so it goes too.
+    nop %sh{ rm -f "$kak_buffile" "$kak_buffile.sent" }
     delete-buffer!
 }
 
