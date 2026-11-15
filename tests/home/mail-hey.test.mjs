@@ -317,3 +317,22 @@ test('mail hey decides a From naming one address twice as that one sender', (t) 
   assert.equal(res.json.data.sender, 'ann@first.test');
   assert.equal(r.db('screened.db'), 'ann@first.test\n');
 });
+
+// notmuch's parse drops an address holding a control character, which routing still reads as the From's last address.
+test('mail hey refuses a two-sender From whose last address holds a control character', (t) => {
+  const r = rig(t);
+  for (const [n, c] of [['1', '\x01'], ['2', '\x7f']]) {
+    r.deliver({ From: `A <a@x1.test>, B <b${c}ob@second.test>`, 'Message-ID': `<ctl${n}@x.test>` });
+    const res = r.mail('hey', 'screen-in', `ctl${n}@x.test`);
+    assert.equal(res.status, 1, res.stdout);
+    assert.match(res.json.error, /^From names two senders, a@x1\.test and b.ob@second\.test; nothing was decided$/);
+  }
+  assert.equal(r.db('screened.db'), '');
+});
+
+test('mail hey reads one address holding a line separator as one, never as two senders', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Ann <ann x@first.test>', 'Message-ID': '<sep@x.test>' });
+  const res = r.mail('hey', 'screen-in', 'sep@x.test');
+  assert.doesNotMatch(res.json.error ?? '', /^From names/);
+});

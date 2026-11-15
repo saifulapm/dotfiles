@@ -4,6 +4,7 @@ Its functions return data and raise MailError; none prints, exits, or marks
 mail read as a side effect of reading. The box list lives here only.
 """
 
+import email.parser
 import email.policy
 import fcntl
 import functools
@@ -731,20 +732,35 @@ def sender(query):
 COUNT_WORDS = {2: "two", 3: "three"}
 
 
+def from_addresses(msg_id):
+    """Each different address the From of message MSG_ID names, lower-cased: notmuch's parse, the one a decision takes its address from, and Python's, which keeps an address holding a control character that notmuch drops but routing still reads."""
+    q = idq(msg_id)
+    ours = list(dict.fromkeys(a.lower() for a in nm("address", "--output=sender", "--output=address", q).split("\n") if a))
+    theirs = []
+    path = nm("search", "--output=files", q).split("\n")[0]
+    if path:
+        with open(path, "rb") as f:
+            head = email.parser.BytesHeaderParser(policy=email.policy.compat32).parse(f)
+        theirs = list(dict.fromkeys(a.lower() for _, a in getaddresses([str(h) for h in head.get_all("From", [])]) if "@" in a))
+    return ours, theirs
+
+
 def sender_to_decide(query):
     """The sender a decision on QUERY acts on: the one address in the From of its newest message that is not yours alone.
     A From naming two or more different addresses, yours among them, is refused: routing reads its last address, so a decision on any one of them may file nothing."""
     mine = {parseaddr(i)[1].lower() for i in identities()}
     for mid in nm("search", "--output=messages", "--sort=newest-first", query).split():
-        addrs = list(dict.fromkeys(a.lower() for a in nm("address", "--output=sender", "--output=address", idq(mid.removeprefix("id:"))).splitlines() if a))
-        if not set(addrs) - mine:
+        ours, theirs = from_addresses(mid.removeprefix("id:"))
+        named = theirs if len(theirs) > len(ours) else ours
+        if not set(named) - mine:
             continue
-        if len(addrs) > 1:
-            named = ", ".join(line(a) for a in addrs[:-1]) + " and " + line(addrs[-1])
-            e = MailError(f"From names {COUNT_WORDS.get(len(addrs), len(addrs))} senders, {named}; nothing was decided")
+        if len(named) > 1:
+            listed = ", ".join(line(a) for a in named[:-1]) + " and " + line(named[-1])
+            e = MailError(f"From names {COUNT_WORDS.get(len(named), len(named))} senders, {listed}; nothing was decided")
             e.hint = "a decision needs a mail from one sender; decide on another mail of the one you mean"
             raise e
-        return addrs[0]
+        if ours:
+            return ours[0]
     raise MailError(f"no sender found for {query}")
 
 
