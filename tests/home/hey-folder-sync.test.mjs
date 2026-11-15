@@ -120,7 +120,7 @@ test('a mail dragged into HEY/Bubbled while a decision holds the lock gets its l
   const moved = Math.floor(Date.now() / 1000);
   const apply = spawn(script, ['--apply'], { env: r.env });
   const ended = new Promise((res) => apply.on('close', res));
-  await new Promise((res) => setTimeout(res, 2500));
+  await new Promise((res) => setTimeout(res, 4000));
   const early = r.db('bubble.db');
   await release();
   assert.equal(await ended, 0);

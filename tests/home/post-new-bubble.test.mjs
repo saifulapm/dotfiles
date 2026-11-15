@@ -77,6 +77,34 @@ test('a bubble cleared while post-new rewrites bubble.db stays cleared', async (
   assert.equal(early, false, 'the clear returned while the pass held bubble.db');
 });
 
+// After the pass post-new still sends away replies (up to 30 s each) and writes the count; a key must not wait for those.
+test('a bubble set while post-new runs past its bubble pass returns at once', async (t) => {
+  const r = rig(t);
+  r.setDb('bubble.db', `id:keep@x.test ${later()}\n`);
+  const stubs = join(r.M, 'stubs');
+  mkdirSync(stubs);
+  const [counting, hold] = [join(r.M, 'counting'), join(r.M, 'hold')];
+  writeFileSync(join(stubs, 'kak-mail'), `#!/bin/sh\ntouch ${counting}\nwhile [ -e ${hold} ]; do sleep 0.05; done\n`);
+  chmodSync(join(stubs, 'kak-mail'), 0o755);
+  writeFileSync(hold, '');
+  const pass = started({ ...r.env, PATH: `${stubs}:${r.env.PATH}` }, 'bash', [hook]);
+  while (!existsSync(counting)) {
+    if (pass.done) throw new Error(`post-new ended before its count: ${(await pass.p).out}`);
+    await new Promise((res) => setTimeout(res, 50));
+  }
+  const bubble = r.mail('hey', 'bubble', 'two@x.test', '--at', 'tomorrow 9am');
+  const late = new Promise((res) => setTimeout(() => res({ code: null, out: 'the bubble was still waiting after 10 s' }), 10000));
+  let b;
+  try {
+    b = await Promise.race([bubble.p, late]);
+  } finally {
+    unlinkSync(hold);
+  }
+  assert.equal((await pass.p).code, 0);
+  assert.equal(b.code, 0, b.out);
+  assert.match(r.db('bubble.db'), /^id:two@x\.test \d+$/m);
+});
+
 // The pass lets the lock go before the rest of the sync, so a later decision never waits for the fetch.
 test('a full mail-sync with no decision in flight ends done with bubble.db\'s undue lines unchanged', (t) => {
   const r = mailRig(t);
