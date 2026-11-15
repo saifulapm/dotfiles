@@ -12,6 +12,9 @@ declare-option -hidden bool mail_unthreaded false
 declare-option -hidden str-list mail_ids
 declare-option -hidden str-list mail_msgs
 declare-option -hidden str mail_return_buf
+# The buffer `mail` was opened from, where q in the boxes goes back to. Global,
+# since a window belongs to one buffer and edit -scratch *mail* leaves it.
+declare-option -hidden str mail_origin
 declare-option -hidden str mail_return_id
 declare-option -hidden int mail_return_line 1
 # A list shows 500 rows from mail_offset; kak-mail list sets the three.
@@ -55,10 +58,23 @@ mail_fill() {
 # ─────────────────────────────── boxes ───────────────────────────────
 
 define-command mail -docstring 'open the mail boxes' %{
+    try %{
+        evaluate-commands %sh{ case $kak_opt_filetype in mail-boxes|mail-list|mail-thread) echo fail ;; esac }
+        set-option global mail_origin %val{bufname}
+    }
     edit -scratch *mail*
     set-option buffer filetype mail-boxes
     mail-boxes-render
     execute-keys gg
+}
+
+# q in the boxes: the kak-mail window (client "mail", named by mail-open) closes,
+# leaving its session running; any other client goes back to mail_origin.
+define-command -hidden mail-boxes-quit %{
+    evaluate-commands %sh{
+        if [ "$kak_client" = mail ]; then echo quit
+        else echo "try %{ buffer %opt{mail_origin} } catch %{ fail 'mail: no buffer to go back to' }"; fi
+    }
 }
 
 define-command -hidden mail-boxes-render %{
@@ -481,7 +497,7 @@ define-command -hidden mail-help %{
 b      jump to a box by letter
 u      refresh counts
 c      compose     <a-g>  sync now
-?      this help}" ;;
+q      close       ?  this help}" ;;
         mail-list) printf '%s\n' "info -title 'mail: list' %{<ret>  read the thread
 r / R  reply / reply all     F  forward
 e / a  archive
@@ -581,6 +597,7 @@ hook global WinSetOption filetype=mail-(boxes|list|thread) %{
 hook global WinSetOption filetype=mail-boxes %{
     map buffer normal <ret> ':mail-boxes-open<ret>' -docstring 'open box'
     map buffer normal u ':mail-refresh<ret>'        -docstring 'refresh'
+    map buffer normal q ':mail-boxes-quit<ret>'     -docstring 'close'
     add-highlighter window/mail-boxes group
     add-highlighter window/mail-boxes/ regex '^ (\S) ' 1:keyword
     add-highlighter window/mail-boxes/ regex ' ([1-9]\d*)$' 1:value

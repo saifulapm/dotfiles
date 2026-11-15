@@ -332,3 +332,38 @@ for (const [keys, file, from, line] of [
     assert.equal(r.db(file), `${line}\n`, k.status);
   });
 }
+
+// Presses q in the boxes view after SETUP, through the JSON UI so q is a real key, and returns the buffer the client is on afterwards (null when the client quit) and what *debug* then holds.
+async function qInBoxes(t, setup) {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<one@x.test>' });
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const note = join(r.M, 'note.txt');
+  writeFileSync(note, 'my work\n');
+  const out = join(r.M, 'out');
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const k = spawn('kak', ['-ui', 'json', '-e', `edit ${note}; ${setup}`], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const keys = (...p) => k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params: p }) + '\n');
+  k.stdout.on('data', () => {});
+  await sleep(1500);
+  keys('q');
+  await sleep(500);
+  keys(':', `echo -to-file ${out}.buf %val{bufname}; evaluate-commands -buffer *debug* %{ write ${out}.d1 }; quit!`, '<ret>');
+  await exited;
+  return { buf: existsSync(`${out}.buf`) ? read(`${out}.buf`) : null, debug: read(`${out}.d1`) };
+}
+
+test('q in the boxes goes back to the file mail was opened from, past a list visited on the way', async (t) => {
+  const { buf, debug } = await qInBoxes(t, 'mail; mail-list-open tag:inbox true; mail');
+  assert.match(buf, /note\.txt$/);
+  assert.match(debug, /This is the debug buffer/);
+  assert.doesNotMatch(debug, /register|Error/);
+});
+
+test('q in the boxes of the kak-mail window (client "mail") closes that client', async (t) => {
+  const { buf } = await qInBoxes(t, 'rename-client mail; mail');
+  assert.equal(buf, null);
+});
