@@ -242,6 +242,8 @@ def run(apply=False):
     if not apply:
         return report(plan(), False)
     fd = lock()
+    # Taken after mail-sync's lock, as dots-sync-mail takes it, and held from reading the decided keys to the last line, so a decision made meanwhile waits rather than gets a second line.
+    deciding = E.lock_decisions()
     try:
         p = plan()
         if not p["batch"] and not p["lines"]:
@@ -255,4 +257,5 @@ def run(apply=False):
         E.refresh_count()
         return report(p, True)
     finally:
+        os.close(deciding)
         os.close(fd)

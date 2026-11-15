@@ -2,9 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { mailRig, me, repo } from './mail-rig.mjs';
+import { chmodSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { holdDecisions, mailRig, me, repo } from './mail-rig.mjs';
 
 const script = join(repo, 'bin/hey-folder-sync');
 
@@ -107,18 +107,6 @@ test("a mail dragged into HEY/Bubbled comes back in a day, named by its thread's
   }
 });
 
-// A test holds the engine's decision lock, as a Kakoune bubble or clear does while it rewrites bubble.db.
-async function holding(r) {
-  const lock = join(r.env.XDG_STATE_HOME, 'hey-mail/decide.lock');
-  mkdirSync(dirname(lock), { recursive: true });
-  const [hold, held] = [join(r.M, 'hold'), join(r.M, 'held')];
-  writeFileSync(hold, '');
-  const child = spawn('flock', [lock, 'sh', '-c', `touch ${held}; while [ -e ${hold} ]; do sleep 0.05; done`]);
-  const gone = new Promise((res) => child.on('close', res));
-  while (!existsSync(held)) await new Promise((res) => setTimeout(res, 50));
-  return async () => { unlinkSync(hold); await gone; };
-}
-
 test('a mail dragged into HEY/Bubbled while a decision holds the lock gets its line once the lock goes, due a day after the move', async (t) => {
   const r = heyRig(t);
   for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(r.box('HEY/Bubbled'), s), { recursive: true });
@@ -128,7 +116,7 @@ test('a mail dragged into HEY/Bubbled while a decision holds the lock gets its l
   assert.equal(r.sync(r.env, '--apply'), '0 0\n');
   renameSync(join(r.box('INBOX'), 'new', 'drag.eml'), join(r.box('HEY/Bubbled'), 'new', 'drag.eml'));
   r.notmuch('new', '--quiet');
-  const release = await holding(r);
+  const release = await holdDecisions(r);
   const moved = Math.floor(Date.now() / 1000);
   const apply = spawn(script, ['--apply'], { env: r.env });
   const ended = new Promise((res) => apply.on('close', res));

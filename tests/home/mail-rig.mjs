@@ -1,8 +1,8 @@
 // A scratch mail store for bin/kak-mail: a real notmuch database, a fake msmtp that records each send, and an env built from nothing, so no test reads or writes the real mail.
-import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 export const repo = new URL('../../', import.meta.url).pathname.replace(/\/$/, '');
 export const me = 'me@x.test';
@@ -54,4 +54,16 @@ export function mailRig(t) {
   const db = (name) => (existsSync(join(dbDir, name)) ? readFileSync(join(dbDir, name), 'utf8') : '');
   const setDb = (name, text) => { mkdirSync(dbDir, { recursive: true }); writeFileSync(join(dbDir, name), text); };
   return { M, env, mail, run, notmuch, deliver, kakMail, sends, db, setDb };
+}
+
+// Holds the engine's decision lock on R's store, as a Kakoune decision does while it rewrites the db files; await the returned function to let it go.
+export async function holdDecisions(r) {
+  const lock = join(r.env.XDG_STATE_HOME, 'hey-mail/decide.lock');
+  mkdirSync(dirname(lock), { recursive: true });
+  const [hold, held] = [join(r.M, 'hold'), join(r.M, 'held')];
+  writeFileSync(hold, '');
+  const child = spawn('flock', [lock, 'sh', '-c', `touch ${held}; while [ -e ${hold} ]; do sleep 0.05; done`]);
+  const gone = new Promise((res) => child.on('close', res));
+  while (!existsSync(held)) await new Promise((res) => setTimeout(res, 50));
+  return async () => { unlinkSync(hold); await gone; };
 }

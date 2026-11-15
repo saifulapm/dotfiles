@@ -1,9 +1,10 @@
 // bin/mail seed on a scratch store (tests/home/mail-rig.mjs): it sorts the senders already in the store into HEY classes, and with no flag it changes nothing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { mailRig, repo } from './mail-rig.mjs';
+import { holdDecisions, mailRig, repo } from './mail-rig.mjs';
 
 const DAY = 86400e3;
 const ago = (days) => new Date(Date.now() - days * DAY).toUTCString();
@@ -111,6 +112,23 @@ test('mail seed --apply writes each decision once and leaves unread as it was', 
   assert.equal(again.status, 0, again.stdout + again.stderr);
   assert.equal(again.stdout, 'nothing to change\n');
   assert.deepEqual(r.snapshot(), before);
+});
+
+// Seed reads the decided keys and then writes its lines, so a decision made between the two would get a second line.
+test('mail seed --apply adds no line while a decision holds the lock, then adds its lines', async (t) => {
+  const r = store(t);
+  const release = await holdDecisions(r);
+  const seed = spawn(join(repo, 'bin/mail'), ['seed', '--apply'], { env: r.env });
+  let out = '';
+  seed.stdout.on('data', (d) => (out += d));
+  seed.stderr.on('data', (d) => (out += d));
+  const ended = new Promise((res) => seed.on('close', res));
+  await new Promise((res) => setTimeout(res, 2000));
+  const early = r.db('screened.db');
+  await release();
+  assert.equal(await ended, 0, out);
+  assert.equal(r.db('screened.db'), 'zed@bills.test\nme@x.test\nbob@people.test\n');
+  assert.equal(early, 'zed@bills.test\n', 'seed wrote its lines while a decision held the lock');
 });
 
 test('mail seed counts a move hey-folder-sync would make for a mail with no From address too', (t) => {
