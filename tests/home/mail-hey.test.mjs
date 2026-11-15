@@ -117,3 +117,22 @@ test('mail hey undo-last with nothing to undo says so, and hints at what it undo
   assert.equal(res.json.error, 'nothing to undo');
   assert.match(res.json.hint, /last archive or Feed move/);
 });
+
+// A sender screened in from The Feed, Paper Trail or screen-out has their mail where a sender screened in from the Screener has it.
+test('mail hey screen-in after feed, papertrail or screen-out leaves no archived or class tag on the sender\'s mail', (t) => {
+  for (const [first, extra] of [['feed', []], ['papertrail', ['--category', 'receipts']], ['screen-out', []]]) {
+    const r = rig(t);
+    r.deliver({ From: 'Shop News <news@shop.test>', Subject: 'older', 'Message-ID': '<h2@shop.test>' });
+    r.notmuch('tag', '-new', '--', '*');
+    const res = first === 'screen-out' ? r.mail('hey', 'screen-out', '--sender', 'news@shop.test') : r.mail('hey', first, 'h1@shop.test', ...extra);
+    assert.equal(res.status, 0, `${first}: ${res.stdout}${res.stderr}`);
+    assert.ok(r.tags('h1@shop.test').includes('archived'), `${first} archives`);
+    const back = r.mail('hey', 'screen-in', 'h1@shop.test');
+    assert.equal(back.status, 0, back.stdout + back.stderr);
+    for (const id of ['h1@shop.test', 'h2@shop.test']) {
+      const tags = r.tags(id);
+      assert.ok(tags.includes('inbox') && tags.includes('screened'), `${first}: ${id} ${tags}`);
+      for (const gone of ['archived', 'thefeed', 'ledger/receipts', 'spam', 'deleted']) assert.ok(!tags.includes(gone), `${first}: ${id} keeps ${gone}`);
+    }
+  }
+});

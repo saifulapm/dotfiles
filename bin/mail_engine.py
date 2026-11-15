@@ -780,7 +780,8 @@ CLASS_TAGS = {
 }
 # What leaving every class takes off a sender's mail.
 LEFT_TAGS = ("-screened", "-thefeed", "-spam", "-deleted", "-bubble")
-UNSCREEN_TAGS = (*LEFT_TAGS, "+inbox")
+# A sender moved from one class to another starts from the inbox, unarchived, before the new class's tags; The Feed, Paper Trail and screen-out archive again.
+UNSCREEN_TAGS = (*LEFT_TAGS, "-archived", "+inbox")
 
 
 def class_tags(cls):
