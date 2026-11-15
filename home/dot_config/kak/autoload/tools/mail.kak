@@ -480,7 +480,7 @@ define-command -hidden mail-help %{
         mail-boxes) printf '%s\n' "info -title 'mail: boxes' %{<ret>  open the box on this line
 b      jump to a box by letter
 u      refresh counts
-c      compose     G  sync now
+c      compose     <a-g>  sync now
 ?      this help}" ;;
         mail-list) printf '%s\n' "info -title 'mail: list' %{<ret>  read the thread
 r / R  reply / reply all     F  forward
@@ -491,7 +491,7 @@ M      mute this thread
 U      undo the last archive or Feed move
 H      hey… (screen in/out, feed, piles, bubble up…)
 o      open a link           A  save + open an attachment (whole thread)
-u      refresh               G  sync now
+u      refresh               <a-g>  sync now
 ] / [  next / previous 500 rows
 c      compose               b  jump to a box
 q      back to the boxes     ?  this help
@@ -505,7 +505,7 @@ gu         open the URL under the cursor
 M          mute this thread
 U          undo the last archive or Feed move
 H          hey… (screen in/out, feed, piles, bubble up…)
-c          compose               G  sync now
+c          compose               <a-g>  sync now
 b          jump to a box
 q          back to the list      ?  this help}" ;;
         esac
@@ -570,7 +570,7 @@ add-highlighter shared/kak-mail/ regex ^--\ \n\N* 0:comment
 
 hook global WinSetOption filetype=mail-(boxes|list|thread) %{
     map buffer normal b ':enter-user-mode mail-jump<ret>' -docstring 'jump to a box'
-    map buffer normal G ':mail-sync<ret>'                 -docstring 'sync'
+    map buffer normal <a-g> ':mail-sync<ret>'             -docstring 'sync'
     map buffer normal c ':mail-compose new<ret>'          -docstring 'compose'
     map buffer normal ? ':mail-help<ret>'                 -docstring 'keys'
     mail-prompt-keys

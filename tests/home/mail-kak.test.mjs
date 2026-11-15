@@ -89,7 +89,7 @@ test('A in a thread offers a.txt of a mail whose Message-ID holds quotes and %{ 
   assert.equal(readFileSync(saved, 'utf8'), 'attached');
 });
 
-// G runs mail-sync in the background and echoes what its exit code means; a fake mail-sync first on PATH exits CODE, and the second parameter of the JSON UI's draw_status, the status line, carries the echo.
+// <a-g> runs mail-sync in the background and echoes what its exit code means; a fake mail-sync first on PATH exits CODE, and the second parameter of the JSON UI's draw_status, the status line, carries the echo.
 async function syncStatus(t, code) {
   const r = mailRig(t);
   mkdirSync(join(r.M, 'run'), { mode: 0o700 });
@@ -123,7 +123,7 @@ for (const [code, said] of [
   [75, 'mail: another sync is running'],
   [1, 'mail: sync failed — see ~/.local/state/hey-mail/sync.log'],
 ]) {
-  test(`G says "${said}" when mail-sync exits ${code}`, async (t) => {
+  test(`<a-g> says "${said}" when mail-sync exits ${code}`, async (t) => {
     assert.equal(await syncStatus(t, code), said);
   });
 }
