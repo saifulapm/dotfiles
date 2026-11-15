@@ -1,7 +1,7 @@
 // Two machines, a and b, carry HEY decisions through dots sync's mail unit, each with its own scratch notmuch store.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join } from 'node:path';
 import { deliver, kakMail, mail, machine, mailbox, mailSync, notmuch, sync, world } from './lib.mjs';
 
@@ -343,6 +343,25 @@ test('a pulled decision whose re-filing failed is re-filed by the next round', a
   assert.equal(await count(b, 'tag:spam and from:x@y.test'), 1);
 });
 
+// notmuch's errors span lines, and dots sync keeps only the last line of the unit's output.
+test("a failed re-filing and a skipped file both reach sync.json's mail error, on one line", async () => {
+  const { w, a, b } = await pair();
+  await deliver(a, 'x@y.test', 'a1@y.test');
+  await deliver(b, 'x@y.test', 'b1@y.test');
+  await hey(a, 'screen-out', 'a1@y.test');
+  await ok(a);
+  writeFileSync(remote(w, 'c'), '{"v":1,"records":');
+  const stub = join(b.env.HOME, 'failing');
+  mkdirSync(stub);
+  writeFileSync(join(stub, 'notmuch'), '#!/bin/sh\n[ "$1" = tag ] && { printf \'notmuch tag: boom\\nQuery string was: from:x\\n\' >&2; exit 1; }\nexec /usr/bin/notmuch "$@"\n', { mode: 0o755 });
+  b.env.PATH = stub + ':' + b.env.PATH;
+  const r = await sync(b, ['--only', 'mail']);
+  assert.equal(r.code, 1, r.stdout + r.stderr);
+  const error = JSON.parse(readFileSync(b.status, 'utf8')).mail.error;
+  assert.match(error, /^mail: skipped c\.json, which does not parse; could not re-file x@y\.test's mail: .*boom.*Query string was: from:x/);
+  assert.doesNotMatch(error, /\n/);
+});
+
 // The journal names the key, the store holds its removal, and the line fired before this round looked.
 test('a bubble set and fired again between two rounds leaves the round green', async () => {
   const w = world();
@@ -494,6 +513,16 @@ test('a sender screened in while the mail round holds the files waits for the ro
   assert.equal(early, false, 'the screen-in returned while the round held the files');
 });
 
+// Whether m's dots-sync-mail is running.
+const mailRound = (m) => readdirSync('/proc').some((pid) => {
+  try {
+    const cmd = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+    return cmd.includes('dots-sync-mail') && cmd.includes(m.env.HOME + '/');
+  } catch {
+    return false;
+  }
+});
+
 // The round waits behind the fetch for mail-sync's lock, and a decision takes only the lock the round takes after it.
 test('a sender screened in while a fetch holds mail-sync and a round waits behind it returns before the fetch ends', async () => {
   const w = world();
@@ -512,7 +541,9 @@ test('a sender screened in while a fetch holds mail-sync and a round waits behin
   const fetch = watched(mailSync(a));
   while (!existsSync(join(a.env.HOME, 'fetch-started'))) await new Promise((r) => setTimeout(r, 50));
   const round = watched(sync(a, ['--only', 'mail']));
-  await new Promise((r) => setTimeout(r, 1000));
+  // The round's own process has started and had time to reach its first lock.
+  while (!mailRound(a)) await new Promise((r) => setTimeout(r, 50));
+  await new Promise((r) => setTimeout(r, 500));
   const late = new Promise((r) => setTimeout(() => r({ code: null, stderr: 'the screen-in was still waiting after 15 s' }), 15000));
   let r;
   try {
@@ -533,8 +564,11 @@ test('a sender screened in while a fetch holds mail-sync and a round waits behin
 test('a round killed while it holds the files leaves them whole, and a decision waiting on it goes through and reaches b', async () => {
   const { a, b } = await pair();
   await deliver(a, 'X <x@y.test>', 'a1@y.test');
+  await deliver(a, 'W <w@y.test>', 'a2@y.test');
   writeFileSync(join(a.hey, 'thefeed.db'), 'f@y.test\n');
   await ok(a);
+  // Its stamp is in the journal the round sets aside before it is killed.
+  await hey(a, 'screen-in', 'a2@y.test');
   const { round } = await paused(a);
   const decision = watched(mail(a, ['hey', 'screen-in', 'a1@y.test']));
   await new Promise((r) => setTimeout(r, 500));
@@ -544,9 +578,29 @@ test('a round killed while it holds the files leaves them whole, and a decision 
   const r = await decision.p;
   assert.equal(r.code, 0, r.stderr);
   assert.equal(db(a, 'thefeed.db'), 'f@y.test\n');
-  assert.equal(db(a, 'screened.db'), 'x@y.test\n');
+  assert.equal(db(a, 'screened.db'), 'w@y.test\nx@y.test\n');
+  // b moves w to The Feed after a screened it in, so only a's stamp from the set-aside journal lets The Feed win; a stamp taken at the next round would beat it.
+  await deliver(b, 'W <w@y.test>', 'b2@y.test');
+  await hey(b, 'feed', 'b2@y.test');
+  await ok(b);
   await ok(a);
   await ok(b);
-  assert.equal(db(b, 'screened.db'), 'x@y.test\n');
-  assert.equal(db(b, 'thefeed.db'), 'f@y.test\n');
+  for (const m of [a, b]) {
+    assert.equal(db(m, 'screened.db'), 'x@y.test\n', m.id);
+    assert.match(db(m, 'thefeed.db'), /^w@y\.test$/m, m.id);
+    assert.match(db(m, 'thefeed.db'), /^f@y\.test$/m, m.id);
+  }
+});
+
+test('two machines deciding one sender in the same millisecond end on the same value', async () => {
+  const { w, a, b } = await pair();
+  const at = Date.now() - 1000;
+  writeFileSync(remote(w, 'c'), JSON.stringify({ v: 1, records: { 'sender t@y.test': { v: 'screened', at } } }));
+  writeFileSync(remote(w, 'd'), JSON.stringify({ v: 1, records: { 'sender t@y.test': { v: 'spam', at } } }));
+  await ok(a);
+  await ok(b);
+  for (const m of [a, b]) {
+    assert.match(db(m, 'spam.db'), /^t@y\.test$/m, m.id);
+    assert.doesNotMatch(db(m, 'screened.db'), /t@y\.test/, m.id);
+  }
 });

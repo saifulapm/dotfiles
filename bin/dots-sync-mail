@@ -286,7 +286,7 @@ def main(path, pulled):
     try:
         migrate_bubbles()
     except E.MailError as e:
-        print(f"mail: could not name bubble.db's threads by Message-ID: {e}", file=sys.stderr)
+        said.append(f"mail: could not name bubble.db's threads by Message-ID: {e}")
     view, missing = local_view()
     stamps, taken = journal()
     records = dict(own)
@@ -408,9 +408,9 @@ def main(path, pulled):
         os.unlink(f)
     os.close(deciding)
     os.close(held)
-    # One line, as dots sync keeps only the last line in sync.json.
+    # One line, as dots sync keeps only the last line in sync.json, and notmuch's errors span several.
     if said or refused:
-        print("mail: " + "; ".join(line.removeprefix("mail: ") for line in said + refused), file=sys.stderr)
+        print("mail: " + "; ".join(" ".join(line.removeprefix("mail: ").split()) for line in said + refused), file=sys.stderr)
     if refused:
         sys.exit(1)
     if left_out:
