@@ -229,3 +229,55 @@ test('a reply sent on a read Reply Later thread puts the thread in Read and out 
   assert.ok(!box('Reply Later').includes(tid));
   assert.ok(!box('Imbox').includes(tid));
 });
+
+// Review m97: the phone moves a thread back to INBOX file by file, and never moves a sent copy out of Sent Messages, so a pile on the sent copy would outlive it.
+test('a pile leaves the thread\'s sent copy out, unless the thread holds nothing else', (t) => {
+  const r = rig(t);
+  const c = r.kakMail('compose', 'reply', 'id:b1@x.test');
+  assert.equal(c.status, 0, c.stderr);
+  assert.equal(r.kakMail('send', c.stdout.trim()).status, 0);
+  const tid = r.notmuch('search', '--output=threads', 'id:b1@x.test').trim();
+  assert.equal(r.mail('hey', 'replylater', 'b1@x.test').status, 0);
+  assert.equal(r.notmuch('count', `${tid} and tag:sent`).trim(), '1');
+  assert.equal(r.notmuch('count', `${tid} and tag:sent and tag:replylater`).trim(), '0');
+  assert.ok(r.tags('b1@x.test').includes('replylater'));
+});
+
+// Walk finding 73BQY9EY: moving a sender between classes gave inbox back to their piled mail, so it sat in Read and Reply Later at once.
+test('moving a sender between classes, or unscreening them, leaves their piled mail out of the inbox', (t) => {
+  const r = rig(t);
+  const box = (name) => r.mail('search', '--box', name).json.data.map((row) => row.id);
+  r.notmuch('tag', '-unread', '--', 'id:h1@shop.test');
+  assert.equal(r.mail('hey', 'replylater', 'h1@shop.test').status, 0);
+  for (const action of ['feed', 'screen-in']) assert.equal(r.mail('hey', action, 'h1@shop.test').status, 0, action);
+  assert.ok(!r.tags('h1@shop.test').includes('inbox'), `${r.tags('h1@shop.test')}`);
+  assert.deepEqual(box('Read'), []);
+  assert.deepEqual(box('Reply Later'), ['h1@shop.test']);
+  assert.equal(r.kakMail('hey', 'unscreen', 'id:h1@shop.test').status, 0);
+  assert.ok(!r.tags('h1@shop.test').includes('inbox'), `unscreen: ${r.tags('h1@shop.test')}`);
+});
+
+test('a reply that puts unread piled mail back in the Imbox updates the margin\'s count', (t) => {
+  const r = rig(t);
+  const count = join(r.M, 'home/.local/state/dots/mail-unread');
+  r.deliver({ From: 'Bob <bob@people.test>', Subject: 'Re: lunch', 'Message-ID': '<b2@x.test>', 'In-Reply-To': '<b1@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', 'id:b2@x.test');
+  assert.equal(r.mail('hey', 'replylater', 'b1@x.test').status, 0);
+  assert.equal(readFileSync(count, 'utf8'), '1\n');
+  const c = r.kakMail('compose', 'reply', 'id:b1@x.test');
+  assert.equal(c.status, 0, c.stderr);
+  assert.equal(r.kakMail('send', c.stdout.trim()).status, 0);
+  assert.equal(readFileSync(count, 'utf8'), '3\n');
+});
+
+test('an undo file that does not parse is nothing to undo, never a trace', (t) => {
+  const r = rig(t);
+  assert.equal(r.mail('hey', 'archive', 'b1@x.test').status, 0);
+  const file = join(r.M, 'home/.local/state/hey-mail/undo.json');
+  for (const text of ['', '{', '[]', JSON.stringify({ at: Date.now() / 1000 })]) {
+    writeFileSync(file, text);
+    const res = r.mail('hey', 'undo-last');
+    assert.equal(res.status, 1, `${text}: ${res.stdout}${res.stderr}`);
+    assert.equal(res.json.error, 'nothing to undo', text);
+  }
+});

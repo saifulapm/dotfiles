@@ -668,6 +668,7 @@ def locked_send(path, expect, env):
                 unpile(thread)
             except MailError:
                 pass
+        refresh_count()
     for a in attach:
         if os.path.dirname(a) == DRAFTS:
             os.unlink(a)
@@ -848,6 +849,7 @@ def to_screener(addr, unread=True, keep=None):
     since = int(time.time()) - SCREENER_DAYS * 86400
     tag(f"{frm} and date:@{since}..", "+inbox", "-archived", *(("+unread",) if unread else ()))
     tag(f"{frm} and date:..@{since}", "+archived", "-inbox")
+    unpiled_inbox(frm)
 
 
 def refile(addr, old, new, keep=None, pulled=False):
@@ -860,6 +862,12 @@ def refile(addr, old, new, keep=None, pulled=False):
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
     if new:
         tag(frm, *(t for t in class_tags(new) if not (pulled and t[1:] == "unread")))
+    unpiled_inbox(frm)
+
+
+def unpiled_inbox(query):
+    """Take inbox back off QUERY's mail in Reply Later or Set Aside, which a sender's class change gives the sender's mail; a pile has no inbox until it is cleared."""
+    tag(f"({query}) and (tag:replylater or tag:setaside)", "-inbox")
 
 
 SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
@@ -884,10 +892,10 @@ def undo_last():
     try:
         with open(UNDO) as f:
             move = json.load(f)
-    except FileNotFoundError:
+    except (FileNotFoundError, ValueError):
         move = None
     # A move from before moves were timed is past undoing; one stamped ahead of a clock set back is not.
-    at = move.get("at") if move else None
+    at = move.get("at") if isinstance(move, dict) and "dump" in move else None
     if not isinstance(at, (int, float)) or time.time() - at > UNDO_SECONDS:
         e = MailError("nothing to undo")
         e.hint = "undo-last undoes only the last archive or Feed move, once, within 10 minutes"
@@ -989,8 +997,8 @@ def unpile(thread):
     took = f"({thread}) and (tag:replylater or tag:setaside) and not (tag:archived or tag:sent or tag:draft or tag:muted or tag:deleted)"
     if nm("count", "--exclude=false", "--", f"(({took}) or (({thread}) and tag:inbox)) and tag:unread").strip() != "0":
         took = f"({took}) and tag:unread"
-    tag(took, "+inbox")
-    tag(thread, "-replylater", "-setaside")
+    # One batch, so a database busy between two calls never leaves the thread in a pile and the inbox at once.
+    nm("tag", "--batch", stdin=f"+inbox -- {took}\n-replylater -setaside -- {thread}\n")
 
 
 def pile(action, queries, arg=None):
@@ -1010,9 +1018,9 @@ def pile(action, queries, arg=None):
     for tid in threads:
         q = "thread:" + tid
         if action == "reply-later":
-            tag(q, "+replylater", "-inbox")
+            tag(f"{q} and not tag:sent", "+replylater", "-inbox")
         elif action == "set-aside":
-            tag(q, "+setaside", "-inbox")
+            tag(f"{q} and not tag:sent", "+setaside", "-inbox")
         elif action == "clear":
             unpile(q)
             tag(q, "-bubbled")
