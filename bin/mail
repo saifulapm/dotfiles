@@ -209,7 +209,7 @@ def cmd_search(a):
     words = " ".join(a.query)
     if not words and not b:
         raise Usage("give a query, or --box NAME")
-    # Each query is parsed alone, so a bracket or quote in the words never reaches past the box.
+    # Each query is parsed alone, so a parenthesis or quote in the words never reaches past the box.
     terms = [q for q in (b[2] if b else "", words) if q]
     if b and b[3]:
         # The Screener decides on people, so each mail is its own row.

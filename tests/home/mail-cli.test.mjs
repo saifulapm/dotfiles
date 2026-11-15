@@ -308,7 +308,7 @@ test('the Screener holds read mail of an undecided sender in the inbox, and The 
 });
 
 // A typed query is parsed on its own, so its ) cannot close the box's clause and reach mail outside the box.
-test('mail search --box returns only that box, whatever brackets or quotes the query holds', (t) => {
+test('mail search --box returns only that box, whatever parentheses or quotes the query holds', (t) => {
   const r = twoMails(t);
   r.deliver({ From: 'Bob <bob@people.test>', Subject: 'a (b', 'Message-ID': '<paren@x.test>' });
   r.notmuch('tag', '+screened', '--', 'id:paren@x.test');
