@@ -396,8 +396,9 @@ def main(path, pulled):
     for f in taken:
         os.unlink(f)
     os.close(held)
-    for line in said + refused:
-        print(line, file=sys.stderr)
+    # One line, as dots sync keeps only the last line in sync.json.
+    if said or refused:
+        print("mail: " + "; ".join(line.removeprefix("mail: ") for line in said + refused), file=sys.stderr)
     if refused:
         sys.exit(1)
     if left_out:

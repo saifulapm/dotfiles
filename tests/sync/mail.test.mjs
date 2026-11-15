@@ -120,6 +120,17 @@ test("another machine's mail file that does not parse fails the unit with 5 and 
   assert.deepEqual(['screened.db', 'foldersync.db'].map((f) => db(b, f)), before);
 });
 
+test("a round that leaves out a file and a record names both in sync.json's mail error", async () => {
+  const { w, a } = await pair();
+  const at = Date.now() + 2 * 24 * 3600 * 1000;
+  writeFileSync(remote(w, 'b'), JSON.stringify({ v: 1, records: { 'sender x@y.test': { v: 'screened', at } } }));
+  writeFileSync(remote(w, 'c'), '{"v":1,"records":');
+  const r = await sync(a, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  assert.equal(JSON.parse(readFileSync(a.status, 'utf8')).mail.error,
+    'mail: left out 1 record from b.json, stamped more than a day ahead; skipped c.json, which does not parse');
+});
+
 test('the boxes enabled on either machine end enabled on both, each keeping its own header', async () => {
   const { a, b } = await pair();
   writeFileSync(join(a.hey, 'foldersync.db'), '# a header\nHEY/Feed\nHEY/ReplyLater\n');
