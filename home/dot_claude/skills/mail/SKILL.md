@@ -113,10 +113,10 @@ Every action can be undone in Kakoune:
 | `screen-in` | the sender's mail goes to the Imbox |
 | `feed` | the sender's mail goes to The Feed |
 | `papertrail --category C` | the sender's mail goes to Paper Trail under C |
-| `replylater` / `setaside` | the thread goes to Reply Later / Set Aside |
+| `replylater` / `setaside` | the thread leaves the Imbox and Read for Reply Later / Set Aside |
 | `bubble --at DATE` | the thread leaves until DATE, then bubbles up |
 | `archive` | the thread leaves the Imbox |
-| `clear` | the thread leaves Reply Later, Set Aside and Bubbled Up, and a pending bubble is cancelled |
+| `clear` | the thread leaves Reply Later, Set Aside and Bubbled Up and goes back where it was (an Imbox thread to the Imbox while any of it is unread, else to Read), and a pending bubble is cancelled; sending a reply clears its thread too |
 | `undo-last` (no ID) | the last archive or Feed move, made in the last 10 minutes, is undone, in Kakoune or here |
 
 `screen-in`, `feed` and `papertrail` take `--domain` to decide every sender

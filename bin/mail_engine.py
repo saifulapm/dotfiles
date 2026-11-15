@@ -663,8 +663,11 @@ def locked_send(path, expect, env):
         subprocess.run(["notmuch", "tag", "+replied", "--", idq(irt)])
         # The mail is out and filed, so a busy database only leaves the thread's piles as they were.
         threads = subprocess.run(["notmuch", "search", "--output=threads", idq(irt)], capture_output=True, text=True).stdout.split()
-        if threads:
-            subprocess.run(["notmuch", "tag", "-replylater", "-setaside", "--", " or ".join(threads)])
+        for thread in threads:
+            try:
+                unpile(thread)
+            except MailError:
+                pass
     for a in attach:
         if os.path.dirname(a) == DRAFTS:
             os.unlink(a)
@@ -980,6 +983,16 @@ def decide(action, addr, arg=None, domain=False):
     return addr
 
 
+def unpile(thread):
+    """Take THREAD out of Reply Later and Set Aside, giving inbox back to the mail a pile took it from: to its unread mail alone while any of the thread is unread, so the thread is in the Imbox and not in Read too, else to all of it, for Read."""
+    # Archived, Feed and Paper Trail mail, a sent copy, a draft and muted mail had no inbox to give back.
+    took = f"({thread}) and (tag:replylater or tag:setaside) and not (tag:archived or tag:sent or tag:draft or tag:muted or tag:deleted)"
+    if nm("count", "--exclude=false", "--", f"(({took}) or (({thread}) and tag:inbox)) and tag:unread").strip() != "0":
+        took = f"({took}) and tag:unread"
+    tag(took, "+inbox")
+    tag(thread, "-replylater", "-setaside")
+
+
 def pile(action, queries, arg=None):
     """Apply a thread ACTION to every thread QUERIES match; return the thread count and, for bubble, when it comes back."""
     threads = dict.fromkeys(t.removeprefix("thread:")
@@ -997,11 +1010,12 @@ def pile(action, queries, arg=None):
     for tid in threads:
         q = "thread:" + tid
         if action == "reply-later":
-            tag(q, "+replylater")
+            tag(q, "+replylater", "-inbox")
         elif action == "set-aside":
-            tag(q, "+setaside")
+            tag(q, "+setaside", "-inbox")
         elif action == "clear":
-            tag(q, "-replylater", "-setaside", "-bubbled")
+            unpile(q)
+            tag(q, "-bubbled")
             # A pending bubble is cancelled too: its line goes, stamped so dots sync takes the removal, and the thread is back in the inbox.
             try:
                 with open(db_path("bubble.db")) as f:

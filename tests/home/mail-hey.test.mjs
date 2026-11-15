@@ -162,3 +162,70 @@ test('mail hey undo-last restores a move made 9 minutes ago, or ahead of a clock
     }
   }
 });
+
+// A pile takes its thread out of the inbox, and clearing it puts back what the pile took: the Imbox while any of it is unread, Read once it is all read.
+test('mail hey replylater and setaside take a thread out of the Imbox and Read, and clear puts it back', (t) => {
+  const r = rig(t);
+  const box = (name) => r.mail('search', '--box', name).json.data.map((row) => row.id);
+  assert.equal(r.mail('hey', 'replylater', 'b1@x.test').status, 0);
+  assert.deepEqual(r.imbox(), ['h1@shop.test']);
+  assert.deepEqual(box('Reply Later'), ['b1@x.test']);
+  r.notmuch('tag', '-unread', '--', 'id:h1@shop.test');
+  assert.equal(r.mail('hey', 'setaside', 'h1@shop.test').status, 0);
+  assert.deepEqual(box('Read'), []);
+  assert.deepEqual(box('Set Aside'), ['h1@shop.test']);
+  assert.equal(r.mail('hey', 'clear', 'b1@x.test').status, 0);
+  assert.deepEqual(r.imbox(), ['b1@x.test']);
+  assert.deepEqual(box('Reply Later'), []);
+  assert.equal(r.mail('hey', 'clear', 'h1@shop.test').status, 0);
+  assert.deepEqual(box('Read'), ['h1@shop.test']);
+  assert.deepEqual(box('Set Aside'), []);
+});
+
+test('clear on a thread with read and unread mail and a sent reply puts it in the Imbox alone, and the reply stays out of every box', (t) => {
+  const r = rig(t);
+  const threads = (name) => r.mail('search', '--box', name).json.data.map((row) => row.thread);
+  r.deliver({ From: 'Ann <ann@people.test>', Subject: 'plan', 'Message-ID': '<p1@x.test>' });
+  r.notmuch('tag', '+screened', '-unread', '-new', '--', 'id:p1@x.test');
+  const c = r.kakMail('compose', 'reply', 'id:p1@x.test');
+  assert.equal(c.status, 0, c.stderr);
+  assert.equal(r.kakMail('send', c.stdout.trim()).status, 0);
+  r.deliver({ From: 'Ann <ann@people.test>', Subject: 'Re: plan', 'Message-ID': '<p2@x.test>', 'In-Reply-To': '<p1@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', 'id:p2@x.test');
+  const tid = r.notmuch('search', '--output=threads', 'id:p1@x.test').trim().replace(/^thread:/, '');
+  assert.equal(r.notmuch('count', `thread:${tid}`).trim(), '3');
+  assert.equal(r.mail('hey', 'replylater', 'p2@x.test').status, 0);
+  for (const name of ['Imbox', 'Read', 'Screener']) assert.ok(!threads(name).includes(tid), `piled, not in ${name}`);
+  assert.equal(r.mail('hey', 'clear', 'p2@x.test').status, 0);
+  assert.ok(threads('Imbox').includes(tid));
+  for (const name of ['Read', 'Screener', 'Reply Later']) assert.ok(!threads(name).includes(tid), `cleared, not in ${name}`);
+  assert.equal(r.notmuch('count', `thread:${tid} and tag:sent and tag:inbox`).trim(), '0');
+});
+
+test('clear gives inbox back only where a pile took it: never to archived, Feed or unpiled mail', (t) => {
+  const r = rig(t);
+  assert.equal(r.mail('hey', 'archive', 'b1@x.test').status, 0);
+  assert.equal(r.mail('hey', 'clear', 'b1@x.test').status, 0);
+  assert.ok(!r.tags('b1@x.test').includes('inbox'), 'an archived thread in no pile stays archived');
+  assert.equal(r.mail('hey', 'feed', 'h1@shop.test').status, 0);
+  assert.equal(r.mail('hey', 'replylater', 'h1@shop.test').status, 0);
+  assert.equal(r.mail('hey', 'clear', 'h1@shop.test').status, 0);
+  assert.ok(!r.tags('h1@shop.test').includes('inbox'), 'a Feed thread goes back to The Feed alone');
+  assert.ok(r.tags('h1@shop.test').includes('thefeed'));
+});
+
+test('a reply sent on a read Reply Later thread puts the thread in Read and out of Reply Later', (t) => {
+  const r = rig(t);
+  const box = (name) => r.mail('search', '--box', name).json.data.map((row) => row.thread);
+  r.notmuch('tag', '-unread', '--', 'id:b1@x.test');
+  const tid = r.notmuch('search', '--output=threads', 'id:b1@x.test').trim().replace(/^thread:/, '');
+  assert.equal(r.mail('hey', 'replylater', 'b1@x.test').status, 0);
+  assert.ok(!box('Read').includes(tid));
+  const c = r.kakMail('compose', 'reply', 'id:b1@x.test');
+  assert.equal(c.status, 0, c.stderr);
+  const s = r.kakMail('send', c.stdout.trim());
+  assert.equal(s.status, 0, s.stderr);
+  assert.ok(box('Read').includes(tid));
+  assert.ok(!box('Reply Later').includes(tid));
+  assert.ok(!box('Imbox').includes(tid));
+});
