@@ -736,13 +736,15 @@ def from_addresses(msg_id):
     """Each different address the From of message MSG_ID names, lower-cased: notmuch's parse, the one a decision takes its address from, and Python's, which keeps an address holding a control character that notmuch drops but routing still reads."""
     q = idq(msg_id)
     ours = list(dict.fromkeys(a.lower() for a in nm("address", "--output=sender", "--output=address", q).split("\n") if a))
-    theirs = []
-    path = nm("search", "--output=files", q).split("\n")[0]
-    if path:
-        with open(path, "rb") as f:
-            head = email.parser.BytesHeaderParser(policy=email.policy.compat32).parse(f)
-        theirs = list(dict.fromkeys(a.lower() for _, a in getaddresses([str(h) for h in head.get_all("From", [])]) if "@" in a))
-    return ours, theirs
+    # mbsync renames a file on a flag change before the next notmuch new, so a path the index still names may be gone; with none left, notmuch's parse alone counts.
+    for path in filter(None, nm("search", "--output=files", q).split("\n")):
+        try:
+            with open(path, "rb") as f:
+                head = email.parser.BytesHeaderParser(policy=email.policy.compat32).parse(f)
+        except OSError:
+            continue
+        return ours, list(dict.fromkeys(a.lower() for _, a in getaddresses([str(h) for h in head.get_all("From", [])]) if "@" in a))
+    return ours, []
 
 
 def sender_to_decide(query):

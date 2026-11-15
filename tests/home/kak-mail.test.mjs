@@ -1,7 +1,7 @@
 // bin/kak-mail on a scratch notmuch store (tests/home/mail-rig.mjs): what a sender writes into a mail reaches notmuch as data, never as query syntax or shell.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig, repo } from './mail-rig.mjs';
 
@@ -639,4 +639,15 @@ test('a selection holding a two-sender From decides none of its senders', (t) =>
   const res = r.kakMail('hey', 'screen-in', 'id:one@x.test', 'id:two@x.test');
   assert.equal(res.status, 1, res.stdout);
   assert.equal(r.db('screened.db'), '');
+});
+
+// mbsync renames a mail's file on a flag change, and the index names the old path until the next notmuch new.
+test('a sender decision on a mail whose file moved since the last index still decides its sender', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@first.test>', 'Message-ID': '<moved@x.test>' });
+  const box = join(r.mail, 'icloud/INBOX');
+  for (const f of readdirSync(join(box, 'new'))) renameSync(join(box, 'new', f), join(box, 'cur', `${f}:2,S`));
+  const res = r.kakMail('hey', 'screen-in', 'id:moved@x.test');
+  assert.equal(res.status, 0, res.stderr);
+  assert.equal(r.db('screened.db'), 'ann@first.test\n');
 });
