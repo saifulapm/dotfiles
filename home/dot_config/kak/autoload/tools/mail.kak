@@ -537,7 +537,9 @@ face global MailKey StatusLineMode
 # be copied into it. A theme switch changes mail_keys, and dots.kak then calls
 # mail-strip-all so each open list takes the new text.
 # A line highlighter reads %val{cursor_line} once, when it is added, so the
-# cursor row is added again each time the cursor settles.
+# cursor row is added again after each key (NormalKey runs before the redraw,
+# so it moves with the cursor) and when the cursor settles (NormalIdle, for
+# mapped keys, which skip NormalKey).
 define-command -hidden mail-cursor-row %{
     try %{ remove-highlighter window/mail-list/cursor-row }
     add-highlighter window/mail-list/cursor-row line %val{cursor_line} MailCursor
@@ -611,6 +613,7 @@ hook global WinSetOption filetype=mail-list %{
     add-highlighter window/mail-list/ regex '\[([^\]\n]*)\]$' 1:keyword
     add-highlighter window/mail-list/ regex '^[^\n]*\[[^\]\n]*\bunread\b[^\]\n]*\]$' 0:MailUnread
     mail-cursor-row
+    hook -group mail-list-cursor window NormalKey .* mail-cursor-row
     hook -group mail-list-cursor window NormalIdle .* mail-cursor-row
     mail-strip
     hook -once -always window WinSetOption filetype=.* %{
