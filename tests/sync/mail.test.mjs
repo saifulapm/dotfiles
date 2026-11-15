@@ -1,9 +1,9 @@
 // Two machines, a and b, carry HEY decisions through dots sync's mail unit, each with its own scratch notmuch store.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { deliver, kakMail, machine, mailbox, notmuch, sync, world } from './lib.mjs';
+import { deliver, kakMail, mail, machine, mailbox, notmuch, sync, world } from './lib.mjs';
 
 const db = (m, name) => (existsSync(join(m.hey, name)) ? readFileSync(join(m.hey, name), 'utf8') : '');
 const remote = (w, id) => join(w.remote, 'dots-sync/mail', id + '.json');
@@ -451,4 +451,45 @@ test('a Paper Trail or screen-out decision pulled from a re-files b\'s mail and 
     assert.ok(got.includes('unread'), `${action}: b's mail was marked read: ${got}`);
     assert.ok(!(await tags(a, 'shop-a@x.test')).includes('unread'), `${action}: a, which decided, marks its own mail read`);
   }
+});
+
+// A round started with DOTS_SYNC_MAIL_PAUSE set writes that file once it has read the hey-mail files and journal, and waits until the test removes it.
+async function paused(m) {
+  const pause = join(m.env.HOME, 'pause');
+  m.env.DOTS_SYNC_MAIL_PAUSE = pause;
+  const round = sync(m, ['--only', 'mail']);
+  delete m.env.DOTS_SYNC_MAIL_PAUSE;
+  while (!existsSync(pause)) await new Promise((r) => setTimeout(r, 50));
+  return { round, release: () => unlinkSync(pause) };
+}
+
+// A promise and whether it has settled yet.
+function watched(p) {
+  const w = { done: false };
+  w.p = p.finally(() => (w.done = true));
+  return w;
+}
+
+// The round had already read the sender's Feed line, so without a wait it would put the line back over the screen-in and the journal's stamp would carry The Feed to b.
+test('a sender screened in while the mail round holds the files waits for the round, then reaches b', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'X <x@y.test>', 'a1@y.test');
+  await hey(a, 'feed', 'a1@y.test');
+  await ok(a);
+  const { round, release } = await paused(a);
+  const decision = watched(mail(a, ['hey', 'screen-in', 'a1@y.test']));
+  await new Promise((r) => setTimeout(r, 1500));
+  const early = decision.done;
+  release();
+  assert.equal((await round).code, 0);
+  const r = await decision.p;
+  assert.equal(r.code, 0, r.stderr);
+  assert.match(db(a, 'screened.db'), /^x@y\.test$/m);
+  assert.doesNotMatch(db(a, 'thefeed.db'), /x@y\.test/);
+  assert.match(readFileSync(join(a.env.XDG_STATE_HOME, 'hey-mail/decided'), 'utf8'), / sender x@y\.test$/m);
+  await ok(a);
+  await ok(b);
+  assert.match(db(b, 'screened.db'), /^x@y\.test$/m);
+  assert.doesNotMatch(db(b, 'thefeed.db'), /x@y\.test/);
+  assert.equal(early, false, 'the screen-in returned while the round held the files');
 });

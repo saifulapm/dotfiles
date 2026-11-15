@@ -115,6 +115,9 @@ export const notmuch = (m, args) => run(m, 'notmuch', args);
 // Kakoune's mail commands, run as m.
 export const kakMail = (m, args) => run(m, bin + 'kak-mail', args);
 
+// The mail command, run as m.
+export const mail = (m, args) => run(m, bin + 'mail', args);
+
 // The age identity the ssh unit reads, made for m, or copied from another machine so both open one blob.
 export async function identity(m, from) {
   const path = join(m.env.XDG_CONFIG_HOME, 'chezmoi/key.txt');

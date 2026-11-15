@@ -271,6 +271,8 @@ def main(path, pulled):
         if own is None or not all(ok_record(k, r) for k, r in own.items()):
             fail(f"{os.path.basename(path)}: the local store is broken, so it is left as it is", 4)
     held = lock()
+    # Taken after mail-sync's lock, so a decision never waits behind a fetch.
+    deciding = E.lock_decisions()
     said = []
 
     # This machine's own records stamped far ahead come from a clock that ran fast, and every other machine leaves them out.
@@ -338,6 +340,13 @@ def main(path, pulled):
             said.append(f"mail: left out {plural(ahead, 'from ' + name + ', stamped more than a day ahead', 'from ' + name + ', stamped more than a day ahead')}")
         left_out = left_out or bool(bad or ahead)
 
+    # For a test: the files and journal are read and nothing is written yet.
+    pause = os.environ.get("DOTS_SYNC_MAIL_PAUSE")
+    if pause:
+        open(pause, "w").close()
+        while os.path.exists(pause):
+            time.sleep(0.05)
+
     try:
         for key, at in twin_bubbles(records).items():
             records[key] = {"v": None, "at": at}
@@ -395,6 +404,7 @@ def main(path, pulled):
         os.replace(tmp, path)
     for f in taken:
         os.unlink(f)
+    os.close(deciding)
     os.close(held)
     # One line, as dots sync keeps only the last line in sync.json.
     if said or refused:

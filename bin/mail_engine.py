@@ -6,6 +6,7 @@ mail read as a side effect of reading. The box list lives here only.
 
 import email.policy
 import fcntl
+import functools
 import hashlib
 import json
 import mimetypes
@@ -28,6 +29,8 @@ MSMTP_ACCOUNT = "icloud"
 SENT_DRAFTS = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "kak-mail", "sent-drafts")
 # When each HEY decision was made here, one "MILLISECONDS KEY" line each; dots sync's mail unit stamps the change with it, so the later decision wins, not the later sync.
 JOURNAL = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "decided")
+# Held by each decision while it reads and writes the db files and the journal, and by dots sync's mail round from reading them to rewriting them, so neither writes over the other; mail-sync's lock is never taken, so a decision never waits for a fetch.
+DECIDE_LOCK = os.path.join(os.path.dirname(JOURNAL), "decide.lock")
 # The last archive or Feed move, for undo-last: when it was made, the tags of the mail it changed as `notmuch dump` wrote them, and the sender's class before a Feed move.
 UNDO = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "undo.json")
 # The shell's margin watches this file for the Imbox unread count.
@@ -887,6 +890,27 @@ def remember(query, **move):
 UNDO_SECONDS = 600
 
 
+def lock_decisions():
+    """Wait for DECIDE_LOCK and return the fd that holds it; the lock goes when the fd closes or the process ends."""
+    os.makedirs(os.path.dirname(DECIDE_LOCK), exist_ok=True)
+    fd = os.open(DECIDE_LOCK, os.O_WRONLY | os.O_CREAT, 0o644)
+    fcntl.flock(fd, fcntl.LOCK_EX)
+    return fd
+
+
+def deciding(fn):
+    """Run FN holding DECIDE_LOCK; nothing it calls may take the lock again, as a second flock in one process waits on the first."""
+    @functools.wraps(fn)
+    def run(*args, **kwargs):
+        fd = lock_decisions()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            os.close(fd)
+    return run
+
+
+@deciding
 def undo_last():
     """Put back the mail the last archive or Feed move changed, and the sender's class before a Feed move, when it was made in the last UNDO_SECONDS; return what it undid."""
     try:
@@ -935,6 +959,7 @@ def domain_key(addr):
     return key
 
 
+@deciding
 def decide(action, addr, arg=None, domain=False):
     """Apply a sender ACTION to ADDR, to its @domain with DOMAIN, or to the @domain line that alone decides it for unscreen: the decision line in the db the post-new hook reads, and the tags on its mail so far; return the key it acted on."""
     if "*" in addr:
@@ -1001,6 +1026,7 @@ def unpile(thread):
     nm("tag", "--batch", stdin=f"+inbox -- {took}\n-replylater -setaside -- {thread}\n")
 
 
+@deciding
 def pile(action, queries, arg=None):
     """Apply a thread ACTION to every thread QUERIES match; return the thread count and, for bubble, when it comes back."""
     threads = dict.fromkeys(t.removeprefix("thread:")
