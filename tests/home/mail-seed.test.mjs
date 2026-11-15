@@ -131,6 +131,15 @@ test('mail seed --apply adds no line while a decision holds the lock, then adds 
   assert.equal(early, 'zed@bills.test\n', 'seed wrote its lines while a decision held the lock');
 });
 
+test('mail seed prints a sender holding a control character as one line of plain text', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Ann <ann\x01@first.test>', Subject: 'hello', 'Message-ID': '<ctl@x.test>' });
+  const res = r.seed();
+  assert.equal(res.status, 0, res.stderr);
+  assert.doesNotMatch(res.stdout, /[\x00-\x08\x0b-\x1f\x7f-\x9f]/);
+  assert.match(res.stdout, /^screener ann @first\.test$/m);
+});
+
 test('mail seed counts a move hey-folder-sync would make for a mail with no From address too', (t) => {
   const r = rig(t);
   r.setDb('foldersync.db', 'HEY/Read\n');

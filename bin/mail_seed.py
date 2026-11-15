@@ -214,8 +214,8 @@ def report(p, applied):
         out.append(f"{label}: {sum(c[k][0] for k in kinds)} senders, {sum(c[k][1] for k in kinds)} messages")
     out.append(f"already decided: {p['already']} senders")
     out.append(f"left alone, not one plain address: {p['odd']} senders")
-    out += [f"{db} {line}" for db, line, _ in p["lines"]]
-    out += [f"screener {s}" for s in p["screener"]]
+    out += [f"{db} {E.line(line)}" for db, line, _ in p["lines"]]
+    out += [f"screener {E.line(s)}" for s in p["screener"]]
     moves = sorted(p["moves"].items(), key=lambda kv: (-kv[1], kv[0]))
     out += [f"{n:>3}  {src} -> {to}" for (src, to), n in moves]
     out.append(f"HEY/Read moves: {sum(n for (src, _), n in moves if src == 'HEY/Read')}")
