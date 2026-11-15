@@ -59,23 +59,23 @@ sha256 = "dfee3ae8ff4a4a5d671be032db8463f8b72798535183d2bdaf9331b22550cd7a"
 
 [[pin]]
 name = "amx"
-version = "03036bfebe6551c6254350839c1b8645285c60ea"
+version = "b8c75a20ccb923fd2109d61fdace1c88c871201f"
 repo = "saifulapm/amx"
 track = "commit"
 install = "~/.local/bin/amx, built with cargo"
 runs = "amx --version"
 url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
-sha256 = "6bb0efd51198f61b696e5d073ef3f05d6f6113051896853e1ea000cdf087e8d9"
+sha256 = "bff5098cf2e2208d5a52dcb79ab26a1022b4f86214ad00f495be05816ea5d43d"
 
 [[pin]]
 name = "workflow"
-version = "f2a7fa38762019ce6591ee1515a21483066cbcce"
+version = "2314f53c9d76e7df16e6a3b1cbfe4d55106fd92f"
 repo = "saifulapm/workflow"
 track = "commit"
 install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
 runs = "mem --version && workflow --version && hub --version"
 url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
-sha256 = "d587bab343419829fa18bbd991bc40568a5ce571f71b8a3daca09b815edddc1e"
+sha256 = "7b3689e329635d5f5bcafe9058a0b1e6485603ff313e7b751582e554d88b85e9"
 
 [[pin]]
 name = "pxy"
@@ -119,14 +119,14 @@ sha256 = "aa85f02c4dd9c8662b804b09e31c66c909c2a5a2bff4d1c7a872c097470bc125"
 
 [[pin]]
 name = "lazygit"
-version = "0.66.2"
+version = "0.66.3"
 repo = "jesseduffield/lazygit"
 install = "~/.local/bin/lazygit"
 check = "lazygit --version"
 url.aarch64 = "https://github.com/jesseduffield/lazygit/releases/download/v{version}/lazygit_{version}_linux_arm64.tar.gz"
 url.x86_64 = "https://github.com/jesseduffield/lazygit/releases/download/v{version}/lazygit_{version}_linux_x86_64.tar.gz"
-sha256.aarch64 = "79a3161eeb642f0473e23db6341f7baabd4a5933e921a9c1167c5d5c765c41a4"
-sha256.x86_64 = "158efc9ddfa1241fab5fb3526bb442c8dc6c4b1904d73213b9e4e93e03c52034"
+sha256.aarch64 = "ac0b48237f3d0283813e7154ec063237e519532feb0470c0881a1793ee78fd42"
+sha256.x86_64 = "0a23f429a95f0d09db298b3c291536d818de066aa5a85c255806f0490ff6656b"
 
 [[pin]]
 name = "satty"
@@ -150,12 +150,12 @@ sha256 = "668dd16aee983f111644925a6cccc25ab5dd5107c25d6fd77e05795ae559ef91"
 
 [[pin]]
 name = "asahi-va-driver"
-version = "0e54d318004e204d2f73818c96e89c4642178351"
+version = "60e1558f1585ebc9519843cb753e957a7cbb1373"
 repo = "AsahiLinux/asahi-va-driver"
 track = "commit"
 install = "/usr/lib64/dri/asahi_drv_video.so on the Macs, VA-API over the decoder"
 url = "https://github.com/AsahiLinux/asahi-va-driver/archive/{version}.tar.gz"
-sha256 = "90e38019e76760d8ad11f04878331a90b56d18257f85f620daf57b10e50c71c4"
+sha256 = "8233a8bd4263bc570e5f90bbbc73e8e9b64687b1b1090f3ba6946323e88b6b4e"
 
 [[pin]]
 name = "kbd-light"
@@ -178,21 +178,21 @@ sha256 = "1664096dbe4675ed3d41d5bad0d8a67397dfd853de0f2817c4729c5cf80e58da"
 
 [[pin]]
 name = "kak-ansi"
-version = "856c27ff5b1769cfe45b8c33acf4b449773fde21"
+version = "87dc8ae75b84e3c527c9a9ce8df42ea0ba3f4a3d"
 repo = "eraserhd/kak-ansi"
 track = "commit"
 install = "~/.local/bin/kak-ansi-filter, built with cc, which kak's ansi.kak calls"
 runs = "kak-ansi-filter </dev/null"
 url = "https://github.com/eraserhd/kak-ansi/archive/{version}.tar.gz"
-sha256 = "ce94c3c3e9ec611404930afa7a19e80f1de445bd65442a78070e2c3effe7cc44"
+sha256 = "90de5e641854fb27c21cbad4aca3f8cf954e4ab355c266051c23e4202788c70d"
 
 [[pin]]
 name = "cliairplay"
-version = "0.5.9"
+version = "0.5.14"
 repo = "music-assistant/airplay-cli"
 install = "~/.local/bin/cliairplay on the mini, the office HomePod's AirPlay 2 sender"
 url = "https://github.com/music-assistant/airplay-cli/releases/download/v{version}/cliairplay-linux-aarch64"
-sha256 = "37fcc7dc59e4878f465afd2520923baefeb2c9b761c29f4d7fe5b2815bb3b354"
+sha256 = "dfe8fb5143657d1ea741a8c66bc3dc659d35fc54dd5b80f60ae338d286e1b9e6"
 
 [[pin]]
 name = "scrcpy"
