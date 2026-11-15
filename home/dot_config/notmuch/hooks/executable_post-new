@@ -140,6 +140,9 @@ fi
 
 # Bubble Up rides on every sync, so a bubble surfaces at most one timer interval late.
 if [ -s "$DB_DIR/bubble.db" ]; then
+    # The engine's decision lock, on fd 8 as fd 9 is mail-sync's, held from the read to the rename: a bubble or clear made meanwhile waits and lands after, and none waits on the rest of the sync.
+    exec 8>"$(dirname "$LOG")/decide.lock"
+    flock 8
     now="$(date +%s)"
     remaining="$DB_DIR/bubble.db.tmp"
     : >"$remaining"
@@ -157,7 +160,13 @@ if [ -s "$DB_DIR/bubble.db" ]; then
             printf '%s\n' "$line" >>"$remaining"
         fi
     done <"$DB_DIR/bubble.db"
+    # For a test: bubble.db is read and the rest not yet written back; the file names this process, and the pass waits until the test removes it.
+    if [ -n "${POST_NEW_BUBBLE_PAUSE:-}" ]; then
+        printf '%s' "$$" >"$POST_NEW_BUBBLE_PAUSE.tmp" && mv "$POST_NEW_BUBBLE_PAUSE.tmp" "$POST_NEW_BUBBLE_PAUSE"
+        while [ -e "$POST_NEW_BUBBLE_PAUSE" ]; do sleep 0.05; done
+    fi
     mv "$remaining" "$DB_DIR/bubble.db"
+    exec 8>&-
     [ "$fired" -gt 0 ] && log "bubbled up: $fired thread(s)"
 fi
 
