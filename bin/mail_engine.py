@@ -157,8 +157,8 @@ BIDI = dict.fromkeys(map(ord, "؜‎‏‪‫‬‭‮⁦⁧⁨⁩"))
 
 
 def line(s):
-    """S as one line of plain text: control characters become spaces, bidi controls are dropped."""
-    s = re.sub(r"[\x00-\x1f\x7f-\x9f]", " ", str(s))
+    """S as one line of plain text: control characters and line separators become spaces, bidi controls are dropped."""
+    s = re.sub(r"[\x00-\x1f\x7f-\x9f\u2028\u2029]", " ", str(s))
     return s.translate(BIDI)
 
 
@@ -768,8 +768,8 @@ def tag(query, *changes):
     nm("tag", *changes, "--", query)
 
 
-# An address or @domain rule goes into a from: query in post-new and dots sync, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it.
-ADDR = re.compile(r'[^\s"*(){}\[\]\\/@]*@(?:[^\s"*(){}\[\]\\/@.]+\.)+[^\s"*(){}\[\]\\/@.]+')
+# An address or @domain rule goes into a from: query in post-new and dots sync, so nothing in it may widen the query: notmuch reads from:/.../ as a regex, and a domain with no dot matches every address under it. A control character would reach every machine's db and status line raw.
+ADDR = re.compile(r'[^\s\x00-\x1f\x7f-\x9f"*(){}\[\]\\/@]*@(?:[^\s\x00-\x1f\x7f-\x9f"*(){}\[\]\\/@.]+\.)+[^\s\x00-\x1f\x7f-\x9f"*(){}\[\]\\/@.]+')
 # Domains anyone can sign up at, which never get an @domain line.
 FREEMAIL = {"gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "me.com",
             "mac.com", "proton.me", "protonmail.com", "aol.com"}
@@ -1005,7 +1005,9 @@ def decide(action, addr, arg=None, domain=False):
             raise MailError(f"{action} takes no domain; a domain is screened in, fed, filed in Paper Trail or screened out")
         addr = domain_key(addr)
     elif addr.startswith("@") or not ADDR.fullmatch(addr):
-        raise MailError(f"{addr} is not one plain address, and its line would match more senders than it")
+        e = MailError(f"{line(addr)} is not one plain address, and its line would match more senders than it")
+        e.hint = "a decision needs a sender address with no space, quote, parenthesis, slash, * or control character in it"
+        raise e
     # A decision writes a line for the address alone, which beats its domain's line; an unscreen of an address no line of its own decides undoes its domain's line.
     if action == "unscreen":
         addr = covering(addr)

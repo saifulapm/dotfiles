@@ -332,7 +332,21 @@ test('mail hey refuses a two-sender From whose last address holds a control char
 
 test('mail hey reads one address holding a line separator as one, never as two senders', (t) => {
   const r = rig(t);
-  r.deliver({ From: 'Ann <ann x@first.test>', 'Message-ID': '<sep@x.test>' });
+  r.deliver({ From: 'Ann <ann\u2028x@first.test>', 'Message-ID': '<sep@x.test>' });
   const res = r.mail('hey', 'screen-in', 'sep@x.test');
   assert.doesNotMatch(res.json.error ?? '', /^From names/);
+});
+
+// A control character in a key reaches every machine's db and the status line raw; U+009B is an 8-bit CSI.
+test('mail hey decides no address holding a control character, and says so in one plain line', (t) => {
+  const r = rig(t);
+  for (const [n, c] of [['1', '\u009b'], ['2', '\u0080'], ['3', '\u2028'], ['4', '\u0085']]) {
+    r.deliver({ From: `Ann <ann${c}x@first.test>`, 'Message-ID': `<c${n}@x.test>` });
+    const res = r.mail('hey', 'screen-in', `c${n}@x.test`);
+    assert.equal(res.status, 1, res.stdout);
+    assert.doesNotMatch(res.stdout.trimEnd(), /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/, `${n}: ${JSON.stringify(res.stdout)}`);
+    assert.match(res.json.error, /is not one plain address/);
+    assert.doesNotMatch(res.json.hint, /notmuch failed/);
+  }
+  assert.equal(r.db('screened.db'), '');
 });

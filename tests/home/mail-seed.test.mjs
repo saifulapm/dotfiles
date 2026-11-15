@@ -131,13 +131,15 @@ test('mail seed --apply adds no line while a decision holds the lock, then adds 
   assert.equal(early, 'zed@bills.test\n', 'seed wrote its lines while a decision held the lock');
 });
 
-test('mail seed prints a sender holding a control character as one line of plain text', (t) => {
+test('mail seed leaves a sender holding a control character alone, and prints a bidi control in none of its lines', (t) => {
   const r = rig(t);
   r.deliver({ From: 'Ann <ann\x01@first.test>', Subject: 'hello', 'Message-ID': '<ctl@x.test>' });
+  r.deliver({ From: 'Bo <bo‮x@first.test>', Subject: 'hello', 'Message-ID': '<bidi@x.test>' });
   const res = r.seed();
   assert.equal(res.status, 0, res.stderr);
-  assert.doesNotMatch(res.stdout, /[\x00-\x08\x0b-\x1f\x7f-\x9f]/);
-  assert.match(res.stdout, /^screener ann @first\.test$/m);
+  assert.doesNotMatch(res.stdout, /[\x00-\x08\x0b-\x1f\x7f-\x9f‮]/);
+  assert.match(res.stdout, /^left alone, not one plain address: 1 senders$/m);
+  assert.match(res.stdout, /^screener box@first\.test$/m);
 });
 
 test('mail seed counts a move hey-folder-sync would make for a mail with no From address too', (t) => {
