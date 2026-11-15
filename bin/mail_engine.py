@@ -28,7 +28,7 @@ MSMTP_ACCOUNT = "icloud"
 SENT_DRAFTS = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "kak-mail", "sent-drafts")
 # When each HEY decision was made here, one "MILLISECONDS KEY" line each; dots sync's mail unit stamps the change with it, so the later decision wins, not the later sync.
 JOURNAL = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "decided")
-# The last archive or Feed move, for undo-last: the tags of the mail it changed as `notmuch dump` wrote them, and the sender's class before a Feed move.
+# The last archive or Feed move, for undo-last: when it was made, the tags of the mail it changed as `notmuch dump` wrote them, and the sender's class before a Feed move.
 UNDO = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "hey-mail", "undo.json")
 # The shell's margin watches this file for the Imbox unread count.
 COUNT_FILE = os.path.join(os.environ.get("XDG_STATE_HOME", HOME + "/.local/state"), "dots", "mail-unread")
@@ -868,19 +868,27 @@ def remember(query, **move):
     """Keep QUERY's tags, and MOVE, as the one move undo_last undoes; written by rename, so a failed write leaves the last one."""
     os.makedirs(os.path.dirname(UNDO), exist_ok=True)
     with open(UNDO + ".tmp", "w") as f:
-        json.dump({**move, "dump": nm("dump", "--format=batch-tag", "--", query)}, f)
+        json.dump({**move, "at": time.time(), "dump": nm("dump", "--format=batch-tag", "--", query)}, f)
     os.replace(UNDO + ".tmp", UNDO)
 
 
+# How long a move can be undone.
+UNDO_SECONDS = 600
+
+
 def undo_last():
-    """Put back the mail the last archive or Feed move changed, and the sender's class before a Feed move; return what it undid."""
+    """Put back the mail the last archive or Feed move changed, and the sender's class before a Feed move, when it was made in the last UNDO_SECONDS; return what it undid."""
     try:
         with open(UNDO) as f:
             move = json.load(f)
     except FileNotFoundError:
+        move = None
+    # A move from before moves were timed is past undoing; one stamped ahead of a clock set back is not.
+    at = move.get("at") if move else None
+    if not isinstance(at, (int, float)) or time.time() - at > UNDO_SECONDS:
         e = MailError("nothing to undo")
-        e.hint = "undo-last undoes only the last archive or Feed move, once"
-        raise e from None
+        e.hint = "undo-last undoes only the last archive or Feed move, once, within 10 minutes"
+        raise e
     addr = move.get("sender")
     if addr:
         for db in CLASS_FILES:

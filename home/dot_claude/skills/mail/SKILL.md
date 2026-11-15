@@ -117,7 +117,7 @@ Every action can be undone in Kakoune:
 | `bubble --at DATE` | the thread leaves until DATE, then bubbles up |
 | `archive` | the thread leaves the Imbox |
 | `clear` | the thread leaves Reply Later, Set Aside and Bubbled Up, and a pending bubble is cancelled |
-| `undo-last` (no ID) | the last archive or Feed move is undone, in Kakoune or here |
+| `undo-last` (no ID) | the last archive or Feed move, made in the last 10 minutes, is undone, in Kakoune or here |
 
 `screen-in`, `feed` and `papertrail` take `--domain` to decide every sender
 of that message's domain, as for a company that writes from a new

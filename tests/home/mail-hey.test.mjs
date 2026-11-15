@@ -1,6 +1,7 @@
 // bin/mail hey on a scratch store (tests/home/mail-rig.mjs): an agent files mail only in ways that can be undone, on one message it names, and screens out only a sender Saiful names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig, repo } from './mail-rig.mjs';
 
@@ -133,6 +134,31 @@ test('mail hey screen-in after feed, papertrail or screen-out leaves no archived
       const tags = r.tags(id);
       assert.ok(tags.includes('inbox') && tags.includes('screened'), `${first}: ${id} ${tags}`);
       for (const gone of ['archived', 'thefeed', 'ledger/receipts', 'spam', 'deleted']) assert.ok(!tags.includes(gone), `${first}: ${id} keeps ${gone}`);
+    }
+  }
+});
+
+// undo-last puts back only a move made in the last 10 minutes; an older one, or one from before moves were timed, is past undoing.
+test('mail hey undo-last restores a move made 9 minutes ago, or ahead of a clock set back, and refuses one made 11 minutes ago', (t) => {
+  for (const [ago, restores] of [[9 * 60, true], [-5 * 60, true], [11 * 60, false], [null, false]]) {
+    const r = rig(t);
+    assert.equal(r.mail('hey', 'archive', 'b1@x.test').status, 0);
+    const file = join(r.M, 'home/.local/state/hey-mail/undo.json');
+    const move = JSON.parse(readFileSync(file, 'utf8'));
+    assert.ok(Math.abs(move.at - Date.now() / 1000) < 60, `the move is timed: ${JSON.stringify(move.at)}`);
+    if (ago === null) delete move.at;
+    else move.at = Date.now() / 1000 - ago;
+    writeFileSync(file, JSON.stringify(move));
+    const res = r.mail('hey', 'undo-last');
+    if (restores) {
+      assert.equal(res.status, 0, `${ago}: ${res.stdout}${res.stderr}`);
+      assert.ok(r.imbox().includes('b1@x.test'), `${ago}: back in the Imbox`);
+      assert.ok(r.tags('b1@x.test').includes('inbox') && !r.tags('b1@x.test').includes('archived'), `${ago}: restored`);
+    } else {
+      assert.equal(res.status, 1, `${ago}: ${res.stdout}${res.stderr}`);
+      assert.equal(res.json.error, 'nothing to undo', `${ago}`);
+      assert.match(res.json.hint, /10 minutes/);
+      assert.ok(r.tags('b1@x.test').includes('archived') && !r.tags('b1@x.test').includes('inbox'), `${ago}: stays archived`);
     }
   }
 });
