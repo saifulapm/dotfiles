@@ -142,6 +142,15 @@ managed=$(
             "command": "if workflow guard --help 2>/dev/null | grep -q 'possible values:.*edit'; then workflow guard edit; fi"
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if workflow guard --help 2>/dev/null | grep -q 'possible values:.*agent'; then workflow guard agent; fi"
+          }
+        ]
       }
     ],
     "PostToolBatch": [
@@ -276,7 +285,9 @@ current=$(cat)
 # PreToolUse, WorktreeCreate and WorktreeRemove came from workflow's guards
 # roadmap (2026-11-05), copied from its cloud/settings-hooks.json. `workflow
 # guard bash` refuses a Bash call that repeats a lesson's mistake, and `workflow
-# guard edit` (m7-nudge, 2026-11-14) an Edit or Write while a suite runs; the worktree
+# guard edit` (m7-nudge, 2026-11-14) an Edit or Write while a suite runs, and
+# `workflow guard agent` (g1-start-ready, 2026-11-15) an implementer brief whose
+# VERIFY names no lint; the worktree
 # hooks give an Agent worktree its installs and generated types, which
 # symlinkDirectories did only in part, so that key is deleted. An old or
 # missing workflow falls back: every call runs, and worktrees are plain git.
