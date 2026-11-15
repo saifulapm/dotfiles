@@ -424,3 +424,20 @@ test("an address carved out of a domain on a, and handed back, files its mail on
   const news = await tags(b, 'news-b@x.test');
   assert.ok(news.includes('screened') && news.includes('inbox') && !news.includes('thefeed'), news.join(' '));
 });
+
+// The machine that decided marked its own mail read, and iCloud carries that flag, so a pulled decision re-files mail and leaves unread as it was.
+test('a Paper Trail or screen-out decision pulled from a re-files b\'s mail and keeps it unread', async () => {
+  for (const [action, args, tag] of [['papertrail', ['--arg', 'receipts'], 'ledger/receipts'], ['screen-out', [], 'spam']]) {
+    const { a, b } = await pair();
+    for (const m of [a, b]) await deliver(m, 'Shop <shop@vendor.test>', `shop-${m.id}@x.test`);
+    const r = await kakMail(a, ['hey', action, ...args, 'id:shop-a@x.test']);
+    assert.equal(r.code, 0, r.stderr);
+    await ok(a);
+    await ok(b);
+    assert.match(db(b, action === 'papertrail' ? 'ledger.db' : 'spam.db'), /shop@vendor\.test/);
+    const got = await tags(b, 'shop-b@x.test');
+    assert.ok(got.includes(tag), `${action}: ${got}`);
+    assert.ok(got.includes('unread'), `${action}: b's mail was marked read: ${got}`);
+    assert.ok(!(await tags(a, 'shop-a@x.test')).includes('unread'), `${action}: a, which decided, marks its own mail read`);
+  }
+});

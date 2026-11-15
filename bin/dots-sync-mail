@@ -358,9 +358,9 @@ def main(path, pulled):
             # An address's own line beats its domain's, so a domain's re-filing leaves out the addresses with a line after this round, and an address with none follows its domain's line.
             if kind == "sender" and rest.startswith("@"):
                 E.refile(rest, old, new, [k[7:] for k, v in after.items() if k.startswith("sender ") and v is not None
-                                          and not k[7:].startswith("@") and E.domain_of(k[7:]) == rest])
+                                          and not k[7:].startswith("@") and E.domain_of(k[7:]) == rest], pulled=True)
             elif kind == "sender":
-                E.refile(rest, old or inherited(rest, before), new or inherited(rest, after))
+                E.refile(rest, old or inherited(rest, before), new or inherited(rest, after), pulled=True)
             elif kind == "mute":
                 E.tag(f"thread:{{{rest}}}", *(("+muted", "-inbox") if new else ("-muted",)))
             elif kind == "bubble" and new is not None:

@@ -847,16 +847,16 @@ def to_screener(addr, unread=True, keep=None):
     tag(f"{frm} and date:..@{since}", "+archived", "-inbox")
 
 
-def refile(addr, old, new, keep=None):
-    """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would; an @domain leaves out the addresses in KEEP, as key_query does."""
+def refile(addr, old, new, keep=None, pulled=False):
+    """Re-file the mail this machine holds from ADDR, whose class went from OLD to NEW (either may be None), as unscreening and deciding here would; an @domain leaves out the addresses in KEEP, as key_query does.
+    A PULLED decision, made on another machine, leaves unread as it is: that machine changed its own mail's, and iCloud carries the flag here."""
     frm = key_query(addr, keep)
-    # The machine that unscreened marked the mail unread, and iCloud carries that flag here.
     if old and not new:
         to_screener(addr, unread=False, keep=keep)
     elif old and old != new:
         tag(frm, *UNSCREEN_TAGS, *((f"-ledger/{old[7:]}",) if old.startswith("ledger ") else ()))
     if new:
-        tag(frm, *class_tags(new))
+        tag(frm, *(t for t in class_tags(new) if not (pulled and t[1:] == "unread")))
 
 
 SENDER_ACTIONS = ("screen-in", "feed", "papertrail", "screen-out", "unscreen", "autofile", "recycle")
