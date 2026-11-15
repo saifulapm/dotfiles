@@ -1,9 +1,9 @@
 // Two machines, a and b, carry HEY decisions through dots sync's mail unit, each with its own scratch notmuch store.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { deliver, kakMail, mail, machine, mailbox, notmuch, sync, world } from './lib.mjs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join } from 'node:path';
+import { deliver, kakMail, mail, machine, mailbox, mailSync, notmuch, sync, world } from './lib.mjs';
 
 const db = (m, name) => (existsSync(join(m.hey, name)) ? readFileSync(join(m.hey, name), 'utf8') : '');
 const remote = (w, id) => join(w.remote, 'dots-sync/mail', id + '.json');
@@ -492,4 +492,61 @@ test('a sender screened in while the mail round holds the files waits for the ro
   assert.match(db(b, 'screened.db'), /^x@y\.test$/m);
   assert.doesNotMatch(db(b, 'thefeed.db'), /x@y\.test/);
   assert.equal(early, false, 'the screen-in returned while the round held the files');
+});
+
+// The round waits behind the fetch for mail-sync's lock, and a decision takes only the lock the round takes after it.
+test('a sender screened in while a fetch holds mail-sync and a round waits behind it returns before the fetch ends', async () => {
+  const w = world();
+  const [a, b] = [machine(w, 'a'), machine(w, 'b')];
+  await mailbox(a, { hooks: true });
+  await mailbox(b);
+  for (const m of [a, b]) await ok(m, ['--only', 'mail']);
+  await deliver(a, 'X <x@y.test>', 'a1@y.test');
+  const stubs = join(a.env.HOME, 'fetch-stub');
+  mkdirSync(stubs);
+  const fetching = join(a.env.HOME, 'fetching');
+  writeFileSync(join(stubs, 'mbsync'), `#!/bin/sh\ntouch "$HOME/fetch-started"\nwhile [ -e ${fetching} ]; do sleep 0.1; done\n`);
+  chmodSync(join(stubs, 'mbsync'), 0o755);
+  a.env.PATH = stubs + delimiter + a.env.PATH;
+  writeFileSync(fetching, '');
+  const fetch = watched(mailSync(a));
+  while (!existsSync(join(a.env.HOME, 'fetch-started'))) await new Promise((r) => setTimeout(r, 50));
+  const round = watched(sync(a, ['--only', 'mail']));
+  await new Promise((r) => setTimeout(r, 1000));
+  const late = new Promise((r) => setTimeout(() => r({ code: null, stderr: 'the screen-in was still waiting after 15 s' }), 15000));
+  let r;
+  try {
+    r = await Promise.race([mail(a, ['hey', 'screen-in', 'a1@y.test']), late]);
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(fetch.done || round.done, false, 'the fetch or the round ended before the screen-in returned');
+  } finally {
+    unlinkSync(fetching);
+  }
+  assert.equal((await fetch.p).code, 0);
+  assert.equal((await round.p).code, 0);
+  assert.match(db(a, 'screened.db'), /^x@y\.test$/m);
+  await ok(b);
+  assert.match(db(b, 'screened.db'), /^x@y\.test$/m);
+});
+
+// The kernel lets go of a dead round's lock, and the journal it had set aside is read again by the next round.
+test('a round killed while it holds the files leaves them whole, and a decision waiting on it goes through and reaches b', async () => {
+  const { a, b } = await pair();
+  await deliver(a, 'X <x@y.test>', 'a1@y.test');
+  writeFileSync(join(a.hey, 'thefeed.db'), 'f@y.test\n');
+  await ok(a);
+  const { round } = await paused(a);
+  const decision = watched(mail(a, ['hey', 'screen-in', 'a1@y.test']));
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(decision.done, false);
+  process.kill(Number(readFileSync(join(a.env.HOME, 'pause'), 'utf8')), 'SIGKILL');
+  assert.notEqual((await round).code, 0);
+  const r = await decision.p;
+  assert.equal(r.code, 0, r.stderr);
+  assert.equal(db(a, 'thefeed.db'), 'f@y.test\n');
+  assert.equal(db(a, 'screened.db'), 'x@y.test\n');
+  await ok(a);
+  await ok(b);
+  assert.equal(db(b, 'screened.db'), 'x@y.test\n');
+  assert.equal(db(b, 'thefeed.db'), 'f@y.test\n');
 });

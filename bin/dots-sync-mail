@@ -340,10 +340,12 @@ def main(path, pulled):
             said.append(f"mail: left out {plural(ahead, 'from ' + name + ', stamped more than a day ahead', 'from ' + name + ', stamped more than a day ahead')}")
         left_out = left_out or bool(bad or ahead)
 
-    # For a test: the files and journal are read and nothing is written yet.
+    # For a test: the files and journal are read and nothing is written yet; the file names this process, so a test can kill it here.
     pause = os.environ.get("DOTS_SYNC_MAIL_PAUSE")
     if pause:
-        open(pause, "w").close()
+        with open(pause + ".tmp", "w") as f:
+            f.write(str(os.getpid()))
+        os.replace(pause + ".tmp", pause)
         while os.path.exists(pause):
             time.sleep(0.05)
 

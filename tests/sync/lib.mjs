@@ -118,6 +118,9 @@ export const kakMail = (m, args) => run(m, bin + 'kak-mail', args);
 // The mail command, run as m.
 export const mail = (m, args) => run(m, bin + 'mail', args);
 
+// One mail-sync run as m: fetch, index, then file into IMAP folders, under its lock.
+export const mailSync = (m) => run(m, bin + 'mail-sync', ['--quiet']);
+
 // The age identity the ssh unit reads, made for m, or copied from another machine so both open one blob.
 export async function identity(m, from) {
   const path = join(m.env.XDG_CONFIG_HOME, 'chezmoi/key.txt');
