@@ -74,16 +74,21 @@ reverse_ops() {
 
 # A drag into HEY/Bubbled has no due date, and with no bubble.db line the mail would stay hidden for good, so its thread comes back in 24 hours.
 bubble_from_folder() {
-    local msg="$1" tid first ids
+    local msg="$1" tid first ids due
     tid="$(notmuch search --exclude=false --output=threads -- "$msg" 2>/dev/null | head -n1)"
     tid="${tid#thread:}"
     first="$(notmuch search --exclude=false --output=messages --sort=oldest-first -- "thread:$tid" 2>/dev/null | head -n1)"
     [ -n "$tid" ] && [ -n "$first" ] || return 0
-    grep -q "^$tid " "$DB_DIR/bubble.db" 2>/dev/null && return 0
-    # A line naming any message of the thread already brings it back.
-    ids="$(awk '$1 ~ /^id:/ { printf "%s%s", (n++ ? " or " : ""), $1 }' "$DB_DIR/bubble.db" 2>/dev/null)"
-    [ -n "$ids" ] && [ "$(nm_count "thread:$tid and ($ids)")" -gt 0 ] && return 0
-    printf '%s %d\n' "$first" "$(( $(date +%s) + 86400 ))" >>"$DB_DIR/bubble.db"
+    due=$(( $(date +%s) + 86400 ))
+    # The engine's decision lock, on fd 8 as fd 9 is mail-sync's, held over the check and the append: a bubble or clear rewrites bubble.db by rename, which would drop a line appended to the file it replaced.
+    {
+        flock 8
+        grep -q "^$tid " "$DB_DIR/bubble.db" 2>/dev/null && return 0
+        # A line naming any message of the thread already brings it back.
+        ids="$(awk '$1 ~ /^id:/ { printf "%s%s", (n++ ? " or " : ""), $1 }' "$DB_DIR/bubble.db" 2>/dev/null)"
+        [ -n "$ids" ] && [ "$(nm_count "thread:$tid and ($ids)")" -gt 0 ] && return 0
+        printf '%s %d\n' "$first" "$due" >>"$DB_DIR/bubble.db"
+    } 8>"$STATE_DIR/decide.lock"
     log "bubble: $first due in 24h (dragged into HEY/Bubbled on another client)"
 }
 
