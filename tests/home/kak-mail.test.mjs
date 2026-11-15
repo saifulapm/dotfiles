@@ -614,3 +614,29 @@ test('an address with a line of its own is decided alone, though an @domain line
   assert.equal(r.kakMail('hey', 'screen-in', 'id:va@vendor.test').stdout, 'screen-in: a@vendor.test\n');
   assert.equal(r.db('screened.db'), '@vendor.test\na@vendor.test\n');
 });
+
+// Kakoune's H keys reach the engine through kak-mail hey, which also has the unscreen, autofile and recycle mail hey lacks.
+test('every sender action refuses a From naming two senders, and writes no line, stamp or tag', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@first.test>, Bob <bob@second.test>', 'Message-ID': '<two@x.test>' });
+  r.setDb('screened.db', 'ann@first.test\n');
+  const tags = r.notmuch('search', '--output=tags', 'id:two@x.test');
+  for (const args of [['screen-in'], ['feed'], ['papertrail', '--arg', 'Bills'], ['screen-out'], ['unscreen'], ['autofile', '--arg', 'Work'], ['recycle', '--arg', '30'], ['screen-in', '--domain']]) {
+    const res = r.kakMail('hey', ...args, 'id:two@x.test');
+    assert.equal(res.status, 1, `${args.join(' ')}: ${res.stdout}`);
+    assert.equal(res.stderr, 'kak-mail: From names two senders, ann@first.test and bob@second.test; nothing was decided\n', args.join(' '));
+  }
+  assert.equal(r.db('screened.db'), 'ann@first.test\n');
+  for (const db of ['thefeed.db', 'ledger.db', 'spam.db', 'autofile.db', 'recycle.db']) assert.equal(r.db(db), '', db);
+  assert.equal(existsSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided')), false, 'a decision was stamped');
+  assert.equal(r.notmuch('search', '--output=tags', 'id:two@x.test'), tags);
+});
+
+test('a selection holding a two-sender From decides none of its senders', (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Carol <carol@third.test>', 'Message-ID': '<one@x.test>' });
+  r.deliver({ From: 'Ann <ann@first.test>, Bob <bob@second.test>', 'Message-ID': '<two@x.test>' });
+  const res = r.kakMail('hey', 'screen-in', 'id:one@x.test', 'id:two@x.test');
+  assert.equal(res.status, 1, res.stdout);
+  assert.equal(r.db('screened.db'), '');
+});

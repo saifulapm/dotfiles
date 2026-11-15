@@ -367,3 +367,49 @@ test('q in the boxes of the kak-mail window (client "mail") closes that client',
   const { buf } = await qInBoxes(t, 'rename-client mail; mail');
   assert.equal(buf, null);
 });
+
+// Opens the inbox as a list, threaded unless UNTHREADED, presses KEYS on its first row, and returns the last status line once kak-mail has answered.
+async function pressInList(r, keys, unthreaded) {
+  mkdirSync(r.env.XDG_RUNTIME_DIR, { recursive: true, mode: 0o700 });
+  mkdirSync(r.env.XDG_CONFIG_HOME, { recursive: true });
+  symlinkSync(join(repo, 'home/dot_config/kak'), join(r.env.XDG_CONFIG_HOME, 'kak'));
+  const out = join(r.M, 'out');
+  const env = { ...r.env, PATH: `${r.env.PATH}:${join(process.env.HOME, '.local/bin')}` };
+  const script = [`mail-list-open tag:inbox ${unthreaded}`, `eval -draft %{ execute-keys '%' ; echo -to-file ${out}.list %val{selection} }`].join('\n');
+  const k = spawn('kak', ['-ui', 'json', '-e', script], { env, timeout: 30000 });
+  const exited = new Promise((resolve) => k.on('exit', resolve));
+  const send = (...params) => k.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'keys', params }) + '\n');
+  const statuses = [];
+  let buf = '';
+  k.stdout.on('data', (d) => {
+    buf += d;
+    for (let i; (i = buf.indexOf('\n')) >= 0; buf = buf.slice(i + 1)) {
+      const m = JSON.parse(buf.slice(0, i));
+      if (m.method === 'draw_status') statuses.push(m.params[1].map((atom) => atom.contents).join(''));
+    }
+  });
+  for (let i = 0; i < 100 && !read(`${out}.list`); i++) await sleep(50);
+  const before = statuses.length;
+  send(...keys);
+  for (let i = 0; i < 100 && !statuses.slice(before).some(Boolean); i++) await sleep(50);
+  await sleep(200);
+  send('<esc>', ':quit!<ret>');
+  assert.equal(await exited, 0);
+  return statuses.slice(before).filter(Boolean).at(-1) ?? '';
+}
+
+test('H i on a list row of a two-sender From says so in the status line and decides nothing', async (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@first.test>, Bob <bob@second.test>', 'Message-ID': '<two@x.test>' });
+  const status = await pressInList(r, ['H', 'i'], true);
+  assert.match(status, /From names two senders, ann@first\.test and bob@second\.test; nothing was decided/);
+  assert.equal(r.db('screened.db'), '');
+});
+
+test('H i on a thread row where two people each wrote one mail screens in the newest writer', async (t) => {
+  const r = mailRig(t);
+  r.deliver({ From: 'Ann <ann@first.test>', Subject: 'plans', Date: 'Sat, 14 Nov 2026 10:00:00 +0000', 'Message-ID': '<t1@x.test>' });
+  r.deliver({ From: 'Bob <bob@second.test>', Subject: 'Re: plans', Date: 'Sat, 14 Nov 2026 11:00:00 +0000', 'Message-ID': '<t2@x.test>', 'In-Reply-To': '<t1@x.test>', References: '<t1@x.test>' });
+  const status = await pressInList(r, ['H', 'i'], false);
+  assert.equal(r.db('screened.db'), 'bob@second.test\n', status);
+});

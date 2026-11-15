@@ -728,6 +728,26 @@ def sender(query):
     raise MailError(f"no sender found for {query}")
 
 
+COUNT_WORDS = {2: "two", 3: "three"}
+
+
+def sender_to_decide(query):
+    """The sender a decision on QUERY acts on: the one address in the From of its newest message that is not yours alone.
+    A From naming two or more different addresses, yours among them, is refused: routing reads its last address, so a decision on any one of them may file nothing."""
+    mine = {parseaddr(i)[1].lower() for i in identities()}
+    for mid in nm("search", "--output=messages", "--sort=newest-first", query).split():
+        addrs = list(dict.fromkeys(a.lower() for a in nm("address", "--output=sender", "--output=address", idq(mid.removeprefix("id:"))).splitlines() if a))
+        if not set(addrs) - mine:
+            continue
+        if len(addrs) > 1:
+            named = ", ".join(line(a) for a in addrs[:-1]) + " and " + line(addrs[-1])
+            e = MailError(f"From names {COUNT_WORDS.get(len(addrs), len(addrs))} senders, {named}; nothing was decided")
+            e.hint = "a decision needs a mail from one sender; decide on another mail of the one you mean"
+            raise e
+        return addrs[0]
+    raise MailError(f"no sender found for {query}")
+
+
 def tag(query, *changes):
     nm("tag", *changes, "--", query)
 

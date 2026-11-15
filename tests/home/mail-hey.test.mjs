@@ -1,7 +1,7 @@
 // bin/mail hey on a scratch store (tests/home/mail-rig.mjs): an agent files mail only in ways that can be undone, on one message it names, and screens out only a sender Saiful names.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { mailRig, repo } from './mail-rig.mjs';
 
@@ -280,4 +280,40 @@ test('an undo file that does not parse is nothing to undo, never a trace', (t) =
     assert.equal(res.status, 1, `${text}: ${res.stdout}${res.stderr}`);
     assert.equal(res.json.error, 'nothing to undo', text);
   }
+});
+
+const twoSenders = 'From names two senders, ann@first.test and bob@second.test; nothing was decided';
+
+// The engine decided on the From's first address while routing reads its last, so a decision on a From naming two people reported one and filed nothing.
+test('mail hey refuses every sender decision on a From naming two senders, and changes nothing', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Ann <ann@first.test>, Bob <bob@second.test>', 'Message-ID': '<two@x.test>' });
+  const tags = r.tags('two@x.test');
+  for (const args of [['screen-in'], ['feed'], ['papertrail', '--category', 'receipts'], ['screen-in', '--domain'], ['feed', '--domain']]) {
+    const res = r.mail('hey', args[0], 'two@x.test', ...args.slice(1));
+    assert.equal(res.status, 1, `${args.join(' ')}: ${res.stdout}${res.stderr}`);
+    assert.equal(res.json.ok, false);
+    assert.equal(res.json.error, twoSenders, args.join(' '));
+  }
+  for (const db of ['screened.db', 'thefeed.db', 'ledger.db']) assert.equal(r.db(db), '', db);
+  assert.equal(existsSync(join(r.env.XDG_STATE_HOME, 'hey-mail/decided')), false, 'a decision was stamped');
+  assert.deepEqual(r.tags('two@x.test'), tags);
+});
+
+test('mail hey refuses a From naming a sender and one of your own addresses, naming both', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Bob <bob@second.test>, Me <me@x.test>', 'Message-ID': '<two@x.test>' });
+  const res = r.mail('hey', 'screen-in', 'two@x.test');
+  assert.equal(res.status, 1, res.stdout);
+  assert.equal(res.json.error, 'From names two senders, bob@second.test and me@x.test; nothing was decided');
+  assert.equal(r.db('screened.db'), '');
+});
+
+test('mail hey decides a From naming one address twice as that one sender', (t) => {
+  const r = rig(t);
+  r.deliver({ From: 'Ann <ann@first.test>, "A" <ANN@first.test>', 'Message-ID': '<one@x.test>' });
+  const res = r.mail('hey', 'screen-in', 'one@x.test');
+  assert.equal(res.status, 0, res.stdout);
+  assert.equal(res.json.data.sender, 'ann@first.test');
+  assert.equal(r.db('screened.db'), 'ann@first.test\n');
 });

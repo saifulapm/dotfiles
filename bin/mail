@@ -44,7 +44,7 @@ from email.utils import getaddresses, parseaddr
 # Python would write bin/__pycache__ into the checkout on the first import.
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, check_recipients, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
-                         SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
+                         SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender_to_decide, matched_messages, nm, one_message, part_sizes, search_threads,
                          send_draft, set_unread, thread_messages, thread_of, undo_last, within, write_draft)
 import mail_seed
 
@@ -473,7 +473,7 @@ def cmd_hey(a):
     msg_id = found(a.id)["id"]
     action = HEY[a.action]
     if action in SENDER_ACTIONS:
-        addr = decide(action, sender(idq(msg_id)), a.category, domain=a.domain)
+        addr = decide(action, sender_to_decide(idq(msg_id)), a.category, domain=a.domain)
         refresh_count()
         return {"action": a.action, "id": msg_id, "sender": addr}
     n, when = pile(action, [idq(msg_id)], a.at)

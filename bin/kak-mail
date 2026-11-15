@@ -37,7 +37,7 @@ from urllib.parse import urlsplit
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, HOME, SENDER_ACTIONS, THREAD_ACTIONS, URL, MailError, body_text, both, box, box_counts, decide,
                          domain_key, draft_message, drafts, from_query, identities, line, matched_messages, message_of, nm, one_message,
-                         part_bytes, pile, refresh_count, search_threads, send_draft, sender, set_unread, target,
+                         part_bytes, pile, refresh_count, search_threads, send_draft, sender, sender_to_decide, set_unread, target,
                          thread_messages, undo_last, write_count, write_draft)
 
 LIST_LIMIT = 500
@@ -354,7 +354,7 @@ def cmd_hey(args):
     done = []
     if action in SENDER_ACTIONS:
         # Two selected senders of one domain make one domain decision, and one refused domain stops them all before any is written.
-        for addr in dict.fromkeys((domain_key if domain else str)(sender(q)) for q in queries):
+        for addr in dict.fromkeys((domain_key if domain else str)(sender_to_decide(q)) for q in queries):
             done.append(decide(action, addr, arg, domain))
     elif domain:
         die(f"{action} takes no domain")
