@@ -131,6 +131,11 @@ def both(a, b):
     return " and ".join(f"({q})" for q in terms) or "*"
 
 
+def within(*queries):
+    """Mail matching every one of QUERIES, as an s-expression for --query=sexp: notmuch parses each query on its own, so a ) or " in a typed one cannot reach past it; a bare *, which (infix "*") reads as nothing, drops out."""
+    return "(" + " ".join(['and'] + ['(infix "' + q.replace("\\", "\\\\").replace('"', '\\"') + '")' for q in queries if q.strip() != "*"]) + ")"
+
+
 def box(name):
     for b in BOXES:
         if b[1] == name:
@@ -153,13 +158,13 @@ def line(s):
     return s.translate(BIDI)
 
 
-def search_threads(query, limit, offset=0):
-    """notmuch's thread summaries for QUERY, newest first."""
-    return mended(json.loads(nm("search", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", "--", query)))
+def search_threads(query, limit, offset=0, syntax="infix"):
+    """notmuch's thread summaries for QUERY, in SYNTAX, newest first."""
+    return mended(json.loads(nm("search", f"--query={syntax}", "--format=json", "--format-version=5", f"--limit={limit}", f"--offset={offset}", "--", query)))
 
 
-def matched_messages(query):
-    """The messages QUERY matches, without bodies, newest first."""
+def matched_messages(query, syntax="infix"):
+    """The messages QUERY, in SYNTAX, matches, without bodies, newest first."""
     msgs = []
 
     def walk(nodes):
@@ -169,7 +174,7 @@ def matched_messages(query):
             elif isinstance(node, dict) and "id" in node:
                 if node.get("match"):
                     msgs.append(node)
-    walk(show_json("--body=false", "--entire-thread=false", "--", query))
+    walk(show_json(f"--query={syntax}", "--body=false", "--entire-thread=false", "--", query))
     msgs.sort(key=lambda m: -m["timestamp"])
     return msgs
 

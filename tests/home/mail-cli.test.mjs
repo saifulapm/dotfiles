@@ -306,3 +306,24 @@ test('the Screener holds read mail of an undecided sender in the inbox, and The 
   assert.deepEqual(r.mail('search', '--box', 'Screener').json.data.map((row) => row.id), ['new@x.test']);
   assert.deepEqual(r.mail('search', '--box', 'The Feed').json.data.map((row) => row.id), ['feed@x.test']);
 });
+
+// A typed query is parsed on its own, so its ) cannot close the box's clause and reach mail outside the box.
+test('mail search --box returns only that box, whatever brackets or quotes the query holds', (t) => {
+  const r = twoMails(t);
+  r.deliver({ From: 'Bob <bob@people.test>', Subject: 'a (b', 'Message-ID': '<paren@x.test>' });
+  r.notmuch('tag', '+screened', '--', 'id:paren@x.test');
+  const ids = (...args) => {
+    const res = r.mail('search', ...args);
+    assert.equal(res.status, 0, res.stdout + res.stderr);
+    return res.json.data.map((row) => row.id).sort();
+  };
+  for (const q of ['x) or (tag:inbox', 'x} or {tag:inbox', '" or tag:inbox', 'x) or (tag:inbox"', 'x\\) or (tag:inbox']) {
+    assert.deepEqual(ids('--box', 'Read', q), [], q);
+    assert.ok(ids('--box', 'Screener', q).every((id) => id === 'new@x.test'), q);
+  }
+  assert.deepEqual(ids('--box', 'Imbox', 'subject:"a (b"'), ['paren@x.test']);
+  assert.deepEqual(ids('--box', 'Screener', 'subject:"a (b"'), []);
+  assert.deepEqual(ids('--box', 'Everything', 'subject:"a (b"'), ['paren@x.test']);
+  assert.deepEqual(ids('--box', 'Imbox', '*'), ['imbox@x.test', 'paren@x.test']);
+  assert.deepEqual(ids('subject:"a (b"'), ['paren@x.test']);
+});

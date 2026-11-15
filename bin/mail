@@ -45,7 +45,7 @@ from email.utils import getaddresses, parseaddr
 sys.dont_write_bytecode = True
 from mail_engine import (BOXES, MSMTP_ACCOUNT, AlreadySent, MailError, check_recipients, MissingAttachment, NotFound, Refusal, body_text, both, box_counts, boxes_of, digest, draft_message, draft_path,
                          SENDER_ACTIONS, decide, drafts, identities, idq, line, pile, refresh_count, sender, matched_messages, nm, one_message, part_sizes, search_threads,
-                         send_draft, set_unread, thread_messages, thread_of, undo_last, write_draft)
+                         send_draft, set_unread, thread_messages, thread_of, undo_last, within, write_draft)
 import mail_seed
 
 OPEN, CLOSE = "<<<untrusted-mail>>>", "<<<end-untrusted-mail>>>"
@@ -209,14 +209,15 @@ def cmd_search(a):
     words = " ".join(a.query)
     if not words and not b:
         raise Usage("give a query, or --box NAME")
-    query = both(b[2], words) if b and words else (b[2] if b else words)
+    # Each query is parsed alone, so a bracket or quote in the words never reaches past the box.
+    terms = [q for q in (b[2] if b else "", words) if q]
     if b and b[3]:
         # The Screener decides on people, so each mail is its own row.
-        rows = [(m, thread_of(m["id"]), 1) for m in matched_messages(query)[a.offset:a.offset + a.limit]]
+        rows = [(m, thread_of(m["id"]), 1) for m in matched_messages(within(*terms), "sexp")[a.offset:a.offset + a.limit]]
     else:
         # notmuch reads -tag:x alone and inside `thread:T and (...)` differently, so a listed thread may match nothing there; its newest message stands in.
-        rows = [((matched_messages(both(f"thread:{t['thread']}", query)) or matched_messages(f"thread:{t['thread']}"))[0],
-                 t["thread"], t["total"]) for t in search_threads(query, a.limit, a.offset)]
+        rows = [((matched_messages(within(f"thread:{t['thread']}", *terms), "sexp") or matched_messages(f"thread:{t['thread']}"))[0],
+                 t["thread"], t["total"]) for t in search_threads(within(*terms), a.limit, a.offset, "sexp")]
     homes = boxes_of([m["id"] for m, _, _ in rows])
     return [row(m, thread, count, homes.get(m["id"])) for m, thread, count in rows]
 
