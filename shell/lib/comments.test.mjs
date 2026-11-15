@@ -62,3 +62,22 @@ test('dots-pre-commit runs the qml-js and fixture-git lint tests when a staged f
   writeFileSync(join(dir, 'shell/lib/fixture-git.test.mjs'), red.replace("assert.fail('NAME went red')", 'assert.ok(true)'));
   assert.equal(hook().status, 0, hook().stderr);
 });
+
+test('dots-pre-commit runs the one-design word scan when a staged file is under shell, bin or tests', (t) => {
+  const dir = mkdtempSync(join(tmpdir(), 'pre-commit-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (...args) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', env });
+  git('init', '-q');
+  const hook = () => spawnSync(join(root, 'bin/dots-pre-commit'), [], { cwd: dir, encoding: 'utf8', env });
+  for (const d of ['shell/lib', 'bin']) mkdirSync(join(dir, d), { recursive: true });
+  writeFileSync(join(dir, 'shell/lib/one-design.test.mjs'), "import { test } from 'node:test';\nimport assert from 'node:assert/strict';\ntest('scan', () => assert.fail('one-design went red'));\n");
+  writeFileSync(join(dir, 'a.md'), 'a\n');
+  git('add', 'a.md');
+  assert.equal(hook().status, 0, hook().stderr);
+  writeFileSync(join(dir, 'bin/tool'), '#!/bin/sh\necho a\n');
+  git('add', 'bin/tool');
+  const r = hook();
+  assert.equal(r.status, 1);
+  assert.match(r.stderr, /one-design went red/);
+});
