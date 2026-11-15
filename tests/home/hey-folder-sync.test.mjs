@@ -117,3 +117,27 @@ test('a mail first seen in INBOX is still filed by its tags', (t) => {
   assert.deepEqual(r.files('HEY/ReplyLater'), ['tagged.eml']);
   assert.ok(r.tags('tagged@x.test').includes('replylater'));
 });
+
+// A pile on the phone takes the mail out of the Imbox as a pile here does, and moving it back to INBOX returns it.
+test('a mail moved or first seen in HEY/ReplyLater or HEY/SetAside loses inbox, and one moved back to INBOX regains it', (t) => {
+  const r = heyRig(t);
+  for (const s of ['new', 'cur', 'tmp']) mkdirSync(join(r.box('HEY/SetAside'), s), { recursive: true });
+  r.setDb('foldersync.db', 'HEY/ReplyLater\nHEY/SetAside\n');
+  r.arrive('INBOX', 'moved@x.test', 'moved.eml');
+  r.notmuch('tag', '+screened', '--', 'id:moved@x.test');
+  assert.equal(r.sync(r.env, '--apply'), '0 0\n');
+  renameSync(join(r.box('INBOX'), 'new', 'moved.eml'), join(r.box('HEY/ReplyLater'), 'new', 'moved.eml'));
+  r.arrive('HEY/ReplyLater', 'later@x.test', 'later.eml');
+  r.arrive('HEY/SetAside', 'aside@x.test', 'aside.eml');
+  r.notmuch('tag', '+screened', '--', 'id:later@x.test or id:aside@x.test');
+  r.sync(r.env, '--apply');
+  for (const [id, pile] of [['moved@x.test', 'replylater'], ['later@x.test', 'replylater'], ['aside@x.test', 'setaside']]) {
+    const tags = r.tags(id);
+    assert.ok(tags.includes(pile) && !tags.includes('inbox'), `${id}: ${tags}`);
+  }
+  renameSync(join(r.box('HEY/ReplyLater'), 'new', 'moved.eml'), join(r.box('INBOX'), 'new', 'moved.eml'));
+  r.notmuch('new', '--quiet');
+  r.sync(r.env, '--apply');
+  const back = r.tags('moved@x.test');
+  assert.ok(back.includes('inbox') && !back.includes('replylater'), `back: ${back}`);
+});

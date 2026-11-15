@@ -56,8 +56,9 @@ reverse_ops() {
         "HEY/Read")        printf '+inbox +screened -archived -replylater -setaside -bubble -bubbled' ;;
         # Un-screens this message only; screened.db keeps the sender's decision.
         "HEY/Screener")    printf '+inbox -screened -archived -replylater -setaside -bubble' ;;
-        "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived' ;;
-        "HEY/SetAside")    printf '+setaside -replylater -bubble -archived' ;;
+        # A pile takes the mail out of the Imbox and Read, as Reply Later and Set Aside do on the desktop.
+        "HEY/ReplyLater")  printf '+replylater -setaside -bubble -archived -inbox' ;;
+        "HEY/SetAside")    printf '+setaside -replylater -bubble -archived -inbox' ;;
         "HEY/Feed")        printf '+thefeed +archived -inbox -replylater -setaside -bubble' ;;
         # The phone cannot ask which vendor, so it files as unfiled.
         "HEY/PaperTrail")  printf '+ledger/unfiled +archived -inbox -replylater -setaside -bubble' ;;
