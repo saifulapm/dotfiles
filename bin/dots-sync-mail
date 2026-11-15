@@ -46,8 +46,12 @@ def fail(msg, code):
     sys.exit(code)
 
 
+# Longer than any address or Message-ID, and a key goes whole into one notmuch argument, which Linux holds to 128 KB.
+KEY_MAX = 1000
+
+
 def valid(key, value):
-    if not (value is None or value is True or type(value) in (str, int)):
+    if not (value is None or value is True or type(value) in (str, int)) or len(key) > KEY_MAX:
         return False
     kind, _, rest = key.partition(" ")
     if kind == "sender":
@@ -169,7 +173,7 @@ def local_view():
         # post-new reads the speakeasy code from the first line only.
         for line in lines[:1] if name == "speakeasy" else lines:
             kv = line_record(name, line)
-            if kv and (kv[0] not in view or not kv[0].startswith("sender ") or rank(kv[1]) > rank(view[kv[0]])):
+            if kv and len(kv[0]) <= KEY_MAX and (kv[0] not in view or not kv[0].startswith("sender ") or rank(kv[1]) > rank(view[kv[0]])):
                 view[kv[0]] = kv[1]
     return view, missing
 
@@ -320,7 +324,7 @@ def main(path, pulled):
         try:
             with open(f) as fh:
                 theirs = parse(fh.read())
-        except OSError:
+        except (OSError, UnicodeDecodeError):
             theirs = None
         if theirs is None:
             said.append(f"mail: skipped {name}, which does not parse")
@@ -408,9 +412,10 @@ def main(path, pulled):
         os.unlink(f)
     os.close(deciding)
     os.close(held)
-    # One line, as dots sync keeps only the last line in sync.json, and notmuch's errors span several.
+    # One printable line, as dots sync keeps only the last line in sync.json, notmuch's errors span several, and another machine names its pulled file.
     if said or refused:
-        print("mail: " + "; ".join(" ".join(line.removeprefix("mail: ").split()) for line in said + refused), file=sys.stderr)
+        reasons = (" ".join(line.removeprefix("mail: ").split()) for line in said + refused)
+        print("mail: " + "; ".join("".join(c if c.isprintable() else "?" for c in r) for r in reasons), file=sys.stderr)
     if refused:
         sys.exit(1)
     if left_out:

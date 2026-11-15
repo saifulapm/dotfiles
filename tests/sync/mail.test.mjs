@@ -604,3 +604,45 @@ test('two machines deciding one sender in the same millisecond end on the same v
     assert.doesNotMatch(db(m, 'screened.db'), /t@y\.test/, m.id);
   }
 });
+
+// Another machine writes the pulled file, its name included, so the error a person reads is one line of printable text whatever the name holds.
+test("a pulled file named with a newline or a terminal escape is named on one printable line of the mail error", async () => {
+  const { w, a } = await pair();
+  writeFileSync(join(dirname(remote(w, 'a')), 'q\nmail: all good\x1b[2J.json'), '{"v":1,"records":');
+  const r = await sync(a, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  const error = JSON.parse(readFileSync(a.status, 'utf8')).mail.error;
+  assert.equal(error, 'mail: skipped q mail: all good?[2J.json, which does not parse');
+});
+
+test('a pulled file that is not UTF-8 is skipped by name, and the rest still merges', async () => {
+  const { w, a } = await pair();
+  writeFileSync(remote(w, 'b'), JSON.stringify({ v: 1, records: { 'sender ok@y.test': { v: 'screened', at: Date.now() - 1000 } } }));
+  writeFileSync(remote(w, 'c'), Buffer.from([0xff, 0xfe, 0x7b]));
+  const r = await sync(a, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  assert.equal(JSON.parse(readFileSync(a.status, 'utf8')).mail.error, 'mail: skipped c.json, which does not parse');
+  assert.equal(db(a, 'screened.db'), 'ok@y.test\n');
+});
+
+// A key goes whole into one notmuch argument, which Linux holds to 128 KB.
+test('a pulled record whose key is longer than any address is left out, and the rest still merges', async () => {
+  const { w, a } = await pair();
+  const at = Date.now() - 1000;
+  const records = { [`sender ${'a'.repeat(200000)}@y.test`]: { v: 'spam', at }, 'sender ok@y.test': { v: 'screened', at } };
+  writeFileSync(remote(w, 'b'), JSON.stringify({ v: 1, records }));
+  const r = await sync(a, ['--only', 'mail']);
+  assert.equal(r.code, 5, r.stdout + r.stderr);
+  assert.equal(JSON.parse(readFileSync(a.status, 'utf8')).mail.error, 'mail: left out 1 record from b.json, which is not a HEY decision');
+  assert.equal(db(a, 'screened.db'), 'ok@y.test\n');
+});
+
+// Its decision stays on this machine, where post-new still reads the line, as the store would refuse the key.
+test("a local line naming an address longer than any key keeps every round green", async () => {
+  const { a } = await pair();
+  writeFileSync(join(a.hey, 'spam.db'), `${'s'.repeat(1100)}@y.test\nok@y.test\n`);
+  await ok(a);
+  await ok(a);
+  assert.match(db(a, 'spam.db'), /^ok@y\.test$/m);
+  assert.equal(db(a, 'spam.db').split('\n')[0].length, 1107);
+});
