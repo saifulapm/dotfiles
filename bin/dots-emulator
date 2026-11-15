@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# dots-emulator <avd>: boots that Android virtual device headless as a systemd user unit, so it outlives the shell that started it, waits for the boot and prints its adb serial; one already up is reported as it is. dots-emulator stop <avd> ends it. On the ANGLE renderer: the emulator's own swiftshader segfaults on Fedora seconds in (2026-09-25 on the lareys AVD, 2026-11-15 on ftc-lowend and ftc-modern, SELinux denying execheap); ANGLE does not.
+set -uo pipefail
+{
+
+die() {
+  echo "dots-emulator: $1" >&2
+  exit 1
+}
+
+sdk=${ANDROID_HOME:-$HOME/Android/Sdk}
+emulator=$sdk/emulator/emulator
+# Google ships the emulator for x86_64 Linux only, so the Macs have none.
+[ -x "$emulator" ] || die "this machine has no Android emulator ($emulator)"
+
+stop=
+[ "${1:-}" = stop ] && { stop=1; shift; }
+# The emulator prints its notes on stdout too; a name has no space in it.
+avds=$("$emulator" -list-avds 2>/dev/null | grep -E '^[A-Za-z0-9._-]+$')
+if [ $# -ne 1 ] || ! grep -qxF -- "$1" <<<"$avds"; then
+  echo "usage: dots-emulator [stop] <avd>; AVDs here: ${avds//$'\n'/ }" >&2
+  exit 2
+fi
+avd=$1
+unit=dots-emulator-$avd.service
+
+# Prints the serial of the running emulator of the AVD, which its console names on the first line. Every adb call reads /dev/null: adb shell reads its stdin to the end, and would eat the rest of a script run as `ssh host bash -s`.
+serial() {
+  local s
+  for s in $(adb devices 2>/dev/null </dev/null | awk '$1 ~ /^emulator-[0-9]+$/ { print $1 }'); do
+    if [ "$(adb -s "$s" emu avd name 2>/dev/null </dev/null | head -1 | tr -d '\r')" = "$avd" ]; then
+      echo "$s"
+      return 0
+    fi
+  done
+  return 1
+}
+
+active() {
+  [ "$(systemctl --user is-active "$unit" 2>/dev/null)" = active ]
+}
+
+if [ -n "$stop" ]; then
+  systemctl --user stop "$unit" 2>/dev/null
+  # One started outside the unit ends through its console.
+  s=$(serial) && adb -s "$s" emu kill >/dev/null 2>&1 </dev/null
+  exit 0
+fi
+
+if ! serial >/dev/null && ! active; then
+  systemctl --user reset-failed "$unit" 2>/dev/null
+  systemd-run --user --unit="${unit%.service}" --collect --quiet \
+    "$emulator" -avd "$avd" -no-window -no-audio -no-boot-anim -no-snapshot \
+    -gpu swangle_indirect || die "systemd-run could not start $unit"
+fi
+
+for _ in $(seq 60); do
+  if s=$(serial); then
+    if [ "$(adb -s "$s" shell getprop sys.boot_completed 2>/dev/null </dev/null | tr -d '\r')" = 1 ]; then
+      echo "$s"
+      exit 0
+    fi
+  elif ! active; then
+    die "the emulator of $avd stopped; journalctl --user -u $unit and coredumpctl list say why"
+  fi
+  sleep 5
+done
+die "$avd did not finish booting in five minutes"
+}
