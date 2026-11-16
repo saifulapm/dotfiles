@@ -39,7 +39,7 @@ niri msg action fullscreen-window --id "$his"
 full() { niri msg -j windows | jq -e ".[] | select(.id == $his) | .layout.window_size == [$(niri msg -j outputs | jq -r '[.[] | .logical | .width, .height] | join(",")')]" >/dev/null; }
 until_ok 3000 full
 niri msg action spawn -- qs ipc call island focus
-island_holds() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+island_holds() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 until_ok 3000 island_holds
 sleep 0.3
 "$screen" type z >/dev/null

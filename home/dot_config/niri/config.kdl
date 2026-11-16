@@ -67,8 +67,8 @@ output "HDMI-A-1" {
     scale 1.0
 }
 
-// Notifications show only in the island, so a screencast leaves it out.
+// Notifications show only in the island, which draws in dots-surfaces with every surface, so a screencast leaves them all out.
 layer-rule {
-    match namespace="^dots-island$"
+    match namespace="^dots-surfaces$"
     block-out-from "screencast"
 }

@@ -43,7 +43,7 @@ click_island() {
   # shellcheck disable=SC2086
   point click $at
 }
-island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == $k)' >/dev/null; }
+island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 opened() { until_ok 2000 mode_is "$1" && until_ok 2000 island_focus Exclusive; }
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
 # An agent unlock turns the monitors off a second later, so the check wakes them as Saiful would.

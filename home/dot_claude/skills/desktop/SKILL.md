@@ -157,8 +157,8 @@ open, at 181 MiB idle, so drive its surfaces through `dots-call` instead. Chromi
   one, so a crop of a tiled window is a guess. Fullscreen it first (`niri msg action fullscreen-window
   --id N`, the same call toggles back) and capture the output:
   `grim -o "$(niri msg -j focused-output | jq -r .name)" ...`.
-- Shell surfaces are layers `dots-island`, `dots-surfaces`, `dots-margins`,
-  `dots-paper` and `dots-dim`: check `niri msg -j layers` before trusting an
+- Shell surfaces are layers `dots-surfaces` (the island and every surface),
+  `dots-margins`, `dots-paper` and `dots-dim`: check `niri msg -j layers` before trusting an
   empty shot. A surface closes on the next key or click, so chain open and
   grim in one call.
 

@@ -23,7 +23,7 @@ until_ok 5000 shell_status >/dev/null
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 ask_is() { local a=("$@"); island | jq -e "${a[@]:0:$#-1}" ".ask | ${a[-1]}" >/dev/null 2>&1; }
-island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == $k)' >/dev/null; }
+island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 mod_i() { niri msg action spawn -- dots-call island focus; }
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 # ask <id> <text> [recommend] [option...]

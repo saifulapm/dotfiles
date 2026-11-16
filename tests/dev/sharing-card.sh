@@ -10,7 +10,7 @@ reads() { [ "$(island_text)" = "$1" ]; }
 mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null; }
 rows() { island | jq -c '[.sharing.rows[] | [.text, .stop]]'; }
 rows_are() { [ "$(rows)" = "$1" ]; }
-island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == $k)' >/dev/null; }
+island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns Mod+I's command.
 mod_i() { niri msg action spawn -- dots-call island focus; until_ok 2000 mode_is sharingCard; until_ok 2000 island_focus Exclusive; }
 # cast <stream> <session> <target json> [kind] [pid]: a cast as niri reports it, PipeWire unless said.

@@ -866,6 +866,10 @@ Item {
     visible: !niri.edgeToEdge(niri.focusedOutput, output.width)
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
+    // The surface open inside the island by name, or null; what waits behind it, a count; and the prompt that took the island over, or null (SCNB8HVY).
+    property var surface: null
+    readonly property int waiting: 0
+    readonly property var takeover: null
     // The surfaces' window holds the keyboard for the island while this is true.
     readonly property bool wantsKeys: focused && !attaching
     // At rest the surfaces' window takes clicks only on this.

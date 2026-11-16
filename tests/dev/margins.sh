@@ -86,7 +86,8 @@ check "status reports one running timer" one_timer
 layers=$(niri msg -j layers)
 on_top() { jq -e --arg ns "$1" 'any(.[]; .namespace == $ns and .layer == "Top")' <<<"$layers" >/dev/null; }
 check "dots-margins is on the Top layer" on_top dots-margins
-check "dots-island is on the Top layer" on_top dots-island
+overlay() { jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay") and all(.[]; .namespace != "dots-island")' <<<"$layers" >/dev/null; }
+check "the island draws in dots-surfaces on the Overlay layer, and no dots-island layer remains" overlay
 
 # A visible that reads the window's own screen runs again while Quickshell sets that screen, and qs logs a binding loop.
 loops() { journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -A1 'Binding loop detected for property "visible"' | grep -o '[A-Za-z]*\.qml:[0-9]*' | sort -u | paste -sd' '; }

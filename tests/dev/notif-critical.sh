@@ -8,7 +8,7 @@ mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 shows() { island | jq -e --arg s "$1" '.mode == "notification" and (.text | contains($s))' >/dev/null 2>&1; }
 notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 in_history() { notifs | jq -e --arg s "$1" 'any(.summaries[]; . == $s)' >/dev/null; }
-island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-island" and .keyboard_interactivity == $k)' >/dev/null; }
+island_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns Mod+I's command through niri.
 mod_i_d() {
   niri msg action spawn -- dots-call island focus

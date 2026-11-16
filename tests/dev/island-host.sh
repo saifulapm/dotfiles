@@ -27,6 +27,13 @@ check "no layer is named dots-island" eval '! layer_up dots-island'
 until_ok 3000 island_is '.mode == "rest" and .shown'
 surfaces_keys() { layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 check "at rest the island shows and dots-surfaces holds no keyboard" surfaces_keys None
+check "at rest island state reads surface null, waiting 0 and takeover null ($(island | jq -c '{surface, waiting, takeover}'))" island_is '.surface == null and .waiting == 0 and .takeover == null'
+timeout 0.5 qs ipc call island focus
+until_ok 2000 surfaces_keys Exclusive
+check "Mod+I gives the island the keyboard through dots-surfaces" surfaces_keys Exclusive
+wtype -k Escape
+until_ok 2000 surfaces_keys None
+check "and Esc gives it back" surfaces_keys None
 
 notify-send hi
 until_ok 2000 island_is '.mode == "notification"'
