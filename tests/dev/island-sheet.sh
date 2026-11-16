@@ -27,7 +27,7 @@ check "its groups are SURFACES, IN SURFACES, WORK, WINDOWS, SYSTEM and TOUCHPAD 
 check "and it draws six columns ($(sheet | jq -c '[.columns[].name]'))" sheet_is '[.columns[].name] == .groups'
 in_surfaces() { sheet_is '(.columns[] | select(.name == "IN SURFACES") | .rows) as $r | ($r | any(.key == "Esc")) and (["launcher", "control", "notifications", "pass", "tailscale", "accounts", "dns", "goals"] - [$r[].surface] | length == 0)'; }
 check "IN SURFACES holds Esc and rows for the launcher, Control, Notifications, Pass, Tailscale, Accounts, DNS and Goals" in_surfaces
-check "the sheet draws no legend under its columns ($(sheet | jq -c .legendKeys))" sheet_is '.legendKeys == []'
+check "the sheet draws nothing under its columns, no legend ($(sheet | jq -c .belowColumns))" sheet_is '.belowColumns == 0'
 check "its heading reads Keys ($(sheet | jq -c .heading))" sheet_is '.heading == "Keys"'
 check "no veil is drawn: the pixel 10 px in from the bottom left corner is as it was ($(px 10 $((oh - 10))), was $corner_before)" test "$(px 10 $((oh - 10)))" = "$corner_before"
 

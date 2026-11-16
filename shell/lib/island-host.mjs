@@ -1,5 +1,5 @@
 // The island as the one host of the shell's surfaces: its approved motion (38G8XV1J), its resting shape and which arrivals take it from an open surface.
-import { springCurve } from './island.mjs';
+import { springCurve, pick } from './island.mjs';
 
 export const REST = { width: 176, height: 34 };
 // The concave corner that joins the island to the top edge on each side.
@@ -29,6 +29,9 @@ export function bottomRadius(from, to, e) {
   if (to === undefined) return radiusAt(from);
   return radiusAt(from) + (radiusAt(to) - radiusAt(from)) * e;
 }
+
+// What the island shows: an open surface outranks every slot (PCGX7JPJ), else the slots' own order.
+export const modeOf = (surface, slots) => (surface ? 'surface' : pick(slots));
 
 // Until the waiting dot (PCGX7JPJ), an open surface gives the island up to any slot that arrives: one empty before, or a notification or question that is a new one.
 export function surfaceYields(before, after) {

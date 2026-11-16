@@ -196,3 +196,10 @@ test('a row key draws as one chip per key, with the / between a pair dropped', (
   assert.deepEqual(chipsOf('1-9'), ['1-9']);
   assert.deepEqual(chipsOf('/'), ['/']);
 });
+
+test('a / that is the key itself stays a key, as the cheat sheet\'s own Mod / does', () => {
+  assert.deepEqual(chipsOf('Mod /'), ['Mod', '/']);
+  assert.deepEqual(chipsOf('Mod ⇧ /'), ['Mod', '⇧', '/']);
+  const own = parseBinds(readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8')).find((r) => r.title === 'Cheat Sheet' || /cheat/i.test(r.title));
+  assert.deepEqual(chipsOf(own.key), ['Mod', '/']);
+});

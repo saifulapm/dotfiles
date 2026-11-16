@@ -53,5 +53,41 @@ check "a click on the foot closes Control" control_is '.open == false'
 until_ok 2000 foot_focused
 check "and focuses that foot ($(focused))" foot_focused
 
+# A click on the island while a card is open is a click outside that card: it closes it, and the island opens nothing.
+island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+niri msg action spawn -- dots-call launcher toggle
+until_ok 3000 launcher_is '.open and .settled'
+read -r ix iy < <(timeout 0.5 qs ipc call island box island | jq -r '"\((.x + .w / 2) | floor) \((.y + .h / 2) | floor)"')
+point click "$ix" "$iy"
+until_ok 2000 launcher_is '.open == false'
+check "a click on the island closes the open launcher as a click outside" launcher_is '.open == false'
+check "and the island opens no calendar ($(timeout 0.5 qs ipc call island state | jq -c '{mode, focused}'))" island_is '.mode == "rest" and .focused == false'
+until_ok 2000 layer_keys None
+
+# The notification centre closes on a click outside and keeps its history.
+notifs_is() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+notify-send kept
+until_ok 3000 notifs_is '.count >= 1'
+count=$(timeout 0.5 qs ipc call notifs state | jq .count)
+niri msg action spawn -- dots-call notifs toggle
+until_ok 3000 notifs_is '.open'
+until_ok 2000 layer_keys Exclusive
+point click 40 $((oh - 40))
+until_ok 2000 notifs_is '.open == false'
+check "a click outside closes the notification centre" notifs_is '.open == false'
+check "and deletes nothing from its history ($count before, $(timeout 0.5 qs ipc call notifs state | jq .count) after)" notifs_is --argjson n "$count" '.count == $n'
+until_ok 2000 layer_keys None
+
+# The file picker answers its asker when a click outside closes it, so the asking app never hangs.
+answer=$DOTS_DEV_DIR/picker-answer
+request=$(jq -cn --arg f "$HOME" '{mode: "open", multiple: false, title: "", app: "", folder: $f, name: "", filters: [], filter: 0, accept: ""}')
+{ printf '%s\n' "$request"; sleep 8; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-picker-$WAYLAND_DISPLAY.sock" >"$answer" 2>/dev/null &
+picker_is() { timeout 0.5 dots-call picker state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+until_ok 4000 picker_is '.open'
+point click 40 $((oh - 40))
+until_ok 2000 picker_is '.open == false'
+check "a click outside closes the file picker" picker_is '.open == false'
+check "and the picker answers its asker ($(cat "$answer"))" until_ok 2000 grep -q '"response"' "$answer"
+
 exit "$fails"
 }

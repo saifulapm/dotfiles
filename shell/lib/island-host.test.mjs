@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { springCurve, ease } from './island.mjs';
-import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, surfaceYields } from './island-host.mjs';
+import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, surfaceYields, modeOf } from './island-host.mjs';
 
 test('the island opens and switches on springCurve(260, 0.7, 30), 362 ms where the old open took 611', () => {
   const m = hostMotion();
@@ -89,4 +89,12 @@ test('a second notification or a new question arriving over the first takes the 
 
 test('a state going away keeps the surface open', () => {
   assert.equal(surfaceYields({ notification: note, osd: { kind: 'volume', value: 40 } }, {}), false);
+});
+
+test('an open surface outranks every slot, a question and a lease card among them; with none open the slots rank as before', () => {
+  const all = { question: { id: 'Q1', text: 'q', options: [] }, leaseCard: true, notification: note, osd: { kind: 'volume', value: 40 } };
+  assert.equal(modeOf('cheatsheet', all), 'surface');
+  assert.equal(modeOf(null, all), 'question');
+  assert.equal(modeOf(null, { notification: note }), 'notification');
+  assert.equal(modeOf(null, {}), 'rest');
 });

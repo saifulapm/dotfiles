@@ -79,10 +79,12 @@ Item {
         if (shown)
             closedAt = Date.now();
         shown = false;
+        intro.stop();
+        introMs = introEnd;
     }
 
     // One Esc level: a query typed is cleared first, then the sheet closes (2TM85BFB).
-    function dismiss() {
+    function stepBack() {
         if (input.text !== "")
             input.text = "";
         else
@@ -129,7 +131,8 @@ Item {
             openRowWidth: openRowWidth,
             heading: heading.text,
             rowKeys: rowKeys,
-            legendKeys: []
+            // Whatever the sheet draws under its columns, as visible items after the list; the board draws nothing there.
+            belowColumns: Array.from(column.children).slice(Array.from(column.children).indexOf(list) + 1).filter(c => c.visible).length
         });
     }
 
@@ -206,7 +209,7 @@ Item {
                     clip: true
                     Keys.onPressed: event => {
                         if (event.key === Qt.Key_Escape)
-                            sheet.dismiss();
+                            sheet.stepBack();
                         else
                             return;
                         event.accepted = true;

@@ -165,7 +165,7 @@ Item {
             notice
         })
     // A surface open in the island outranks every slot; an arrival closes it instead (PCGX7JPJ).
-    readonly property string mode: surface ? "surface" : I.pick(slots)
+    readonly property string mode: H.modeOf(surface, slots)
     // The slots as they last were, so an arrival while a surface is open can be told from a state already live.
     property var slotsSeen: ({})
     signal surfaceYielded
@@ -184,7 +184,7 @@ Item {
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way; the rest picks its mode from the same slots it reads, so a slot that empties never meets a mode not yet moved on.
-    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(surface ? "surface" : I.pick(slots), slots, clock.now)
+    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(H.modeOf(surface, slots), slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -233,15 +233,18 @@ Item {
     property real progress: 1
     // Picked when a morph starts, since the mode that picks it changes in the same instant as the target.
     property var curve: null
-    // The last morph as drawn, for island state and the bench: open or close, the box it began from, and each frame's [ms since it began, box width, box height, window width, window height].
+    // The last morph as drawn, for island state and the bench: open or close, the box it began from, and each frame's [ms since it began, box width, box height, window width, window height, work ms].
     property string morphKind: ""
     property var morphFrom: null
     property var morphFrames: []
     property real morphT0: 0
-    // Called on each of the window's frames while the box morphs.
+    // When the window's frame began its scene graph sync and finished rendering, which the surfaces' window sets.
+    property real syncedAt: 0
+    property real renderedAt: 0
+    // Called on each of the window's frames while the box morphs; the last field is the frame's own work, sync to rendered, in ms.
     function swapped() {
         if (morphing.running)
-            morphFrames.push([Date.now() - morphT0, box.width, box.height, parent ? parent.width : 0, parent ? parent.height : 0]);
+            morphFrames.push([Date.now() - morphT0, box.width, box.height, parent ? parent.width : 0, parent ? parent.height : 0, renderedAt - syncedAt]);
     }
     // What the box last morphed for; a size change with the same content, such as a font loading or a theme switch, snaps instead.
     property string morphedFor: ""
@@ -765,6 +768,8 @@ Item {
     }
 
     function focusIsland() {
+        if (cardOpen)
+            return;
         if (mode === "lease")
             leaseOpen = true;
         else if (mode === "sharing")
@@ -901,6 +906,9 @@ Item {
     // The open surface's size as it asks for it, and the part its content draws in.
     property real surfaceWidth: 0
     property real surfaceHeight: 0
+    // True while a card not yet moved into the island is open; the island takes no input then.
+    property bool cardOpen: false
+    enabled: !cardOpen
     // True while the open surface's rows still fade in.
     property bool surfaceBusy: false
     // When the box and its content last came to rest, in ms since the epoch.

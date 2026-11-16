@@ -197,6 +197,14 @@ PanelWindow {
 
     Connections {
         target: host.contentItem.Window.window
+        function onBeforeSynchronizing() {
+            if (host.island)
+                host.island.syncedAt = Date.now();
+        }
+        function onAfterRendering() {
+            if (host.island)
+                host.island.renderedAt = Date.now();
+        }
         function onFrameSwapped() {
             host.island?.swapped();
             for (const s of host.all) {
@@ -261,8 +269,8 @@ PanelWindow {
             const at = s ? mapToItem(s, mouse.x, mouse.y) : null;
             if (!s || ClickLib.onCard(s, at.x, at.y))
                 mouse.accepted = false;
-            else if (s.dismiss)
-                s.dismiss();
+            else if (s.stepBack)
+                s.stepBack();
             else
                 s.close();
         }
@@ -304,6 +312,14 @@ PanelWindow {
         sourceComponent: Root.CheatSheet {
             theme: host.theme
         }
+    }
+
+    // While a card is open, a click on the island is a click outside that card, so the island takes no input.
+    Binding {
+        when: !!host.island
+        target: host.island
+        property: "cardOpen"
+        value: host.shown && !(host.cheatsheet?.shown ?? false)
     }
 
     Binding {
