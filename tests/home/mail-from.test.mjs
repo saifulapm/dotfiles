@@ -312,6 +312,57 @@ test('a domain decision on several selected mails changes nothing when one of th
   assert.equal(r.notmuch('dump'), before);
 });
 
+// Every From shape the parsers met one at a time: each db line gets a ledger category of its own, so the tags name the lines post-new filed the mail by, and the decision Kakoune and mail hey make must name that one sender or refuse.
+const fromShapes = [
+  { shape: 'plain address', from: 'ann@people.test', lines: ['ann@people.test'], filed: ['ann@people.test'], decides: 'ann@people.test' },
+  { shape: 'display name', from: 'Ann <ann@people.test>', lines: ['ann@people.test'], filed: ['ann@people.test'], decides: 'ann@people.test' },
+  { shape: 'quoted display name', from: '"Ann, A." <ann@people.test>', lines: ['ann@people.test'], filed: ['ann@people.test'], decides: 'ann@people.test' },
+  { shape: 'comment', from: 'ann@people.test (Ann)', lines: ['ann@people.test'], filed: ['ann@people.test'], decides: 'ann@people.test' },
+  { shape: 'list of yours and another', from: 'me@x.test, bob@y.test', lines: ['me@x.test', 'bob@y.test'], filed: ['bob@y.test'], refuses: ['sender_to_decide', /^From names two senders, me@x\.test and bob@y\.test; nothing was decided$/] },
+  { shape: 'list of two not yours', from: 'ann@people.test, bob@y.test', lines: ['ann@people.test', 'bob@y.test'], filed: ['bob@y.test'], refuses: ['sender_to_decide', /^From names two senders, ann@people\.test and bob@y\.test; nothing was decided$/] },
+  { shape: 'group', from: 'undisclosed: a@x.test, b@y.test;', lines: ['a@x.test', 'b@y.test'], filed: [], refuses: ['sender_to_decide', /^From names two senders, a@x\.test and b@y\.test; nothing was decided$/] },
+  { shape: 'encoded-word name holding a comma', from: '=?utf-8?q?Doe=2C_John?= <john@x.test>', lines: ['john@x.test'], filed: ['john@x.test'], decides: 'john@x.test' },
+  { shape: 'quoted address as the name', from: '"boss@corp.test" <evil@x.test>', lines: ['boss@corp.test', 'evil@x.test'], filed: ['evil@x.test'], decides: 'evil@x.test' },
+  { shape: 'non-ASCII name and address', from: 'Jörg <jörg@firma.test>', lines: ['jörg@firma.test'], filed: ['jörg@firma.test'], decides: 'jörg@firma.test' },
+  { shape: 'unclosed comment', from: 'evil@bad.test (x <ann@people.test>', lines: ['evil@bad.test', 'ann@people.test'], filed: ['ann@people.test'], refuses: ['sender_to_decide', /^no sender found for id:row@x\.test$/] },
+  { shape: 'two @', from: 'ann@evil@people.test', lines: ['ann@evil@people.test', 'evil@people.test', 'ann@evil'], filed: [], refuses: ['decide', /^ann@evil is not one plain address/] },
+  { shape: 'C0 control', from: 'Ann <ann\x01x@first.test>', lines: ['ann\x01x@first.test', 'annx@first.test'], filed: ['ann\x01x@first.test'], refuses: ['sender_to_decide', /^no sender found for id:row@x\.test$/] },
+  { shape: 'C0 control in a list', from: 'A <a@x1.test>, B <b\x01ob@second.test>', lines: ['a@x1.test', 'b\x01ob@second.test', 'bob@second.test'], filed: ['b\x01ob@second.test'], refuses: ['sender_to_decide', /^From names two senders, a@x1\.test and b ob@second\.test; nothing was decided$/] },
+  { shape: 'C1 control U+0085', from: 'Ann <ann\x85x@first.test>', lines: ['ann\x85x@first.test', 'annx@first.test'], filed: ['ann\x85x@first.test'], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
+  { shape: 'C1 control U+009B', from: 'Ann <ann\x9bx@first.test>', lines: ['ann\x9bx@first.test', 'annx@first.test'], filed: ['ann\x9bx@first.test'], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
+  { shape: 'line separator U+2028', from: 'Ann <ann x@first.test>', lines: ['ann x@first.test', 'annx@first.test'], filed: [], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
+  { shape: 'bidi mark U+202E', from: 'Bo <bo‮x@first.test>', lines: ['bo‮x@first.test', 'box@first.test'], filed: ['bo‮x@first.test'], decides: 'bo‮x@first.test' },
+];
+const decideRow = [
+  'import json, mail_engine as E',
+  'try: s = E.sender_to_decide("id:row@x.test")',
+  'except E.MailError as e: print(json.dumps(["sender_to_decide", str(e)])); raise SystemExit',
+  'try: print(json.dumps(["decides", E.decide("screen-in", s)]))',
+  'except E.MailError as e: print(json.dumps(["decide", str(e)]))',
+].join('\n');
+
+test("post-new and a decision name the same one sender for every shape of From, or the decision refuses", async (t) => {
+  for (const row of fromShapes) {
+    await t.test(row.shape, (t) => {
+      const r = hooked(t);
+      r.setDb('ledger.db', row.lines.map((a, i) => `c${i} ${a}\n`).join(''));
+      r.deliver({ From: row.from, 'Message-ID': '<row@x.test>' });
+      const filed = tagsOf(r, 'row@x.test').filter((x) => x.startsWith('ledger/c')).map((x) => row.lines[+x.slice(8)]);
+      assert.deepEqual(filed, row.filed);
+      const res = r.run('python3', ['-B', '-c', decideRow], { env: { ...r.env, PYTHONPATH: join(repo, 'bin'), PYTHONDONTWRITEBYTECODE: '1' } });
+      assert.equal(res.status, 0, res.stderr);
+      const [stage, said] = JSON.parse(res.stdout);
+      if (row.decides) {
+        assert.deepEqual([stage, said], ['decides', row.decides]);
+        assert.deepEqual(filed, [said]);
+      } else {
+        assert.equal(stage, row.refuses[0], said);
+        assert.match(said, row.refuses[1]);
+      }
+    });
+  }
+});
+
 test('a comment that holds a sender before another comment never stands in for it', (t) => {
   const r = hooked(t);
   r.setDb('screened.db', 'ann@people.test\n@vendor.test\n');
