@@ -4,34 +4,36 @@ import QtQuick
 import QtQuick.Layouts
 import "." as Root
 import "lib/cheatsheet.mjs" as Lib
-import "lib/voice.mjs" as V
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as T
 
-// Every titled niri bind and the touchpad's gestures in five columns, drawn in the Surfaces window.
+// Every titled niri bind, each surface's own keys and the touchpad's gestures in six columns, drawn inside the island on its fill.
 Item {
     id: sheet
 
     required property var theme
     property bool shown: false
     property var rows: []
-    // False until the binds file is first read and its rows are built, so the first open drops a full card.
+    // False until the binds file is first read and its rows are built.
     property bool bindsRead: false
     // How many row titles are cut short on screen, so a check can tell every bind apart.
     property int truncated: 0
     readonly property string query: input.text
-    readonly property var columns: Lib.columnsOf(Lib.groupRows(Lib.filterRows(rows, query)))
+    readonly property var columns: Lib.columnsOfSix(Lib.groupRowsSix(Lib.filterRows(rows, query)))
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+    // The island grows to this width for the sheet, as the boards draw it.
+    readonly property int wantWidth: 1160
 
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: V.listLook(theme.tokens)
-    readonly property Root.Motion motion: Root.Motion {
-        shown: sheet.shown
-        ready: sheet.bindsRead
-        tokens: sheet.theme.tokens
-    }
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and the tones lifted to read on its fill.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray" })
+
+    implicitHeight: column.implicitHeight
 
     function open(t0) {
         openT0 = t0;
@@ -40,56 +42,55 @@ Item {
         input.text = "";
         list.contentY = 0;
         shown = true;
-        keys.forceActiveFocus();
+        input.forceActiveFocus();
     }
 
     function close() {
         shown = false;
     }
 
-    // Called on each of the host window's frames; the first one after the open starts to play ends the timing, so a first open's load counts.
+    // One Esc level: a query typed is cleared first, then the sheet closes (2TM85BFB).
+    function dismiss() {
+        if (input.text !== "")
+            input.text = "";
+        else
+            close();
+    }
+
+    // Called on each of the host window's frames; the first one after the open ends the timing, so a first open's load counts.
     function swapped() {
-        if (motion.open && openT0 >= 0) {
+        if (shown && openT0 >= 0) {
             openMs = Date.now() - openT0;
             openT0 = -1;
         }
     }
 
     function state() {
-        // The keys as drawn, read from the row and legend items.
+        const drawn = [];
         const rowKeys = [];
         for (let i = 0; i < groupRepeater.count; i++) {
-            const col = groupRepeater.itemAt(i).columnGroups;
-            for (let k = 0; k < col.count; k++) {
-                const g = col.itemAt(k).groupRows;
-                for (let j = 0; j < g.count; j++)
-                    rowKeys.push(g.itemAt(j).keyLabel);
+            const g = groupRepeater.itemAt(i);
+            const rs = [];
+            for (let j = 0; j < g.groupRows.count; j++) {
+                const row = g.groupRows.itemAt(j);
+                rs.push({ key: row.modelData.key, surface: row.modelData.surface ?? null, width: row.width });
+                rowKeys.push(row.modelData.key);
             }
+            drawn.push({ name: g.entry.name, rows: rs });
         }
-        const legend = [];
-        for (let i = 0; i < legendRepeater.count; i++)
-            legend.push(legendRepeater.itemAt(i));
-        const r = topRule.mapToItem(null, 0, 0);
         return JSON.stringify({
             open: shown,
             rows: rows.length,
             truncated: truncated,
-            groups: Lib.GROUPS,
+            groups: Lib.GROUPS_SIX,
+            columns: drawn,
             query: query,
             openMs: openMs,
             opens: opens,
-            motion: motion.curves?.kind ?? null,
-            settleMs: motion.settleMs,
-            firstFrame: motion.firstFrame,
-            settled: motion.settled,
-            drawing: sheet.visible,
-            cardBox: card.drawnBox(),
-            heading: pill.text,
-            ruleBox: { x: r.x, y: r.y, w: topRule.width, h: topRule.height },
+            drawing: shown,
+            heading: heading.text,
             rowKeys: rowKeys,
-            legend: legend.map(p => p.keyLabel + " " + p.wordLabel).join("  "),
-            legendKeys: legend.map(p => p.keyLabel),
-            legendSpacing: legend.length ? legend[0].wordSpacing : 0
+            legendKeys: []
         });
     }
 
@@ -101,213 +102,159 @@ Item {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            sheet.rows = Lib.parseBinds(text()).concat(Lib.TOUCHPAD);
+            sheet.rows = Lib.parseBinds(text()).concat(Lib.IN_SURFACES, Lib.TOUCHPAD);
             sheet.bindsRead = true;
         }
         onLoadFailed: sheet.bindsRead = true
     }
 
-    visible: motion.drawing
+    // The click-outside test reads a press on this as one on the sheet.
+    ColumnLayout {
+        id: column
+        objectName: "card"
+        width: sheet.width
+        height: sheet.height
+        spacing: 8
 
-    Item {
-        id: keys
-        anchors.fill: parent
-        focus: true
-        Keys.onPressed: event => {
-            if (event.key === Qt.Key_Slash)
-                input.forceActiveFocus();
-            else if (event.key === Qt.Key_Escape)
-                sheet.close();
-            else
-                return;
-            event.accepted = true;
-        }
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 16
+            Layout.rightMargin: 16
+            Layout.topMargin: 16
+            spacing: 16
 
-        Rectangle {
-            anchors.fill: parent
-            color: card.wash
-        }
+            Text {
+                id: heading
+                textFormat: Text.PlainText
+                Layout.fillWidth: true
+                text: "Keys"
+                color: sheet.on
+                font.family: sheet.fonts.ui ?? ""
+                font.pixelSize: 15
+                font.weight: Font.Bold
+            }
 
-        Root.Surface {
-            id: card
-            x: Math.round((parent.width - width) / 2)
-            y: Math.round((parent.height - height) / 2)
-            width: Math.min(1160, parent.width - 48)
-            height: Math.min(column.implicitHeight, parent.height - 96)
-            tokens: sheet.theme.tokens
-            motion: sheet.motion
+            // The search field: a tile a shade above the island's fill; typing filters the rows.
+            Rectangle {
+                Layout.preferredWidth: 240
+                implicitHeight: 32
+                radius: 10
+                color: Qt.alpha(sheet.on, 0.06)
 
-            ColumnLayout {
-                id: column
-                anchors.fill: parent
-                spacing: 0
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 24
-                    Layout.rightMargin: 24
-                    Layout.topMargin: 18
-                    Layout.bottomMargin: 14
-                    spacing: 14
-
-                    Rectangle {
-                        implicitWidth: pill.implicitWidth + 18
-                        implicitHeight: pill.implicitHeight + 6
-                        radius: 8
-                        color: look.label.fill
-                        Text {
-                            id: pill
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: look.heading("keys", "")
-                            color: look.label.color
-                            font.family: fonts.ui
-                            font.pixelSize: 12
-                            font.weight: Font.Medium
-                        }
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        Layout.fillWidth: true
-                        text: "read from the niri binds · Mod = Super"
-                        elide: Text.ElideRight
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 12
-                    }
-                    TextInput {
-                        id: input
-                        visible: activeFocus || text !== ""
-                        Layout.preferredWidth: 220
-                        color: c.ink
-                        font.family: fonts.mono
-                        font.pixelSize: 12
-                        clip: true
-                        Keys.onPressed: event => {
-                            if (event.key === Qt.Key_Escape)
-                                sheet.close();
-                            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                                keys.forceActiveFocus();
-                            else
-                                return;
-                            event.accepted = true;
-                        }
-                    }
-                    Row {
-                        spacing: 8
-                        Repeater {
-                            model: look.keys([["/", "filter"], ["esc", "close"]])
-                            KeyPair {
-                                id: headKey
-                                required property int index
-                                theme: sheet.theme
-                                look: sheet.look
-
-                                // The first chip is / and the second esc, so a click on one does what its key does.
-                                Root.Click {
-                                    name: "cheatsheet-key:" + headKey.index
-                                    onTapped: headKey.index === 0 ? input.forceActiveFocus() : sheet.close()
-                                }
-                            }
-                        }
-                    }
+                Text {
+                    anchors.fill: input
+                    visible: input.text === ""
+                    verticalAlignment: Text.AlignVCenter
+                    textFormat: Text.PlainText
+                    text: "Search"
+                    color: sheet.tones.muted
+                    font: input.font
                 }
 
-                Rule {
-                    id: topRule
-                }
-
-                // Scrolls when the columns are taller than the screen leaves room for.
-                Flickable {
-                    id: list
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    implicitHeight: groups.implicitHeight + 36
-                    contentHeight: groups.implicitHeight + 36
+                TextInput {
+                    id: input
+                    anchors.fill: parent
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
+                    verticalAlignment: TextInput.AlignVCenter
+                    color: sheet.on
+                    font.family: sheet.fonts.ui ?? ""
+                    font.pixelSize: 13
                     clip: true
-                    boundsBehavior: Flickable.StopAtBounds
+                    Keys.onPressed: event => {
+                        if (event.key === Qt.Key_Escape)
+                            sheet.dismiss();
+                        else
+                            return;
+                        event.accepted = true;
+                    }
+                }
+            }
+        }
 
-                    Row {
-                        id: groups
-                        x: 24
-                        y: 18
-                        width: list.width - 48
-                        spacing: 28
+        // Scrolls when the columns are taller than the island's height cap leaves room for.
+        Flickable {
+            id: list
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            implicitHeight: groups.implicitHeight + 16
+            contentHeight: groups.implicitHeight + 16
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
+            Row {
+                id: groups
+                x: 16
+                width: list.width - 32
+                spacing: 16
+
+                Repeater {
+                    id: groupRepeater
+                    model: sheet.columns
+
+                    // A column holds one group: its caption, then its rows.
+                    Column {
+                        id: group
+                        required property var modelData
+                        readonly property var entry: modelData[0]
+                        readonly property alias groupRows: rowRepeater
+                        width: (groups.width - 5 * groups.spacing) / 6
+                        spacing: 6
+
+                        Text {
+                            textFormat: Text.PlainText
+                            bottomPadding: 2
+                            text: group.entry.name
+                            color: sheet.tones.muted
+                            font.family: sheet.fonts.ui ?? ""
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.2
+                            font.capitalization: Font.AllUppercase
+                        }
 
                         Repeater {
-                            id: groupRepeater
-                            model: sheet.columns
+                            id: rowRepeater
+                            model: group.entry.rows
 
-                            // A column holds one group, or SYSTEM with the touchpad under it.
-                            Column {
-                                id: column
+                            // A title, then its keys as 20 px chips.
+                            RowLayout {
+                                id: row
                                 required property var modelData
-                                readonly property alias columnGroups: columnRepeater
-                                width: (groups.width - 3 * groups.spacing) / 4
-                                spacing: 18
+                                width: group.width
+                                spacing: 6
 
-                                Repeater {
-                                    id: columnRepeater
-                                    model: column.modelData
+                                Text {
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    text: row.modelData.title
+                                    // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
+                                    wrapMode: Text.Wrap
+                                    onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
+                                    Component.onDestruction: if (truncated) sheet.truncated -= 1
+                                    color: sheet.on
+                                    font.family: sheet.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                }
 
-                                    Column {
-                                        id: group
-                                        required property var modelData
-                                        readonly property alias groupRows: rowRepeater
-                                        width: column.width
-                                        spacing: 6
-
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            bottomPadding: 4
-                                            text: group.modelData.name
-                                            color: look.small.color
-                                            font.family: look.small.font
-                                            font.pixelSize: look.small.size
-                                            font.letterSpacing: look.small.spacing
-                                        }
-
-                                        Repeater {
-                                            id: rowRepeater
-                                            model: group.modelData.rows
-
-                                            RowLayout {
-                                                required property var modelData
-                                                readonly property string keyLabel: rowKey.text
-                                                width: group.width
-                                                spacing: 6
-
-                                                Text {
-                                                    textFormat: Text.PlainText
-                                                    Layout.maximumWidth: group.width - rowKey.implicitWidth - 24
-                                                    text: modelData.title
-                                                    // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
-                                                    wrapMode: Text.Wrap
-                                                    onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
-                                                    Component.onDestruction: if (truncated) sheet.truncated -= 1
-                                                    color: c.ink
-                                                    font.family: fonts.ui
-                                                    font.pixelSize: 13
-                                                }
-                                                Text {
-                                                    textFormat: Text.PlainText
-                                                    Layout.fillWidth: true
-                                                    text: "........................................................................"
-                                                    clip: true
-                                                    color: c.line
-                                                    font.family: fonts.mono
-                                                    font.pixelSize: 11
-                                                }
-                                                Text {
-                                                    id: rowKey
-                                                    textFormat: Text.PlainText
-                                                    text: look.keyText(modelData.key)
-                                                    color: c.ink
-                                                    font.family: fonts.mono
-                                                    font.pixelSize: 11
-                                                    font.letterSpacing: look.small.spacing
-                                                }
+                                Row {
+                                    spacing: 3
+                                    Layout.alignment: Qt.AlignTop
+                                    Repeater {
+                                        model: Lib.chipsOf(row.modelData.key)
+                                        Rectangle {
+                                            required property string modelData
+                                            width: Math.max(20, chipText.implicitWidth + 12)
+                                            height: 20
+                                            radius: 10
+                                            color: Qt.alpha(sheet.on, 0.11)
+                                            Text {
+                                                id: chipText
+                                                anchors.centerIn: parent
+                                                textFormat: Text.PlainText
+                                                text: parent.modelData
+                                                color: sheet.on
+                                                font.family: sheet.fonts.mono ?? ""
+                                                font.pixelSize: 11
                                             }
                                         }
                                     }
@@ -316,45 +263,7 @@ Item {
                         }
                     }
                 }
-
-                Rule {}
-
-                // The keys every surface shares, in the launcher's legend chips.
-                Flow {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 14
-                    Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: 10
-                    Layout.bottomMargin: Layout.topMargin
-                    spacing: 8
-
-                    Text {
-                        textFormat: Text.PlainText
-                        height: implicitHeight + 6
-                        verticalAlignment: Text.AlignVCenter
-                        text: look.tabText("inside every surface")
-                        color: c.muted
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
-                    }
-
-                    Repeater {
-                        id: legendRepeater
-                        model: look.keys([["j/k", "move"], ["↵", "act"], ["/", "search"], ["⇥", "section"], ["esc", "close"]])
-                        KeyPair {
-                            theme: sheet.theme
-                            look: sheet.look
-                        }
-                    }
-                }
             }
         }
-    }
-
-    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
-    component Rule: Item {
-        Layout.fillWidth: true
-        implicitHeight: 1
     }
 }

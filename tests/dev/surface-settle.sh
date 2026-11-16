@@ -15,13 +15,14 @@ settles() {
   niri msg action spawn -- dots-call "$s" open >/dev/null
   until_ok 3000 surface_is "$s" .settled
   check "the $s settles as a spring in 340 to 400 ms ($(timeout 0.5 qs ipc call "$s" state | jq -c '[.motion, .settleMs, .firstFrame]'))" surface_is "$s" "$springs"
-  case $s in cheatsheet | control) check "the $s draws its first frame near the start of its open" from_start "$s" ;; esac
+  case $s in control) check "the $s draws its first frame near the start of its open" from_start "$s" ;; esac
   timeout 0.5 qs ipc call "$s" close >/dev/null
   until_ok 2000 surface_is "$s" '.drawing == false'
 }
 
 until_ok 5000 shell_status >/dev/null
-for s in launcher notifs cheatsheet goals control; do settles "$s"; done
+# The cheat sheet grows from the island on its own motion, which island-motion.sh times.
+for s in launcher notifs goals control; do settles "$s"; done
 # The launcher times its own close: 120 ms, so it feels instant, give or take a frame or so.
 check "the launcher's close took 100 to 170 ms, far shorter than its open ($(timeout 0.5 qs ipc call launcher state | jq -c '[.closeTookMs, .settleMs, .motionMs]'))" \
   surface_is launcher '.closeTookMs >= 100 and .closeTookMs <= 170 and .closeTookMs < .settleMs and .motionMs.close < .motionMs.open'

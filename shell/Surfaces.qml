@@ -256,8 +256,12 @@ PanelWindow {
         anchors.fill: parent
         onPressed: mouse => {
             const s = host.all.find(s => s?.shown);
-            if (!s || ClickLib.onCard(s, mouse.x, mouse.y))
+            // A surface in the island is drawn inside it, so the press is read in the surface's own coordinates.
+            const at = s ? mapToItem(s, mouse.x, mouse.y) : null;
+            if (!s || ClickLib.onCard(s, at.x, at.y))
                 mouse.accepted = false;
+            else if (s.dismiss)
+                s.dismiss();
             else
                 s.close();
         }
@@ -290,12 +294,42 @@ PanelWindow {
         }
     }
 
+    // The cheat sheet draws inside the island, on the island's fill, so it reads the scheme's own tokens.
     Loader {
         id: cheatsheetLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
         active: false
         sourceComponent: Root.CheatSheet {
-            theme: panelTheme
+            theme: host.theme
+        }
+    }
+
+    Binding {
+        when: !!host.island
+        target: host.island
+        property: "surface"
+        value: host.cheatsheet?.shown ? "cheatsheet" : null
+    }
+
+    Binding {
+        when: !!host.island && !!host.cheatsheet
+        target: host.island
+        property: "surfaceWidth"
+        value: host.cheatsheet?.wantWidth ?? 0
+    }
+
+    Binding {
+        when: !!host.island && !!host.cheatsheet
+        target: host.island
+        property: "surfaceHeight"
+        value: host.cheatsheet?.implicitHeight ?? 0
+    }
+
+    Connections {
+        target: host.island
+        function onSurfaceYielded() {
+            host.cheatsheet?.close();
         }
     }
 

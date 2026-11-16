@@ -164,7 +164,16 @@ Item {
             playing,
             notice
         })
-    readonly property string mode: I.pick(slots)
+    // A surface open in the island outranks every slot; an arrival closes it instead (PCGX7JPJ).
+    readonly property string mode: surface ? "surface" : I.pick(slots)
+    // The slots as they last were, so an arrival while a surface is open can be told from a state already live.
+    property var slotsSeen: ({})
+    signal surfaceYielded
+    onSlotsChanged: {
+        if (surface && H.surfaceYields(slotsSeen, slots))
+            surfaceYielded();
+        slotsSeen = slots;
+    }
     // When the current mode began, in ms since the epoch, so a check can time a mode without polling error.
     property real modeSince: Date.now()
     onModeChanged: {
@@ -174,8 +183,8 @@ Item {
         if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
             release();
     }
-    // The lease's text is read back from what is drawn, since each theme words it its own way.
-    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(mode, slots, clock.now)
+    // The lease's text is read back from what is drawn, since each theme words it its own way; the rest picks its mode from the same slots it reads, so a slot that empties never meets a mode not yet moved on.
+    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(surface ? "surface" : I.pick(slots), slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -202,17 +211,19 @@ Item {
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
-            osd: [osdLook.width, osdLook.height]
+            osd: [osdLook.width, osdLook.height],
+            // An open surface's own width and height, up to the output's less 48 px each way (PMQRFEYY, M4SVCQVQ).
+            surface: [Math.min(surfaceWidth, output.width - 48), Math.min(surfaceHeight, output.height - 48)]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading", "surface"].indexOf(mode) < 0 ? "label" : mode
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
     readonly property var motion: I.islandMotion(!!theme.tokens)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart].some(p => p.busy)
+    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy)
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -864,14 +875,18 @@ Item {
 
     // The output the island follows, niri's focused one, as the surfaces' window it draws in does.
     readonly property var output: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
-    // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it.
-    visible: !niri.edgeToEdge(niri.focusedOutput, output.width)
+    // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it; an open surface shows over it (BRQAT409).
+    visible: !!surface || !niri.edgeToEdge(niri.focusedOutput, output.width)
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
     property real fillStartedAt: 0
     property real fillEndedAt: 0
     // The surface open inside the island by name, or null; what waits behind it, a count; and the prompt that took the island over, or null (SCNB8HVY).
     property var surface: null
+    // The open surface's size as it asks for it, and the part its content draws in.
+    property real surfaceWidth: 0
+    property real surfaceHeight: 0
+    readonly property Item surfaceSlot: surfacePart
     readonly property int waiting: 0
     readonly property var takeover: null
     // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
@@ -1837,6 +1852,17 @@ Item {
                         }
                     }
                 }
+            }
+
+            // The open surface's content, laid out at its target size from the first frame so it never reflows mid-morph; the surfaces' window parents it here.
+            IslandPart {
+                id: surfacePart
+                shown: island.part === "surface"
+                key: island.surface ?? ""
+                swap: island.motion?.swap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.surface[0]
+                height: island.sizes.surface[1]
             }
 
             IslandPart {

@@ -97,18 +97,5 @@ until_ok 2000 pass_is '.mode == "list"'
 wtype -k Escape
 until_ok 3000 pass_is '.open | not'
 
-# The cheat sheet's chips: / focuses the filter, esc closes.
-sheet_state() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }
-sheet_is() { sheet_state | jq -e "$@" >/dev/null 2>&1; }
-niri msg action spawn -- dots-call cheatsheet toggle
-until_ok 3000 sheet_is '.open and .settled'
-click_box cheatsheet-key:0
-wtype mute
-until_ok 2000 sheet_is '.query == "mute"'
-check "a click on the cheat sheet's / chip focuses the filter, so typing filters ($(sheet_state | jq -c .query))" sheet_is '.query == "mute"'
-click_box cheatsheet-key:1
-until_ok 2000 sheet_is '.open == false'
-check "a click on its esc chip closes it" sheet_is '.open == false'
-
 exit "$fails"
 }

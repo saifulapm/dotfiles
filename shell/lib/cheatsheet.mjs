@@ -117,3 +117,6 @@ export function filterRows(rows, query) {
   const q = query.toLowerCase();
   return rows.filter((r) => r.title.toLowerCase().includes(q) || r.key.toLowerCase().includes(q));
 }
+
+// A row's key as the chips it draws: one per key, the / between a pair dropped, unless the key is / itself.
+export const chipsOf = (key) => (key === '/' ? ['/'] : key.split(' ').filter((p) => p && p !== '/'));

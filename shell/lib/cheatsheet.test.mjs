@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { parseBinds, groupRows, columnsOf, filterRows, TOUCHPAD, GROUPS_SIX, IN_SURFACES, groupRowsSix, columnsOfSix } from './cheatsheet.mjs';
+import { parseBinds, groupRows, columnsOf, filterRows, TOUCHPAD, GROUPS_SIX, IN_SURFACES, groupRowsSix, columnsOfSix, chipsOf } from './cheatsheet.mjs';
 
 const binds = readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8');
 const row = (line) => parseBinds(line)[0];
@@ -187,4 +187,12 @@ test('every IN SURFACES row names a key its surface\'s code handles, a shared ro
       for (const p of want) assert.ok(p.test(code), `${s} ${r.key} ${r.title}: no ${p}`);
     }
   }
+});
+
+test('a row key draws as one chip per key, with the / between a pair dropped', () => {
+  assert.deepEqual(chipsOf('Mod ⇧ T'), ['Mod', '⇧', 'T']);
+  assert.deepEqual(chipsOf('J / K'), ['J', 'K']);
+  assert.deepEqual(chipsOf('Esc'), ['Esc']);
+  assert.deepEqual(chipsOf('1-9'), ['1-9']);
+  assert.deepEqual(chipsOf('/'), ['/']);
 });

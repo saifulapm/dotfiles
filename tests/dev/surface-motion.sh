@@ -78,7 +78,7 @@ check "opening the cheat sheet mid-close stops the launcher drawing at once" sta
 timeout 0.5 qs ipc call cheatsheet close >/dev/null
 until_ok 9000 sheet_is '.drawing == false'
 
-# Every other surface's card springs too, read from the card as drawn rather than from its Motion.
+# Every other surface's card springs too, read from the card as drawn rather than from its Motion; the cheat sheet grows from the island instead.
 surface_is() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -e "$2" >/dev/null; }
 card_w() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -r .cardBox.w; }
 # springs <target> <open command> <close command>: the card 300 ms into a 20x open, then at rest.
@@ -95,7 +95,7 @@ springs() {
   check "the $1 card still draws as its close plays" surface_is "$1" .drawing
   until_ok 9000 surface_is "$1" '.drawing == false'
 }
-for s in notifs cheatsheet goals control; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
+for s in notifs goals control; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
 springs record "qs ipc call record toggle" "qs ipc call record toggle"
 # pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent, as in polkit.sh.
 fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
