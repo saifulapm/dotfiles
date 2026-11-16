@@ -71,9 +71,9 @@ PanelWindow {
             launcher.close();
         catchKeys();
     }
-    // One thing holds the island at a time, so a surface that opens takes the keyboard from the island.
+    // One thing holds the island at a time, so a surface that opens takes the keyboard from the island, unless the island opened it for an attachment.
     onShownChanged: {
-        if (shown)
+        if (shown && !(island?.attaching ?? false))
             island?.release();
         catchKeys();
     }

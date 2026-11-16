@@ -870,8 +870,8 @@ Item {
     property var surface: null
     readonly property int waiting: 0
     readonly property var takeover: null
-    // The surfaces' window holds the keyboard for the island while this is true.
-    readonly property bool wantsKeys: focused && !attaching
+    // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
+    readonly property bool wantsKeys: focused && !attaching && visible
     // At rest the surfaces' window takes clicks only on this.
     readonly property Item maskItem: box
 

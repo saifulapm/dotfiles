@@ -71,7 +71,8 @@ mkdir -p "$fake/files"
 echo report >"$fake/files/report.txt"
 wtype -k a
 until_ok 4000 eval 'pk_state | jq -e ".open and .settled and .listed" >/dev/null'
-check "a opens the file picker, which takes the keyboard" island_focus None
+# The picker draws in the island's window, so it holds that window's keyboard; the keys typed into it next prove it has them.
+check "a opens the file picker, which takes the keyboard" eval 'island_focus Exclusive && pk_state | jq -e .open >/dev/null'
 wtype -M ctrl l -m ctrl
 until_ok 2000 eval 'pk_state | jq -e .pathMode >/dev/null'
 wtype "$fake/files/" -k Return

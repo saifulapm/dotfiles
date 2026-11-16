@@ -34,14 +34,14 @@ check "screen key Return into it exits 3 too" test $? = 3
 "$screen" type x --any
 check "while --any lets screen type x reach it" until_ok 2000 read_is his x
 
-# niri gives the keys to a fullscreen window ahead of a Top-layer surface holding them, so the Island focused over Saiful's fullscreen foot holds nothing.
+# The island hides over a fullscreen window, so Mod+I there gives it no keyboard and Saiful's fullscreen foot holds nothing for screen.
 niri msg action fullscreen-window --id "$his"
 full() { niri msg -j windows | jq -e ".[] | select(.id == $his) | .layout.window_size == [$(niri msg -j outputs | jq -r '[.[] | .logical | .width, .height] | join(",")')]" >/dev/null; }
 until_ok 3000 full
 niri msg action spawn -- qs ipc call island focus
 island_holds() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-until_ok 3000 island_holds
-sleep 0.3
+sleep 0.5
+check "the Island focused over his fullscreen foot takes no keyboard" eval '! island_holds'
 "$screen" type z >/dev/null
 rc=$?
 check "the Island focused over his fullscreen foot: screen type z exits 3 (got $rc)" test "$rc" = 3
