@@ -104,10 +104,12 @@ Item {
         for (let i = 0; i < groupRepeater.count; i++) {
             const g = groupRepeater.itemAt(i);
             const rs = [];
-            for (let j = 0; j < g.groupRows.count; j++) {
-                const row = g.groupRows.itemAt(j);
-                rs.push({ key: row.modelData.key, surface: row.modelData.surface ?? null, width: row.width });
-                rowKeys.push(row.modelData.key);
+            for (const r of [g.groupRows, g.tailRows]) {
+                for (let j = 0; j < r.count; j++) {
+                    const row = r.itemAt(j);
+                    rs.push({ key: row.entry.key, surface: row.entry.surface ?? null, width: row.width });
+                    rowKeys.push(row.entry.key);
+                }
             }
             drawn.push({ name: g.entry.name, rows: rs });
         }
@@ -239,6 +241,7 @@ Item {
                         required property var modelData
                         readonly property var entry: modelData[0]
                         readonly property alias groupRows: rowRepeater
+                        readonly property alias tailRows: tailRepeater
                         width: (groups.width - 5 * groups.spacing) / 6
                         spacing: 6
 
@@ -257,62 +260,83 @@ Item {
                             font.capitalization: Font.AllUppercase
                         }
 
+                        // The first seven rows come in one by one.
                         Repeater {
                             id: rowRepeater
-                            model: group.entry.rows
+                            model: group.entry.rows.slice(0, 7)
 
-                            // A title, then its keys as 20 px chips.
-                            RowLayout {
+                            KeyRow {
                                 id: row
                                 required property var modelData
                                 required property int index
+                                entry: modelData
                                 width: group.width
-                                spacing: 6
                                 opacity: sheet.rowIn(2 + index)
                                 transform: Translate {
                                     y: H.rowFade(2 + row.index).rise * (1 - sheet.rowIn(2 + row.index))
                                 }
+                            }
+                        }
 
-                                Text {
-                                    textFormat: Text.PlainText
-                                    Layout.fillWidth: true
-                                    text: row.modelData.title
-                                    // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
-                                    wrapMode: Text.Wrap
-                                    onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
-                                    Component.onDestruction: if (truncated) sheet.truncated -= 1
-                                    color: sheet.on
-                                    font.family: sheet.fonts.ui ?? ""
-                                    font.pixelSize: 13
-                                }
+                        // The rest come in together with the tenth, past rowFade's cap, so a long column costs one fade.
+                        Column {
+                            width: group.width
+                            spacing: 6
+                            opacity: sheet.rowIn(9)
+                            transform: Translate {
+                                y: H.rowFade(9).rise * (1 - sheet.rowIn(9))
+                            }
 
-                                Row {
-                                    spacing: 3
-                                    Layout.alignment: Qt.AlignTop
-                                    Repeater {
-                                        model: Lib.chipsOf(row.modelData.key)
-                                        Rectangle {
-                                            required property string modelData
-                                            width: Math.max(20, chipText.implicitWidth + 12)
-                                            height: 20
-                                            radius: 10
-                                            color: Qt.alpha(sheet.on, 0.11)
-                                            Text {
-                                                id: chipText
-                                                anchors.centerIn: parent
-                                                textFormat: Text.PlainText
-                                                text: parent.modelData
-                                                color: sheet.on
-                                                font.family: sheet.fonts.mono ?? ""
-                                                font.pixelSize: 11
-                                            }
-                                        }
-                                    }
+                            Repeater {
+                                id: tailRepeater
+                                model: group.entry.rows.slice(7)
+
+                                KeyRow {
+                                    required property var modelData
+                                    entry: modelData
+                                    width: group.width
                                 }
                             }
                         }
                     }
                 }
+            }
+        }
+    }
+
+    // A title, then its keys in one 20 px chip; a chip per key cost the shell 10 MiB of idle memory across the sheet's rows.
+    component KeyRow: RowLayout {
+        required property var entry
+        spacing: 6
+
+        Text {
+            textFormat: Text.PlainText
+            Layout.fillWidth: true
+            text: parent.entry.title
+            // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
+            wrapMode: Text.Wrap
+            onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
+            Component.onDestruction: if (truncated) sheet.truncated -= 1
+            color: sheet.on
+            font.family: sheet.fonts.ui ?? ""
+            font.pixelSize: 13
+        }
+
+        Rectangle {
+            Layout.alignment: Qt.AlignTop
+            implicitWidth: Math.max(20, keyText.implicitWidth + 12)
+            implicitHeight: 20
+            radius: 10
+            color: Qt.alpha(sheet.on, 0.11)
+
+            Text {
+                id: keyText
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: Lib.chipsOf(parent.parent.entry.key).join("  ")
+                color: sheet.on
+                font.family: sheet.fonts.mono ?? ""
+                font.pixelSize: 11
             }
         }
     }
