@@ -35,6 +35,8 @@ ShellRoot {
             return;
         surfacesLoader.component = compiled("Surfaces.qml");
         desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService, lock: lockScope });
+        // The resting island draws in the surfaces' window, so the window is made with the Desk; the surfaces in it still warm a second later.
+        surfacesLoader.active = true;
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
         pinentry = compiled("Pinentry.qml").createObject(root, { surfaces: surfacesLoader });
         portal = compiled("Portal.qml").createObject(root, { surfaces: surfacesLoader });
@@ -51,7 +53,7 @@ ShellRoot {
                     })));
     }
 
-    // A second after the first frame the surfaces are made in the background, so even a first open is warm; an open before then is still cold, which is what just bench times.
+    // A second after the first frame each surface is made in the background, so even a first open is warm; an open before then is still cold, which is what just bench times.
     Root.Tick {
         id: warmStart
         interval: 1000
@@ -277,7 +279,7 @@ ShellRoot {
         }
     }
 
-    // Stands in for a LazyLoader: Surfaces compiles after the first frame and is made a second later or on the first open, whichever comes first.
+    // Stands in for a LazyLoader: Surfaces compiles after the first frame and is made with the Desk, or on an open before then.
     QtObject {
         id: surfacesLoader
 

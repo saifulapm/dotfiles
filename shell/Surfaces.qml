@@ -198,6 +198,9 @@ PanelWindow {
         }
     }
 
+    // The window follows niri's focused output (N0107CYM), as the island in it does.
+    readonly property var output: Quickshell.screens.find(s => s.name === niri?.focusedOutput) ?? Quickshell.screens[0]
+    screen: output
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "dots-surfaces"
     WlrLayershell.keyboardFocus: shown || overview ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
