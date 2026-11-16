@@ -33,7 +33,7 @@ check "at exactly 440 px" eval 'island | jq -e ".drawn == 440 and .width == 440"
 until_ok 7000 mode_is rest
 read -r _ took < <(watch_morph)
 check "closing back to the clock settles faster than opening (${took} ms)" test "$took" -le 600
-check "at the clock's own width" eval 'island | jq -e ".drawn == .width and .width < 100" >/dev/null'
+check "at the resting island's 176 px" eval 'island | jq -e ".drawn == .width and .width == 176" >/dev/null'
 
 exit $((fails > 0))
 }
