@@ -57,9 +57,16 @@ median() { printf '%s\n' "$@" | sort -n | sed -n 3p; }
 first_frame=$(median "${frames[@]}")
 cold=$(median "${colds[@]}")
 schemes_cold=$(median "${schemes_colds[@]}")
-sleep 0.3
-warm=$(open_once 3) || exit 1
-schemes_warm=$(schemes_once 4) || exit 1
+# A warm open read once, during the surfaces' warm-up, swung from 3 to 25 ms on one tree, so each warm row is the median of five opens once the shell has settled.
+sleep 2
+warms=() schemes_warms=()
+for i in 0 1 2 3 4; do
+  warms+=("$(open_once $((3 + 2 * i)))") || exit 1
+  schemes_warms+=("$(schemes_once $((4 + 2 * i)))") || exit 1
+done
+echo "     warm opens: ${warms[*]}; c mode warm opens: ${schemes_warms[*]}"
+warm=$(median "${warms[@]}")
+schemes_warm=$(median "${schemes_warms[@]}")
 
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
