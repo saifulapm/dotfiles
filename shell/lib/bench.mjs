@@ -1,12 +1,43 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
 
 // idle RSS is 200 MiB (#7S2JD316, #KSH3FVWD): GL reads 172 MiB, no lever reached 150 without costing real memory, the picker's specimens add 3-7 MiB, and by m24 every start read 194-198.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0 };
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0, morphMaxMs: 20, morphP95Ms: 12 };
+
+// The measured baseline of every row that has one (mem fact 76XT47G6, just bench at d77a9e69).
+export const BASELINE = { firstFrameMs: 170, rssMiB: 204, coldMs: 38, warmMs: 3, schemesColdMs: 35, schemesWarmMs: 16, passColdMs: 3, filesColdMs: 11, switchMs: 114, idleCpu: 0.13 };
+
+// The run-to-run spread a row may add to its baseline.
+export const SPREAD = { firstFrameMs: 10, rssMiB: 0, coldMs: 17, warmMs: 17, schemesColdMs: 17, schemesWarmMs: 17, passColdMs: 17, filesColdMs: 17, switchMs: 17, idleCpu: 0.02 };
+
+// The c mode, pass and files rows answer to the panel's budgets.
+const BUDGET_KEY = { schemesColdMs: 'coldMs', schemesWarmMs: 'warmMs', passColdMs: 'coldMs', filesColdMs: 'coldMs' };
+
+// A row inside its budget stays inside it; a row already over its budget may not get worse than its baseline plus the spread.
+export function limits(budgets, baseline, spread) {
+  const out = {};
+  for (const k of Object.keys(baseline)) {
+    const budget = budgets[BUDGET_KEY[k] ?? k];
+    const cap = Math.round((baseline[k] + spread[k]) * 1e6) / 1e6;
+    out[k] = baseline[k] > budget ? cap : Math.min(budget, cap);
+  }
+  return out;
+}
+
+// The longest frame interval and the 95th percentile (nearest rank) of a morph's frame intervals in ms.
+export function frameStats(intervalsMs) {
+  if (intervalsMs.length === 0) return null;
+  const sorted = intervalsMs.slice().sort((a, b) => a - b);
+  return { max: sorted[sorted.length - 1], p95: sorted[Math.ceil(0.95 * sorted.length) - 1] };
+}
 
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
 
-export function report(m, b) {
+export function report(m, budgets) {
+  const b = Object.assign({}, budgets, limits(budgets, BASELINE, SPREAD));
+  const morph = (name, s) => (s
+    ? line(name, `${s.max}/${s.p95}`, 'ms', '≤', `${b.morphMaxMs}/${b.morphP95Ms}`, s.max <= b.morphMaxMs && s.p95 <= b.morphP95Ms)
+    : `${name.padEnd(13)} none`);
   // GPU buffers are shmem, so a lever that moves memory out of RSS into them only shows here; reported, not budgeted.
   const cgroup = `${'cgroup mem'.padEnd(13)} ${Math.floor(m.anonShmemKiB / 1024)} MiB`;
   const checks = [
@@ -16,12 +47,12 @@ export function report(m, b) {
     line('panel cold', m.coldMs, 'ms', '≤', b.coldMs, m.coldMs <= b.coldMs),
     line('panel warm', m.warmMs, 'ms', '≤', b.warmMs, m.warmMs <= b.warmMs),
     // The launcher's colorscheme mode, its forty rows and strips, answers to the launcher's budgets; cold is its first open after a start.
-    line('c mode cold', m.schemesColdMs, 'ms', '≤', b.coldMs, m.schemesColdMs <= b.coldMs),
-    line('c mode warm', m.schemesWarmMs, 'ms', '≤', b.warmMs, m.schemesWarmMs <= b.warmMs),
+    line('c mode cold', m.schemesColdMs, 'ms', '≤', b.schemesColdMs, m.schemesColdMs <= b.schemesColdMs),
+    line('c mode warm', m.schemesWarmMs, 'ms', '≤', b.schemesWarmMs, m.schemesWarmMs <= b.schemesWarmMs),
     // Pass's first open after its 30 s unload, which loads it again.
-    line('pass cold', m.passColdMs, 'ms', '≤', b.coldMs, m.passColdMs <= b.coldMs),
+    line('pass cold', m.passColdMs, 'ms', '≤', b.passColdMs, m.passColdMs <= b.passColdMs),
     // The file picker's first open after its 30 s unload, from the request's arrival to its first frame.
-    line('files cold', m.filesColdMs, 'ms', '≤', b.coldMs, m.filesColdMs <= b.coldMs),
+    line('files cold', m.filesColdMs, 'ms', '≤', b.filesColdMs, m.filesColdMs <= b.filesColdMs),
     line('timers', m.timers, '', '=', b.timers, m.timers === b.timers),
     line('theme switch', m.switchMs, 'ms', '≤', b.switchMs, m.switchMs <= b.switchMs),
     // Read at rest on the dot paper: m1's 0.02 % plus 0.05.
@@ -38,10 +69,13 @@ export function report(m, b) {
     line('deen frame', m.deenFirstFrameMs, 'ms', '≤', b.appFirstFrameMs, m.deenFirstFrameMs <= b.appFirstFrameMs),
     line('deen rss', Math.floor(m.deenRssKiB / 1024), 'MiB', '≤', b.appRssMiB, m.deenRssKiB <= b.appRssMiB * 1024),
     line('deen closed', m.deenLeft, 'left', '=', b.appLeft, m.deenLeft === b.appLeft),
+    // The island's morph in and out, from the frame intervals the shell recorded; a morph that was not timed fails.
+    morph('morph open', m.morphOpen),
+    morph('morph close', m.morphClose),
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
-  return { lines: [...checks.slice(0, 2), cgroup, ...checks.slice(2), switched], over: checks.some((l) => l.endsWith('OVER')) };
+  return { lines: [...checks.slice(0, 2), cgroup, ...checks.slice(2), switched], over: checks.some((l) => l.endsWith('OVER') || l.endsWith(' none')) };
 }
 
 // Round the list and back again from start: with three themes that is each of the six ordered pairs once.
@@ -68,8 +102,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const [appFirstFrameMs, appRssKiB, appLeft] = process.argv.slice(15, 18).map(Number);
   const [dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft] = process.argv.slice(18, 21).map(Number);
   const [deenFirstFrameMs, deenRssKiB, deenLeft] = process.argv.slice(21, 24).map(Number);
+  const pair = (a) => (a.length === 2 ? { max: Number(a[0]), p95: Number(a[1]) } : null);
+  const morphOpen = pair(process.argv.slice(24, 26));
+  const morphClose = pair(process.argv.slice(26, 28));
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, schemesColdMs, schemesWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, schemesColdMs, schemesWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, morphOpen, morphClose, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),
@@ -80,6 +117,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     appFirstFrameMs: env('DOTS_BUDGET_APP_FIRST_FRAME_MS', BUDGETS.appFirstFrameMs),
     appRssMiB: env('DOTS_BUDGET_APP_RSS_MIB', BUDGETS.appRssMiB),
     appLeft: env('DOTS_BUDGET_APP_LEFT', BUDGETS.appLeft),
+    morphMaxMs: env('DOTS_BUDGET_MORPH_MAX_MS', BUDGETS.morphMaxMs),
+    morphP95Ms: env('DOTS_BUDGET_MORPH_P95_MS', BUDGETS.morphP95Ms),
   });
   console.log(r.lines.join('\n'));
   process.exit(r.over ? 1 : 0);

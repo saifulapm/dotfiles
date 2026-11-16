@@ -1,27 +1,46 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { report, switchCycle, BUDGETS } from './bench.mjs';
+import { report, switchCycle, limits, frameStats, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 48, warmMs: 4, schemesColdMs: 41, schemesWarmMs: 9, passColdMs: 37, filesColdMs: 33, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03' };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 } };
+const rest = ['180224', '0', '180', '131072', '0', '220', '141072', '0'];
+const head = ['130', '152576', '38', '4', '1', '0.03', '120', '157000', '236544', '35', '9', '3', '11', '310'];
+const morph = ['14', '9', '15', '10'];
+const args = [...head, ...rest];
 
-test('every measure within budget reads ok and passes', () => {
+test('the limits are the budget or the baseline plus its spread, whichever holds a row tighter', () => {
+  assert.deepEqual(limits(BUDGETS, BASELINE, SPREAD), {
+    firstFrameMs: 180,
+    rssMiB: 204,
+    idleCpu: 0.15,
+    switchMs: 131,
+    coldMs: 50,
+    warmMs: 16,
+    schemesColdMs: 50,
+    schemesWarmMs: 16,
+    passColdMs: 20,
+    filesColdMs: 28,
+  });
+});
+
+test('every measure within its limit reads ok and passes', () => {
   const r = report(good, BUDGETS);
   assert.equal(r.over, false);
   assert.deepEqual(r.lines, [
-    'first frame   130 ms  ≤ 150 ms   ok',
-    'idle rss      149 MiB ≤ 200 MiB  ok',
+    'first frame   130 ms  ≤ 180 ms   ok',
+    'idle rss      149 MiB ≤ 204 MiB  ok',
     'cgroup mem    231 MiB',
-    'panel cold    48 ms   ≤ 50 ms    ok',
+    'panel cold    38 ms   ≤ 50 ms    ok',
     'panel warm    4 ms    ≤ 16 ms    ok',
-    'c mode cold   41 ms   ≤ 50 ms    ok',
+    'c mode cold   35 ms   ≤ 50 ms    ok',
     'c mode warm   9 ms    ≤ 16 ms    ok',
-    'pass cold     37 ms   ≤ 50 ms    ok',
-    'files cold    33 ms   ≤ 50 ms    ok',
+    'pass cold     3 ms    ≤ 20 ms    ok',
+    'files cold    11 ms   ≤ 28 ms    ok',
     'timers        1       = 1        ok',
-    'theme switch  120 ms  ≤ 300 ms   ok',
-    'idle cpu      0.03 %  ≤ 0.07 %   ok',
+    'theme switch  120 ms  ≤ 131 ms   ok',
+    'idle cpu      0.03 %  ≤ 0.15 %   ok',
     'app 1st frame 310 ms  ≤ 500 ms   ok',
     'app open rss  176 MiB ≤ 250 MiB  ok',
     'app closed    0 left  = 0 left   ok',
@@ -31,6 +50,8 @@ test('every measure within budget reads ok and passes', () => {
     'deen frame    220 ms  ≤ 500 ms   ok',
     'deen rss      137 MiB ≤ 250 MiB  ok',
     'deen closed   0 left  = 0 left   ok',
+    'morph open    14/9 ms ≤ 20/12 ms ok',
+    'morph close   15/10 ms ≤ 20/12 ms ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -41,28 +62,51 @@ test('one measure over its budget reads OVER and fails', () => {
   assert.equal(r.lines[4], 'panel warm    17 ms   ≤ 16 ms    OVER');
 });
 
-test('a first frame of 150 ms passes and 160 ms is OVER', () => {
-  assert.equal(report({ ...good, firstFrameMs: 150 }, BUDGETS).over, false);
-  assert.equal(report({ ...good, firstFrameMs: 160 }, BUDGETS).over, true);
+test('a first frame of 180 ms passes and 181 ms is OVER', () => {
+  assert.equal(report({ ...good, firstFrameMs: 180 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, firstFrameMs: 181 }, BUDGETS).over, true);
 });
 
-test('RSS a KiB over the 200 MiB budget is OVER, not rounded down into it', () => {
-  assert.equal(report({ ...good, rssKiB: 200 * 1024 }, BUDGETS).over, false);
-  assert.equal(report({ ...good, rssKiB: 200 * 1024 + 1 }, BUDGETS).over, true);
+test('RSS a KiB over the 204 MiB baseline is OVER, not rounded down into it', () => {
+  assert.equal(report({ ...good, rssKiB: 204 * 1024 }, BUDGETS).over, false);
+  assert.equal(report({ ...good, rssKiB: 204 * 1024 + 1 }, BUDGETS).over, true);
 });
 
-// Pass loads on open and unloads 30 s after it closes, so its first open after that answers to the cold budget.
-test('a first open of Pass after its unload over 50 ms is OVER', () => {
-  const r = report({ ...good, passColdMs: 51 }, BUDGETS);
+test('idle cpu of 0.15 % passes and 0.16 % is OVER', () => {
+  assert.equal(report({ ...good, cpu: '0.15' }, BUDGETS).over, false);
+  const r = report({ ...good, cpu: '0.16' }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[7], 'pass cold     51 ms   ≤ 50 ms    OVER');
+  assert.equal(r.lines[11], 'idle cpu      0.16 %  ≤ 0.15 %   OVER');
 });
 
-// The file picker loads on a request and unloads 30 s after it closes, so its first open after that answers to the cold budget too.
-test('a first open of the file picker after its unload over 50 ms is OVER', () => {
-  const r = report({ ...good, filesColdMs: 51 }, BUDGETS);
+test('a theme switch of 131 ms passes and 132 ms is OVER', () => {
+  assert.equal(report({ ...good, switchMs: 131 }, BUDGETS).over, false);
+  const r = report({ ...good, switchMs: 132 }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[8], 'files cold    51 ms   ≤ 50 ms    OVER');
+  assert.equal(r.lines[10], 'theme switch  132 ms  ≤ 131 ms   OVER');
+});
+
+test('a panel cold of 50 ms passes and 51 ms is OVER', () => {
+  assert.equal(report({ ...good, coldMs: 50 }, BUDGETS).over, false);
+  const r = report({ ...good, coldMs: 51 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[3], 'panel cold    51 ms   ≤ 50 ms    OVER');
+});
+
+// Pass loads on open and unloads 30 s after it closes; its first open after that is held to its baseline plus the spread.
+test('a first open of Pass after its unload over 20 ms is OVER', () => {
+  assert.equal(report({ ...good, passColdMs: 20 }, BUDGETS).over, false);
+  const r = report({ ...good, passColdMs: 21 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[7], 'pass cold     21 ms   ≤ 20 ms    OVER');
+});
+
+// The file picker loads on a request and unloads 30 s after it closes, so its first open after that is held the same way.
+test('a first open of the file picker after its unload over 28 ms is OVER', () => {
+  assert.equal(report({ ...good, filesColdMs: 28 }, BUDGETS).over, false);
+  const r = report({ ...good, filesColdMs: 29 }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[8], 'files cold    29 ms   ≤ 28 ms    OVER');
 });
 
 test('a timer count other than the budget is OVER either way', () => {
@@ -70,19 +114,17 @@ test('a timer count other than the budget is OVER either way', () => {
   assert.equal(report({ ...good, timers: 2 }, BUDGETS).over, true);
 });
 
-test('the CLI exits 1 when an env budget is exceeded and 0 otherwise', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /panel warm {4}4 ms/);
+test('the CLI exits 0 when every row is ok and 1 when one is over', () => {
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /panel warm {4}4 ms/);
   assert.throws(
-    () => execFileSync('node', [cli, ...args], { env: { ...process.env, DOTS_BUDGET_FIRST_FRAME_MS: '1' }, stdio: 'pipe' }),
-    (e) => e.status === 1 && /first frame +130 ms +≤ 1 ms +OVER/.test(e.stdout.toString()),
+    () => execFileSync('node', [cli, ...args, ...morph], { env: { ...process.env, DOTS_BUDGET_APP_FIRST_FRAME_MS: '1' }, stdio: 'pipe' }),
+    (e) => e.status === 1 && /app 1st frame 310 ms +≤ 1 ms +OVER/.test(e.stdout.toString()),
   );
-});
-
-test('the slowest of the six theme switches over 300 ms is OVER', () => {
-  const r = report({ ...good, switchMs: 301 }, BUDGETS);
-  assert.equal(r.over, true);
-  assert.equal(r.lines[10], 'theme switch  301 ms  ≤ 300 ms   OVER');
+  const over = [...head.slice(0, 2), '51', ...head.slice(3), ...rest, ...morph];
+  assert.throws(
+    () => execFileSync('node', [cli, ...over], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /panel cold {4}51 ms +≤ 50 ms +OVER/.test(e.stdout.toString()),
+  );
 });
 
 test('the six ordered pairs of three themes are each switched once, ending where they began', () => {
@@ -96,12 +138,6 @@ test('the RSS after every theme has been shown is reported but never OVER', () =
   assert.equal(report({ ...good, switchedKiB: 400 * 1024 }, BUDGETS).over, false);
 });
 
-test('idle cpu over 0.07 % is OVER', () => {
-  const r = report({ ...good, cpu: '0.08' }, BUDGETS);
-  assert.equal(r.over, true);
-  assert.equal(r.lines[11], 'idle cpu      0.08 %  ≤ 0.07 %   OVER');
-});
-
 test('the cgroup anon+shmem is reported beside idle rss but never OVER', () => {
   const r = report({ ...good, anonShmemKiB: 900 * 1024 }, BUDGETS);
   assert.equal(r.lines[2], 'cgroup mem    900 MiB');
@@ -109,8 +145,7 @@ test('the cgroup anon+shmem is reported beside idle rss but never OVER', () => {
 });
 
 test('the CLI prints the cgroup memory from its ninth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /cgroup mem {4}231 MiB/);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /cgroup mem {4}231 MiB/);
 });
 
 test('a c mode cold of 51 ms is OVER and 50 ok, a c mode warm of 17 ms is OVER and 16 ok', () => {
@@ -125,26 +160,24 @@ test('a c mode cold of 51 ms is OVER and 50 ok, a c mode warm of 17 ms is OVER a
 });
 
 test('the CLI prints both c mode lines from its tenth and eleventh arguments and exits 1 when either is over', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544'];
-  const out = execFileSync('node', [cli, ...args, '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'], { encoding: 'utf8' });
-  assert.match(out, /c mode cold {3}41 ms +≤ 50 ms +ok/);
+  const out = execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' });
+  assert.match(out, /c mode cold {3}35 ms +≤ 50 ms +ok/);
   assert.match(out, /c mode warm {3}9 ms +≤ 16 ms +ok/);
-  for (const [c, w] of [['51', '9'], ['41', '17']]) {
+  for (const [c, w] of [['51', '9'], ['35', '17']]) {
+    const a = [...head.slice(0, 9), c, w, ...head.slice(11), ...rest, ...morph];
     assert.throws(
-      () => execFileSync('node', [cli, ...args, c, w, '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'], { stdio: 'pipe' }),
+      () => execFileSync('node', [cli, ...a], { stdio: 'pipe' }),
       (e) => e.status === 1 && /OVER/.test(e.stdout.toString()),
     );
   }
 });
 
 test('the CLI prints pass cold from its twelfth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /pass cold {5}37 ms +≤ 50 ms +ok/);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /pass cold {5}3 ms +≤ 20 ms +ok/);
 });
 
 test('the CLI prints files cold from its thirteenth argument', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0', '220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args], { encoding: 'utf8' }), /files cold {4}33 ms +≤ 50 ms +ok/);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /files cold {4}11 ms +≤ 28 ms +ok/);
 });
 
 // Files is its own qs process: its first frame is held to 500 ms, its RSS to 250 MiB, and nothing of it may outlive its window.
@@ -170,12 +203,11 @@ test('one App process left after its window closes is OVER and none is ok', () =
 });
 
 test('the CLI prints the App lines from its fourteenth to sixteenth arguments and exits 1 when one is over', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33'];
-  const dekho = ['180', '131072', '0', '220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args, '310', '180224', '0', ...dekho], { encoding: 'utf8' }), /app 1st frame 310 ms +≤ 500 ms +ok/);
+  const dekho = rest.slice(3);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /app 1st frame 310 ms +≤ 500 ms +ok/);
   for (const tail of [['501', '180224', '0'], ['310', String(250 * 1024 + 1), '0'], ['310', '180224', '1']]) {
     assert.throws(
-      () => execFileSync('node', [cli, ...args, ...tail, ...dekho], { stdio: 'pipe' }),
+      () => execFileSync('node', [cli, ...head.slice(0, 13), ...tail, ...dekho, ...morph], { stdio: 'pipe' }),
       (e) => e.status === 1 && /app .*OVER/.test(e.stdout.toString()),
     );
   }
@@ -190,12 +222,11 @@ test('Dekho over any App budget reads OVER on its own line', () => {
 });
 
 test('the CLI reads Dekho from its seventeenth to nineteenth arguments and exits 1 when one is over', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0'];
-  const deen = ['220', '141072', '0'];
-  assert.match(execFileSync('node', [cli, ...args, '180', '131072', '0', ...deen], { encoding: 'utf8' }), /dekho frame +180 ms +≤ 500 ms +ok/);
+  const deen = rest.slice(5);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /dekho frame +180 ms +≤ 500 ms +ok/);
   for (const tail of [['501', '131072', '0'], ['180', String(250 * 1024 + 1), '0'], ['180', '131072', '1']]) {
     assert.throws(
-      () => execFileSync('node', [cli, ...args, ...tail, ...deen], { stdio: 'pipe' }),
+      () => execFileSync('node', [cli, ...head, ...rest.slice(0, 3), ...tail, ...deen, ...morph], { stdio: 'pipe' }),
       (e) => e.status === 1 && /dekho .*OVER/.test(e.stdout.toString()),
     );
   }
@@ -210,12 +241,56 @@ test('Deen over any App budget reads OVER on its own line', () => {
 });
 
 test('the CLI reads Deen from its twentieth to twenty-second arguments and exits 1 when one is over', () => {
-  const args = ['130', '152576', '48', '4', '1', '0.03', '120', '157000', '236544', '41', '9', '37', '33', '310', '180224', '0', '180', '131072', '0'];
-  assert.match(execFileSync('node', [cli, ...args, '220', '141072', '0'], { encoding: 'utf8' }), /deen frame +220 ms +≤ 500 ms +ok/);
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /deen frame +220 ms +≤ 500 ms +ok/);
   for (const tail of [['501', '141072', '0'], ['220', String(250 * 1024 + 1), '0'], ['220', '141072', '1']]) {
     assert.throws(
-      () => execFileSync('node', [cli, ...args, ...tail], { stdio: 'pipe' }),
+      () => execFileSync('node', [cli, ...head, ...rest.slice(0, 5), ...tail, ...morph], { stdio: 'pipe' }),
       (e) => e.status === 1 && /deen .*OVER/.test(e.stdout.toString()),
     );
   }
+});
+
+test('frameStats gives the longest interval and the nearest-rank 95th percentile', () => {
+  const twenty = Array.from({ length: 20 }, (_, i) => i + 1);
+  assert.deepEqual(frameStats(twenty), { max: 20, p95: 19 });
+  assert.deepEqual(frameStats([7, 3, 5]), { max: 7, p95: 7 });
+  assert.deepEqual(frameStats([16]), { max: 16, p95: 16 });
+  assert.equal(frameStats([]), null);
+});
+
+test('a morph open with a longest interval of 21 ms or a p95 of 13 ms is OVER, 20 and 12 ok', () => {
+  assert.equal(report({ ...good, morphOpen: { max: 20, p95: 12 } }, BUDGETS).over, false);
+  const long = report({ ...good, morphOpen: { max: 21, p95: 9 } }, BUDGETS);
+  assert.equal(long.over, true);
+  assert.equal(long.lines[21], 'morph open    21/9 ms ≤ 20/12 ms OVER');
+  const slow = report({ ...good, morphOpen: { max: 14, p95: 13 } }, BUDGETS);
+  assert.equal(slow.over, true);
+  assert.equal(slow.lines[21], 'morph open    14/13 ms ≤ 20/12 ms OVER');
+});
+
+test('a morph close is held to the same budgets on its own line', () => {
+  assert.equal(report({ ...good, morphClose: { max: 20, p95: 12 } }, BUDGETS).over, false);
+  const r = report({ ...good, morphClose: { max: 21, p95: 12 } }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[22], 'morph close   21/12 ms ≤ 20/12 ms OVER');
+});
+
+test('a morph that was not timed reads none and is OVER', () => {
+  const r = report({ ...good, morphOpen: null }, BUDGETS);
+  assert.equal(r.over, true);
+  assert.equal(r.lines[21], 'morph open    none');
+});
+
+test('the CLI reads the morph rows from its last four arguments and counts a missing pair as OVER', () => {
+  const out = execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' });
+  assert.match(out, /morph open {4}14\/9 ms +≤ 20\/12 ms +ok/);
+  assert.match(out, /morph close {3}15\/10 ms +≤ 20\/12 ms +ok/);
+  assert.throws(
+    () => execFileSync('node', [cli, ...args, '14', '9', '21', '10'], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /morph close {3}21\/10 ms +≤ 20\/12 ms +OVER/.test(e.stdout.toString()),
+  );
+  assert.throws(
+    () => execFileSync('node', [cli, ...args], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /morph open {4}none/.test(e.stdout.toString()),
+  );
 });
