@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { parseBinds, groupRows, columnsOf, filterRows, TOUCHPAD } from './cheatsheet.mjs';
+import { readFileSync, readdirSync } from 'node:fs';
+import { parseBinds, groupRows, columnsOf, filterRows, TOUCHPAD, GROUPS_SIX, IN_SURFACES, groupRowsSix, columnsOfSix } from './cheatsheet.mjs';
 
 const binds = readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8');
 const row = (line) => parseBinds(line)[0];
@@ -116,4 +116,75 @@ test('a filter matches the title or the key text, ignoring case', () => {
     'Switch Windows Back',
   ]);
   assert.equal(filterRows(rows, '').length, rows.length);
+});
+
+const SURFACES = ['launcher', 'control', 'notifications', 'pass', 'tailscale', 'accounts', 'dns', 'goals'];
+
+test('the six groups are the surfaces, the keys inside them, work, windows, system and the touchpad', () => {
+  assert.deepEqual(GROUPS_SIX, ['SURFACES', 'IN SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD']);
+});
+
+test('IN SURFACES lists the shared keys, Esc among them, then each surface\'s own in order', () => {
+  assert.ok(IN_SURFACES.some((r) => r.surface === 'shared' && r.key === 'Esc'));
+  const order = [];
+  for (const r of IN_SURFACES) if (order[order.length - 1] !== r.surface) order.push(r.surface);
+  assert.deepEqual(order, ['shared'].concat(SURFACES));
+  for (const r of IN_SURFACES) assert.ok(r.title && r.group === 'IN SURFACES', JSON.stringify(r));
+});
+
+test('the real binds, the surface keys and the touchpad fill six groups in six columns', () => {
+  const groups = groupRowsSix(parseBinds(binds).concat(IN_SURFACES, TOUCHPAD));
+  assert.deepEqual(groups.map((g) => g.name), ['SURFACES', 'IN SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD']);
+  for (const g of groups) assert.ok(g.rows.length > 0, g.name);
+  assert.deepEqual(groups[1].rows, IN_SURFACES);
+  assert.deepEqual(columnsOfSix(groups).map((col) => col.map((g) => g.name)), [['SURFACES'], ['IN SURFACES'], ['WORK'], ['WINDOWS'], ['SYSTEM'], ['TOUCHPAD']]);
+});
+
+// What a row's key text must find in its surface's code, every pattern of it; a key text missing here fails the test.
+const CODE = {
+  Esc: [/Key_Escape\b/],
+  'J / K': [/Key_J\b/, /Key_K\b/],
+  '↑ / ↓': [/Key_Up\b/, /Key_Down\b/],
+  'H / L': [/Key_H\b/, /Key_L\b/],
+  '⇧ J / K': [/ShiftModifier/, /Key_J\b/, /Key_K\b/],
+  '↵': [/Key_Return\b/],
+  '⇧ ↵': [/ShiftModifier/, /Key_Return\b/],
+  Tab: [/Key_Tab\b/],
+  '⇧ Tab': [/ShiftModifier/, /Key_Tab\b/],
+  Space: [/Key_Space\b/],
+  '/': [/Key_Slash\b/],
+  '1-9': [/\[1-9\]/],
+  '1-5': [/Key_1\b/, /Key_5\b/],
+  '⇧ D': [/ShiftModifier/, /Key_D\b/],
+  '⇧ O': [/Key_O\b/, /"O"/],
+  'w␣': [/'w '/],
+  '=␣': [/'= '/],
+};
+const pattern = (key) => CODE[key] || (/^[A-Z]$/.test(key) ? [new RegExp(`Key_${key}\\b`)] : null);
+
+const shell = new URL('../', import.meta.url);
+const read = (name) => readFileSync(new URL(name, shell), 'utf8');
+const control = readdirSync(shell).filter((f) => /^Control.*\.qml$/.test(f));
+const FILES = {
+  launcher: ['Launcher.qml', 'lib/launcher.mjs'],
+  control,
+  notifications: ['Notifications.qml'],
+  pass: ['Pass.qml'],
+  tailscale: ['Tailscale.qml'],
+  accounts: ['Accounts.qml'],
+  dns: ['Dns.qml'],
+  goals: ['Goals.qml'],
+};
+
+// The sheet is the only place a surface's keys show, so each row must name a key its surface's code handles.
+test('every IN SURFACES row names a key its surface\'s code handles, a shared row every surface\'s', () => {
+  assert.ok(control.includes('Control.qml') && control.length > 1, control.join());
+  for (const r of IN_SURFACES) {
+    const want = pattern(r.key);
+    assert.ok(want, `no code pattern for ${r.key}`);
+    for (const s of r.surface === 'shared' ? SURFACES : [r.surface]) {
+      const code = FILES[s].map(read).join('\n');
+      for (const p of want) assert.ok(p.test(code), `${s} ${r.key} ${r.title}: no ${p}`);
+    }
+  }
 });

@@ -56,6 +56,62 @@ export function columnsOf(groups) {
   return [groups.slice(0, 1), groups.slice(1, 2), groups.slice(2, 3), groups.slice(3)];
 }
 
+export const GROUPS_SIX = ['SURFACES', 'IN SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD'];
+
+// No surface shows key hints, so these rows are where its keys are listed: the keys all eight take alike, then each one's own.
+export const IN_SURFACES = [
+  ['shared', 'Esc', 'Close'],
+  // The launcher's and Pass's query fields type j and k until Tab moves to the list.
+  ['shared', 'J / K', 'Move Down or Up'],
+  ['launcher', '↑ / ↓', 'Move from the Query'],
+  ['launcher', 'Tab', 'Go to the List'],
+  ['launcher', '↵', 'Open'],
+  ['launcher', '⇧ ↵', 'Copy Without Pasting'],
+  ['launcher', 'w␣', 'Search Windows'],
+  ['launcher', '=␣', 'Calculator'],
+  ['control', 'Tab', 'Next Section'],
+  ['control', '⇧ Tab', 'Previous Section'],
+  ['control', '↵', 'Toggle or Open'],
+  ['control', 'H / L', 'Step a Level'],
+  ['control', 'M', 'Mute'],
+  ['notifications', '↵', 'Open'],
+  ['notifications', 'D', 'Dismiss'],
+  ['notifications', '⇧ D', 'Clear All'],
+  ['notifications', 'I', 'Do Not Disturb for the App'],
+  ['notifications', '/', 'Search'],
+  ['notifications', '1-9', 'Run an Action'],
+  ['pass', 'Tab', 'Go to the List'],
+  ['pass', '↵', 'Copy Password'],
+  ['pass', 'O', 'Copy Code'],
+  ['pass', 'S', 'Show'],
+  ['pass', 'N', 'New Entry'],
+  ['pass', 'E', 'Edit'],
+  ['tailscale', '↵', 'Copy Address'],
+  ['tailscale', 'S', 'Send a File'],
+  ['tailscale', 'T', 'Turn Tailscale Off or On'],  ['accounts', '↵', 'Use'],
+  ['accounts', 'R', 'Fetch Again'],
+  ['dns', 'Space', 'Kid Mode'],
+  ['dns', '1-5', 'Flip a Category'],
+  ['dns', 'O', 'Open for 30 Minutes'],
+  ['dns', '⇧ O', 'Open for 2 Hours'],
+  ['dns', 'A', 'Allow a Site'],
+  ['dns', 'N', 'Add a Device'],
+  ['goals', '↵', 'Fold or Unfold'],
+  ['goals', 'Space', 'Tick'],
+  ['goals', 'N', 'New Goal'],
+  ['goals', 'T', 'New Task'],
+  ['goals', '⇧ J / K', 'Reorder'],
+  ['goals', 'D', 'Delete'],
+].map(([surface, key, title]) => ({ title, key, group: 'IN SURFACES', surface }));
+
+export function groupRowsSix(rows) {
+  return GROUPS_SIX.map((name) => ({ name, rows: rows.filter((r) => r.group === name) }));
+}
+
+export function columnsOfSix(groups) {
+  return groups.map((g) => [g]);
+}
+
 export function filterRows(rows, query) {
   const q = query.toLowerCase();
   return rows.filter((r) => r.title.toLowerCase().includes(q) || r.key.toLowerCase().includes(q));
