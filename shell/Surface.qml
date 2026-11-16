@@ -24,6 +24,8 @@ Item {
             easing.type: Easing.InOutSine
         }
     }
+    // A bare surface draws no fill or frame of its own, as the island, whose shape draws its fill beside it.
+    property bool bare: false
     // The Motion that plays this card's open and close; the island and the previews have none.
     property var motion: null
     readonly property var pose: motion ? motion.pose : ({ lift: 0, scale: 1, opacity: 1 })
@@ -49,6 +51,7 @@ Item {
     Rectangle {
         id: fillRect
         anchors.fill: parent
+        visible: !surface.bare
         color: surface.style.fill
         border.width: surface.style.frame.gradient ? 0 : surface.style.frame.width
         border.color: surface.style.frame.color
@@ -72,7 +75,7 @@ Item {
     Shape {
         id: edge
         anchors.fill: parent
-        visible: !!surface.style.frame.gradient
+        visible: !!surface.style.frame.gradient && !surface.bare
         ShapePath {
             strokeColor: "transparent"
             fillRule: ShapePath.OddEvenFill

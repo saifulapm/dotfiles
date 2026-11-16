@@ -8,6 +8,7 @@ import "lib/goals.mjs" as G
 import "lib/idle.mjs" as Idle
 import "lib/surface.mjs" as S
 import "lib/voice.mjs" as V
+import "lib/island-host.mjs" as H
 
 // The margins are text alone on the paper, either side of the island.
 PanelWindow {
@@ -30,7 +31,8 @@ PanelWindow {
     readonly property var marginState: M.marginState(view, clock.now, { awake: Idle.awakeWord(Root.State.awakeUntil), sync: sync.failing ? "sync !" : "", goal: G.marginGoal(goals.store, clock.now), mail: mail, wifi: network.wifi, battery: power.battery })
     readonly property var goal: G.marginGoalParts(goals.store, clock.now)
     readonly property var voice: V.marginLook(theme.tokens)
-    readonly property real lineEnd: width / 2 - islandWidth / 2 - 8
+    // The rules stop 8 px short of the island's concave corners.
+    readonly property real lineEnd: width / 2 - islandWidth / 2 - H.CONCAVE - 8
     readonly property var look: S.marginStyle(theme.tokens)
 
     WlrLayershell.layer: WlrLayer.Top

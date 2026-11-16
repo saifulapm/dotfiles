@@ -13,6 +13,8 @@ import "lib/notifs.mjs" as N
 import "lib/worldclock.mjs" as W
 import "lib/control.mjs" as C
 import "lib/click.mjs" as ClickLib
+import "lib/island-host.mjs" as H
+import "lib/switch.mjs" as Sw
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
 Item {
@@ -189,7 +191,7 @@ Item {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            label: mode === "rest" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             downloading: [downloadingLook.width, downloadingLook.height],
@@ -866,6 +868,8 @@ Item {
     visible: !niri.edgeToEdge(niri.focusedOutput, output.width)
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
+    property real fillStartedAt: 0
+    property real fillEndedAt: 0
     // The surface open inside the island by name, or null; what waits behind it, a count; and the prompt that took the island over, or null (SCNB8HVY).
     property var surface: null
     readonly property int waiting: 0
@@ -874,6 +878,8 @@ Item {
     readonly property bool wantsKeys: focused && !attaching && visible
     // At rest the surfaces' window takes clicks only on this.
     readonly property Item maskItem: box
+    // The island's fill as drawn this frame.
+    readonly property color fillColor: fillShape.fill
 
     Connections {
         target: Root.Pairing
@@ -1037,11 +1043,85 @@ Item {
         font.weight: Font.Medium
     }
 
+    // The bottom corners' radius on the box's own progress, 14 at rest and 20 on anything taller.
+    readonly property real bottomRadius: progress >= 1 || !curve ? H.bottomRadius(toHeight) : H.bottomRadius(fromHeight, toHeight, I.ease(curve.points, progress))
+
+    // The island's fill: the box joined to the top edge by a concave corner on each side, square to the edge, rounded below, with no frame or shadow.
+    Shape {
+        id: fillShape
+        x: box.x - H.CONCAVE
+        y: box.y
+        width: box.width + 2 * H.CONCAVE
+        height: box.height
+        preferredRendererType: Shape.CurveRenderer
+        readonly property real r: Math.min(island.bottomRadius, box.height / 2, box.width / 2)
+        property color fill: box.style.fill
+        // A colorscheme switch crossfades it with the paper, as every surface's fill does; island state reports when the last crossfade began and ended.
+        Behavior on fill {
+            ColorAnimation {
+                duration: Sw.SWITCH.ms * Root.State.slowdown
+                easing.type: Easing.InOutSine
+                onRunningChanged: running ? island.fillStartedAt = Date.now() : island.fillEndedAt = Date.now()
+            }
+        }
+
+        ShapePath {
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: fillShape.fill
+            startX: 0
+            startY: 0
+            PathLine {
+                x: fillShape.width
+                y: 0
+            }
+            PathArc {
+                x: fillShape.width - H.CONCAVE
+                y: H.CONCAVE
+                radiusX: H.CONCAVE
+                radiusY: H.CONCAVE
+                direction: PathArc.Counterclockwise
+            }
+            PathLine {
+                x: fillShape.width - H.CONCAVE
+                y: fillShape.height - fillShape.r
+            }
+            PathArc {
+                x: fillShape.width - H.CONCAVE - fillShape.r
+                y: fillShape.height
+                radiusX: fillShape.r
+                radiusY: fillShape.r
+            }
+            PathLine {
+                x: H.CONCAVE + fillShape.r
+                y: fillShape.height
+            }
+            PathArc {
+                x: H.CONCAVE
+                y: fillShape.height - fillShape.r
+                radiusX: fillShape.r
+                radiusY: fillShape.r
+            }
+            PathLine {
+                x: H.CONCAVE
+                y: H.CONCAVE
+            }
+            PathArc {
+                x: 0
+                y: 0
+                radiusX: H.CONCAVE
+                radiusY: H.CONCAVE
+                direction: PathArc.Counterclockwise
+            }
+        }
+    }
+
     Root.Surface {
         id: box
-        // Centred on the output, so the box morphs without the window resizing.
+        // Centred on the output, so the box morphs without the window resizing; its top is the output's top row.
         x: Math.round((island.width - width) / 2)
-        y: 10
+        y: 0
+        bare: true
         width: island.progress >= 1 || !island.curve ? island.toWidth : island.fromWidth + (island.toWidth - island.fromWidth) * I.ease(island.curve.points, island.progress)
         height: island.progress >= 1 || !island.curve ? island.toHeight : island.fromHeight + (island.toHeight - island.fromHeight) * I.ease(island.curve.points, island.progress)
         tokens: island.theme.tokens
@@ -1082,7 +1162,7 @@ Item {
                     color: box.style.text
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
-                    font.weight: Font.Medium
+                    font.weight: island.mode === "rest" ? Font.Bold : Font.Medium
                 }
             }
 
