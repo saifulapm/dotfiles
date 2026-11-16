@@ -92,10 +92,12 @@ export function switchCycle(themes, start) {
   return ahead.concat([start], ahead.slice().reverse(), [start]);
 }
 
-// bin/dots-bench passes island state's morph frames and reads back "max p95".
+// bin/dots-bench passes island state's morph frames and reads back the longest interval and the p95 of each frame's work, its sixth field (BH6GX53J).
 if (process.argv[2] === 'frames' && import.meta.url === `file://${process.argv[1]}`) {
-  const s = frameStats(morphIntervals(JSON.parse(process.argv[3])));
-  console.log(s ? `${s.max} ${s.p95}` : '');
+  const frames = JSON.parse(process.argv[3]);
+  const gaps = frameStats(morphIntervals(frames));
+  const work = frameStats(frames.map((f) => f[5]));
+  console.log(gaps && work ? `${gaps.max} ${work.p95}` : '');
   process.exit(0);
 }
 

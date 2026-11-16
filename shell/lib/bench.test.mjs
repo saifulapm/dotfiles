@@ -300,7 +300,8 @@ test('frame intervals are the gaps between a morph\'s frames, the wait for its f
   assert.deepEqual(morphIntervals([[5, 176, 34]]), []);
 });
 
-test('the frames CLI prints a morph\'s longest interval and its p95 from island state\'s frames', () => {
-  const frames = JSON.stringify([[4, 0, 0], [12, 0, 0], [20, 0, 0], [37, 0, 0], [45, 0, 0]]);
-  assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 17');
+// BH6GX53J: no frame interval over 20 ms, and 95% of frames done within 12 ms; at 60 Hz an interval is 16.7 ms, so the 12 is each frame's own work.
+test('the frames CLI prints a morph\'s longest interval and the p95 of its frames\' work from island state\'s frames', () => {
+  const frames = JSON.stringify([[4, 0, 0, 0, 0, 3], [12, 0, 0, 0, 0, 2], [20, 0, 0, 0, 0, 9], [37, 0, 0, 0, 0, 4], [45, 0, 0, 0, 0, 1]]);
+  assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 9');
 });
