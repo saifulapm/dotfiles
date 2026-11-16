@@ -66,4 +66,5 @@ for _ in $(seq 60); do
   sleep 5
 done
 die "$avd did not finish booting in five minutes"
+exit
 }
