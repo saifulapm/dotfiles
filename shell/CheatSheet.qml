@@ -46,11 +46,11 @@ Item {
     // The first row's width on the open's first frame, so a check can tell it never reflowed.
     property var openRowWidth: null
 
-    // Row n's fade: 0 to 1 on an ease-out from its delay, as H.rowFade times it.
+    // Row n's fade: 0 to 1 on an ease-out from its delay, as H.rowFade times it; it never reaches 0, since a hundred rows entering the scene graph in one frame mid-morph took 24 ms.
     function rowIn(n) {
         const f = H.rowFade(n);
         const x = Math.max(0, Math.min(1, (introMs - f.delay) / f.ms));
-        return 1 - Math.pow(1 - x, 3);
+        return Math.max(0.002, 1 - Math.pow(1 - x, 3));
     }
 
     NumberAnimation {
