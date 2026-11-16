@@ -48,9 +48,17 @@ Item {
         run.restart();
     }
 
+    // When the key last changed, so a burst of keys swaps in place.
+    property real keyAt: 0
+
     onShownChanged: shown ? come() : go()
-    onKeyChanged: if (shown)
-        come()
+    // A key that comes while the content is still coming in, or within a swap's time of the last key, swaps in place: replayed each time, a burst of notifications held the card at 0 opacity.
+    onKeyChanged: {
+        const burst = swap !== null && Date.now() - keyAt < swap.delay + swap.inMs;
+        keyAt = Date.now();
+        if (shown && !run.running && !burst)
+            come();
+    }
 
     NumberAnimation {
         id: run
