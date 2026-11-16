@@ -330,8 +330,8 @@ const fromShapes = [
   { shape: 'C0 control in a list', from: 'A <a@x1.test>, B <b\x01ob@second.test>', lines: ['a@x1.test', 'b\x01ob@second.test', 'bob@second.test'], filed: ['b\x01ob@second.test'], refuses: ['sender_to_decide', /^From names two senders, a@x1\.test and b ob@second\.test; nothing was decided$/] },
   { shape: 'C1 control U+0085', from: 'Ann <ann\x85x@first.test>', lines: ['ann\x85x@first.test', 'annx@first.test'], filed: ['ann\x85x@first.test'], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
   { shape: 'C1 control U+009B', from: 'Ann <ann\x9bx@first.test>', lines: ['ann\x9bx@first.test', 'annx@first.test'], filed: ['ann\x9bx@first.test'], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
-  { shape: 'line separator U+2028', from: 'Ann <ann x@first.test>', lines: ['ann x@first.test', 'annx@first.test'], filed: [], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
-  { shape: 'bidi mark U+202E', from: 'Bo <bo‮x@first.test>', lines: ['bo‮x@first.test', 'box@first.test'], filed: ['bo‮x@first.test'], decides: 'bo‮x@first.test' },
+  { shape: 'line separator U+2028', from: 'Ann <ann\u2028x@first.test>', lines: ['ann\u2028x@first.test', 'annx@first.test'], filed: [], refuses: ['decide', /^ann x@first\.test is not one plain address/] },
+  { shape: 'bidi mark U+202E', from: 'Bo <bo\u202ex@first.test>', lines: ['bo\u202ex@first.test', 'box@first.test'], filed: ['bo\u202ex@first.test'], decides: 'bo\u202ex@first.test' },
 ];
 const decideRow = [
   'import json, mail_engine as E',
