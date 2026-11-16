@@ -147,6 +147,26 @@ qs ipc call launcher mode emoji >/dev/null || die "launcher emoji mode failed"
 until_ok 3000 host_focus Exclusive || die "emoji mode never took the keyboard"
 qs ipc call launcher close >/dev/null
 until_ok 3000 host_focus None || die "emoji mode never gave the keyboard back"
+# The island's morph into the cheat sheet and back, three times warm, each held to the frame budget by its worst longest frame and worst p95.
+island_state() { timeout 0.5 qs ipc call island state 2>/dev/null; }
+island_is() { island_state | jq -e "$1" >/dev/null 2>&1; }
+morph_stats() { node "$(dirname "$0")/../shell/lib/bench.mjs" frames "$(island_state | jq -c .morph.frames)"; }
+worse() { printf '%s\n%s\n' "$1" "$2" | sort -n | tail -1; }
+open_max=0 open_p95=0 close_max=0 close_p95=0
+for i in 1 2 3; do
+  dots-call cheatsheet toggle >/dev/null || die "cheatsheet toggle failed"
+  until_ok 3000 island_is '.surface == "cheatsheet" and .animating == false and .morph.kind == "open"' || die "the island never settled on the cheat sheet"
+  read -r mx p95 < <(morph_stats)
+  [ -n "$mx" ] || die "the island recorded no frames for its open"
+  open_max=$(worse "$open_max" "$mx") open_p95=$(worse "$open_p95" "$p95")
+  wtype -k Escape
+  until_ok 3000 island_is '.surface == null and .animating == false and .morph.kind == "close"' || die "the island never settled back at rest"
+  read -r mx p95 < <(morph_stats)
+  [ -n "$mx" ] || die "the island recorded no frames for its close"
+  close_max=$(worse "$close_max" "$mx") close_p95=$(worse "$close_p95" "$p95")
+  until_ok 3000 host_focus None || die "the cheat sheet never gave the keyboard back"
+done
+echo "     morph open: longest ${open_max} ms, p95 ${open_p95}; close: longest ${close_max} ms, p95 ${close_p95}"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 # GPU buffers are shmem, which RSS misses, so the unit's cgroup anon+shmem is read at the same moment.
@@ -233,6 +253,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95"
 exit
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { report, switchCycle, limits, frameStats, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
+import { report, switchCycle, limits, frameStats, morphIntervals, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
 const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 } };
@@ -293,4 +293,14 @@ test('the CLI reads the morph rows from its last four arguments and counts a mis
     () => execFileSync('node', [cli, ...args], { stdio: 'pipe' }),
     (e) => e.status === 1 && /morph open {4}none/.test(e.stdout.toString()),
   );
+});
+
+test('frame intervals are the gaps between a morph\'s frames, the wait for its first frame left out', () => {
+  assert.deepEqual(morphIntervals([[9, 176, 34], [17, 300, 80], [35, 600, 200], [43, 900, 400]]), [8, 18, 8]);
+  assert.deepEqual(morphIntervals([[5, 176, 34]]), []);
+});
+
+test('the frames CLI prints a morph\'s longest interval and its p95 from island state\'s frames', () => {
+  const frames = JSON.stringify([[4, 0, 0], [12, 0, 0], [20, 0, 0], [37, 0, 0], [45, 0, 0]]);
+  assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 17');
 });

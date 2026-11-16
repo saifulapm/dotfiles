@@ -30,6 +30,13 @@ export function frameStats(intervalsMs) {
   return { max: sorted[sorted.length - 1], p95: sorted[Math.ceil(0.95 * sorted.length) - 1] };
 }
 
+// The gaps between a morph's frames as island state records them, [ms since it began, ...]; the wait for the first frame is an open's time, not a frame's.
+export function morphIntervals(frames) {
+  const out = [];
+  for (let i = 1; i < frames.length; i++) out.push(frames[i][0] - frames[i - 1][0]);
+  return out;
+}
+
 const line = (name, value, unit, op, limit, ok) =>
   `${name.padEnd(13)} ${`${value} ${unit}`.padEnd(7)} ${op} ${`${limit} ${unit}`.padEnd(8)} ${ok ? 'ok' : 'OVER'}`;
 
@@ -83,6 +90,13 @@ export function switchCycle(themes, start) {
   const i = themes.indexOf(start);
   const ahead = themes.slice(i + 1).concat(themes.slice(0, i));
   return ahead.concat([start], ahead.slice().reverse(), [start]);
+}
+
+// bin/dots-bench passes island state's morph frames and reads back "max p95".
+if (process.argv[2] === 'frames' && import.meta.url === `file://${process.argv[1]}`) {
+  const s = frameStats(morphIntervals(JSON.parse(process.argv[3])));
+  console.log(s ? `${s.max} ${s.p95}` : '');
+  process.exit(0);
 }
 
 if (process.argv[2] === 'cycle' && import.meta.url === `file://${process.argv[1]}`) {
