@@ -198,6 +198,7 @@ PanelWindow {
     Connections {
         target: host.contentItem.Window.window
         function onFrameSwapped() {
+            host.island?.swapped();
             for (const s of host.all) {
                 s?.swapped();
                 s?.motion?.swapped();
@@ -324,6 +325,13 @@ PanelWindow {
         target: host.island
         property: "surfaceHeight"
         value: host.cheatsheet?.implicitHeight ?? 0
+    }
+
+    Binding {
+        when: !!host.island && !!host.cheatsheet
+        target: host.island
+        property: "surfaceBusy"
+        value: host.cheatsheet?.busy ?? false
     }
 
     Connections {

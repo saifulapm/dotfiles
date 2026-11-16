@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, islandMotion, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls, micClient, windowFor } from './island.mjs';
+import { pick, islandText, boxWidth, MAX_WIDTH, monthGrid, shiftMonth, recordingText, springCurve, isCompact, downloadingParts, ease, captureOf, shareRow, shareRowText, commNames, stopSessions, brightnessStep, micApps, mediaControls, micClient, windowFor } from './island.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32);
 const note = { app: 'notify-send', summary: 'hi', body: '' };
@@ -84,13 +84,6 @@ test('a recording reads minutes and seconds since it started', () => {
   assert.equal(recordingText(0, 61 * 60 * 1000), '61:00');
 });
 
-// The approved prototype's numbers: stiffness 260 and damping 0.70 open, 1.5 times stiffer and 0.08 more damped close.
-test('the island opens on the spring in 611 ms and closes in 456 ms, its content scaling in as it fades', () => {
-  const m = islandMotion(true);
-  assert.deepEqual([m.open.ms, m.close.ms], [611, 456]);
-  assert.deepEqual(m.swap, { kind: 'spring', inMs: 306, outMs: 130, delay: 60 });
-});
-
 test('a spring curve starts at 0, overshoots and ends at rest', () => {
   const { points } = springCurve(260, 0.7);
   assert.equal(points.length, 61);
@@ -107,10 +100,6 @@ test('ease reads between samples and keeps the overshoot', () => {
   assert.equal(ease(spring, 0), 0);
   assert.ok([0.3, 0.35, 0.4, 0.45].some((t) => ease(spring, t) > 1));
   assert.equal(ease(spring, 2), 1);
-});
-
-test('before the scheme loads the island has no motion', () => {
-  assert.equal(islandMotion(false), null);
 });
 
 test('the one-line modes close; the cards open', () => {

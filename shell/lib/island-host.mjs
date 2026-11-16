@@ -8,13 +8,19 @@ export const CONCAVE = 12;
 // 61 samples at even steps of time, as island.mjs samples a spring, so ease reads both alike.
 const easeOut = Array.from({ length: 61 }, (_, i) => Math.round((1 - (1 - i / 60) ** 3) * 10000) / 10000);
 
-// Open and switch on the spring, ended within 1/30 of its travel; close on a short ease-out; the outgoing content fades over outMs.
+// Open and switch on the spring, ended within 1/30 of its travel; close on a short ease-out; the outgoing content fades over outMs, and an island part comes in by swap, rising as it fades, or on a close by closeSwap, over the close itself.
 export function hostMotion() {
-  return { open: springCurve(260, 0.7, 30), close: { ms: 120, points: easeOut }, outMs: 80 };
+  return {
+    open: springCurve(260, 0.7, 30),
+    close: { ms: 120, points: easeOut },
+    outMs: 80,
+    swap: { kind: 'rise', inMs: 200, outMs: 80, delay: 60, rise: 6 },
+    closeSwap: { kind: 'rise', inMs: 120, outMs: 80, delay: 0, rise: 0 },
+  };
 }
 
 // When row n of the incoming content starts to fade in, how long it takes and how far it rises; rows past the tenth come in with it (496AQ7DS).
-export const rowFade = (n) => ({ delay: 60 + 18 * Math.min(n, 10), ms: 200, rise: 6 });
+export const rowFade = (n) => ({ delay: 60 + 18 * Math.min(n, 9), ms: 200, rise: 6 });
 
 const radiusAt = (height) => (height > REST.height ? 20 : 14);
 

@@ -6,6 +6,7 @@ import "." as Root
 import "lib/cheatsheet.mjs" as Lib
 import "lib/surface.mjs" as S
 import "lib/island-tones.mjs" as T
+import "lib/island-host.mjs" as H
 
 // Every titled niri bind, each surface's own keys and the touchpad's gestures in six columns, drawn inside the island on its fill.
 Item {
@@ -24,6 +25,9 @@ Item {
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+    // When the last open and close were asked for, in ms since the epoch.
+    property real openedAt: 0
+    property real closedAt: 0
     // The island grows to this width for the sheet, as the boards draw it.
     readonly property int wantWidth: 1160
 
@@ -34,18 +38,46 @@ Item {
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray" })
 
     implicitHeight: column.implicitHeight
+    // The last row is in by this many ms after the open (rowFade's cap).
+    readonly property int introEnd: H.rowFade(99).delay + H.rowFade(99).ms
+    // Milliseconds since the open began, which each row's fade reads; at rest every row is in.
+    property real introMs: introEnd
+    readonly property bool busy: intro.running
+    // The first row's width on the open's first frame, so a check can tell it never reflowed.
+    property var openRowWidth: null
+
+    // Row n's fade: 0 to 1 on an ease-out from its delay, as H.rowFade times it.
+    function rowIn(n) {
+        const f = H.rowFade(n);
+        const x = Math.max(0, Math.min(1, (introMs - f.delay) / f.ms));
+        return 1 - Math.pow(1 - x, 3);
+    }
+
+    NumberAnimation {
+        id: intro
+        target: sheet
+        property: "introMs"
+        from: 0
+        to: sheet.introEnd
+        duration: sheet.introEnd
+    }
 
     function open(t0) {
         openT0 = t0;
+        openedAt = t0;
         openMs = null;
         opens += 1;
         input.text = "";
         list.contentY = 0;
+        openRowWidth = null;
         shown = true;
+        intro.restart();
         input.forceActiveFocus();
     }
 
     function close() {
+        if (shown)
+            closedAt = Date.now();
         shown = false;
     }
 
@@ -62,6 +94,7 @@ Item {
         if (shown && openT0 >= 0) {
             openMs = Date.now() - openT0;
             openT0 = -1;
+            openRowWidth = groupRepeater.count && groupRepeater.itemAt(0).groupRows.count ? groupRepeater.itemAt(0).groupRows.itemAt(0).width : null;
         }
     }
 
@@ -88,6 +121,10 @@ Item {
             openMs: openMs,
             opens: opens,
             drawing: shown,
+            busy: busy,
+            openedAt: openedAt,
+            closedAt: closedAt,
+            openRowWidth: openRowWidth,
             heading: heading.text,
             rowKeys: rowKeys,
             legendKeys: []
@@ -122,6 +159,10 @@ Item {
             Layout.rightMargin: 16
             Layout.topMargin: 16
             spacing: 16
+            opacity: sheet.rowIn(0)
+            transform: Translate {
+                y: H.rowFade(0).rise * (1 - sheet.rowIn(0))
+            }
 
             Text {
                 id: heading
@@ -204,6 +245,10 @@ Item {
                         Text {
                             textFormat: Text.PlainText
                             bottomPadding: 2
+                            opacity: sheet.rowIn(1)
+                            transform: Translate {
+                                y: H.rowFade(1).rise * (1 - sheet.rowIn(1))
+                            }
                             text: group.entry.name
                             color: sheet.tones.muted
                             font.family: sheet.fonts.ui ?? ""
@@ -220,8 +265,13 @@ Item {
                             RowLayout {
                                 id: row
                                 required property var modelData
+                                required property int index
                                 width: group.width
                                 spacing: 6
+                                opacity: sheet.rowIn(2 + index)
+                                transform: Translate {
+                                    y: H.rowFade(2 + row.index).rise * (1 - sheet.rowIn(2 + row.index))
+                                }
 
                                 Text {
                                     textFormat: Text.PlainText

@@ -200,7 +200,7 @@ Item {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: mode === "rest" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             downloading: [downloadingLook.width, downloadingLook.height],
@@ -222,8 +222,9 @@ Item {
     readonly property real targetHeight: sizes[part][1]
     readonly property real boxWidth: targetWidth
     readonly property real drawnWidth: box.width
-    readonly property var motion: I.islandMotion(!!theme.tokens)
-    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy)
+    // The approved motion (38G8XV1J); none before the scheme loads, so the first frame draws at rest.
+    readonly property var motion: theme.tokens ? H.hostMotion() : null
+    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -232,6 +233,16 @@ Item {
     property real progress: 1
     // Picked when a morph starts, since the mode that picks it changes in the same instant as the target.
     property var curve: null
+    // The last morph as drawn, for island state and the bench: open or close, the box it began from, and each frame's [ms since it began, box width, box height, window width, window height].
+    property string morphKind: ""
+    property var morphFrom: null
+    property var morphFrames: []
+    property real morphT0: 0
+    // Called on each of the window's frames while the box morphs.
+    function swapped() {
+        if (morphing.running)
+            morphFrames.push([Date.now() - morphT0, box.width, box.height, parent ? parent.width : 0, parent ? parent.height : 0]);
+    }
     // What the box last morphed for; a size change with the same content, such as a font loading or a theme switch, snaps instead.
     property string morphedFor: ""
     onTargetWidthChanged: morph()
@@ -256,6 +267,10 @@ Item {
         }
         fromWidth = box.width;
         fromHeight = box.height;
+        morphKind = I.isCompact(mode) ? "close" : "open";
+        morphFrom = [fromWidth, fromHeight];
+        morphFrames = [];
+        morphT0 = Date.now();
         toWidth = targetWidth;
         toHeight = targetHeight;
         curve = I.isCompact(mode) ? motion.close : motion.open;
@@ -886,6 +901,12 @@ Item {
     // The open surface's size as it asks for it, and the part its content draws in.
     property real surfaceWidth: 0
     property real surfaceHeight: 0
+    // True while the open surface's rows still fade in.
+    property bool surfaceBusy: false
+    // When the box and its content last came to rest, in ms since the epoch.
+    property real settledAt: 0
+    onAnimatingChanged: if (!animating)
+        settledAt = Date.now()
     readonly property Item surfaceSlot: surfacePart
     readonly property int waiting: 0
     readonly property var takeover: null
@@ -1153,7 +1174,7 @@ Item {
             onWheel: event => island.wheeled(event.angleDelta.y)
         }
 
-        // Each part is drawn at its own size and clipped to the box as it morphs.
+        // Each part is drawn at its own size and clipped to the box as it morphs; a one-line part comes in over the close, a card on the open's timing.
         Item {
             anchors.fill: parent
             clip: true
@@ -1162,7 +1183,7 @@ Item {
                 id: labelPart
                 shown: island.part === "label"
                 key: island.mode
-                swap: island.motion?.swap ?? null
+                swap: island.motion?.closeSwap ?? null
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.label[0]
                 height: island.sizes.label[1]
@@ -1185,7 +1206,7 @@ Item {
                 id: leasePart
                 shown: island.part === "lease"
                 key: ""
-                swap: island.motion?.swap ?? null
+                swap: island.motion?.closeSwap ?? null
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.lease[0]
                 height: island.sizes.lease[1]
@@ -1282,7 +1303,7 @@ Item {
                 id: sendingPart
                 shown: island.part === "sending"
                 key: ""
-                swap: island.motion?.swap ?? null
+                swap: island.motion?.closeSwap ?? null
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.sending[0]
                 height: island.sizes.sending[1]
@@ -1387,7 +1408,7 @@ Item {
                 id: downloadingPart
                 shown: island.part === "downloading"
                 key: ""
-                swap: island.motion?.swap ?? null
+                swap: island.motion?.closeSwap ?? null
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.downloading[0]
                 height: island.sizes.downloading[1]
@@ -1860,6 +1881,7 @@ Item {
                 shown: island.part === "surface"
                 key: island.surface ?? ""
                 swap: island.motion?.swap ?? null
+                staggered: true
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.surface[0]
                 height: island.sizes.surface[1]

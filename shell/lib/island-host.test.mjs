@@ -24,8 +24,13 @@ test('the close is a 120 ms ease-out: fast at first, never past rest', () => {
   assert.ok(ease(close.points, 0.25) > 0.5, 'an ease-out covers most of the way in its first quarter');
 });
 
-test('the outgoing content fades over 80 ms', () => {
+test('the outgoing content fades over 80 ms, and the incoming comes in over 200 ms after 60, as each island part swaps', () => {
   assert.equal(hostMotion().outMs, 80);
+  assert.deepEqual(hostMotion().swap, { kind: 'rise', inMs: 200, outMs: 80, delay: 60, rise: 6 });
+});
+
+test('on a close the incoming content fades in over the close itself, with no delay or rise, so the island settles inside 200 ms', () => {
+  assert.deepEqual(hostMotion().closeSwap, { kind: 'rise', inMs: 120, outMs: 80, delay: 0, rise: 0 });
 });
 
 test('row n of the incoming content fades in from 60 + 18 n ms for 200 ms, rising 6 px', () => {
@@ -34,11 +39,12 @@ test('row n of the incoming content fades in from 60 + 18 n ms for 200 ms, risin
   assert.deepEqual(rowFade(5), { delay: 150, ms: 200, rise: 6 });
 });
 
-// 496AQ7DS: rows past the tenth come in with it, so a long surface settles by 440 ms, inside behaviour 4's 450.
-test('the stagger stops at the tenth row, so every row is in by 440 ms', () => {
-  assert.deepEqual(rowFade(10), rowFade(40));
+// 496AQ7DS: rows past the tenth (n = 9) come in with it, so a long surface settles by 422 ms, a frame inside behaviour 4's 450.
+test('the stagger stops at the tenth row, so every row is in by 422 ms', () => {
+  assert.deepEqual(rowFade(9), rowFade(40));
+  assert.notDeepEqual(rowFade(8), rowFade(9));
   const last = rowFade(200);
-  assert.equal(last.delay + last.ms, 440);
+  assert.equal(last.delay + last.ms, 422);
 });
 
 test('the island rests at 176 x 34 with 12 px concave corners', () => {

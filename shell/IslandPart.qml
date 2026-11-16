@@ -1,14 +1,16 @@
 import QtQuick
 
-// One block of the island's content, sized as its own card; it scales and fades in and out while the box morphs.
+// One block of the island's content, sized as its own card; it rises and fades in, and fades out, while the box morphs.
 Item {
     id: part
 
     property bool shown: false
     // A new key while shown swaps the content in place, as a notification that replaces the last one does.
     property string key: ""
-    // islandMotion's swap: {kind, inMs, outMs, delay}; null shows and hides at once.
+    // hostMotion's swap: {kind, inMs, outMs, delay, rise}; null shows and hides at once.
     property var swap: null
+    // A part whose rows come in one by one shows at once and lets its rows fade themselves; it still fades out.
+    property bool staggered: false
     default property alias content: inner.data
     readonly property bool busy: run.running
     // The clock starts below 0 by the delay and runs to 1.
@@ -23,13 +25,14 @@ Item {
 
     visible: shown || leaving
     opacity: leaving ? 1 - progress : progress
-    scale: !swap ? 1 : leaving ? 1 + 0.06 * progress : 0.9 + 0.1 * progress
-    transformOrigin: Item.Top
+    transform: Translate {
+        y: !part.swap || part.leaving ? 0 : part.swap.rise * (1 - part.progress)
+    }
 
     function come() {
         leaving = false;
         run.stop();
-        if (!swap || !armed) {
+        if (!swap || !armed || staggered) {
             clock = 1;
             return;
         }

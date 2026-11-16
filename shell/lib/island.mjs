@@ -206,10 +206,3 @@ export function ease(points, t) {
   const i = Math.floor(t * STEPS);
   return points[i] + (points[i + 1] - points[i]) * (t * STEPS - i);
 }
-
-// How the island morphs on the one spring: the shape's open and close curves and how its content swaps, scaling in from 90% as it fades; null before the scheme loads.
-export function islandMotion(loaded) {
-  if (!loaded) return null;
-  const open = springCurve(260, 0.7);
-  return { open, close: springCurve(390, 0.78), swap: { kind: 'spring', inMs: Math.min(Math.max(Math.round(open.ms * 0.5), 180), 320), outMs: 130, delay: 60 } };
-}
