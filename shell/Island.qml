@@ -1,7 +1,6 @@
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Pipewire
-import Quickshell.Wayland
 import Quickshell.Widgets
 import QtQuick
 import QtQuick.Layouts
@@ -15,8 +14,8 @@ import "lib/worldclock.mjs" as W
 import "lib/control.mjs" as C
 import "lib/click.mjs" as ClickLib
 
-// At rest the island is the clock, a Surface box 10 px below the top edge; the window pads for its shadow.
-PanelWindow {
+// At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
+Item {
     id: island
 
     required property var theme
@@ -198,7 +197,7 @@ PanelWindow {
             sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
-            question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(screen.height * 0.8))],
+            question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
             osd: [osdLook.width, osdLook.height]
@@ -220,8 +219,6 @@ PanelWindow {
     property real progress: 1
     // Picked when a morph starts, since the mode that picks it changes in the same instant as the target.
     property var curve: null
-    // The taller of the old and new box while it morphs, so the window resizes twice per morph rather than every frame.
-    property real heldHeight: 0
     // What the box last morphed for; a size change with the same content, such as a font loading or a theme switch, snaps instead.
     property string morphedFor: ""
     onTargetWidthChanged: morph()
@@ -239,7 +236,6 @@ PanelWindow {
         }
         if (!motion || !fresh) {
             morphing.stop();
-            heldHeight = 0;
             toWidth = targetWidth;
             toHeight = targetHeight;
             progress = 1;
@@ -247,7 +243,6 @@ PanelWindow {
         }
         fromWidth = box.width;
         fromHeight = box.height;
-        heldHeight = Math.max(heldHeight, box.height);
         toWidth = targetWidth;
         toHeight = targetHeight;
         curve = I.isCompact(mode) ? motion.close : motion.open;
@@ -460,10 +455,9 @@ PanelWindow {
     function osdState() {
         if (mode !== "osd")
             return null;
-        const shift = (screen.width - width) / 2;
         const at = item => {
             const p = item.mapToItem(null, 0, 0);
-            return { x: p.x + shift, y: p.y, w: item.width, h: item.height };
+            return { x: p.x, y: p.y, w: item.width, h: item.height };
         };
         return {
             value: osdValue.text,
@@ -623,7 +617,7 @@ PanelWindow {
             return null;
         const at = (item) => {
             const p = item.mapToItem(null, 0, 0);
-            return { x: p.x + (screen.width - width) / 2, y: p.y, w: item.width, h: item.height };
+            return { x: p.x, y: p.y, w: item.width, h: item.height };
         };
         const shownChip = columnChip.visible ? columnChip : null;
         return {
@@ -671,9 +665,6 @@ PanelWindow {
         };
     }
 
-    // Room for the widest shadow, Artboard's soft one, beside and below the box.
-    readonly property int padSide: 32
-    readonly property int padBelow: 44
     // Mod+I gives the island the keyboard to act on what it shows; anything but a question gives it back.
     property bool focused: false
     property bool replying: false
@@ -849,10 +840,9 @@ PanelWindow {
             Quickshell.execDetached(["sh", "-c", `wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ ${-5 * t.steps}%-`]);
     }
 
-    // Where a click area is drawn on the island's output, {x, y, w, h}, or null: the window is centred at the top of its output.
+    // Where a click area is drawn on the island's output, {x, y, w, h}, or null: the island fills its output from the origin.
     function box(name) {
-        const b = JSON.parse(ClickLib.boxJson(contentItem, name));
-        return JSON.stringify(b ? Object.assign(b, { x: b.x + Math.round((screen.width - width) / 2) }) : null);
+        return ClickLib.boxJson(island, name);
     }
 
     function release() {
@@ -870,23 +860,16 @@ PanelWindow {
     readonly property string questionId: question?.id ?? ""
     onQuestionIdChanged: release()
 
-    // The output the island follows; visible reads it, not the window's own screen, which Quickshell sets again while visible makes the window, and qs logged that as a binding loop.
+    // The output the island follows, niri's focused one, as the surfaces' window it draws in does.
     readonly property var output: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
-    screen: output
     // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it.
     visible: !niri.edgeToEdge(niri.focusedOutput, output.width)
-    WlrLayershell.layer: WlrLayer.Top
-    WlrLayershell.namespace: "dots-island"
-    WlrLayershell.keyboardFocus: focused && !attaching ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
-    exclusionMode: ExclusionMode.Ignore
-    anchors.top: true
-    implicitWidth: I.MAX_WIDTH + 2 * padSide
-    implicitHeight: box.y + Math.max(targetHeight, heldHeight) + padBelow
-    color: "transparent"
-    // Only the box takes clicks, not the shadow around it.
-    mask: Region {
-        item: box
-    }
+    width: parent ? parent.width : 0
+    height: parent ? parent.height : 0
+    // The surfaces' window holds the keyboard for the island while this is true.
+    readonly property bool wantsKeys: focused && !attaching
+    // At rest the surfaces' window takes clicks only on this.
+    readonly property Item maskItem: box
 
     Connections {
         target: Root.Pairing
@@ -939,8 +922,6 @@ PanelWindow {
         property: "progress"
         from: 0
         to: 1
-        onRunningChanged: if (!running)
-            island.heldHeight = 0
     }
 
     PwObjectTracker {
@@ -1054,8 +1035,8 @@ PanelWindow {
 
     Root.Surface {
         id: box
-        // Centred in a window as wide as the widest card, so the box morphs without the window resizing.
-        x: Math.round((island.implicitWidth - width) / 2)
+        // Centred on the output, so the box morphs without the window resizing.
+        x: Math.round((island.width - width) / 2)
         y: 10
         width: island.progress >= 1 || !island.curve ? island.toWidth : island.fromWidth + (island.toWidth - island.fromWidth) * I.ease(island.curve.points, island.progress)
         height: island.progress >= 1 || !island.curve ? island.toHeight : island.fromHeight + (island.toHeight - island.fromHeight) * I.ease(island.curve.points, island.progress)

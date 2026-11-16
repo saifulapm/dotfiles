@@ -43,6 +43,8 @@ PanelWindow {
     required property var reminders
     // The Desk's niri service, null until the Desk loads.
     required property var niri
+    // The Desk's island, which draws in this window; null until the Desk loads.
+    required property var island
     readonly property var launcher: launcherLoader.item
     readonly property var notifications: notifsLoader.item
     readonly property var cheatsheet: cheatsheetLoader.item
@@ -69,7 +71,12 @@ PanelWindow {
             launcher.close();
         catchKeys();
     }
-    onShownChanged: catchKeys()
+    // One thing holds the island at a time, so a surface that opens takes the keyboard from the island.
+    onShownChanged: {
+        if (shown)
+            island?.release();
+        catchKeys();
+    }
 
     function catchKeys() {
         if (overview && !shown)
@@ -203,7 +210,7 @@ PanelWindow {
     screen: output
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "dots-surfaces"
-    WlrLayershell.keyboardFocus: shown || overview ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: shown || overview || (island?.wantsKeys ?? false) ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
     anchors {
         top: true
@@ -212,11 +219,16 @@ PanelWindow {
         right: true
     }
     color: "transparent"
-    // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover.
-    mask: shown && !(notifications?.dragging ?? false) ? null : noInput
+    // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover; at rest only the island takes clicks.
+    mask: shown && !(notifications?.dragging ?? false) ? null : island?.visible ? islandInput : noInput
 
     Region {
         id: noInput
+    }
+
+    Region {
+        id: islandInput
+        item: host.island ? host.island.maskItem : null
     }
 
     // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed, and Esc or Enter closes the overview on the window it shows focused.

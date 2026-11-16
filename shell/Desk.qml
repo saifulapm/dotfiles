@@ -16,6 +16,10 @@ Scope {
     required property var notifs
     // The session lock, whose agent lease the island shows.
     required property var lock
+    // shell.qml's loader of the surfaces' window, whose content the island draws in.
+    required property var surfaces
+    // The surfaces' window reads the island's mask and keyboard through this.
+    readonly property var islandItem: island
     // The Goals window reaches the store through this.
     readonly property alias goals: goalsService
     // Control's Route section and the shell's status read the last sync round through this.
@@ -149,6 +153,7 @@ Scope {
 
     Root.Island {
         id: island
+        parent: desk.surfaces.item ? desk.surfaces.item.contentItem : null
         theme: desk.theme
         niri: niriService
         clock: clockService

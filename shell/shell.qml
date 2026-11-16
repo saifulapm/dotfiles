@@ -34,7 +34,7 @@ ShellRoot {
         if (firstFrameMs === null || desk !== null)
             return;
         surfacesLoader.component = compiled("Surfaces.qml");
-        desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService, lock: lockScope });
+        desk = compiled("Desk.qml").createObject(root, { theme: themeService, notifs: notifsService, lock: lockScope, surfaces: surfacesLoader });
         // The resting island draws in the surfaces' window, so the window is made with the Desk; the surfaces in it still warm a second later.
         surfacesLoader.active = true;
         polkit = compiled("Polkit.qml").createObject(root, { surfaces: surfacesLoader });
@@ -299,7 +299,8 @@ ShellRoot {
                 goals: Qt.binding(() => root.desk ? root.desk.goals : null),
                 sync: Qt.binding(() => root.desk ? root.desk.sync : null),
                 reminders: Qt.binding(() => root.desk ? root.desk.reminders : null),
-                niri: Qt.binding(() => root.desk ? root.desk.niri : null)
+                niri: Qt.binding(() => root.desk ? root.desk.niri : null),
+                island: Qt.binding(() => root.desk ? root.desk.islandItem : null)
             });
         }
     }
