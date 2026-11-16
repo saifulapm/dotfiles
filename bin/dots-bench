@@ -57,12 +57,18 @@ median() { printf '%s\n' "$@" | sort -n | sed -n 3p; }
 first_frame=$(median "${frames[@]}")
 cold=$(median "${colds[@]}")
 schemes_cold=$(median "${schemes_colds[@]}")
-# A warm open read once, during the surfaces' warm-up, swung from 3 to 25 ms on one tree, so each warm row is the median of five opens once the shell has settled.
+# A warm open reopens the mode it was in: an open in the other mode rebuilds the launcher's rows and read 17 to 22 ms on any tree, so each warm row drops the first open after the switch and takes the median of the next five.
 sleep 2
 warms=() schemes_warms=()
-for i in 0 1 2 3 4; do
-  warms+=("$(open_once $((3 + 2 * i)))") || exit 1
-  schemes_warms+=("$(schemes_once $((4 + 2 * i)))") || exit 1
+for i in 0 1 2 3 4 5; do
+  sleep 0.3
+  ms=$(open_once $((3 + i))) || exit 1
+  ((i > 0)) && warms+=("$ms")
+done
+for i in 0 1 2 3 4 5; do
+  sleep 0.3
+  ms=$(schemes_once $((9 + i))) || exit 1
+  ((i > 0)) && schemes_warms+=("$ms")
 done
 echo "     warm opens: ${warms[*]}; c mode warm opens: ${schemes_warms[*]}"
 warm=$(median "${warms[@]}")
