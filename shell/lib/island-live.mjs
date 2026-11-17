@@ -51,12 +51,12 @@ function shape(mode, slots) {
     case 'recording':
       return state(ICONS.record, s, { tone: 'danger' });
     case 'lease':
-      return state(ICONS.robot, s.who, { tail: left(s.left) });
+      return state(ICONS.robot, s.who, { tail: left(s.left), tone: s.left <= 60000 ? 'danger' : 'normal' });
     case 'sending':
       return state(ICONS.upload, `${filesText(s.count)} to ${oneLine(s.to)}`, { bar: s.pct });
     case 'downloading':
       if (s.failure) return state(ICONS.alert, `${oneLine(s.failure.title)} · ${oneLine(s.failure.reason)}`, { tone: 'danger' });
-      return state(ICONS.download, `${s.n} / ${s.total}`, { tail: `${s.pct}%` });
+      return state(ICONS.download, s.list ? `${s.n} / ${s.total}` : s.title, { tail: `${s.pct}%`, bar: s.pct });
     case 'btConnect':
       return state(ICONS.headphones, deviceName(s.name, s.address), { tail: s.battery === null ? '' : `${Math.round(s.battery * 100)}%` });
     case 'capture':

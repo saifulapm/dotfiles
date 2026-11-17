@@ -101,20 +101,12 @@ Item {
     property var toast: null
     // dots-capture's result, {kind, title, detail, swatch}, for the toast's 1.5 s.
     property var capture: null
-    onCaptureChanged: holdCaptureNote()
-    // The capture draws in the notification's card.
-    readonly property var captureLook: V.captureLook(theme.tokens)
     // A Taildrop send, {count, to, pct}, from dots-taildrop-send's start until its done.
     property var sending: null
-    readonly property var sendingLook: V.sendingLook(theme.tokens)
     // A YouTube download: the one underneath, {n, total, list, title, pct, kind}, and a failure held 5 s over it, {title, reason}. Either one fills the slot.
     property var download: null
     property var failure: null
     readonly property var downloading: download || failure ? Object.assign({ n: 1, total: 1, list: "", title: "", pct: 0, kind: "" }, download, { failure }) : null
-    property var heldDownloading: null
-    onDownloadingChanged: if (downloading)
-        heldDownloading = downloading
-    readonly property var downloadingLook: V.downloadingLook(theme.tokens)
     property var playing: null
     // Opened by a click on the playing island; it reads the player the media keys run, so it stays through a pause.
     property bool mediaOpen: false
@@ -130,7 +122,6 @@ Item {
     property var heldCalendar: null
     property var heldNotification: null
     property var heldQuestion: null
-    property var heldOsd: null
     property var heldShareRows: []
     onShareRowsChanged: if (shareRows.length)
         heldShareRows = shareRows
@@ -141,8 +132,6 @@ Item {
         heldNotification = notification
     onQuestionChanged: if (question)
         heldQuestion = question
-    onOsdChanged: if (osd)
-        heldOsd = osd
     onTextChanged: if (I.isCompact(mode))
         heldText = text
     Component.onCompleted: heldText = text
@@ -180,13 +169,12 @@ Item {
     property real modeSince: Date.now()
     onModeChanged: {
         modeSince = Date.now();
-        holdCaptureNote();
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
         if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way; the rest picks its mode from the same slots it reads, so a slot that empties never meets a mode not yet moved on.
-    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLabel.text, leaseWho.text, leaseTime.text].filter(t => t).join(" ") : I.islandText(H.modeOf(surface, slots), slots, clock.now)
+    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLook.slot.label.text, leaseLook.slot.who.text(lease.who), leaseLook.time(lease.left)].filter(t => t).join(" ") : I.islandText(H.modeOf(surface, slots), slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -204,9 +192,6 @@ Item {
     readonly property var sizes: ({
             label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
-            lease: [leaseLook.slot.width, leaseLook.slot.height],
-            sending: [sendingLook.width, sendingLook.height],
-            downloading: [downloadingLook.width, downloadingLook.height],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
             notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
@@ -214,12 +199,10 @@ Item {
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
-            osd: [osdLook.width, osdLook.height],
             // An open surface's own width and height, up to the output's less 48 px each way (PMQRFEYY, M4SVCQVQ).
             surface: [Math.min(surfaceWidth, output.width - 48), Math.min(surfaceHeight, output.height - 48)]
         })
-    // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading", "surface"].indexOf(mode) >= 0 ? mode : live ? "live" : "label"
+    readonly property string part: ["notification", "question", "calendar", "leaseCard", "sharingCard", "mediaCard", "surface"].indexOf(mode) >= 0 ? mode : live ? "live" : "label"
     // Board 2's one-line state of this mode, picked from the same slots the mode reads, or null; heldLive keeps the last one so it leaves drawn.
     readonly property var live: L.liveState(H.modeOf(surface, slots), slots, clock.now)
     property var heldLive: null
@@ -234,7 +217,7 @@ Item {
     readonly property real drawnWidth: box.width
     // The approved motion (38G8XV1J); none before the scheme loads, so the first frame draws at rest.
     readonly property var motion: theme.tokens ? H.hostMotion() : null
-    readonly property bool animating: morphing.running || [labelPart, livePart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
+    readonly property bool animating: morphing.running || [labelPart, livePart, leaseCardPart, sharingCardPart, mediaCardPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -489,26 +472,6 @@ Item {
         }
     }
 
-    // A capture as drawn in the notification's card, for `island state`: its title, detail and swatch.
-    function captureState() {
-        if (mode !== "capture")
-            return null;
-        return {
-            drawn: notePart.shown ? "card" : null,
-            head: appName.text,
-            title: summary.text,
-            titleElided: summary.truncated,
-            detail: body.text,
-            swatch: island.heldNotification?.swatch && tile.visible ? String(tile.color).toUpperCase() : null
-        };
-    }
-
-    // A card theme draws the capture as a notification, so the card is handed a note while the capture is what shows; one the card held stays drawn as it leaves.
-    function holdCaptureNote() {
-        if (capture && mode === "capture")
-            heldNotification = captureLook.note(capture);
-    }
-
     // The one-line state as drawn, for `island state`: what heldLive says, the text as it shows (elided or not), and where the clock's right edge sits against the box's.
     function liveDrawn() {
         if (part !== "live" || !heldLive)
@@ -526,24 +489,6 @@ Item {
             clockRight: Math.round(livePart.width - (liveClock.x + liveClock.width)),
             clockLeft: Math.round(liveClock.x),
             textRight: Math.round(liveRow.x + liveText.x + liveText.width)
-        };
-    }
-
-    // What the OSD draws, for `island state`.
-    function osdState() {
-        if (mode !== "osd")
-            return null;
-        const at = item => {
-            const p = item.mapToItem(null, 0, 0);
-            return { x: p.x, y: p.y, w: item.width, h: item.height };
-        };
-        return {
-            value: osdValue.text,
-            valueFont: [osdValue.font.family, osdValue.font.pixelSize],
-            bars: osdLook.bars,
-            lit: osdBars.drawn(),
-            islandBox: at(box),
-            valueBox: at(osdValue)
         };
     }
 
@@ -617,49 +562,6 @@ Item {
         download = null;
     }
 
-    // What the downloading slot draws, for `island state`.
-    function downloadingState() {
-        if (mode !== "downloading")
-            return null;
-        const last = dlTail.visible ? dlTail : dlMain;
-        return {
-            failed: !!heldDownloading.failure,
-            head: downloadingLook.head ? [dlHeadLeft.text, dlHeadRight.text] : [],
-            chip: dlChip.visible ? dlChipText.text : "",
-            line: dlChip.visible ? dlChipText.text + " " + dlMain.text : dlMain.text + dlTail.text,
-            elided: dlMain.truncated,
-            lines: dlMain.lineCount,
-            barFill: dlBar.visible ? Math.round(dlFill.width) : 0,
-            barWidth: Math.round(dlBar.width),
-            barHeight: dlBar.visible ? Math.round(dlBar.height) : 0,
-            right: Math.round(last.mapToItem(downloadingPart, last.width, 0).x),
-            frame: String(box.style.frame.color)
-        };
-    }
-
-    // What the sending slot draws, for `island state`.
-    function sendingState() {
-        if (mode !== "sending")
-            return null;
-        const parts = [];
-        let name = null;
-        for (let i = 0; i < sendingParts.count; i++) {
-            const t = sendingParts.itemAt(i);
-            parts.push(t.text);
-            if (t.modelData.name)
-                name = t;
-        }
-        return {
-            label: parts.join(" "),
-            elided: name ? name.truncated : false,
-            lines: name ? name.lineCount : 0,
-            barFill: Math.round(sendingFill.width),
-            barWidth: Math.round(sendingInline.width),
-            barHeight: Math.round(sendingFill.height),
-            right: Math.round(sendingInline.mapToItem(sendingPart, sendingInline.width, 0).x)
-        };
-    }
-
     // The sharing card's rows as drawn, each with its width against the card's.
     function sharingState() {
         const rows = [];
@@ -668,25 +570,11 @@ Item {
         return { rows, inner: shareColumn.width };
     }
 
-    // What the lease slot and card draw, for `island state`.
+    // What the lease card draws, for `island state`; the one-line slot is under live.
     function leaseState() {
         if (mode === "leaseCard")
             return Object.assign({ card: true, label: leaseFrameLabel.visible ? leaseFrameLabel.text : "", bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
-        if (mode !== "lease")
-            return null;
-        return {
-            label: leaseLabel.text,
-            who: leaseWho.text,
-            time: leaseTime.text,
-            elided: leaseWho.truncated,
-            lines: leaseWho.lineCount,
-            timeColor: String(leaseTime.color),
-            timeFont: leaseTime.font.family,
-            timeRight: Math.round(leaseTimeBox.mapToItem(leasePart, leaseTimeBox.width, 0).x),
-            fill: String(box.style.fill),
-            frame: String(box.style.frame.color),
-            chip: leaseChip.visible ? String(leaseChip.color) : null
-        };
+        return null;
     }
 
     // Where a notification's parts are drawn, in output pixels, for `island state`.
@@ -1363,371 +1251,6 @@ Item {
             }
 
             IslandPart {
-                id: leasePart
-                shown: island.part === "lease"
-                key: ""
-                swap: island.motion?.closeSwap ?? null
-                x: Math.round((parent.width - width) / 2)
-                width: island.sizes.lease[0]
-                height: island.sizes.lease[1]
-
-                // The mark, the label and the holder from the left, the time at the right edge, as the boards draw the slot.
-                Row {
-                    id: leaseRow
-                    readonly property var slot: island.leaseLook.slot
-                    readonly property var warn: island.leaseWarning ? island.leaseLook.warning : null
-                    x: slot.pad
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: slot.gap
-
-                    // Artboard's last minute rings its dot in the chip's colour.
-                    Rectangle {
-                        visible: leaseRow.slot.mark !== null
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: leaseRow.warn?.ring ? 16 : leaseRow.slot.mark?.size ?? 0
-                        height: width
-                        radius: leaseRow.slot.mark?.shape === "dot" ? width / 2 : 0
-                        color: leaseRow.warn?.ring || "transparent"
-
-                        Rectangle {
-                            anchors.centerIn: parent
-                            width: leaseRow.slot.mark?.size ?? 0
-                            height: width
-                            radius: leaseRow.slot.mark?.shape === "dot" ? width / 2 : 0
-                            color: leaseRow.warn?.mark || leaseRow.slot.mark?.color || "transparent"
-                        }
-                    }
-
-                    Text {
-                        id: leaseLabel
-                        visible: text !== ""
-                        anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        text: leaseRow.slot.label.text
-                        color: leaseRow.warn?.label || leaseRow.slot.label.color || box.style.text
-                        font.family: leaseRow.slot.label.font
-                        font.pixelSize: leaseRow.slot.label.size
-                        font.letterSpacing: leaseRow.slot.label.spacing
-                    }
-
-                    // A holder's name is anyone's text: one line, elided before the time.
-                    Text {
-                        id: leaseWho
-                        anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        width: Math.min(implicitWidth, leasePart.width - 2 * leaseRow.slot.pad - leaseRow.spacing * (leaseLabel.visible ? 3 : 2) - (leaseRow.slot.mark ? 16 : 0) - (leaseLabel.visible ? leaseLabel.width : 0) - leaseTimeBox.width)
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: leaseRow.slot.who.text(island.lease?.who ?? "")
-                        color: leaseRow.slot.who.color || box.style.text
-                        font.family: leaseRow.slot.who.font
-                        font.pixelSize: leaseRow.slot.who.size
-                        font.weight: leaseRow.slot.who.weight
-                        font.letterSpacing: leaseRow.slot.who.spacing
-                    }
-                }
-
-                Item {
-                    id: leaseTimeBox
-                    anchors.right: parent.right
-                    anchors.rightMargin: leaseRow.slot.pad
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: leaseTime.implicitWidth + (leaseChip.visible ? 16 : 0)
-                    height: leaseTime.implicitHeight + (leaseChip.visible ? 4 : 0)
-
-                    // Artboard's last minute puts the time in a chip.
-                    Rectangle {
-                        id: leaseChip
-                        visible: (leaseRow.warn?.chip ?? "") !== ""
-                        anchors.fill: parent
-                        radius: 8
-                        color: leaseRow.warn?.chip || "transparent"
-                    }
-
-                    Text {
-                        id: leaseTime
-                        anchors.centerIn: parent
-                        textFormat: Text.PlainText
-                        text: island.leaseLook.time(island.lease?.left ?? 0)
-                        color: leaseRow.warn?.time || leaseRow.slot.time.color || box.style.text
-                        font.family: leaseRow.slot.time.font
-                        font.pixelSize: leaseRow.slot.time.size
-                        font.weight: leaseRow.slot.time.weight
-                        font.letterSpacing: leaseRow.slot.time.spacing
-                        font.features: { "tnum": 1 }
-                    }
-                }
-            }
-
-            IslandPart {
-                id: sendingPart
-                shown: island.part === "sending"
-                key: ""
-                swap: island.motion?.closeSwap ?? null
-                x: Math.round((parent.width - width) / 2)
-                width: island.sizes.sending[0]
-                height: island.sizes.sending[1]
-                readonly property var look: island.sendingLook
-                // What the parts other than the machine's name take, so that one elides into what is left; the bar keeps 40 px.
-                readonly property real fixed: 2 * look.pad + (look.mark ? look.mark.size + look.gap : 0) + 40 + look.gap + sendingParts.fixedWidth
-
-                // The mark and the words from the left, and the bar after the words.
-                Row {
-                    x: sendingPart.look.pad
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: sendingPart.look.gap
-
-                    Item {
-                        visible: sendingPart.look.mark !== null
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: sendingPart.look.mark?.size ?? 0
-                        height: width
-
-                        Rectangle {
-                            visible: sendingPart.look.mark?.shape !== "upload"
-                            anchors.fill: parent
-                            color: sendingPart.look.mark?.color || box.style.text
-                        }
-
-                        // Artboard's board draws an arrow up out of a tray.
-                        Shape {
-                            visible: sendingPart.look.mark?.shape === "upload"
-                            anchors.fill: parent
-                            preferredRendererType: Shape.CurveRenderer
-                            ShapePath {
-                                strokeColor: sendingPart.look.mark?.color || box.style.text
-                                strokeWidth: 1.6
-                                fillColor: "transparent"
-                                capStyle: ShapePath.RoundCap
-                                joinStyle: ShapePath.RoundJoin
-                                scale: Qt.size((sendingPart.look.mark?.size ?? 16) / 16, (sendingPart.look.mark?.size ?? 16) / 16)
-                                PathSvg {
-                                    path: "M8 11.5V3.5m-3.2 3.2L8 3.5l3.2 3.2M3 13.5h10"
-                                }
-                            }
-                        }
-                    }
-
-                    Repeater {
-                        id: sendingParts
-                        model: sendingPart.look.parts
-                        readonly property real fixedWidth: widthOf(false)
-                        readonly property real nameWidth: widthOf(true)
-
-                        function widthOf(name) {
-                            let w = 0;
-                            for (let i = 0; i < count; i++) {
-                                const t = itemAt(i);
-                                if (t && t.modelData.name === name)
-                                    w += name ? t.width : t.implicitWidth + sendingPart.look.gap;
-                            }
-                            return w;
-                        }
-
-                        // The machine's name comes from the tailnet: one line, and its part elides before the rest.
-                        Text {
-                            required property var modelData
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            width: modelData.name ? Math.max(0, Math.min(implicitWidth, sendingPart.width - sendingPart.fixed)) : implicitWidth
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                            text: modelData.text(island.sending?.count ?? 0, island.sending?.to ?? "", island.sending?.pct ?? 0)
-                            color: modelData.color || box.style.text
-                            font.family: modelData.font
-                            font.pixelSize: modelData.size
-                            font.weight: modelData.weight
-                            font.letterSpacing: modelData.spacing
-                        }
-                    }
-
-                    Rectangle {
-                        id: sendingInline
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: Math.max(40, 40 + sendingPart.width - sendingPart.fixed - sendingParts.nameWidth)
-                        height: sendingPart.look.bar.height
-                        radius: sendingPart.look.bar.radius
-                        color: sendingPart.look.bar.track
-                    }
-                }
-
-                // The fill sits on the bar's track.
-                Rectangle {
-                    id: sendingFill
-                    readonly property Item track: sendingInline
-                    x: track.mapToItem(sendingPart, 0, 0).x
-                    y: track.mapToItem(sendingPart, 0, 0).y
-                    width: track.width * (island.sending?.pct ?? 0) / 100
-                    height: track.height
-                    radius: sendingPart.look.bar.radius
-                    color: sendingPart.look.bar.fill
-                }
-            }
-
-            IslandPart {
-                id: downloadingPart
-                shown: island.part === "downloading"
-                key: ""
-                swap: island.motion?.closeSwap ?? null
-                x: Math.round((parent.width - width) / 2)
-                width: island.sizes.downloading[0]
-                height: island.sizes.downloading[1]
-                readonly property var look: island.downloadingLook
-                readonly property var held: island.heldDownloading
-                readonly property bool failed: held ? !!held.failure : false
-                readonly property var words: held ? I.downloadingParts(held, look.chip !== null) : { chip: "", main: "", tail: "" }
-                readonly property color ink: look.line.color || box.style.text
-
-                // Artboard's tile holds a play glyph.
-                Rectangle {
-                    id: dlTile
-                    visible: downloadingPart.look.tile !== null
-                    x: downloadingPart.look.pad
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: downloadingPart.look.tile?.size ?? 0
-                    height: width
-                    radius: downloadingPart.look.tile?.radius ?? 0
-                    color: downloadingPart.look.tile?.fill ?? "transparent"
-
-                    Shape {
-                        anchors.centerIn: parent
-                        width: 20
-                        height: 20
-                        preferredRendererType: Shape.CurveRenderer
-                        ShapePath {
-                            strokeColor: box.style.text
-                            strokeWidth: 1.5
-                            fillColor: "transparent"
-                            PathSvg {
-                                path: "M5.5 4h9A3.5 3.5 0 0 1 18 7.5v5a3.5 3.5 0 0 1-3.5 3.5h-9A3.5 3.5 0 0 1 2 12.5v-5A3.5 3.5 0 0 1 5.5 4z"
-                            }
-                        }
-                        ShapePath {
-                            strokeColor: "transparent"
-                            fillColor: box.style.text
-                            PathSvg {
-                                path: "M8.4 7.4v5.2L13 10z"
-                            }
-                        }
-                    }
-                }
-
-                Column {
-                    id: dlColumn
-                    x: downloadingPart.look.pad + (dlTile.visible ? dlTile.width + 14 : 0)
-                    width: downloadingPart.width - x - downloadingPart.look.pad
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: downloadingPart.look.gap
-
-                    Item {
-                        visible: downloadingPart.look.head !== null
-                        width: parent.width
-                        height: visible ? dlHeadLeft.implicitHeight : 0
-
-                        Text {
-                            id: dlHeadLeft
-                            textFormat: Text.PlainText
-                            text: downloadingPart.look.head?.left ?? ""
-                            color: downloadingPart.look.head?.color ?? box.style.text
-                            font.family: downloadingPart.look.head?.font ?? ""
-                            font.pixelSize: downloadingPart.look.head?.size ?? 12
-                            font.letterSpacing: downloadingPart.look.head?.spacing ?? 0
-                        }
-
-                        Text {
-                            id: dlHeadRight
-                            anchors.right: parent.right
-                            textFormat: Text.PlainText
-                            text: downloadingPart.look.head?.right(downloadingPart.held?.kind ?? "", I.islandText("rest", {}, clock.now)) ?? ""
-                            color: downloadingPart.look.head?.color ?? box.style.text
-                            font.family: downloadingPart.look.head?.font ?? ""
-                            font.pixelSize: downloadingPart.look.head?.size ?? 12
-                            font.letterSpacing: downloadingPart.look.head?.spacing ?? 0
-                        }
-                    }
-
-                    // The failure's chip, then the title and reason (or the download's title) eliding before the percent, which never does.
-                    Row {
-                        id: dlLine
-                        height: Math.max(dlMain.implicitHeight, dlChip.height)
-
-                        Item {
-                            id: dlChip
-                            visible: downloadingPart.failed && downloadingPart.words.chip !== ""
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: visible ? dlChipBox.width + 8 : 0
-                            height: visible ? dlChipBox.height : 0
-
-                            Rectangle {
-                                id: dlChipBox
-                                width: dlChipText.implicitWidth + 2 * (downloadingPart.look.chip?.padX ?? 0)
-                                height: dlChipText.implicitHeight + 2 * (downloadingPart.look.chip?.padY ?? 0)
-                                radius: downloadingPart.look.chip?.radius ?? 0
-                                color: downloadingPart.look.chip?.fill ?? "transparent"
-
-                                Text {
-                                    id: dlChipText
-                                    anchors.centerIn: parent
-                                    textFormat: Text.PlainText
-                                    text: downloadingPart.words.chip
-                                    color: downloadingPart.look.chip?.color ?? box.style.text
-                                    font.family: downloadingPart.look.line.font
-                                    font.pixelSize: downloadingPart.look.line.size
-                                    font.weight: downloadingPart.look.line.weight
-                                }
-                            }
-                        }
-
-                        Text {
-                            id: dlMain
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            width: Math.max(0, Math.min(implicitWidth, dlColumn.width - dlChip.width - dlTail.implicitWidth))
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                            text: downloadingPart.words.main
-                            color: downloadingPart.ink
-                            font.family: downloadingPart.look.line.font
-                            font.pixelSize: downloadingPart.look.line.size
-                            font.weight: downloadingPart.look.line.weight
-                            font.letterSpacing: downloadingPart.look.line.spacing
-                        }
-
-                        Text {
-                            id: dlTail
-                            visible: downloadingPart.words.tail !== ""
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            text: downloadingPart.words.tail
-                            color: downloadingPart.ink
-                            font.family: downloadingPart.look.line.font
-                            font.pixelSize: downloadingPart.look.line.size
-                            font.weight: downloadingPart.look.line.weight
-                            font.letterSpacing: downloadingPart.look.line.spacing
-                            font.features: { "tnum": 1 }
-                        }
-                    }
-
-                    Rectangle {
-                        id: dlBar
-                        visible: !downloadingPart.failed
-                        width: parent.width
-                        height: visible ? downloadingPart.look.bar.height : 0
-                        radius: downloadingPart.look.bar.radius
-                        color: downloadingPart.look.bar.track
-
-                        Rectangle {
-                            id: dlFill
-                            width: parent.width * (downloadingPart.held?.pct ?? 0) / 100
-                            height: parent.height
-                            radius: parent.radius
-                            color: downloadingPart.look.bar.fill
-                        }
-                    }
-                }
-            }
-
-            IslandPart {
                 id: leaseCardPart
                 shown: island.part === "leaseCard"
                 key: ""
@@ -2045,63 +1568,6 @@ Item {
                 x: Math.round((parent.width - width) / 2)
                 width: island.sizes.surface[0]
                 height: island.sizes.surface[1]
-            }
-
-            IslandPart {
-                id: osdPart
-                shown: island.part === "osd"
-                key: ""
-                swap: island.motion?.swap ?? null
-                x: Math.round((parent.width - width) / 2)
-                width: island.sizes.osd[0]
-                height: island.sizes.osd[1]
-
-                // The glyph, the bar and the value.
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: anchors.leftMargin
-                    spacing: 12
-
-                    // A speaker for volume, a sun for brightness, drawn as 16 px strokes in the text colour.
-                    Shape {
-                        implicitWidth: 16
-                        implicitHeight: 16
-
-                        ShapePath {
-                            strokeColor: box.style.text
-                            strokeWidth: 1.5
-                            fillColor: "transparent"
-                            capStyle: ShapePath.RoundCap
-                            joinStyle: ShapePath.RoundJoin
-
-                            PathSvg {
-                                path: island.heldOsd?.kind === "brightness"
-                                    ? "M 11 8 A 3 3 0 1 1 5 8 A 3 3 0 1 1 11 8 M 8 1 L 8 2.5 M 8 13.5 L 8 15 M 1 8 L 2.5 8 M 13.5 8 L 15 8 M 3 3 L 4 4 M 12 12 L 13 13 M 3 13 L 4 12 M 12 4 L 13 3"
-                                    : "M 2 6 L 5 6 L 9 2.5 L 9 13.5 L 5 10 L 2 10 Z M 11.5 5.5 Q 13 8 11.5 10.5 M 13.5 3.5 Q 16 8 13.5 12.5"
-                            }
-                        }
-                    }
-
-                    OsdBars {
-                        id: osdBars
-                        Layout.fillWidth: true
-                        look: island.osdLook
-                        value: island.heldOsd?.value ?? 0
-                    }
-
-                    Text {
-                        id: osdValue
-                        textFormat: Text.PlainText
-                        horizontalAlignment: Text.AlignRight
-                        text: island.heldOsd ? island.osdLook.valueText(island.heldOsd.value) : ""
-                        readonly property var look: island.osdLook.value
-                        color: look.color || box.style.text
-                        font.family: look.font
-                        font.pixelSize: look.size
-                        font.weight: look.weight
-                    }
-                }
             }
 
             IslandPart {

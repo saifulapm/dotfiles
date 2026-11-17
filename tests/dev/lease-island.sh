@@ -42,29 +42,27 @@ near() {
 }
 
 until_ok 5000 shell_status >/dev/null
-check "at rest the island is the clock" state_is '.mode == "rest" and .lease == null'
+check "at rest the island is the clock" state_is '.mode == "rest" and .live == null and .lease == null'
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
 unlock claude 2
 
 settled '.mode == "lease"'
-echo "     lease: $(island | jq -c '{text, warning, lease}')"
+echo "     lease: $(island | jq -c '{text, warning, live}')"
 check "island state reads the lease with claude, out of its warning" state_is '.mode == "lease" and (.text | contains("claude")) and .warning == false'
-check "the slot is 264 px, with the time at its right edge" state_is '.drawn == 264 and .lease.timeRight == 248'
+check "the line draws a robot icon, claude and the time left, the clock at the right, 34 px" state_is --arg i "$(printf '\U000F06A9')" '.live.icon == $i and .live.text == "claude" and (.live.tail | test("^[12]:[0-5][0-9]$")) and .live.clockRight == 14 and .height == 34'
 read_back=$(ocr)
-check "the box draws the slot where the clock was (tesseract read '$read_back')" grep -qiF Agent <<<"$read_back"
+check "the box draws the slot where the clock was (tesseract read '$read_back')" grep -qiF claude <<<"$read_back"
 
 # 45 s left is inside the last minute.
 timeout 0.5 qs ipc call lock renew claude 0.75 >/dev/null
 settled '.warning == true'
-check "with 42 s left, island state reports warning, the time as 0:ss" state_is '.warning == true and (.lease.time | test("^0:4[0-5]$"))'
-chip=$(near 255 241 232)
-check "the time sits in a chip, and the dot in its ring ($chip px of #FFF1E8)" test "$chip" -gt 300
-check "the time turns #B4380B" state_is '.lease.timeColor == "#b4380b" and .lease.chip == "#fff1e8"'
+check "with 42 s left, island state reports warning, the time as 0:ss" state_is '.warning == true and (.live.tail | test("^0:4[0-5]$"))'
+check "the last minute takes the danger tone ($(island | jq -c '[.live.tone, .live.ink]'))" state_is '.live.tone == "danger"'
 
 timeout 0.5 qs ipc call lock renew claude 15 >/dev/null
 settled '.warning == false'
-check "renew claude 15 brings the normal look back" state_is '.warning == false and .lease.timeColor == "#ffffff" and .lease.chip == null'
+check "renew claude 15 brings the normal look back" state_is '.warning == false and .live.tone == "normal"'
 
 # Mod+I opens the lease card; niri runs no binds for wtype, so the check spawns the bind's command.
 mod_i() { niri msg action spawn -- dots-call island focus; }
@@ -86,15 +84,15 @@ check "Enter on the card locks within 1 s ($took ms)" lock_is '.locked and .held
 # A holder's name is anyone's text: one line, no bidi controls, elided inside the island.
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
-check "a lock ends the slot" state_is '.mode != "lease" and .lease == null'
+check "a lock ends the slot" state_is '.mode != "lease" and .live == null'
 timeout 0.5 qs ipc call lock unlock "$(printf 'cl\naude‮ x')" 5 >/dev/null
 settled '.mode == "lease"'
-check "a name with a newline and U+202E draws as one line ($(island | jq -c .lease.who))" state_is '.lease.who == "Agent · cl aude x" and .lease.lines == 1'
+check "a name with a newline and U+202E draws as one line ($(island | jq -c .live.text))" state_is '.live.text == "cl aude x"'
 niri msg action spawn -- dots-call lock lock
 until_ok 3000 lock_is '.locked and .secure'
 unlock "$(printf 'x%.0s' {1..200})" 5
 settled '.mode == "lease"'
-check "a 200-character name elides before the time, inside the slot's 264 px ($(island | jq -c '{drawn, t: .lease.timeRight}'))" state_is '.lease.elided and .lease.lines == 1 and .drawn == 264 and .lease.timeRight == 248'
+check "a 200-character name elides before the time, the clock at the right of the 560 px line ($(island | jq -c '{drawn, r: .live.clockRight}'))" state_is '.live.elided and .live.clockRight == 14 and .width == 560'
 mod_i
 settled '.mode == "leaseCard" and .focused'
 check "and on the card it elides on one line" state_is '.lease.elided and .drawn == 440'

@@ -2,7 +2,6 @@
 
 import { dateText, pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
-import { captureText } from './island.mjs';
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
 import { slabText } from './surface.mjs';
@@ -183,14 +182,6 @@ export function islandLook(tokens) {
   };
 }
 
-// What each capture card says under its result: the line names how it was read; niri's pick gives no place, so a colour says only that it was picked.
-const CAPTURE_BODY = { ocr: 'eng + ben · from region', qr: 'from region', colour: 'colour picked' };
-
-// How the island draws dots-capture's result: the notification card, fed a note from Capture with the result as its summary.
-export function captureLook() {
-  return { note: (r) => ({ swatch: r.swatch, icon: '', files: [], app: 'Capture', summary: captureText(r), body: CAPTURE_BODY[r.kind] }) };
-}
-
 // How the island draws an agent's lease in place of the clock, its last minute and its Mod+I card; a colour left empty is the island's own text colour.
 export function leaseLook(tokens) {
   const c = (tokens || UNTHEMED).color;
@@ -230,40 +221,6 @@ export function leaseLook(tokens) {
       barFill: tokens ? plainTones(tokens).bar : c.accent,
       keys: [['↵', 'lock now'], ['esc', 'close']],
     },
-  };
-}
-
-// How the island draws a Taildrop send in place of the clock: an upload mark, the words with the percent in them (the machine's name elides) and a rounded bar after them; a colour left empty is the island's own text colour.
-export function sendingLook(tokens) {
-  const c = (tokens || UNTHEMED).color;
-  const t = (tokens || UNTHEMED).type;
-  const files = (count) => `${count} ${count === 1 ? 'file' : 'files'}`;
-  return {
-    width: 380,
-    height: 40,
-    pad: 16,
-    gap: 10,
-    mark: { shape: 'upload', size: 16, color: '' },
-    parts: [{ font: t.ui, size: 13, color: '', weight: 500, spacing: 0, name: true, text: (count, to, pct) => `Sending ${files(count)} to ${line(to)} · ${pct}%` }],
-    bar: { height: 6, radius: 3, track: tokens ? plainTones(tokens).island.tile : c.muted, fill: tokens ? plainTones(tokens).bar : c.accent },
-  };
-}
-
-// How the island draws a YouTube download in place of the clock: a tile and the folder over a line and a bar; a failure keeps the box, drops the bar and shows a chip. A colour left empty is the island's own text colour.
-export function downloadingLook(tokens) {
-  const t = (tokens || UNTHEMED).type;
-  const text = (size, color, extra) => Object.assign({ font: t.ui, size, color, weight: 400, spacing: 0 }, extra);
-  const folders = { audio: '~/Music/YouTube', video: '~/Videos/YouTube' };
-  return {
-    width: 440,
-    height: 76,
-    pad: 16,
-    gap: 6,
-    tile: { size: 40, radius: 12, fill: plainTones(tokens).island.tile },
-    head: Object.assign(text(12, plainTones(tokens).island.head), { left: 'YouTube', right: (kind) => folders[kind] ?? '' }),
-    line: text(15, '', { weight: 700 }),
-    bar: { height: 4, radius: 2, track: plainTones(tokens).island.tile, fill: plainTones(tokens).bar },
-    chip: { fill: plainTones(tokens).warnChip, color: plainTones(tokens).warn, radius: 8, padX: 8, padY: 2 },
   };
 }
 

@@ -47,10 +47,10 @@ test('the mic, LIVE, a recording and a notice take the danger tone', () => {
   assert.deepEqual([notice.icon, notice.text, notice.tone], [ICONS.alert, 'theme failed', 'danger']);
 });
 
-test('an agent lease is a robot, the agent and the time left', () => {
+test('an agent lease is a robot, the agent and the time left; its last minute takes the danger tone', () => {
   const l = live('lease', { who: 'claude', left: 272000 });
   assert.deepEqual([l.icon, l.text, l.tail, l.tone], [ICONS.robot, 'claude', '4:32', 'normal']);
-  assert.equal(live('lease', { who: 'claude', left: 59000 }).tail, '0:59');
+  assert.deepEqual([live('lease', { who: 'claude', left: 59000 }).tail, live('lease', { who: 'claude', left: 59000 }).tone], ['0:59', 'danger']);
 });
 
 test('a send is an upload, the files and where, and a pill bar', () => {
@@ -58,9 +58,10 @@ test('a send is an upload, the files and where, and a pill bar', () => {
   assert.deepEqual([s.icon, s.text, s.bar], [ICONS.upload, '2 files to nuc', 48]);
 });
 
-test('a download of 3 is a download icon, 1 / 3 and its percent', () => {
+test('a download of 3 is a download icon, 1 / 3, its percent and a pill bar; a single one reads its title', () => {
   const d = live('downloading', { n: 1, total: 3, list: 'Mix', title: 'Song', pct: 40, kind: 'audio', failure: null });
-  assert.deepEqual([d.icon, d.text, d.tail, d.bar], [ICONS.download, '1 / 3', '40%', null]);
+  assert.deepEqual([d.icon, d.text, d.tail, d.bar], [ICONS.download, '1 / 3', '40%', 40]);
+  assert.equal(live('downloading', { n: 1, total: 1, list: '', title: 'Song', pct: 0, kind: 'audio', failure: null }).text, 'Song');
   const f = live('downloading', { n: 1, total: 1, list: '', title: '', pct: 0, kind: '', failure: { title: 'Song', reason: 'private video' } });
   assert.deepEqual([f.icon, f.text, f.tone], [ICONS.alert, 'Song · private video', 'danger']);
 });

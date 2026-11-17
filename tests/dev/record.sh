@@ -49,6 +49,8 @@ check "Enter starts recording" state_is '.recording and (.picking | not)'
 check "wf-recorder runs" recorder_running
 until_ok 2000 island_recs
 check "the island reads REC 00:0x" island_recs
+rec_drawn() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e --arg i "$(printf '\U000F044A')" '.live.icon == $i and (.live.text | test("^00:0[0-9]$")) and .live.tone == "danger" and .height == 34' >/dev/null; }
+check "and draws a red record icon and 00:0x, 34 px tall" rec_drawn
 echo "     island: $(island_text)"
 sleep 3
 mod_shift_r

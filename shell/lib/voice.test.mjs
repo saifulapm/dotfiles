@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 import { contrast } from './theme.mjs';
-import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, sendingLook, downloadingLook, chipLook, clockLook, captureLook, MODES, inOrder } from './voice.mjs';
+import { plainTones, launcherLook, islandLook, osdLook, listLook, marginLook, leaseLook, chipLook, clockLook, MODES, inOrder } from './voice.mjs';
 import { parseQuery } from './launcher.mjs';
 
 const SCHEMES = schemeNames();
@@ -164,21 +164,6 @@ test("the OSD is one rounded bar in the scheme's bar tone on its island tile, wi
     assert.deepEqual([osd(n).lit.color, osd(n).unlit.color, osd(n).bars], [t.bar, t.island.tile, 'round'], n);
   }
   assert.deepEqual([osd('artboard').valueText(62), osd('artboard').valueText(5)], ['62', '5']);
-});
-
-const OCR = { kind: 'ocr', title: 'Text copied', detail: '214 characters', swatch: null };
-const COLOUR = { kind: 'colour', title: 'Copied', detail: '#C8381E', swatch: '#C8381E' };
-const QR = { kind: 'qr', title: 'QR code copied', detail: '', swatch: null };
-const MISS = { kind: 'ocr', title: '', detail: 'No text found', swatch: null };
-
-test("the capture result is the notification card from Capture, the result as the summary", () => {
-  const a = captureLook(schemeTokens('artboard'));
-  assert.deepEqual(Object.keys(a), ['note']);
-  assert.deepEqual(a.note(OCR), { app: 'Capture', summary: 'Text copied · 214 characters', body: 'eng + ben · from region', swatch: null, icon: '', files: [] });
-  assert.deepEqual([a.note(COLOUR).summary, a.note(COLOUR).body, a.note(COLOUR).swatch], ['Copied #C8381E', 'colour picked', '#C8381E']);
-  assert.deepEqual([a.note(QR).summary, a.note(QR).body], ['QR code copied', 'from region']);
-  assert.equal(a.note(MISS).summary, 'No text found');
-  assert.equal(captureLook(null).note(OCR).app, 'Capture');
 });
 
 const list = (name) => listLook(schemeTokens(name));
@@ -344,27 +329,6 @@ test('the lease card is a selected frame in the accent, named Island, with its t
 test('a holder any caller names is one line without bidi controls, in the slot and the card', () => {
   assert.equal(lease('artboard').slot.who.text('cl\naude‮ x'), 'Agent · cl aude x');
   assert.equal(lease('artboard').card.who('‮claude'), 'claude');
-});
-
-const sending = (name) => sendingLook(schemeTokens(name));
-
-test('the sending slot is a 380 by 40 pill with an upload glyph, the percent in its words and a 6 px rounded bar after them', () => {
-  const s = sending('artboard');
-  assert.deepEqual([s.width, s.height, s.pad, s.gap, s.mark], [380, 40, 16, 10, { shape: 'upload', size: 16, color: '' }]);
-  assert.equal(s.parts.length, 1);
-  assert.deepEqual([s.parts[0].text(2, 'nuc', 48), s.parts[0].text(1, 'n‮u\nc', 0), s.parts[0].size, s.parts[0].weight, s.parts[0].name, 'pct' in s], ['Sending 2 files to nuc · 48%', 'Sending 1 file to nu c · 0%', 13, 500, true, false]);
-  assert.deepEqual(s.bar, { height: 6, radius: 3, track: '#2B2F36', fill: '#6C83FF' });
-  assert.deepEqual(sendingLook(null).bar, { height: 6, radius: 3, track: 'gray', fill: 'white' });
-});
-
-test('the downloading slot is 440 wide with a 40 px play tile, YouTube and the folder at 12 px, a 15 px bold line, a 4 px rounded bar and a failed chip', () => {
-  const d = downloadingLook(schemeTokens('artboard'));
-  assert.deepEqual([d.width, d.height, d.pad, d.gap, d.tile], [440, 76, 16, 6, { size: 40, radius: 12, fill: '#2B2F36' }]);
-  assert.deepEqual([d.head.left, d.head.right('audio', '14:32'), d.head.right('video', '14:32'), d.head.right('', '14:32'), d.head.size, d.head.color], ['YouTube', '~/Music/YouTube', '~/Videos/YouTube', '', 12, '#A3A9B4']);
-  assert.deepEqual([d.line.size, d.line.weight, d.line.color], [15, 700, '']);
-  assert.deepEqual(d.bar, { height: 4, radius: 2, track: '#2B2F36', fill: '#6C83FF' });
-  assert.deepEqual(d.chip, { fill: '#FFF1E8', color: '#B4380B', radius: 8, padX: 8, padY: 2 });
-  assert.equal('failure' in d, false);
 });
 
 const chip = (name) => chipLook(schemeTokens(name));

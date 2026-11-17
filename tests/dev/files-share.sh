@@ -81,10 +81,10 @@ share_to iPhone
 check "the cursor is on the iPhone, online" files_is '.share.rows[.share.selected] | .name == "iPhone" and .status == "online"'
 wtype -k Return
 check "Enter on the iPhone closes the list" until_ok 2000 files_is '.share.open == false'
-check "and the island shows the send of 3 files to iPhone ($(island | jq -c .sending))" until_ok 5000 island_is '.mode == "sending" and (.sending.label | startswith("Sending 3 files to iPhone ·"))'
+check "and the island shows the send of 3 files to iPhone ($(island | jq -c .live))" until_ok 5000 island_is '.mode == "sending" and .live.text == "3 files to iPhone"'
 check "the fake logged one file cp of the three paths to the iPhone's address ($(cp_log))" \
   test "$(cp_log)" = "file cp $h/a.bin $h/b.bin $h/c.bin 100.95.3.21:"
-check "the send ends and the island lets go of it" until_ok 15000 island_is '.sending == null'
+check "the send ends and the island lets go of it" until_ok 15000 island_is '.mode != "sending"'
 
 open_share
 echo "     $(files_state | jq -c '.share | {head, keys, first: .rows[1]}')"

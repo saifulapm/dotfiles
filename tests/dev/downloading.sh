@@ -21,31 +21,31 @@ near() {
 rgb() { printf '%d %d %d' "0x${1:1:2}" "0x${1:3:2}" "0x${1:5:2}"; }
 
 until_ok 5000 shell_status >/dev/null
-check "at rest the island is the clock" state_is '.mode == "rest" and .downloading == null'
+check "at rest the island is the clock" state_is '.mode == "rest" and .live == null'
 check "a percent before any start is dropped" bash -c 'dots-call downloading progress 30 && sleep 0.3 && ! timeout 0.5 qs ipc call island state | jq -e ".mode == \"downloading\"" >/dev/null'
 dots-call downloading start 3 18 Focus Feather audio
 dots-call downloading progress 37
 
 settled '.mode == "downloading"'
-echo "     downloading: $(island | jq -c '{text, width, drawn, downloading}')"
+echo "     downloading: $(island | jq -c '{text, width, drawn, live}')"
 check "island state reports mode downloading and the line" state_is '.mode == "downloading" and .text == "↓ Focus 3 / 18 · Feather · 37%"'
-check "the slot draws the line on one line at its 440 px, from the left, with room to spare" state_is '.downloading.line == "↓ Focus 3 / 18 · Feather · 37%" and .drawn == 440 and .downloading.lines == 1 and (.downloading.elided | not) and .downloading.right < (.drawn - 16) and .downloading.failed == false'
-check "the head reads YouTube and the folder" state_is '.downloading.head == ["YouTube", "~/Music/YouTube"]'
-check "the bar is filled to 37% of its width" state_is '(.downloading.barWidth | type == "number") and .downloading.barFill >= (.downloading.barWidth * 0.35) and .downloading.barFill <= (.downloading.barWidth * 0.39)'
-area=$(island | jq '(.downloading.barFill * .downloading.barHeight * 0.8) | floor')
-check "the bar's fill colour #6C83FF is drawn over its area ($area px)" test "$(near $(rgb '#6C83FF'))" -ge "$area"
+check "the line draws a download icon, 3 / 18 and 37%, the clock at the right, in 34 px" state_is --arg i "$(printf '\U000F01DA')" '.live.icon == $i and .live.text == "3 / 18" and .live.tail == "37%" and (.live.elided | not) and .live.tone == "normal" and .live.clockRight == 14 and .height == 34'
+check "the bar is filled to 37% of its width" state_is '(.live.bar.width | type == "number") and .live.bar.fill >= (.live.bar.width * 0.35) and .live.bar.fill <= (.live.bar.width * 0.39)'
+area=$(island | jq '(.live.bar.fill * 6 * 0.8) | floor')
+ink=$(island | jq -r '.live.ink | ascii_upcase')
+check "the bar's fill, the island's on colour $ink, is drawn over its area ($area px)" test "$(near $(rgb "$ink"))" -ge "$area"
 
 dots-call downloading progress 80
-check "progress moves the drawn percent and the fill" until_ok 3000 state_is '.downloading.line == "↓ Focus 3 / 18 · Feather · 80%" and .downloading.barFill >= (.downloading.barWidth * 0.78) and .downloading.barFill <= (.downloading.barWidth * 0.82)'
+check "progress moves the drawn percent and the fill" until_ok 3000 state_is '.live.tail == "80%" and .live.bar.fill >= (.live.bar.width * 0.78) and .live.bar.fill <= (.live.bar.width * 0.82)'
 notify-send -a Test "over the download" "a"
 check "a notification shows over the download" until_ok 3000 state_is '.mode == "notification"'
-check "and the download comes back once it has gone" until_ok 8000 state_is '.mode == "downloading" and .downloading.line == "↓ Focus 3 / 18 · Feather · 80%"'
+check "and the download comes back once it has gone" until_ok 8000 state_is '.mode == "downloading" and .live.text == "3 / 18" and .live.tail == "80%"'
 dots-call sending start 1 nuc
 check "a send outranks the download" until_ok 3000 state_is '.mode == "sending"'
 dots-call sending done
 check "and the download comes back when the send is done" until_ok 3000 state_is '.mode == "downloading"'
 dots-call downloading done
-check "done brings the clock back" until_ok 3000 state_is '.mode == "rest" and .downloading == null'
+check "done brings the clock back" until_ok 3000 state_is '.mode == "rest" and .live == null'
 
 # A failure holds 5 s over a start that arrives meanwhile, then the download underneath shows.
 t0=$(now_ms)
@@ -53,10 +53,10 @@ dots-call downloading failed Feather "HTTP 403"
 dots-call downloading start 4 18 Focus Next audio
 settled '.mode == "downloading"'
 since=$(island | jq .since)
-check "a failure is drawn as it is told, with no bar" state_is '.downloading.failed and .downloading.line == "↓ failed · Feather · HTTP 403" and .downloading.barHeight == 0'
+check "a failure is drawn as it is told, with no bar" state_is '.live.tone == "danger" and .live.text == "Feather · HTTP 403" and .live.bar == null'
 sleep $(awk -v t0="$t0" -v now="$(now_ms)" 'BEGIN { s = 4 - (now - t0) / 1000; print (s > 0 ? s : 0) }')
-check "and still at 4 s, in the same mode it began" state_is --argjson s "$since" '.downloading.line == "↓ failed · Feather · HTTP 403" and .since == $s'
-check "at about 5 s the download underneath shows" until_ok 3000 state_is '.downloading.line == "↓ Focus 4 / 18 · Next · 0%"'
+check "and still at 4 s, in the same mode it began" state_is --argjson s "$since" '.live.text == "Feather · HTTP 403" and .since == $s'
+check "at about 5 s the download underneath shows" until_ok 3000 state_is '.live.text == "4 / 18" and .live.tail == "0%"'
 took=$(($(now_ms) - t0))
 check "the hold lasted about 5 s (took $took ms)" test "$took" -ge 4800 -a "$took" -le 6500
 dots-call downloading done
@@ -66,27 +66,27 @@ t0=$(now_ms)
 dots-call downloading failed X y
 dots-call downloading done
 sleep 3.5
-check "a failure survives done while it is held" state_is '.mode == "downloading" and .downloading.failed'
-check "and the island returns to rest after its 5 s" until_ok 3000 state_is '.mode == "rest" and .downloading == null'
+check "a failure survives done while it is held" state_is '.mode == "downloading" and .live.tone == "danger"'
+check "and the island returns to rest after its 5 s" until_ok 3000 state_is '.mode == "rest" and .live == null'
 took=$(($(now_ms) - t0))
 check "the hold lasted about 5 s (took $took ms)" test "$took" -ge 4800 -a "$took" -le 6500
 
 # The failure draws as a chip.
 dots-call downloading failed Feather "HTTP 403"
 settled '.mode == "downloading"'
-check "the failure is a chip then the rest" state_is '.downloading.chip == "↓ failed" and .downloading.line == "↓ failed · Feather · HTTP 403"'
+check "the failure is a red alert icon, then the title and why" state_is --arg i "$(printf '\U000F0028')" '.live.icon == $i and .live.tone == "danger" and .live.text == "Feather · HTTP 403"'
 until_ok 8000 state_is '.mode == "rest"'
 
 # A single download reads without a place, and a forged or long title elides before the percent.
 dots-call downloading start 1 1 "" Feather audio
 settled '.mode == "downloading"'
-check "a single download reads its title and 0%" state_is '.text == "↓ Feather · 0%" and .downloading.line == "↓ Feather · 0%"'
+check "a single download reads its title and 0%" state_is '.text == "↓ Feather · 0%" and .live.text == "Feather" and .live.tail == "0%"'
 dots-call downloading start 1 1 "" "$(printf 'x%.0s' {1..300})" audio
 dots-call downloading progress 37
 settled '.mode == "downloading"'
-check "a 300-character title elides on one line and the percent is still drawn at the right edge" state_is '.downloading.elided and .downloading.lines == 1 and (.downloading.right - (.drawn - 16) | fabs) <= 1 and (.downloading.line | endswith(" · 37%"))'
+check "a 300-character title elides on one line, the percent still drawn and the clock at the right edge" state_is '.live.elided and .live.tail == "37%" and .live.clockRight == 14 and .width == 560'
 dots-call downloading start 1 1 $'Fo\no‮' $'Fea\nther' audio
-check "a forged name draws as one line" until_ok 3000 state_is '.downloading.lines == 1 and .text == "↓ Fo o 1 / 1 · Fea ther · 0%"'
+check "a forged name draws as one line" until_ok 3000 state_is '.live.text == "1 / 1" and .text == "↓ Fo o 1 / 1 · Fea ther · 0%"'
 dots-call downloading done
 exit $((fails > 0))
 }

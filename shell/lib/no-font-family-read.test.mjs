@@ -21,7 +21,7 @@ const BASELINE = {
   'DekhoReleases.qml': 1,
   'DekhoTitle.qml': 1,
   'FilePicker.qml': 1,
-  'Island.qml': 3,
+  'Island.qml': 1,
   'Launcher.qml': 1,
   'Lock.qml': 1,
   'PolkitPrompt.qml': 1,
