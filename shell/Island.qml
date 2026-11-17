@@ -522,7 +522,7 @@ Item {
         for (let i = 0; i < dayRepeater.count; i++) {
             const cell = dayRepeater.itemAt(i);
             if (cell.todayMark.visible)
-                today = { day: cell.dayText.text, width: cell.todayMark.width, height: cell.todayMark.height, filled: cell.todayMark.color.a > 0, border: cell.todayMark.border.width, bold: cell.dayText.font.weight === Font.Bold };
+                today = { day: cell.dayText.text, width: cell.todayMark.width, height: cell.todayMark.height, filled: cell.todayMark.color.a > 0, circle: cell.todayMark.radius * 2 >= cell.todayMark.width - 0.5, border: cell.todayMark.border.width, bold: cell.dayText.font.weight === Font.Bold };
         }
         return {
             title: titleLeft.text,
@@ -1767,12 +1767,26 @@ Item {
 
                 Column {
                     id: month
-                    x: 18
+                    x: 16
                     y: 16
-                    width: parent.width - 36
-                    spacing: 10
+                    width: parent.width - 32
+                    spacing: 12
 
-                    // The month, a rule, then the city column.
+                    // Today beside a calendar, with the clock at the right.
+                    Root.CardHead {
+                        id: monthHead
+                        width: parent.width
+                        glyph: L.ICONS.calendar
+                        title: Qt.formatDate(island.clock.now, "dddd d MMMM")
+                        detail: island.cities.length ? island.cities[0].city : ""
+                        clock: island.clockNow
+                        ink: box.style.text
+                        muted: island.tones.muted
+                        danger: island.tones.danger
+                        font: island.theme.tokens?.type.mono ?? ""
+                    }
+
+                    // The month, a rule, then the city tiles.
                     Row {
                         width: parent.width
 
@@ -1844,16 +1858,15 @@ Item {
                                             width: island.clockLook.grid.cell
                                             height: island.clockLook.grid.rowHeight
 
+                                            // Today is a filled circle in the on colour, its number in the fill's.
                                             Rectangle {
                                                 id: todayBox
                                                 visible: parent.isToday
                                                 anchors.centerIn: parent
-                                                width: parent.mark.w
-                                                height: parent.mark.h
-                                                radius: parent.mark.radius
-                                                color: parent.mark.inverted ? parent.mark.fill || box.style.text : "transparent"
-                                                border.width: parent.mark.border
-                                                border.color: parent.mark.borderColor
+                                                width: Math.min(parent.width, parent.height) - 2
+                                                height: width
+                                                radius: width / 2
+                                                color: box.style.text
                                             }
 
                                             Text {
@@ -1861,7 +1874,7 @@ Item {
                                                 anchors.centerIn: parent
                                                 textFormat: Text.PlainText
                                                 text: parent.modelData ?? ""
-                                                color: parent.isToday && parent.mark.inverted ? box.style.fill : parent.at.color || box.style.text
+                                                color: parent.isToday ? box.style.fill : parent.at.color || box.style.text
                                                 font.family: parent.at.font
                                                 font.pixelSize: parent.at.size
                                                 font.weight: parent.isToday ? Font.Bold : Font.Normal
@@ -1881,6 +1894,7 @@ Item {
                         Column {
                             id: cityColumn
                             width: month.width - monthGrid.width - 2 * island.clockLook.gap - 1
+                            spacing: 6
 
                             Repeater {
                                 id: cityRepeater
@@ -1892,21 +1906,31 @@ Item {
                                     readonly property var look: island.clockLook
                                     readonly property bool home: modelData.home
                                     width: cityColumn.width
-                                    height: Math.max(cityNames.height, cityTime.implicitHeight) + (home ? 8 : 18)
+                                    height: Math.max(cityNames.height, cityTime.implicitHeight) + 20
+                                    readonly property Item tile: cityTile
+
+                                    // Each city is a tile: the on colour at 6 % under it, fill only.
+                                    Rectangle {
+                                        id: cityTile
+                                        anchors.fill: parent
+                                        radius: 14
+                                        color: Qt.alpha(box.style.text, 0.06)
+                                    }
 
                                     function drawn() {
                                         return {
                                             city: cityName.text,
                                             time: cityTime.text,
                                             offset: offsetUnder.visible ? offsetUnder.text : "",
-                                            day: cityDay.visible ? cityDay.text : ""
+                                            day: cityDay.visible ? cityDay.text : "",
+                                            tile: { fill: String(cityTile.color), radius: cityTile.radius, w: Math.round(cityTile.width), h: Math.round(cityTile.height) }
                                         };
                                     }
 
                                     Column {
                                         id: cityNames
+                                        x: 12
                                         anchors.verticalCenter: parent.verticalCenter
-                                        anchors.verticalCenterOffset: cityRow.home ? -4 : 0
                                         spacing: 1
 
                                         Item {
@@ -1979,8 +2003,8 @@ Item {
                                         id: cityTime
                                         readonly property var at: cityRow.home ? cityRow.look.homeTime : cityRow.look.time
                                         anchors.right: parent.right
+                                        anchors.rightMargin: 12
                                         anchors.verticalCenter: parent.verticalCenter
-                                        anchors.verticalCenterOffset: cityRow.home ? -4 : 0
                                         textFormat: Text.PlainText
                                         text: cityRow.modelData.time
                                         color: at.color || box.style.text
@@ -1992,14 +2016,6 @@ Item {
                                 }
                             }
                         }
-                    }
-
-                    Text {
-                        textFormat: Text.PlainText
-                        text: "h/l month · Esc"
-                        color: Qt.alpha(box.style.text, 0.55)
-                        font.family: island.theme.tokens?.type.mono ?? ""
-                        font.pixelSize: 11
                     }
                 }
             }

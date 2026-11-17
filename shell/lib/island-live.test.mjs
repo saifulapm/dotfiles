@@ -22,6 +22,7 @@ test('each icon is a filled Material Design glyph from the Symbols Nerd Font', (
     eyedropper: '\u{F020A}',
     check: '\u{F012C}',
     alert: '\u{F0028}',
+    calendar: '\u{F00ED}',
   });
 });
 

@@ -20,6 +20,7 @@ export const ICONS = {
   eyedropper: '\u{F020A}',
   check: '\u{F012C}',
   alert: '\u{F0028}',
+  calendar: '\u{F00ED}',
 };
 
 const oneLine = (s) =>

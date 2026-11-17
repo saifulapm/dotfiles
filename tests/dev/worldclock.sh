@@ -104,6 +104,9 @@ today_marked() { island | jq -e --argjson d "$(date +%-d)" '.calendar.grid.today
 echo "     grid: $(island | jq -c '.calendar.grid')"
 check "the calendar draws its month heading and first weekday letter" grid_is
 check "the calendar marks today's cell" today_marked
+check "today is a filled circle" eval "island | jq -e '.calendar.grid.today | .filled and .circle and .width == .height' >/dev/null"
+check "the four cities are tiles, fill only ($(island | jq -c '[.calendar.cities[].tile.radius]'))" eval "island | jq -e '(.calendar.cities | length) == 4 and all(.calendar.cities[]; .tile.radius == 14 and .tile.w > 0)' >/dev/null"
+check "and the card stays 560 px" eval "island | jq -e '.width == 560' >/dev/null"
 
 exit $((fails > 0))
 }
