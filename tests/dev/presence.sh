@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The local hub's presence flags in $XDG_STATE_HOME/qshell follow the session: idle while dimmed, locked while locked or leased, and a restart clears what no state holds. Claude Code's presence marker stands only while neither does, and goes when the shell's unit stops.
 {
+export DOTS_DEV_IDLE=on
 source "$(dirname "$0")/lib.sh"
 
 flags=$DOTS_DEV_DIR/state/qshell

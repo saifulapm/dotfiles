@@ -12,7 +12,7 @@ Scope {
     required property var lock
     // The shell's loader of the Surfaces window (active, item).
     required property var surfaces
-    property var times: Lib.TIMES
+    property var times: Lib.startTimes(Quickshell.env("DOTS_IDLE"))
     // How often a step asked niri to turn the monitors off, so a check can see the request.
     property int monitorsOff: 0
 

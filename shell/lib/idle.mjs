@@ -3,6 +3,9 @@
 import { clockText } from './margins.mjs';
 export const TIMES = [240, 300, 360];
 
+// A nested session starts with DOTS_IDLE=off, so a walk left without input is never dimmed or locked under it; the steps wait a day.
+export const startTimes = (env) => (env === 'off' ? [86400, 86401, 86402] : TIMES);
+
 // Test times must be whole seconds that rise step by step, or the real ones stay.
 export function validTimes(t) {
   return t.length === 3 && t.every((s) => Number.isInteger(s) && s > 0) && t[0] < t[1] && t[1] < t[2];

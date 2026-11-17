@@ -135,6 +135,17 @@ test('every DOTS_* that dots-dev exports is passed to the shell unit by name', (
   assert.deepEqual(missing, []);
 });
 
+// m100's walker sat 20 minutes on the nested session's own 300 s idle lock; only a check that asks for the idle steps gets them.
+test('dots-dev starts the nested shell with idle locking off unless a check sets DOTS_DEV_IDLE=on, and only the idle checks do', () => {
+  const dev = readFileSync(new URL('../../bin/dots-dev', import.meta.url), 'utf8');
+  assert.match(dev, /^export DOTS_IDLE=\$\{DOTS_DEV_IDLE:-off\}$/m);
+  const idle = readFileSync(new URL('../Idle.qml', import.meta.url), 'utf8');
+  assert.match(idle, /property var times: Lib\.startTimes\(Quickshell\.env\("DOTS_IDLE"\)\)/);
+  const dir = new URL('../../tests/dev/', import.meta.url);
+  const asking = readdirSync(dir).filter((f) => f.endsWith('.sh') && /^export DOTS_DEV_IDLE=on$/m.test(readFileSync(new URL(f, dir), 'utf8')));
+  assert.deepEqual(asking.sort(), ['idle.sh', 'presence.sh']);
+});
+
 // A DevTools eval exits 0 whatever it answers, so `check ... page '<js>'` passed on false in m33; check refuses page, row and cdp as its command.
 test('check refuses a DevTools eval as its command, bare or under until_ok', () => {
   const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');

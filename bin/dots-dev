@@ -21,6 +21,8 @@ export DOTS_AGENT_HOME=$D/agents
 export DOTS_MACHINE=dev
 # Nor the live hub's questions or the live PipeWire.
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
+# The nested shell never dims or locks itself, since a walk or a long check pauses its input for minutes; idle.sh and presence.sh set DOTS_DEV_IDLE=on for the real steps.
+export DOTS_IDLE=${DOTS_DEV_IDLE:-off}
 # Surface motion runs this many times slower; only the motion checks pass more than 1, and the live unit never sets it.
 export DOTS_MOTION_SLOWDOWN=${DOTS_MOTION_SLOWDOWN:-1}
 # The picker opens on date, newest first; the checks that walk its rows by name get name, and one that sets it empty gets the date default.

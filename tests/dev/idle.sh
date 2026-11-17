@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Idle steps at test times of 4, 5 and 6 s: dim, then lock, then monitors off; a window holding an idle inhibitor stops all three.
 {
+export DOTS_DEV_IDLE=on
 source "$(dirname "$0")/lib.sh"
 
 idle_state() { timeout 0.5 qs ipc call idle state 2>/dev/null; }

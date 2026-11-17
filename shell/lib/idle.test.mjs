@@ -1,9 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIMES, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeWord, awakeDetail } from './idle.mjs';
+import { TIMES, startTimes, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeWord, awakeDetail } from './idle.mjs';
 
 test('the idle steps dim at 4 min, lock at 5 and turn monitors off at 6', () => {
   assert.deepEqual(TIMES, [240, 300, 360]);
+});
+
+test('a shell started with DOTS_IDLE=off waits a day before it dims, and any other value keeps the real steps', () => {
+  assert.deepEqual(startTimes(''), TIMES);
+  assert.deepEqual(startTimes('on'), TIMES);
+  const off = startTimes('off');
+  assert.ok(validTimes(off));
+  assert.ok(off[0] >= 86400);
 });
 
 test('times must be whole seconds that rise step by step', () => {
