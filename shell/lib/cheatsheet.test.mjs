@@ -219,3 +219,8 @@ test('a filtered IN SURFACES keeps only the captions of surfaces with a row left
   const group = groupRowsSix(filterRows(IN_SURFACES, 'kid')).find((g) => g.name === 'IN SURFACES');
   assert.deepEqual(group.rows.map((r) => r.caption ?? r.title), ['DNS', 'Kid Mode']);
 });
+
+test('minus, equal, [ and ] read as the keys they print', () => {
+  const rows = parseBinds(['Mod+Minus hotkey-overlay-title="Column Narrower" { set-column-width "-10%"; }', 'Mod+Equal hotkey-overlay-title="Column Wider" { set-column-width "+10%"; }', 'Mod+BracketLeft hotkey-overlay-title="Pull In or Push Out Left" { consume-or-expel-window-left; }', 'Mod+BracketRight hotkey-overlay-title="Pull In or Push Out Right" { consume-or-expel-window-right; }'].join('\n'));
+  assert.deepEqual(rows.map((r) => r.key), ['Mod -', 'Mod =', 'Mod [', 'Mod ]']);
+});

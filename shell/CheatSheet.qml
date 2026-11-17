@@ -335,8 +335,8 @@ Item {
         id: keyRow
         required property var entry
         readonly property bool caption: !!entry.caption
-        // The chip goes under its title when the title's longest word and the chip do not fit side by side, so no word breaks.
-        readonly property bool stacked: keyBox.implicitWidth + columnSpacing + Math.max(...keyRow.entry.title.split(" ").map(w => w.length)) * sheet.glyphWidth > width
+        // The chip goes under its title when it would take over 40% of the row or leave the title's longest word no room, so the title neither breaks a word nor sets one word a line.
+        readonly property bool stacked: keyBox.implicitWidth > width * 0.4 || keyBox.implicitWidth + columnSpacing + Math.max(...keyRow.entry.title.split(" ").map(w => w.length)) * sheet.glyphWidth > width
         readonly property bool squeezed: title.contentWidth > title.width + 0.5
         columns: stacked ? 1 : 2
         columnSpacing: 6

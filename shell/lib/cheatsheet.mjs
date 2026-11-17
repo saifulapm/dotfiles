@@ -13,7 +13,7 @@ export const TOUCHPAD = [
 ].map(([key, title]) => ({ title, key, group: 'TOUCHPAD' }));
 
 const MODS = { Mod: 'Mod', Shift: '⇧', Ctrl: '⌃', Alt: '⌥', Super: 'Super' };
-const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',', Semicolon: ';' };
+const KEYS = { Slash: '/', Return: '↵', Page_Up: 'PgUp', Page_Down: 'PgDn', Escape: 'Esc', Period: '.', Comma: ',', Semicolon: ';', Minus: '-', Equal: '=', BracketLeft: '[', BracketRight: ']' };
 
 // media: each bare media key's title, which names that key under a modifier too.
 function keyText(combo, title, media) {

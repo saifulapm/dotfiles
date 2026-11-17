@@ -31,6 +31,7 @@ check "Mod+/ shows the cheat sheet with exclusive keyboard" sheet_shown
 check "state counts $titled rows, one per titled bind, the $in_surfaces in surfaces and the 7 touchpad rows" state_is --argjson n "$((titled + in_surfaces + 7))" '.rows == $n'
 check "no row's title is cut short" state_is '.truncated == 0'
 check "no row's title is squeezed past a word by its key chip ($(sheet_state | jq -c .squeezed))" state_is '.squeezed == []'
+check "[ and ] read as the keys they print, not as niri names them" state_is '(.rowKeys | index("Mod [") != null) and (.rowKeys | index("Mod ]") != null) and ([.rowKeys[] | select(test("Brack" + "et"))] | length == 0)'
 check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ Tab") != null'
 check "the drawn rows include the Notes corner" state_is '.rowKeys | index("↗ corner") != null'
 check "state lists the six groups" state_is '.groups == ["SURFACES", "IN SURFACES", "WORK", "WINDOWS", "SYSTEM", "TOUCHPAD"]'
