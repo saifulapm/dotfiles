@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A notification's actions as chips on the island card: Mod+I, then 1 to 9 runs the action with that number.
+# A notification's actions as buttons on the island card, with no number drawn: Mod+I, then 1 to 9 runs the action with that number.
 {
 source "$(dirname "$0")/lib.sh"
 out=$(mktemp)
@@ -14,8 +14,8 @@ mod_i() {
   niri msg action spawn -- dots-call island focus
   until_ok 2000 island_focus Exclusive
 }
-# Each theme writes a key its own way (1, [1]) and a word in caps or not, so the chips are read as "1 yes".
-chips() { island | jq -c '[.note.actions[] | ascii_downcase | gsub("[\\[\\]]"; "")]'; }
+# The card draws each action's word alone, so the buttons are read as "yes".
+chips() { island | jq -c '[.note.actions[] | ascii_downcase]'; }
 chips_are() { [ "$(chips)" = "$1" ]; }
 printed() { [ "$(cat "$out")" = "$1" ]; }
 # notify-send -A waits for an action or the close, and prints the action's key; it is let go at the end of each step.
@@ -30,7 +30,7 @@ done_asking() {
 
 ask -A yes=Yes -A no=No ask
 until_ok 2000 shows ask
-check "two actions draw two chips ($(chips))" chips_are '["1 yes","2 no"]'
+check "two actions draw two buttons ($(chips))" chips_are '["yes","no"]'
 mod_i
 wtype -k 2
 until_ok 2000 printed no
@@ -40,7 +40,7 @@ done_asking
 
 ask -A a=One -A b=Two -A c=Three -A d=Four -A e=Five five
 until_ok 2000 shows five
-check "five actions draw three chips ($(chips))" chips_are '["1 one","2 two","3 three"]'
+check "five actions draw three buttons ($(chips))" chips_are '["one","two","three"]'
 mod_i
 wtype -k 4
 sleep 1
@@ -50,7 +50,7 @@ done_asking
 
 ask -A default=Open -A settings=Settings -A later=Later web
 until_ok 2000 shows web
-check "default and settings draw no chip ($(chips))" chips_are '["1 later"]'
+check "default and settings draw no button ($(chips))" chips_are '["later"]'
 mod_i
 wtype -k Return
 until_ok 2000 printed default
@@ -149,7 +149,7 @@ apart() { jq -e 'map(ascii_downcase) | .[0] != .[2] and .[1] != .[2]' >/dev/null
 ask -A yes=Yes ink
 until_ok 2000 shows ink
 ink=$(island | jq -c .note.actionInk)
-check "the card's chip key and word differ from their fill ($ink)" apart "$ink"
+check "the card's first button, inverted, draws its word apart from its fill ($ink)" jq -e 'map(ascii_downcase) | .[0] != .[1]' <<<"$ink"
 open_centre
 ink=$(notifs | jq -c .actionInk)
 check "the row's chip key and word differ from their fill ($ink)" apart "$ink"

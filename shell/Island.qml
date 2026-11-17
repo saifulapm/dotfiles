@@ -193,10 +193,10 @@ Item {
             label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
-            sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
+            sharingCard: [520, shareColumn.implicitHeight + 32],
             notification: [440, card.implicitHeight + 32],
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
-            question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
+            question: [520, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
             mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
             // An open surface's own width and height, up to the output's less 48 px each way (PMQRFEYY, M4SVCQVQ).
@@ -569,7 +569,7 @@ Item {
         const rows = [];
         for (let i = 0; i < shareRepeater.count; i++)
             rows.push(shareRepeater.itemAt(i).drawn);
-        return { rows, inner: shareColumn.width };
+        return { rows, inner: shareColumn.width, title: shareHead.title, buttons: [shareStop.visible ? shareStop.drawn : null].filter(b => b) };
     }
 
     // What the lease card draws, for `island state`; the one-line slot is under live.
@@ -690,7 +690,8 @@ Item {
         return {
             expanded: focused,
             replying,
-            where: where.text,
+            where: [askHead.title, askHead.detail].filter(p => p && p !== "Agent").join(" · "),
+            clock: askHead.clockItem.text,
             lines: askText.lineCount,
             truncated: askText.truncated,
             summary: askSummary.visible ? askSummary.text : null,
@@ -762,6 +763,13 @@ Item {
         } else {
             questions.answer(q.id, q.options[index]);
         }
+    }
+
+    // Enter or Stop sharing on the sharing card: niri stops every PipeWire share by its session, and the card closes.
+    function stopShares() {
+        for (const id of I.stopSessions(sharingCard ?? []))
+            Quickshell.execDetached(["niri", "msg", "action", "stop-cast", "--session-id", String(id)]);
+        release();
     }
 
     // The media card's previous, playPause and next, as the media keys run them.
@@ -1466,44 +1474,79 @@ Item {
 
                 Column {
                     id: shareColumn
-                    x: 14
-                    y: 12
-                    width: parent.width - 28
+                    x: 16
+                    y: 16
+                    width: parent.width - 32
                     spacing: 8
 
+                    Root.CardHead {
+                        id: shareHead
+                        width: parent.width
+                        glyph: L.ICONS.cast
+                        alarm: true
+                        title: island.sharing ? I.liveText(island.sharing) : "LIVE"
+                        detail: island.heldShareRows.length === 1 ? "1 share" : island.heldShareRows.length + " shares"
+                        clock: island.clockNow
+                        ink: box.style.text
+                        muted: island.tones.muted
+                        danger: island.tones.danger
+                        font: island.theme.tokens?.type.mono ?? ""
+                    }
+
+                    // One row per share: its target, then who watches it in the muted tone.
                     Repeater {
                         id: shareRepeater
                         model: island.heldShareRows
 
-                        Item {
-                            id: shareRow
+                        Text {
+                            id: rowText
                             required property var modelData
-                            readonly property var drawn: ({ text: rowText.text, stop: stopText.visible, lines: rowText.lineCount, elided: rowText.truncated, width: Math.ceil(rowText.width + (stopText.visible ? stopText.width + 12 : 0)) })
-                            width: shareColumn.width
-                            height: rowText.implicitHeight
+                            readonly property var drawn: ({ text: text, stop: modelData.stop, lines: lineCount, elided: truncated, width: Math.ceil(width) })
+                            width: Math.min(implicitWidth, shareColumn.width)
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                            text: I.shareRowText(Object.assign({}, modelData, { stop: false }))
+                            color: box.style.text
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 13
+                        }
+                    }
 
-                            Text {
-                                id: rowText
-                                width: parent.width - (stopText.visible ? stopText.implicitWidth + 12 : 0)
-                                textFormat: Text.PlainText
-                                elide: Text.ElideRight
-                                maximumLineCount: 1
-                                text: I.shareRowText(Object.assign({}, shareRow.modelData, { stop: false }))
-                                color: box.style.text
-                                font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 13
-                                font.weight: Font.Medium
+                    // Stop ends every PipeWire share, as Enter does, and shows only when one can be stopped; Close gives the island back.
+                    Row {
+                        id: shareButtons
+                        width: parent.width
+                        spacing: 8
+                        readonly property bool stoppable: island.heldShareRows.some(r => r.stop)
+
+                        Root.CardButton {
+                            id: shareStop
+                            visible: shareButtons.stoppable
+                            width: (shareButtons.width - shareButtons.spacing) / 2
+                            text: "Stop sharing"
+                            primary: true
+                            ink: box.style.text
+                            fill: box.style.fill
+                            font: island.theme.tokens?.type.mono ?? ""
+
+                            Root.Click {
+                                name: "share:stop"
+                                onTapped: island.stopShares()
                             }
+                        }
 
-                            Text {
-                                id: stopText
-                                anchors.right: parent.right
-                                visible: shareRow.modelData.stop
-                                textFormat: Text.PlainText
-                                text: "↵ stop"
-                                color: island.theme.tokens?.color.accent ?? box.style.text
-                                font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 13
+                        Root.CardButton {
+                            width: shareButtons.stoppable ? (shareButtons.width - shareButtons.spacing) / 2 : shareButtons.width
+                            text: "Close"
+                            primary: !shareButtons.stoppable
+                            ink: box.style.text
+                            fill: box.style.fill
+                            font: island.theme.tokens?.type.mono ?? ""
+
+                            Root.Click {
+                                name: "share:close"
+                                onTapped: island.release()
                             }
                         }
                     }
@@ -1607,7 +1650,8 @@ Item {
 
                     Row {
                         id: noteContent
-                        visible: body.visible || noteBar.visible || columnChip.visible || thumb.visible
+                        // Read from what each one shows, since a child of a hidden row reads hidden itself.
+                        visible: body.text !== "" || typeof island.heldNotification?.progress === "number" || (island.heldNotification?.files ?? []).length > 0 || thumbImage.status === Image.Ready
                         width: parent.width
                         spacing: 12
 
@@ -1996,35 +2040,23 @@ Item {
 
                     Column {
                         id: ask
-                        x: 20
+                        x: 16
                         y: 16
-                        width: askFlick.width - 40
-                        spacing: 12
+                        width: askFlick.width - 32
+                        spacing: 8
 
-                        Item {
+                        // Who asks: the project over the machine, beside a robot, with the clock at the right; no key is drawn (8HYAV3GE).
+                        Root.CardHead {
+                            id: askHead
                             width: parent.width
-                            height: where.implicitHeight
-
-                            Text {
-                                id: where
-                                textFormat: Text.PlainText
-                                width: parent.width - hint.implicitWidth - 12
-                                elide: Text.ElideRight
-                                text: [island.heldQuestion?.project, island.heldQuestion?.machine].filter(p => p).map(Q.unbidi).join(" · ")
-                                color: Qt.alpha(box.style.text, 0.65)
-                                font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 11
-                            }
-
-                            Text {
-                                id: hint
-                                textFormat: Text.PlainText
-                                anchors.right: parent.right
-                                text: island.heldQuestion?.pairing ? "" : island.focused ? "a file · s shot · ^V paste · Esc" : "Mod+I"
-                                color: Qt.alpha(box.style.text, 0.65)
-                                font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 11
-                            }
+                            glyph: L.ICONS.robot
+                            title: Q.unbidi(island.heldQuestion?.project ?? "") || "Agent"
+                            detail: Q.unbidi(island.heldQuestion?.machine ?? "")
+                            clock: island.clockNow
+                            ink: box.style.text
+                            muted: island.tones.muted
+                            danger: island.tones.danger
+                            font: island.theme.tokens?.type.mono ?? ""
                         }
 
                         // Two lines until Mod+I opens the card, then all of it; a pairing request is plain text, a question's web addresses are links.
@@ -2039,8 +2071,8 @@ Item {
                             lineHeight: 1.3
                             color: box.style.text
                             linkColor: box.style.text
-                            font.family: island.theme.tokens?.type.ui ?? ""
-                            font.pixelSize: 15
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 13
                             onLinkActivated: link => island.openLink(link)
 
                             HoverHandler {
@@ -2055,12 +2087,12 @@ Item {
                             textFormat: Text.PlainText
                             elide: Text.ElideRight
                             text: island.heldQuestion ? Q.summary(island.heldQuestion) : ""
-                            color: Qt.alpha(box.style.text, 0.8)
-                            font.family: island.theme.tokens?.type.ui ?? ""
-                            font.pixelSize: 13
+                            color: island.tones.muted
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 12
                         }
 
-                        // Every option in full, one to a row, the recommended one filled and starred.
+                        // Every option in full as a button, one to a row, the first inverted and the rest quiet; Reply… is the last.
                         Column {
                             id: askOptions
                             visible: !island.heldQuestion?.pairing && island.focused && !island.replying
@@ -2076,13 +2108,12 @@ Item {
                                     required property int index
                                     readonly property bool isReply: index === Math.min(island.heldQuestion?.options.length ?? 0, 9)
                                     readonly property bool recommended: !isReply && modelData === island.heldQuestion?.recommend
-                                    readonly property var drawn: ({ text: optionText.text, recommended, lines: optionText.lineCount, elided: optionText.truncated })
+                                    readonly property bool primary: index === 0 && !isReply
+                                    readonly property var drawn: ({ text: optionText.text, recommended, primary, fill: String(color), lines: optionText.lineCount, elided: optionText.truncated })
                                     width: parent.width
-                                    height: optionText.implicitHeight + 12
-                                    radius: 8
-                                    color: recommended ? box.style.text : "transparent"
-                                    border.width: recommended ? 0 : 1
-                                    border.color: Qt.alpha(box.style.text, 0.35)
+                                    height: Math.max(32, optionText.implicitHeight + 14)
+                                    radius: 10
+                                    color: primary ? box.style.text : Qt.alpha(box.style.text, 0.07)
 
                                     Text {
                                         id: optionText
@@ -2091,10 +2122,11 @@ Item {
                                         width: parent.width - 24
                                         textFormat: Text.PlainText
                                         wrapMode: Text.Wrap
-                                        text: (parent.isReply ? "r" : parent.index + 1) + " · " + Q.unbidi(parent.modelData) + (parent.recommended ? "  ★" : "")
-                                        color: parent.recommended ? box.style.fill : box.style.text
-                                        font.family: island.theme.tokens?.type.ui ?? ""
+                                        text: Q.unbidi(parent.modelData)
+                                        color: parent.primary ? box.style.fill : box.style.text
+                                        font.family: island.theme.tokens?.type.mono ?? ""
                                         font.pixelSize: 13
+                                        font.weight: parent.primary ? Font.Bold : Font.Medium
                                     }
 
                                     Root.Click {
@@ -2269,9 +2301,7 @@ Item {
                 }
                 if (island.mode === "sharingCard") {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                        for (const id of I.stopSessions(island.sharingCard))
-                            Quickshell.execDetached(["niri", "msg", "action", "stop-cast", "--session-id", String(id)]);
-                        island.release();
+                        island.stopShares();
                     } else if (event.key === Qt.Key_Escape) {
                         island.release();
                     }
@@ -2327,6 +2357,8 @@ Item {
                 } else if (event.key === Qt.Key_R) {
                     island.replying = true;
                     reply.forceActiveFocus();
+                } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && q.options.length) {
+                    island.questions.answer(q.id, q.options[0]);
                 } else {
                     const option = Q.optionFor(q, event.text);
                     if (option !== null)

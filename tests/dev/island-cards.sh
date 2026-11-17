@@ -45,10 +45,10 @@ notify-send "burst 1"
 notify-send "burst 2"
 notify-send "burst 3"
 burst_ms=$(($(now_ms) - t0))
-wait_burst() { island_is '.mode == "notification" and .note.summary == "burst 3"'; }
-until_ok 3000 wait_burst
 widths=()
-for _ in 1 2 3 4 5; do widths+=("$(island | jq .drawn)"); sleep 0.05; done
-check "three notifications in $burst_ms ms swap in place: the card stays 440 px (${widths[*]}) and ends on the third" bash -c "[ \"$(printf '%s\n' "${widths[@]}" | sort -u)\" = 440 ] && timeout 0.5 qs ipc call island state | jq -e '.note.summary == \"burst 3\" and .width == 440' >/dev/null"
+for _ in 1 2 3 4 5 6; do widths+=("$(island | jq .width)"); sleep 0.05; done
+settled '.note.summary == "burst 3"'
+check "three notifications in $burst_ms ms swap in place: the card's width stays 440 px (${widths[*]})" test "$(printf '%s\n' "${widths[@]}" | sort -u)" = 440
+check "and it ends on the third, drawn at 440 px" island_is '.note.summary == "burst 3" and .drawn == 440'
 exit "$fails"
 }

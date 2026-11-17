@@ -4,7 +4,7 @@
 source "$(dirname "$0")/lib.sh"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
-state_is() { island | jq -e "$1" >/dev/null 2>&1; }
+state_is() { island | jq -e "$@" >/dev/null 2>&1; }
 in_scheme() { "$repo/bin/dots" colorscheme "$1" >/dev/null; until_ok 3000 eval "shell_status | jq -e --arg t '$1' '.theme == \$t and .transition == \"\"' >/dev/null"; sleep 0.3; }
 # A notification the shell shows once its morph has settled, so its boxes are where they stay.
 shown() { until_ok 3000 state_is "$1 and .mode == \"notification\" and .animating == false"; }
@@ -53,12 +53,12 @@ until_ok 5000 shell_status >/dev/null
 notify-send "Download complete" "report-october.pdf · 2.4 MB"
 shown '.note.summary == "Download complete"'
 echo "     note: $(island | jq -c .note)"
-check "the island reads the app and now" state_is '.note.app == "notify-send" and .note.age == "now"'
+check "the island reads the app under the summary, and the clock" state_is --arg c "$(date +%H:%M)" '.note.app == "notify-send" and .note.age == $c'
 # While a notification shows, the clock's minute tick and its 5 s hold are the only timers: nothing counts now up.
 check "while the notification shows, status reports two timers, the clock and the hold" eval 'shell_status | jq -e ".timers == 2" >/dev/null'
-check "the notification shows a 40 px tile with its glyph" state_is '.note.tileBox.w == 40 and .note.tileBox.h == 40 and .note.glyph == "N"'
-tile=$(near "$(geo tileBox)" 43 47 54 4)
-check "the tile at the notification's left reads #2B2F36 ($tile of 1600 px)" test "$tile" -gt 1000
+check "the notification shows a 36 px icon circle with its glyph" state_is '.note.tileBox.w == 36 and .note.tileBox.h == 36 and .note.glyph == "N"'
+tile=$(near "$(geo tileBox)" 43 47 54 6)
+check "the circle at the notification's left is the on colour's 11 % over the fill, near #2B2F36 ($tile of 1296 px)" test "$tile" -gt 600
 
 notify_as "" "no app"
 shown '.note.summary == "no app"'
