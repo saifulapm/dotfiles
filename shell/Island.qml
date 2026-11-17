@@ -17,7 +17,7 @@ import "lib/island-host.mjs" as H
 import "lib/switch.mjs" as Sw
 import "lib/island-live.mjs" as L
 import "lib/island-tones.mjs" as T
-import "lib/island-wait.mjs" as W
+import "lib/island-wait.mjs" as Wait
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
 Item {
@@ -899,7 +899,7 @@ Item {
     // What waits behind an open surface: the notifications Notifs holds, each question that arrived, and one media change (7E95CSV2).
     property var questionsWaiting: []
     property bool mediaWaiting: false
-    readonly property int waiting: W.count(notifs.queue) + questionsWaiting.length + (mediaWaiting ? 1 : 0)
+    readonly property int waiting: Wait.count(notifs.queue) + questionsWaiting.length + (mediaWaiting ? 1 : 0)
     onSurfaceChanged: if (!surface) {
         questionsWaiting = [];
         mediaWaiting = false;

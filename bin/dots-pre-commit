@@ -15,7 +15,7 @@ if (found.length) {
 }
 
 // These went red only in the wave suite six times, and run in well under a second; they read the working tree, as the suite does, and one-design scans bin too.
-const LINTS = ['shell/lib/qml-js.test.mjs', 'shell/lib/fixture-git.test.mjs', 'shell/lib/one-design.test.mjs'];
+const LINTS = ['shell/lib/qml-js.test.mjs', 'shell/lib/fixture-git.test.mjs', 'shell/lib/one-design.test.mjs', 'shell/lib/import-qualifier.test.mjs'];
 if (names.some((f) => /^(shell|tests|bin)\//.test(f))) {
   const top = git('rev-parse', '--show-toplevel').trim();
   const lints = LINTS.filter((f) => existsSync(join(top, f)));
