@@ -228,8 +228,8 @@ PanelWindow {
         right: true
     }
     color: "transparent"
-    // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover; at rest only the island takes clicks.
-    mask: shown && !(notifications?.dragging ?? false) ? null : island?.visible ? islandInput : noInput
+    // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover; at rest only the island takes clicks, and after Mod+I the whole output does, so a click outside gives the keyboard back (SMB51G7B).
+    mask: shown && !(notifications?.dragging ?? false) ? null : island?.wantsKeys ? null : island?.visible ? islandInput : noInput
 
     Region {
         id: noInput
@@ -265,6 +265,15 @@ PanelWindow {
         anchors.fill: parent
         onPressed: mouse => {
             const s = host.all.find(s => s?.shown);
+            // After Mod+I a press outside the island gives the keyboard back and goes no further; one on it is the island's.
+            if (!s && host.island?.wantsKeys) {
+                const box = host.island.maskItem;
+                if (box.contains(mapToItem(box, mouse.x, mouse.y)))
+                    mouse.accepted = false;
+                else
+                    host.island.release();
+                return;
+            }
             // A surface in the island is drawn inside it, so the press is read in the surface's own coordinates.
             const at = s ? mapToItem(s, mouse.x, mouse.y) : null;
             if (!s || ClickLib.onCard(s, at.x, at.y))
