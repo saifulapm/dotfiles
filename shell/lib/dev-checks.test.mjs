@@ -146,6 +146,16 @@ test('dots-dev starts the nested shell with idle locking off unless a check sets
   assert.deepEqual(asking.sort(), ['idle.sh', 'presence.sh']);
 });
 
+// m100's bench died twice typing a scheme name when the idle live monitors went off mid-run; a power-on beside it every 20 s let it pass.
+test('dots-bench powers the live monitors on every 20 s through the live niri while it runs, and stops that in its cleanup', () => {
+  const bench = readFileSync(new URL('../../bin/dots-bench', import.meta.url), 'utf8');
+  const loop = bench.match(/^\s*\(while :; do NIRI_SOCKET="\$live_niri" niri msg action power-on-monitors >\/dev\/null 2>&1; sleep (\d+); done\) 9>&- &$/m);
+  assert.ok(loop, 'a background power-on loop through $live_niri, with the lock fd closed');
+  assert.ok(Number(loop[1]) <= 20);
+  assert.match(bench, /^\s*monitors_pid=\$!$/m);
+  assert.match(bench, /^cleanup\(\) \{[^\n]*kill "\$monitors_pid"/m);
+});
+
 // A DevTools eval exits 0 whatever it answers, so `check ... page '<js>'` passed on false in m33; check refuses page, row and cdp as its command.
 test('check refuses a DevTools eval as its command, bare or under until_ok', () => {
   const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');

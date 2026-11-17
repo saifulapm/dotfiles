@@ -7,6 +7,13 @@ source "$(dirname "$0")/../tests/dev/lib.sh"
 
 idle_s=${DOTS_BENCH_IDLE_S:-60}
 
+# With no input the live monitors go off minutes into a run, and the nested session's keys then stall and repeat (m100's bench died on it twice), so they are powered on every 20 s until the bench ends.
+if [ -n "$live_niri" ]; then
+  (while :; do NIRI_SOCKET="$live_niri" niri msg action power-on-monitors >/dev/null 2>&1; sleep 20; done) 9>&- &
+  monitors_pid=$!
+fi
+cleanup() { [ -z "${monitors_pid:-}" ] || kill "$monitors_pid" 2>/dev/null; }
+
 die() {
   echo "bench: $*" >&2
   exit 1
