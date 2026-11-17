@@ -60,7 +60,7 @@ for _ in $(seq 15); do
   sleep 0.1
 done
 check "notify-send -u critical now over a fullscreen window draws nothing" test "$saw" = no
-echo "     before the toggle: $(island | jq -c '{shown, mode, waiting}') focused $(niri msg -j focused-window | jq -c '{app_id, is_fullscreen: .layout}')"
+echo "     before the toggle at $(now_ms): $(island | jq -c '{shown, mode, waiting}'), queue $(timeout 0.5 qs ipc call notifs state | jq -c .queue)"
 niri msg action fullscreen-window
 until_ok 3000 island_is '.shown and .mode == "notification"'
 echo "     after: $(island | jq -c '{shown, mode, waiting}')"
