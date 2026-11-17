@@ -43,7 +43,7 @@ Item {
     // Home first, then UTC, London and New York, each {city, time, offset, day, home}; empty until dots-zones answers.
     readonly property var cities: zones.answer ? W.cityRows(clock.now.getTime(), zones.answer) : []
     readonly property var clockLook: V.clockLook(theme.tokens)
-    readonly property var notification: notifs.current
+    readonly property var notification: H.shownNotification(notifs.current, sharing)
     readonly property real recordingSince: Root.State.recordingSince
     // Bumped each second while a recording runs, so its counter moves.
     property real recordingNow: 0

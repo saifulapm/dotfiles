@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { springCurve, ease } from './island.mjs';
-import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, surfaceYields, modeOf } from './island-host.mjs';
+import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, surfaceYields, modeOf, shownNotification } from './island-host.mjs';
 
 test('the island opens and switches on springCurve(260, 0.7, 30), 362 ms where the old open took 611', () => {
   const m = hostMotion();
@@ -97,4 +97,13 @@ test('an open surface outranks every slot, a question and a lease card among the
   assert.equal(modeOf(null, all), 'question');
   assert.equal(modeOf(null, { notification: note }), 'notification');
   assert.equal(modeOf(null, {}), 'rest');
+});
+
+// 61SHXHG7: niri can only black out a whole layer from a cast, which would black out the whole output, so the island keeps notifications to itself instead.
+test('while a screen is shared the island shows no notification, and shows it again once the share ends', () => {
+  const share = [{ kind: 'PipeWire', session: 1 }];
+  assert.equal(shownNotification(note, share), null);
+  assert.equal(shownNotification(note, null), note);
+  assert.equal(shownNotification(null, null), null);
+  assert.equal(modeOf(null, { notification: shownNotification(note, share), sharing: share }), 'sharing');
 });

@@ -33,6 +33,9 @@ export function bottomRadius(from, to, e) {
 // What the island shows: an open surface outranks every slot (PCGX7JPJ), else the slots' own order.
 export const modeOf = (surface, slots) => (surface ? 'surface' : pick(slots));
 
+// The notification the island may show: none while a screen is shared, so a share never shows one (61SHXHG7); it still goes to the centre's history.
+export const shownNotification = (current, sharing) => (sharing ? null : current);
+
 // Until the waiting dot (PCGX7JPJ), an open surface gives the island up to any slot that arrives: one empty before, or a notification or question that is a new one.
 export function surfaceYields(before, after) {
   return Object.keys(after).some((k) => {
