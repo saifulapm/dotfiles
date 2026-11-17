@@ -1,7 +1,7 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
 
 // idle RSS is 200 MiB (#7S2JD316, #KSH3FVWD): GL reads 172 MiB, no lever reached 150 without costing real memory, the picker's specimens add 3-7 MiB, and by m24 every start read 194-198.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0, morphMaxMs: 20, morphP95Ms: 12 };
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0, morphMaxMs: 34, morphP95Ms: 12 };
 
 // The measured baseline of every row that has one (mem fact 76XT47G6, just bench at d77a9e69).
 export const BASELINE = { firstFrameMs: 170, rssMiB: 204, coldMs: 38, warmMs: 3, schemesColdMs: 35, schemesWarmMs: 16, passColdMs: 3, filesColdMs: 11, switchMs: 114, idleCpu: 0.13 };

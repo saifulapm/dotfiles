@@ -50,8 +50,8 @@ test('every measure within its limit reads ok and passes', () => {
     'deen frame    220 ms  ≤ 500 ms   ok',
     'deen rss      137 MiB ≤ 250 MiB  ok',
     'deen closed   0 left  = 0 left   ok',
-    'morph open    14/9 ms ≤ 20/12 ms ok',
-    'morph close   15/10 ms ≤ 20/12 ms ok',
+    'morph open    14/9 ms ≤ 34/12 ms ok',
+    'morph close   15/10 ms ≤ 34/12 ms ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -258,21 +258,22 @@ test('frameStats gives the longest interval and the nearest-rank 95th percentile
   assert.equal(frameStats([]), null);
 });
 
-test('a morph open with a longest interval of 21 ms or a p95 of 13 ms is OVER, 20 and 12 ok', () => {
-  assert.equal(report({ ...good, morphOpen: { max: 20, p95: 12 } }, BUDGETS).over, false);
-  const long = report({ ...good, morphOpen: { max: 21, p95: 9 } }, BUDGETS);
+// JN450PWP: one missed 60 Hz refresh at most, so the longest gap is held to 34 ms; each frame's work to 12 ms at p95.
+test('a morph open with a longest interval of 35 ms or a p95 of 13 ms is OVER, 34 and 12 ok', () => {
+  assert.equal(report({ ...good, morphOpen: { max: 34, p95: 12 } }, BUDGETS).over, false);
+  const long = report({ ...good, morphOpen: { max: 35, p95: 9 } }, BUDGETS);
   assert.equal(long.over, true);
-  assert.equal(long.lines[21], 'morph open    21/9 ms ≤ 20/12 ms OVER');
+  assert.equal(long.lines[21], 'morph open    35/9 ms ≤ 34/12 ms OVER');
   const slow = report({ ...good, morphOpen: { max: 14, p95: 13 } }, BUDGETS);
   assert.equal(slow.over, true);
-  assert.equal(slow.lines[21], 'morph open    14/13 ms ≤ 20/12 ms OVER');
+  assert.equal(slow.lines[21], 'morph open    14/13 ms ≤ 34/12 ms OVER');
 });
 
 test('a morph close is held to the same budgets on its own line', () => {
-  assert.equal(report({ ...good, morphClose: { max: 20, p95: 12 } }, BUDGETS).over, false);
-  const r = report({ ...good, morphClose: { max: 21, p95: 12 } }, BUDGETS);
+  assert.equal(report({ ...good, morphClose: { max: 34, p95: 12 } }, BUDGETS).over, false);
+  const r = report({ ...good, morphClose: { max: 35, p95: 12 } }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[22], 'morph close   21/12 ms ≤ 20/12 ms OVER');
+  assert.equal(r.lines[22], 'morph close   35/12 ms ≤ 34/12 ms OVER');
 });
 
 test('a morph that was not timed reads none and is OVER', () => {
@@ -283,11 +284,11 @@ test('a morph that was not timed reads none and is OVER', () => {
 
 test('the CLI reads the morph rows from its last four arguments and counts a missing pair as OVER', () => {
   const out = execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' });
-  assert.match(out, /morph open {4}14\/9 ms +≤ 20\/12 ms +ok/);
-  assert.match(out, /morph close {3}15\/10 ms +≤ 20\/12 ms +ok/);
+  assert.match(out, /morph open {4}14\/9 ms +≤ 34\/12 ms +ok/);
+  assert.match(out, /morph close {3}15\/10 ms +≤ 34\/12 ms +ok/);
   assert.throws(
-    () => execFileSync('node', [cli, ...args, '14', '9', '21', '10'], { stdio: 'pipe' }),
-    (e) => e.status === 1 && /morph close {3}21\/10 ms +≤ 20\/12 ms +OVER/.test(e.stdout.toString()),
+    () => execFileSync('node', [cli, ...args, '14', '9', '35', '10'], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /morph close {3}35\/10 ms +≤ 34\/12 ms +OVER/.test(e.stdout.toString()),
   );
   assert.throws(
     () => execFileSync('node', [cli, ...args], { stdio: 'pipe' }),
@@ -300,7 +301,7 @@ test('frame intervals are the gaps between a morph\'s frames, the wait for its f
   assert.deepEqual(morphIntervals([[5, 176, 34]]), []);
 });
 
-// BH6GX53J: no frame interval over 20 ms, and 95% of frames done within 12 ms; at 60 Hz an interval is 16.7 ms, so the 12 is each frame's own work.
+// BH6GX53J and JN450PWP: the longest frame interval, and 95% of frames done within 12 ms; at 60 Hz an interval is 16.7 ms, so the 12 is each frame's own work.
 test('the frames CLI prints a morph\'s longest interval and the p95 of its frames\' work from island state\'s frames', () => {
   const frames = JSON.stringify([[4, 0, 0, 0, 0, 3], [12, 0, 0, 0, 0, 2], [20, 0, 0, 0, 0, 9], [37, 0, 0, 0, 0, 4], [45, 0, 0, 0, 0, 1]]);
   assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 9');
