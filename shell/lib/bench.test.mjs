@@ -50,8 +50,8 @@ test('every measure within its limit reads ok and passes', () => {
     'deen frame    220 ms  ≤ 500 ms   ok',
     'deen rss      137 MiB ≤ 250 MiB  ok',
     'deen closed   0 left  = 0 left   ok',
-    'morph open    14/9 ms ≤ 34/12 ms ok',
-    'morph close   15/10 ms ≤ 34/12 ms ok',
+    'morph open    14/9 ms ≤ 36/12 ms ok',
+    'morph close   15/10 ms ≤ 36/12 ms ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -258,22 +258,22 @@ test('frameStats gives the longest interval and the nearest-rank 95th percentile
   assert.equal(frameStats([]), null);
 });
 
-// JN450PWP: one missed 60 Hz refresh at most, so the longest gap is held to 34 ms; each frame's work to 12 ms at p95.
-test('a morph open with a longest interval of 35 ms or a p95 of 13 ms is OVER, 34 and 12 ok', () => {
-  assert.equal(report({ ...good, morphOpen: { max: 34, p95: 12 } }, BUDGETS).over, false);
-  const long = report({ ...good, morphOpen: { max: 35, p95: 9 } }, BUDGETS);
+// JN450PWP and S7XQGGT4: one missed 60 Hz refresh at most, plus 2 ms of the shell's whole-ms clock, so the longest gap is held to 36 ms; each frame's work to 12 ms at p95.
+test('a morph open with a longest interval of 37 ms or a p95 of 13 ms is OVER, 36 and 12 ok', () => {
+  assert.equal(report({ ...good, morphOpen: { max: 36, p95: 12 } }, BUDGETS).over, false);
+  const long = report({ ...good, morphOpen: { max: 37, p95: 9 } }, BUDGETS);
   assert.equal(long.over, true);
-  assert.equal(long.lines[21], 'morph open    35/9 ms ≤ 34/12 ms OVER');
+  assert.equal(long.lines[21], 'morph open    37/9 ms ≤ 36/12 ms OVER');
   const slow = report({ ...good, morphOpen: { max: 14, p95: 13 } }, BUDGETS);
   assert.equal(slow.over, true);
-  assert.equal(slow.lines[21], 'morph open    14/13 ms ≤ 34/12 ms OVER');
+  assert.equal(slow.lines[21], 'morph open    14/13 ms ≤ 36/12 ms OVER');
 });
 
 test('a morph close is held to the same budgets on its own line', () => {
-  assert.equal(report({ ...good, morphClose: { max: 34, p95: 12 } }, BUDGETS).over, false);
-  const r = report({ ...good, morphClose: { max: 35, p95: 12 } }, BUDGETS);
+  assert.equal(report({ ...good, morphClose: { max: 36, p95: 12 } }, BUDGETS).over, false);
+  const r = report({ ...good, morphClose: { max: 37, p95: 12 } }, BUDGETS);
   assert.equal(r.over, true);
-  assert.equal(r.lines[22], 'morph close   35/12 ms ≤ 34/12 ms OVER');
+  assert.equal(r.lines[22], 'morph close   37/12 ms ≤ 36/12 ms OVER');
 });
 
 test('a morph that was not timed reads none and is OVER', () => {
@@ -284,11 +284,11 @@ test('a morph that was not timed reads none and is OVER', () => {
 
 test('the CLI reads the morph rows from its last four arguments and counts a missing pair as OVER', () => {
   const out = execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' });
-  assert.match(out, /morph open {4}14\/9 ms +≤ 34\/12 ms +ok/);
-  assert.match(out, /morph close {3}15\/10 ms +≤ 34\/12 ms +ok/);
+  assert.match(out, /morph open {4}14\/9 ms +≤ 36\/12 ms +ok/);
+  assert.match(out, /morph close {3}15\/10 ms +≤ 36\/12 ms +ok/);
   assert.throws(
-    () => execFileSync('node', [cli, ...args, '14', '9', '35', '10'], { stdio: 'pipe' }),
-    (e) => e.status === 1 && /morph close {3}35\/10 ms +≤ 34\/12 ms +OVER/.test(e.stdout.toString()),
+    () => execFileSync('node', [cli, ...args, '14', '9', '37', '10'], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /morph close {3}37\/10 ms +≤ 36\/12 ms +OVER/.test(e.stdout.toString()),
   );
   assert.throws(
     () => execFileSync('node', [cli, ...args], { stdio: 'pipe' }),
