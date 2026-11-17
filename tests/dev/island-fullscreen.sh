@@ -53,6 +53,8 @@ check "and Mod+I then 1 answers it" until_ok 2000 called "answer --by popup -- Q
 printf '{"self": "macbook", "questions": []}\n' >"$DOTS_HUB_QUESTIONS"
 until_ok 3000 island_is '.shown == false'
 
+# hi's 5 s run out first, so the critical is the only one left waiting.
+sleep 4
 notify-send -u critical now
 saw=no
 for _ in $(seq 15); do
@@ -60,10 +62,8 @@ for _ in $(seq 15); do
   sleep 0.1
 done
 check "notify-send -u critical now over a fullscreen window draws nothing" test "$saw" = no
-echo "     before the toggle at $(now_ms): $(island | jq -c '{shown, mode, waiting}'), queue $(timeout 0.5 qs ipc call notifs state | jq -c .queue)"
 niri msg action fullscreen-window
 until_ok 3000 island_is '.shown and .mode == "notification"'
-echo "     after: $(island | jq -c '{shown, mode, waiting}')"
 check "and shows once the window leaves fullscreen" island_is '.mode == "notification" and .note.summary == "now"'
 exit "$fails"
 }
