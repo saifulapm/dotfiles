@@ -51,7 +51,7 @@ magenta() {
     console.log(n);
   '
 }
-right_thumb='.note.picture.w == 48 and .note.picture.h == 48 and .note.picture.x > .note.summaryBox.x + .note.summaryBox.w'
+right_thumb='.note.picture.w == 48 and .note.picture.h == 48 and ((.note.picture.x + .note.picture.w) - (.note.islandBox.x + .note.islandBox.w - 16) | fabs) <= 1 and .note.picture.y >= .note.summaryBox.y + .note.summaryBox.h'
 notify-send -a Art -h string:image-path:"$pic" "Cover"
 shown cover
 check "an image-path PNG draws a 48 px thumbnail at the right ($(note picture))" state_is "$right_thumb"

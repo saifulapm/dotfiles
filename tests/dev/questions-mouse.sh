@@ -89,7 +89,7 @@ click_island island
 until_ok 2000 island_drawn ask:option:0
 until_ok 2000 ask_is '.where == "projekt · nuc"'
 check "the header draws the project without its bidi control ($(island | jq -c '.ask.where'))" ask_is '.where == "projekt · nuc"'
-check "the option draws without its bidi control ($(island | jq -c '.ask.options[0].text'))" ask_is '.options[0].text == "1 · live liat gnirts"'
+check "the option draws without its bidi control ($(island | jq -c '.ask.options[0].text'))" ask_is '.options[0].text == "live liat gnirts"'
 click_island ask:option:0
 until_ok 2000 called "answer --by popup -- Q4 $forged"
 check "and a click answers with the option as asked" called "answer --by popup -- Q4 $forged"

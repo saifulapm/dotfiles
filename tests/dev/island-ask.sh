@@ -27,13 +27,14 @@ until_ok 5000 island_is '.mode == "rest"'
 ask Q1 "Ship the release?" "Ship it" "Wait a day" "Never"
 settled '.mode == "question"'
 check "a question with three options draws at 520 px ($(island | jq .width))" island_is '.width == 520'
+echo "     ask: $(island | jq -c '.ask | {where, clock, expanded}')"
 check "its header names who asks and the clock" island_is --arg c "$(date +%H:%M)" '.ask.where == "tambour · nuc.ts.net" and .ask.clock == $c'
 mod_i
 settled '.mode == "question" and .focused'
 echo "     options: $(island | jq -c '.ask.options')"
 check "Mod+I shows the options as buttons with no number: Ship it inverted, the rest quiet, then Reply…" island_is '[.ask.options[] | [.text, .primary]] == [["Ship it", true], ["Wait a day", false], ["Never", false], ["Reply…", false]]'
 wtype -k Return
-check "Enter answers the first option" until_ok 2000 called "answer --by popup -- Q1 Ship it"
+check "Enter answers the first option ($(tail -1 "$calls" 2>/dev/null))" until_ok 2000 called "answer --by popup -- Q1 Ship it"
 printf '{"self": "macbook", "questions": []}\n' >"$DOTS_HUB_QUESTIONS"
 until_ok 3000 island_is '.mode == "rest"'
 

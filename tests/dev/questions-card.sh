@@ -51,7 +51,7 @@ until_ok 1000 ask_is '.expanded'
 state=$(island)
 echo "     open: $(jq -c '.ask | {lines, truncated, summary, options}' <<<"$state")"
 check "Mod+I opens the whole question" ask_is '.expanded and .truncated == false and .lines > 2 and .summary == null'
-check "every option shows in full, wrapped, and Reply last" ask_is '[.options[].elided] == [false, false, false, false] and .options[1].lines > 1 and (.options[3].text | startswith("r · Reply"))'
+check "every option shows in full as a button, wrapped, with no number, the first inverted, and Reply last" ask_is '[.options[].elided] == [false, false, false, false] and .options[1].lines > 1 and .options[3].text == "Reply…" and .options[0].primary and (.options[0].text | test("^[0-9]") | not)'
 check "the recommended option is starred, not the first" ask_is '[.options[].recommended] == [false, true, false, false] and (.options[1].text | endswith("★"))'
 
 # A click on the link's first letters, which start the text.

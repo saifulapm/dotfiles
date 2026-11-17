@@ -1648,15 +1648,17 @@ Item {
                         font: island.theme.tokens?.type.mono ?? ""
                     }
 
-                    Row {
+                    // Anchored, not a Row: a Row skips a column with nothing in it and slides the picture to the left.
+                    Item {
                         id: noteContent
                         // Read from what each one shows, since a child of a hidden row reads hidden itself.
                         visible: body.text !== "" || typeof island.heldNotification?.progress === "number" || (island.heldNotification?.files ?? []).length > 0 || thumbImage.status === Image.Ready
                         width: parent.width
-                        spacing: 12
+                        height: Math.max(noteText.implicitHeight, columnChip.visible ? columnChip.height : 0, thumb.visible ? thumb.height : 0)
 
                         Column {
-                            width: parent.width - (columnChip.visible ? columnChip.width + parent.spacing : 0) - (thumb.visible ? thumb.width + parent.spacing : 0)
+                            id: noteText
+                            width: (columnChip.visible ? columnChip.x - 12 : thumb.visible ? thumb.x - 12 : parent.width)
                             anchors.verticalCenter: parent.verticalCenter
                             spacing: 6
 
@@ -1686,6 +1688,8 @@ Item {
 
                         FileChip {
                             id: columnChip
+                            anchors.right: thumb.visible ? thumb.left : parent.right
+                            anchors.rightMargin: thumb.visible ? 12 : 0
                             anchors.verticalCenter: parent.verticalCenter
                             width: implicitWidth
                             height: implicitHeight
@@ -1699,6 +1703,7 @@ Item {
                         ClippingRectangle {
                             id: thumb
                             visible: thumbImage.status === Image.Ready
+                            anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             width: 48
                             height: 48
@@ -2138,7 +2143,7 @@ Item {
                                         width: parent.width - 24
                                         textFormat: Text.PlainText
                                         wrapMode: Text.Wrap
-                                        text: Q.unbidi(parent.modelData)
+                                        text: Q.unbidi(parent.modelData) + (parent.recommended ? "  ★" : "")
                                         color: parent.primary ? box.style.fill : box.style.text
                                         font.family: island.theme.tokens?.type.mono ?? ""
                                         font.pixelSize: 13
