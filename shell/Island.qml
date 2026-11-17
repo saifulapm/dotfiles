@@ -693,8 +693,11 @@ Item {
         paster.running = true;
     }
 
+    // When the last attach ended: the Enter that chose a file in the picker must not also answer the question.
+    property real attachEndedAt: 0
     function attachDone() {
         attaching = false;
+        attachEndedAt = Date.now();
         if (focused)
             keys.forceActiveFocus();
     }
@@ -2388,8 +2391,9 @@ Item {
                 } else if (event.key === Qt.Key_R) {
                     island.replying = true;
                     reply.forceActiveFocus();
-                } else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && q.options.length) {
-                    island.questions.answer(q.id, q.options[0]);
+                } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    if (q.options.length && !event.isAutoRepeat && Date.now() - island.attachEndedAt > 500)
+                        island.questions.answer(q.id, q.options[0]);
                 } else {
                     const option = Q.optionFor(q, event.text);
                     if (option !== null)

@@ -66,7 +66,7 @@ check "renew claude 15 brings the normal look back" state_is '.warning == false 
 
 # Mod+I opens the lease card; niri runs no binds for wtype, so the check spawns the bind's command.
 island_keys() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-mod_i() { niri msg action spawn -- dots-call island focus; until_ok 2000 island_keys; }
+mod_i() { niri msg action spawn -- dots-call island focus; until_ok 2000 island_keys; sleep 0.3; }
 mod_i
 settled '.mode == "leaseCard" and .focused'
 echo "     card: $(island | jq -c '{drawn, lease}')"
