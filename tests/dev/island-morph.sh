@@ -41,7 +41,7 @@ dots-call cheatsheet toggle >/dev/null
 until_ok 3000 settled_open
 frames=$(island | jq -c .morph)
 echo "     reopen: $(jq -c '{kind, from, first: .frames[0]}' <<<"$frames")"
-turned_back() { jq -e '.kind == "open" and .from[0] > 176 and .from[0] < 1160 and (.frames[0][1] - .from[0] | if . < 0 then -. else . end) < 60' <<<"$frames" >/dev/null; }
+turned_back() { jq -e '.kind == "open" and .from[0] > 176 and .from[0] < 1160 and all(.frames[]; .[1] >= $f[0].from[0] - 2)' --slurpfile f <(echo "$frames") <<<"$frames" >/dev/null; }
 check "Mod+/ 60 ms into the close opens from where the box is, with no jump to rest" turned_back
 exit "$fails"
 }

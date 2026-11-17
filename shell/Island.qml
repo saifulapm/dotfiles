@@ -243,6 +243,14 @@ Item {
     property real renderedAt: 0
     // Called on each of the window's frames while the box morphs; the last field is the frame's own work, sync to rendered, in ms.
     function swapped() {
+        if (morphWaits > 0) {
+            morphWaits -= 1;
+            if (morphWaits === 0) {
+                morphT0 = Date.now();
+                morphing.restart();
+            }
+            return;
+        }
         if (morphing.running)
             morphFrames.push([Date.now() - morphT0, box.width, box.height, parent ? parent.width : 0, parent ? parent.height : 0, renderedAt - syncedAt]);
     }
@@ -279,8 +287,17 @@ Item {
         curve = I.isCompact(mode) ? motion.close : motion.open;
         morphing.duration = curve.ms;
         progress = 0;
+        // A surface's open changes the window's input and keyboard, which draws a frame of its own; the box starts moving two frames later, so that frame is not one of the morph's.
+        if (part === "surface") {
+            morphing.stop();
+            morphWaits = 2;
+            return;
+        }
+        morphWaits = 0;
         morphing.restart();
     }
+    // Frames still to swap before a surface's open starts to move.
+    property int morphWaits: 0
     component HeadText: Text {
         textFormat: Text.PlainText
         color: island.noteLook.head.color
