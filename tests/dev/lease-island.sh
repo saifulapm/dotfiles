@@ -65,11 +65,12 @@ settled '.warning == false'
 check "renew claude 15 brings the normal look back" state_is '.warning == false and .live.tone == "normal"'
 
 # Mod+I opens the lease card; niri runs no binds for wtype, so the check spawns the bind's command.
-mod_i() { niri msg action spawn -- dots-call island focus; }
+island_keys() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+mod_i() { niri msg action spawn -- dots-call island focus; until_ok 2000 island_keys; }
 mod_i
 settled '.mode == "leaseCard" and .focused'
 echo "     card: $(island | jq -c '{drawn, lease}')"
-check "Mod+I opens the card: the name, the unlock time, the time left, the bar and the keys" state_is '.lease.card and .drawn == 440 and .lease.who == "claude" and (.lease.unlocked | test("^unlocked [0-2][0-9]:[0-5][0-9]$")) and (.lease.time | test("^1[45]:[0-5][0-9]$")) and .lease.bar == "round" and .lease.keys == "↵ lock now · esc close" and .lease.label == "Island" and .lease.timeColor == "#ffffff"'
+check "Mod+I opens the 520 px card: the name, the unlock time, the time left over a progress pill, and Lock now inverted beside Close" state_is '.lease.card and .drawn == 520 and .lease.who == "claude" and (.lease.unlocked | test("^unlocked [0-2][0-9]:[0-5][0-9]$")) and (.lease.time | test("^1[45]:[0-5][0-9]$")) and .lease.pill.fill > 0 and [.lease.buttons[] | [.text, .primary]] == [["Lock now", true], ["Close", false]]'
 wtype -k Escape
 settled '.mode == "lease"'
 check "Esc closes the card back to the slot, still unlocked" bash -c "$(declare -f state_is island lock_is); state_is '.mode == \"lease\" and .focused == false' && lock_is '.locked == false'"
@@ -95,7 +96,7 @@ settled '.mode == "lease"'
 check "a 200-character name elides before the time, the clock at the right of the 560 px line ($(island | jq -c '{drawn, r: .live.clockRight}'))" state_is '.live.elided and .live.clockRight == 14 and .width == 560'
 mod_i
 settled '.mode == "leaseCard" and .focused'
-check "and on the card it elides on one line" state_is '.lease.elided and .drawn == 440'
+check "and on the card it elides on one line" state_is '.lease.elided and .drawn == 520'
 wtype -k Escape
 settled '.mode == "lease"'
 

@@ -162,6 +162,8 @@ status_is() { busctl --user get-property org.mpris.MediaPlayer2.dotsfake /org/mp
 title_is() { busctl --user get-property org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Metadata 2>/dev/null | grep -q "\"xesam:title\" s \"$1\""; }
 check "a click on the playing island opens the media card ($(island | jq -c '{mode, text}'))" reads "Track — Artist  h previous  ␣ pause  l next"
 check "and gives it the keyboard" island_focus Exclusive
+media_drawn() { island | jq -e '.width == 480 and .media.art == [64, 64] and .media.pill.width > 0 and [.media.buttons[].primary] == [false, true, false]' >/dev/null; }
+check "the media card is 480 px with a 64 px art square, a progress pill and previous, pause and next, pause inverted ($(island | jq -c '{width, media}'))" media_drawn
 until_ok 2000 island_drawn media:playPause
 click_island media:playPause
 until_ok 2000 status_is Paused

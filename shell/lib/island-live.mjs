@@ -21,6 +21,10 @@ export const ICONS = {
   check: '\u{F012C}',
   alert: '\u{F0028}',
   calendar: '\u{F00ED}',
+  play: '\u{F040A}',
+  pause: '\u{F03E4}',
+  previous: '\u{F04AE}',
+  next: '\u{F04AD}',
 };
 
 const oneLine = (s) =>

@@ -113,8 +113,11 @@ Item {
     readonly property var mediaCard: mediaOpen && media.target ? {
         title: media.target.trackTitle,
         artist: media.target.trackArtist,
+        art: media.target.trackArtUrl ?? "",
         playing: media.target.isPlaying
     } : null
+    // How far the open media card's track has played, 0 to 1, read each second while the card shows; -1 when the player tells no length.
+    property real mediaProgress: -1
     property var heldMediaCard: null
     onMediaCardChanged: if (mediaCard)
         heldMediaCard = mediaCard
@@ -192,13 +195,13 @@ Item {
     readonly property var sizes: ({
             label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
-            leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
+            leaseCard: [520, leaseColumn.implicitHeight + 32],
             sharingCard: [520, shareColumn.implicitHeight + 32],
             notification: [440, card.implicitHeight + 32],
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [520, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
-            mediaCard: [noteLook.width, mediaColumn.implicitHeight + 24],
+            mediaCard: [480, mediaColumn.implicitHeight + 32],
             // An open surface's own width and height, up to the output's less 48 px each way (PMQRFEYY, M4SVCQVQ).
             surface: [Math.min(surfaceWidth, output.width - 48), Math.min(surfaceHeight, output.height - 48)]
         })
@@ -494,12 +497,25 @@ Item {
         };
     }
 
+    // The media card as drawn, for `island state`: its art square, title, pill and buttons.
+    function mediaState() {
+        if (mode !== "mediaCard")
+            return null;
+        return {
+            art: [mediaArt.width, mediaArt.height],
+            artLoaded: artImage.status === Image.Ready,
+            title: mediaTitle.text,
+            pill: { width: Math.round(mediaPill.width), fill: mediaPillFill.width, progress: mediaProgress },
+            buttons: Array.from({ length: mediaRepeater.count }, (_, i) => mediaRepeater.itemAt(i).drawn)
+        };
+    }
+
     // The card's name, unlock time and time left as drawn.
     function leaseCardDrawn() {
         return {
-            who: cardWhoCard.text,
-            elided: cardWhoCard.truncated,
-            unlocked: cardUnlockedCard.text,
+            who: leaseHead.titleItem.text,
+            elided: leaseHead.titleItem.truncated,
+            unlocked: leaseHead.detailItem.text,
             time: cardTime.text,
             timeColor: String(cardTime.color)
         };
@@ -575,7 +591,7 @@ Item {
     // What the lease card draws, for `island state`; the one-line slot is under live.
     function leaseState() {
         if (mode === "leaseCard")
-            return Object.assign({ card: true, label: leaseFrameLabel.visible ? leaseFrameLabel.text : "", bar: leaseLook.card.bar, keys: leaseLook.card.keys.map(k => k.join(" ")).join(" · ") }, leaseCardDrawn());
+            return Object.assign({ card: true, pill: { width: Math.round(leasePill.width), fill: leasePillFill.width }, buttons: [lockNow.drawn, leaseClose.drawn] }, leaseCardDrawn());
         return null;
     }
 
@@ -1019,21 +1035,6 @@ Item {
         onTriggered: island.notice = ""
     }
 
-    // Artboard's open lease card is a selected frame named Island; the island sits 10 px from the top, so the name goes beside its corner, not above.
-    Text {
-        id: leaseFrameLabel
-        visible: island.mode === "leaseCard" && island.leaseLook.card.label !== ""
-        anchors.right: box.left
-        anchors.rightMargin: 12
-        y: box.y
-        textFormat: Text.PlainText
-        text: island.leaseLook.card.label
-        color: island.theme.tokens?.color.accent ?? "transparent"
-        font.family: island.theme.tokens?.type.ui ?? ""
-        font.pixelSize: 11
-        font.weight: Font.Medium
-    }
-
     // The bottom corners' radius on the box's own progress, 14 at rest and 20 on anything taller.
     readonly property real bottomRadius: progress >= 1 || !curve ? H.bottomRadius(toHeight) : H.bottomRadius(fromHeight, toHeight, I.ease(curve.points, progress))
 
@@ -1118,7 +1119,6 @@ Item {
         tokens: island.theme.tokens
         role: "island"
         // The open lease card is framed in the accent.
-        restyle: island.mode === "leaseCard" ? island.leaseLook.card.box : null
 
         // Under every part, so a question's scroll and a notification's own area take the pointer first.
         Root.Click {
@@ -1271,191 +1271,97 @@ Item {
                 width: island.sizes.leaseCard[0]
                 height: island.sizes.leaseCard[1]
 
+                // Board 2's lease card: who holds the session and since when, the time left over a progress pill, then Lock now and Close.
                 Column {
                     id: leaseColumn
-                    // Not named card: the notification's id: card would win the lookup.
-                    readonly property var look: island.leaseLook.card
-                    readonly property color ink: look.ink || box.style.text
-                    readonly property color muted: island.theme.tokens?.color.muted ?? ink
-                    readonly property color accent: island.theme.tokens?.color.accent ?? ink
-                    readonly property color timeColor: island.leaseWarning ? island.leaseLook.warning.time : ink
-                    readonly property string font: island.theme.tokens?.type.ui ?? ""
                     readonly property real share: island.lease && island.lock.leaseUntil > island.lock.unlockedAt ? Math.min(1, island.lease.left / (island.lock.leaseUntil - island.lock.unlockedAt)) : 0
-                    width: parent.width
+                    x: 16
+                    y: 16
+                    width: parent.width - 32
+                    spacing: 12
 
-                    // A lock tile, the head, name and unlock time, the time at the right, and the bar.
+                    Root.CardHead {
+                        id: leaseHead
+                        width: parent.width
+                        glyph: L.ICONS.robot
+                        title: island.leaseLook.card.who(island.lease?.who ?? "")
+                        detail: island.leaseLook.card.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
+                        clock: island.clockNow
+                        ink: box.style.text
+                        muted: island.tones.muted
+                        danger: island.tones.danger
+                        font: island.theme.tokens?.type.mono ?? ""
+                    }
+
                     Item {
                         width: parent.width
-                        height: cardRow.implicitHeight + 14 + 6 + 30
+                        height: cardTime.implicitHeight
 
-                        Item {
-                            id: cardRow
-                            x: 18
-                            y: 16
-                            width: parent.width - 36
-                            implicitHeight: Math.max(40, cardMiddle.implicitHeight, cardRight.implicitHeight)
+                        // The pill: the on colour's 14 % with its fill to the share of the lease left; the last minute takes the danger tone.
+                        Rectangle {
+                            id: leasePill
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - cardTime.implicitWidth - 12
+                            height: 6
+                            radius: 3
+                            color: Qt.alpha(box.style.text, 0.14)
 
                             Rectangle {
-                                id: cardTile
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 40
-                                height: 40
-                                radius: 12
-                                color: leaseColumn.look.tile ?? "transparent"
-
-                                Shape {
-                                    anchors.centerIn: parent
-                                    width: 18
-                                    height: 18
-
-                                    ShapePath {
-                                        strokeColor: leaseColumn.ink
-                                        strokeWidth: 1.6
-                                        fillColor: "transparent"
-                                        capStyle: ShapePath.RoundCap
-                                        PathSvg {
-                                            path: "M 5.5 8 H 12.5 A 2 2 0 0 1 14.5 10 V 13.5 A 2 2 0 0 1 12.5 15.5 H 5.5 A 2 2 0 0 1 3.5 13.5 V 10 A 2 2 0 0 1 5.5 8 Z M 6 8 V 5.5 A 3 3 0 0 1 11.8 4.5"
-                                        }
-                                    }
-                                }
-                            }
-
-                            Column {
-                                id: cardMiddle
-                                x: 54
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: parent.width - x - cardRight.width - 14
-                                spacing: 3
-
-                                Text {
-                                    textFormat: Text.PlainText
-                                    text: leaseColumn.look.head ?? ""
-                                    color: leaseColumn.look.headColor || leaseColumn.muted
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    id: cardWhoCard
-                                    width: parent.width
-                                    textFormat: Text.PlainText
-                                    elide: Text.ElideRight
-                                    maximumLineCount: 1
-                                    text: leaseColumn.look.who(island.lease?.who ?? "")
-                                    color: leaseColumn.ink
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 15
-                                    font.weight: Font.Medium
-                                }
-
-                                Text {
-                                    id: cardUnlockedCard
-                                    textFormat: Text.PlainText
-                                    text: leaseColumn.look.unlocked(Qt.formatTime(new Date(island.lock.unlockedAt), "HH:mm"))
-                                    color: leaseColumn.look.unlockedColor || leaseColumn.muted
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 13
-                                }
-                            }
-
-                            Column {
-                                id: cardRight
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 2
-
-                                Text {
-                                    id: cardTime
-                                    anchors.right: parent.right
-                                    textFormat: Text.PlainText
-                                    text: island.leaseLook.time(island.lease?.left ?? 0)
-                                    color: leaseColumn.timeColor
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 26
-                                    font.weight: Font.Bold
-                                    font.letterSpacing: -0.5
-                                    font.features: { "tnum": 1 }
-                                }
-
-                                Text {
-                                    anchors.right: parent.right
-                                    textFormat: Text.PlainText
-                                    text: leaseColumn.look.left ?? ""
-                                    color: leaseColumn.look.headColor || leaseColumn.muted
-                                    font.family: leaseColumn.font
-                                    font.pixelSize: 12
-                                }
+                                id: leasePillFill
+                                width: Math.round(parent.width * leaseColumn.share)
+                                height: parent.height
+                                radius: parent.radius
+                                color: island.leaseWarning ? island.tones.danger : box.style.text
                             }
                         }
 
-                        Rectangle {
-                            x: 18
-                            y: cardRow.y + cardRow.height + 14
-                            width: parent.width - 36
-                            height: 6
-                            radius: 3
-                            color: leaseColumn.look.tile ?? "transparent"
-
-                            Rectangle {
-                                width: parent.width * leaseColumn.share
-                                height: parent.height
-                                radius: 3
-                                color: island.leaseWarning ? island.leaseLook.warning.time : leaseColumn.look.barFill ?? leaseColumn.accent
-                            }
+                        Text {
+                            id: cardTime
+                            anchors.right: parent.right
+                            textFormat: Text.PlainText
+                            text: island.leaseLook.time(island.lease?.left ?? 0)
+                            color: island.leaseWarning ? island.tones.danger : box.style.text
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            font.features: { "tnum": 1 }
                         }
                     }
 
-                    // The keys as chips, under a rule.
-                    Item {
+                    Row {
+                        id: leaseButtons
                         width: parent.width
-                        height: keysRow.implicitHeight + 22
+                        spacing: 8
 
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: leaseColumn.look.tile
+                        Root.CardButton {
+                            id: lockNow
+                            width: (leaseButtons.width - leaseButtons.spacing) / 2
+                            text: "Lock now"
+                            primary: true
+                            ink: box.style.text
+                            fill: box.style.fill
+                            font: island.theme.tokens?.type.mono ?? ""
+
+                            Root.Click {
+                                name: "lease:lock"
+                                onTapped: {
+                                    island.release();
+                                    island.lock.lockNow();
+                                }
+                            }
                         }
 
-                        Row {
-                            id: keysRow
-                            x: 18
-                            y: 10
-                            spacing: 8
+                        Root.CardButton {
+                            id: leaseClose
+                            width: (leaseButtons.width - leaseButtons.spacing) / 2
+                            text: "Close"
+                            ink: box.style.text
+                            fill: box.style.fill
+                            font: island.theme.tokens?.type.mono ?? ""
 
-                            Repeater {
-                                model: leaseColumn.look.keys
-
-                                Rectangle {
-                                    required property var modelData
-                                    width: keyText.implicitWidth + 14
-                                    height: keyText.implicitHeight + 6
-                                    radius: 6
-                                    color: leaseColumn.look.tile
-
-                                    // The key in ink, then what it does.
-                                    Row {
-                                        id: keyText
-                                        anchors.centerIn: parent
-                                        spacing: 5
-
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: parent.parent.modelData[0]
-                                            color: leaseColumn.ink
-                                            font.family: leaseColumn.font
-                                            font.pixelSize: 11
-                                            font.weight: Font.Medium
-                                        }
-
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: parent.parent.modelData[1]
-                                            color: leaseColumn.look.headColor || leaseColumn.muted
-                                            font.family: leaseColumn.font
-                                            font.pixelSize: 11
-                                        }
-                                    }
-                                }
+                            Root.Click {
+                                name: "lease:close"
+                                onTapped: island.release()
                             }
                         }
                     }
@@ -1562,38 +1468,142 @@ Item {
                 width: island.sizes.mediaCard[0]
                 height: island.sizes.mediaCard[1]
 
+                // A 1 s read of the player's position while the card shows, since MPRIS sends no position as it plays.
+                Tick {
+                    interval: 1000
+                    repeat: true
+                    triggeredOnStart: true
+                    running: island.part === "mediaCard"
+                    onTriggered: {
+                        const p = island.media.target;
+                        if (p)
+                            p.positionChanged();
+                        island.mediaProgress = p && p.lengthSupported && p.length > 0 ? Math.max(0, Math.min(1, p.position / p.length)) : -1;
+                    }
+                }
+
+                // Board 2's media card: the art square beside the title and artist with the clock, a progress pill, then previous, pause and next.
                 Column {
                     id: mediaColumn
-                    x: 14
-                    y: 12
-                    width: parent.width - 28
-                    spacing: 8
+                    x: 16
+                    y: 16
+                    width: parent.width - 32
+                    spacing: 12
 
-                    Text {
+                    Item {
                         width: parent.width
-                        textFormat: Text.PlainText
-                        elide: Text.ElideRight
-                        maximumLineCount: 1
-                        text: I.trackText(island.heldMediaCard ?? {})
-                        color: box.style.text
-                        font.family: island.theme.tokens?.type.mono ?? ""
-                        font.pixelSize: 13
-                        font.weight: Font.Medium
-                    }
+                        height: 64
 
-                    Row {
-                        spacing: 18
-
-                        Repeater {
-                            model: I.mediaControls(island.heldMediaCard?.playing ?? false)
+                        ClippingRectangle {
+                            id: mediaArt
+                            width: 64
+                            height: 64
+                            radius: 12
+                            color: Qt.alpha(box.style.text, 0.11)
 
                             Text {
-                                required property var modelData
+                                anchors.centerIn: parent
+                                visible: artImage.status !== Image.Ready
                                 textFormat: Text.PlainText
-                                text: modelData.text
-                                color: island.noteLook.control.color
+                                text: L.ICONS.music
+                                color: box.style.text
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 24
+                            }
+
+                            Image {
+                                id: artImage
+                                anchors.fill: parent
+                                source: island.heldMediaCard?.art ?? ""
+                                asynchronous: true
+                                fillMode: Image.PreserveAspectCrop
+                                sourceSize.width: 128
+                                sourceSize.height: 128
+                            }
+                        }
+
+                        Column {
+                            x: 64 + 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: parent.width - x - mediaClock.implicitWidth - 12
+                            spacing: 2
+
+                            Text {
+                                id: mediaTitle
+                                width: parent.width
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                text: V.line(island.heldMediaCard?.title ?? "") || I.trackText(island.heldMediaCard ?? {})
+                                color: box.style.text
                                 font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 13
+                                font.pixelSize: 15
+                                font.weight: Font.Bold
+                            }
+
+                            Text {
+                                width: parent.width
+                                visible: text !== ""
+                                textFormat: Text.PlainText
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
+                                text: V.line(island.heldMediaCard?.artist ?? "")
+                                color: island.tones.muted
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        Text {
+                            id: mediaClock
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: island.clockNow
+                            color: box.style.text
+                            font.family: island.theme.tokens?.type.mono ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            font.features: { "tnum": 1 }
+                        }
+                    }
+
+                    // The progress pill: the on colour's 14 % with its fill to how far the track has played.
+                    Rectangle {
+                        id: mediaPill
+                        width: parent.width
+                        height: 6
+                        radius: 3
+                        color: Qt.alpha(box.style.text, 0.14)
+
+                        Rectangle {
+                            id: mediaPillFill
+                            width: Math.round(parent.width * Math.max(0, island.mediaProgress))
+                            height: parent.height
+                            radius: parent.radius
+                            color: box.style.text
+                        }
+                    }
+
+                    // Previous and next are quiet, and play or pause, the one a press runs, is inverted.
+                    Row {
+                        id: mediaButtons
+                        width: parent.width
+                        spacing: 8
+
+                        Repeater {
+                            id: mediaRepeater
+                            model: I.mediaControls(island.heldMediaCard?.playing ?? false)
+
+                            Root.CardButton {
+                                required property var modelData
+                                width: (mediaButtons.width - 2 * mediaButtons.spacing) / 3
+                                height: 40
+                                text: modelData.key === "previous" ? L.ICONS.previous : modelData.key === "next" ? L.ICONS.next : island.heldMediaCard?.playing ? L.ICONS.pause : L.ICONS.play
+                                primary: modelData.key === "playPause"
+                                ink: box.style.text
+                                fill: box.style.fill
+                                font: "Symbols Nerd Font Mono"
 
                                 Root.Click {
                                     name: "media:" + parent.modelData.key
