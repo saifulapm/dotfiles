@@ -18,8 +18,8 @@ keyboard_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == 
 mod_i() { niri msg action spawn -- dots-call island focus; until_ok 2000 keyboard_is Exclusive; sleep 0.3; }
 summaries() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -c .summaries; }
 called() { grep -qxF -- "$1" "$calls" 2>/dev/null; }
-# The island's centre on the output's top row, as #RRGGBB.
-top_px() { grim -g "$(($(niri msg -j outputs | jq '[.[]][0].logical.width') / 2)),0 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n' | tr a-f A-F | sed 's/^/#/'; }
+# One output pixel at the output's middle column, $1 px down, as #RRGGBB.
+mid_px() { grim -g "$(($(niri msg -j outputs | jq '[.[]][0].logical.width') / 2)),$1 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n' | tr a-f A-F | sed 's/^/#/'; }
 recs=()
 cleanup() {
   kill "$player" "${recs[@]}" 2>/dev/null
@@ -27,8 +27,8 @@ cleanup() {
 }
 
 until_ok 3000 island_is '.mode == "rest"'
-# A foot drawing one flat colour across the whole output, so its pixels are known.
-niri msg action spawn -- foot -c /dev/null -o colors.background=336699 sh -c 'sleep 600'
+# A foot with nothing in it, so its top rows are its background.
+niri msg action spawn -- foot -c /dev/null sh -c 'sleep 600'
 until_ok 5000 bash -c '[ "$(niri msg -j focused-window | jq -r .app_id)" = foot ]'
 niri msg action fullscreen-window
 until_ok 3000 island_is '.shown == false'
@@ -39,7 +39,7 @@ recs+=($!)
 notify-send hi
 sleep 1.5
 check "with a fullscreen window, a playing track, a mic in use and notify-send hi draw nothing ($(island | jq -c '{shown, mode}'))" island_is '.shown == false'
-check "the output's top row is the window's own pixels ($(top_px))" test "$(top_px)" = "#336699"
+check "the output's top row is the window's own pixels ($(mid_px 0), the foot's $(mid_px 300))" test "$(mid_px 0)" = "$(mid_px 300)"
 until_ok 6000 bash -c "timeout 0.5 qs ipc call notifs state | jq -e '.summaries | index(\"hi\") != null' >/dev/null"
 check "the notification sent while fullscreen is in the notification centre's list ($(summaries))" bash -c "timeout 0.5 qs ipc call notifs state | jq -e '.summaries | index(\"hi\") != null' >/dev/null"
 kill "$player" "${recs[@]}" 2>/dev/null
@@ -60,8 +60,10 @@ for _ in $(seq 15); do
   sleep 0.1
 done
 check "notify-send -u critical now over a fullscreen window draws nothing" test "$saw" = no
+echo "     before the toggle: $(island | jq -c '{shown, mode, waiting}') focused $(niri msg -j focused-window | jq -c '{app_id, is_fullscreen: .layout}')"
 niri msg action fullscreen-window
 until_ok 3000 island_is '.shown and .mode == "notification"'
+echo "     after: $(island | jq -c '{shown, mode, waiting}')"
 check "and shows once the window leaves fullscreen" island_is '.mode == "notification" and .note.summary == "now"'
 exit "$fails"
 }

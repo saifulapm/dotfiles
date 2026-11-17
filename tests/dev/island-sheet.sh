@@ -62,8 +62,11 @@ until_ok 2000 at_rest
 
 open_sheet
 notify-send hi
-until_ok 2000 island_is '.surface == null and .mode == "notification"'
-check "a notification that arrives takes the island from the sheet and shows hi ($(island | jq -c '{surface, mode, text}'))" island_is '.surface == null and (.text | test("hi"))'
+until_ok 2000 island_is '.waiting == 1'
+check "a notification that arrives waits behind the sheet ($(island | jq -c '{surface, mode, waiting}'))" island_is '.surface == "cheatsheet" and .waiting == 1'
+wtype -k Escape
+until_ok 3000 island_is '.surface == null and .mode == "notification"'
+check "and shows hi once the sheet closes" island_is '.surface == null and (.text | test("hi"))'
 timeout 0.5 qs ipc call notifs clear
 until_ok 8000 at_rest
 

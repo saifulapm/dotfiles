@@ -103,6 +103,8 @@ check "they show one at a time after Esc, in order (${seen[*]})" test "${seen[*]
 until_ok 3000 island_is '.mode == "rest"'
 
 # 6. A volume key changes the volume and its OSD has run out by the close.
+wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
+until_ok 3000 island_is '.mode == "rest"'
 before=$(wpctl get-volume @DEFAULT_AUDIO_SINK@)
 sheet_open
 niri msg action spawn -- wpctl set-volume -l 1 @DEFAULT_AUDIO_SINK@ 5%+
