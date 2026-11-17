@@ -67,24 +67,19 @@ test('the bottom radius follows the same progress as the box, from 14 to 20 and 
 
 const note = { key: 'n1', summary: 'hi' };
 
-// PCGX7JPJ: until the waiting dot, a live state that arrives while a surface is open takes the island.
-test('a live state that arrives while a surface is open takes the island', () => {
-  assert.equal(surfaceYields({}, { notification: note }), true);
-  assert.equal(surfaceYields({}, { osd: { kind: 'volume', value: 40 } }), true);
-  assert.equal(surfaceYields({}, { toast: 'Copied' }), true);
-  assert.equal(surfaceYields({}, { question: { id: 'Q1' } }), true);
+// 7E95CSV2: from m101 what arrives while a surface is open waits behind the dot; until m106 only a pairing request still closes the surface (PCGX7JPJ).
+test('a notification, a question, the OSD or a toast arriving while a surface is open leaves it open', () => {
+  assert.equal(surfaceYields({}, { notification: note }), false);
+  assert.equal(surfaceYields({}, { osd: { kind: 'volume', value: 40 } }), false);
+  assert.equal(surfaceYields({}, { toast: 'Copied' }), false);
+  assert.equal(surfaceYields({}, { question: { id: 'Q1' } }), false);
+  assert.equal(surfaceYields({ notification: note }, { notification: { key: 'n2', summary: 'again' } }), false);
 });
 
-test('a state already live when the surface opened keeps it open', () => {
-  const playing = { title: 'T', artist: 'A' };
-  assert.equal(surfaceYields({ playing, recording: '00:12' }, { playing: { title: 'U', artist: 'A' }, recording: '00:13' }), false);
-  assert.equal(surfaceYields({ notification: note }, { notification: note }), false);
-  assert.equal(surfaceYields({}, {}), false);
-});
-
-test('a second notification or a new question arriving over the first takes the island', () => {
-  assert.equal(surfaceYields({ notification: note }, { notification: { key: 'n2', summary: 'again' } }), true);
-  assert.equal(surfaceYields({ question: { id: 'Q1' } }, { question: { id: 'Q2' } }), true);
+test('a pairing request arriving, or a new one, closes the surface', () => {
+  assert.equal(surfaceYields({}, { question: { id: 'pair-1', pairing: 'pin' } }), true);
+  assert.equal(surfaceYields({ question: { id: 'Q1' } }, { question: { id: 'pair-1', pairing: 'confirm' } }), true);
+  assert.equal(surfaceYields({ question: { id: 'pair-1', pairing: 'pin' } }, { question: { id: 'pair-1', pairing: 'pin' } }), false);
 });
 
 test('a state going away keeps the surface open', () => {

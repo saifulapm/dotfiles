@@ -36,15 +36,8 @@ export const modeOf = (surface, slots) => (surface ? 'surface' : pick(slots));
 // The notification the island may show: none while a screen is shared, so a share never shows one (61SHXHG7); it still goes to the centre's history.
 export const shownNotification = (current, sharing) => (sharing ? null : current);
 
-// Until the waiting dot (PCGX7JPJ), an open surface gives the island up to any slot that arrives: one empty before, or a notification or question that is a new one.
+// What arrives while a surface is open waits behind the dot (7E95CSV2); until m106 a pairing request, which arrives in the question slot, still closes the surface (PCGX7JPJ).
 export function surfaceYields(before, after) {
-  return Object.keys(after).some((k) => {
-    const now = after[k];
-    const was = before[k];
-    if (!now) return false;
-    if (!was) return true;
-    if (k === 'notification') return now.key !== was.key;
-    if (k === 'question') return now.id !== was.id;
-    return false;
-  });
+  const now = after.question;
+  return !!now?.pairing && now.id !== before.question?.id;
 }

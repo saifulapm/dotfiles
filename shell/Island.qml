@@ -17,6 +17,7 @@ import "lib/island-host.mjs" as H
 import "lib/switch.mjs" as Sw
 import "lib/island-live.mjs" as L
 import "lib/island-tones.mjs" as T
+import "lib/island-wait.mjs" as W
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
 Item {
@@ -166,6 +167,10 @@ Item {
     onSlotsChanged: {
         if (surface && H.surfaceYields(slotsSeen, slots))
             surfaceYielded();
+        if (surface && slots.question && !slots.question.pairing && slots.question.id !== slotsSeen.question?.id && questionsWaiting.indexOf(slots.question.id) < 0)
+            questionsWaiting = questionsWaiting.concat([slots.question.id]);
+        if (surface && slots.playing && I.trackText(slots.playing) !== I.trackText(slotsSeen.playing ?? {}))
+            mediaWaiting = true;
         slotsSeen = slots;
     }
     // When the current mode began, in ms since the epoch, so a check can time a mode without polling error.
@@ -193,7 +198,7 @@ Item {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            label: mode === "rest" || mode === "surface" ? [waiting > 0 && mode === "rest" ? 204 : H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
             leaseCard: [520, leaseColumn.implicitHeight + 32],
             sharingCard: [520, shareColumn.implicitHeight + 32],
@@ -495,6 +500,14 @@ Item {
             clockLeft: Math.round(liveClock.x),
             textRight: Math.round(liveRow.x + liveText.x + liveText.width)
         };
+    }
+
+    // The waiting dot in output pixels, or null while none draws.
+    function dotBox() {
+        if (!waitDot.visible)
+            return null;
+        const p = waitDot.mapToItem(null, 0, 0);
+        return { x: p.x, y: p.y, w: waitDot.width, h: waitDot.height, color: String(waitDot.color) };
     }
 
     // The media card as drawn, for `island state`: its art square, title, pill and buttons.
@@ -882,7 +895,20 @@ Item {
     onAnimatingChanged: if (!animating)
         settledAt = Date.now()
     readonly property Item surfaceSlot: surfacePart
-    readonly property int waiting: 0
+    // What waits behind an open surface: the notifications Notifs holds, each question that arrived, and one media change (7E95CSV2).
+    property var questionsWaiting: []
+    property bool mediaWaiting: false
+    readonly property int waiting: W.count(notifs.queue) + questionsWaiting.length + (mediaWaiting ? 1 : 0)
+    onSurfaceChanged: if (!surface) {
+        questionsWaiting = [];
+        mediaWaiting = false;
+    }
+    // Notifications wait while a surface is open, and those that waited keep waiting while a question shows, so it goes first (3WG2NHE3).
+    Binding {
+        target: island.notifs
+        property: "held"
+        value: !!island.surface || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
+    }
     readonly property var takeover: null
     // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
     readonly property bool wantsKeys: focused && !attaching && visible
@@ -1121,7 +1147,6 @@ Item {
         height: island.progress >= 1 || !island.curve ? island.toHeight : island.fromHeight + (island.toHeight - island.fromHeight) * I.ease(island.curve.points, island.progress)
         tokens: island.theme.tokens
         role: "island"
-        // The open lease card is framed in the accent.
 
         // Under every part, so a question's scroll and a notification's own area take the pointer first.
         Root.Click {
@@ -2285,6 +2310,19 @@ Item {
                     }
                 }
             }
+        }
+
+        // The waiting dot: 6 px in the accent, at an open surface's top right, or after the resting clock (2VC2VCJR).
+        Rectangle {
+            id: waitDot
+            visible: island.waiting > 0 && (island.mode === "surface" || island.mode === "rest")
+            x: island.mode === "surface" ? box.width - 14 - width : Math.round(box.width / 2 + label.implicitWidth / 2 + 8)
+            y: island.mode === "surface" ? 14 : Math.round((box.height - height) / 2)
+            z: 2
+            width: 6
+            height: 6
+            radius: 3
+            color: island.tones.accent
         }
 
         // A click opens a notification and a right click puts it away; the keyboard does the same through Mod+I.

@@ -4,6 +4,7 @@ import Quickshell.Services.Notifications
 import QtQuick
 import ".." as Root
 import "../lib/notifs.mjs" as N
+import "../lib/island-wait.mjs" as W
 
 // The shell owns org.freedesktop.Notifications; the newest notification takes the island from any older one.
 Scope {
@@ -13,6 +14,11 @@ Scope {
     property var current: null
     // Undismissed criticals a newer notification took the island from, newest first; each comes back once the island is free.
     property var waiting: []
+    // While the island holds arrivals, a surface being open, each waits here in arrival order with its expiry; they show one at a time once it lets go, and one that ran out meanwhile stays in the history only (3WG2NHE3).
+    property bool held: false
+    property var queue: []
+    onHeldChanged: if (!held && !current)
+        release()
     // Newest first, at most 200, kept in the state dir across restarts.
     property var history: []
     // While on, a notification goes to the history only, and the island stays at rest; a critical one, or one from an app let through, still shows.
@@ -89,6 +95,15 @@ Scope {
     function show(e) {
         if (!N.shows(e, N.ruleOf(rules, e.app), dnd))
             return;
+        if (held || (queue.length && current?.key !== e.key)) {
+            const at = Date.now();
+            queue = W.arrive(queue, { kind: "notification", key: e.key, at, expires: W.expiry(at, N.holdMs(e, N.ruleOf(rules, e.app))), entry: e });
+            return;
+        }
+        present(e);
+    }
+
+    function present(e) {
         waiting = N.setAside(waiting, current, e.key, rules);
         current = e;
         hold.stop();
@@ -121,6 +136,7 @@ Scope {
     // Closed by its app, or dismissed here: it never comes back, and the island goes to the next waiting critical or rests.
     function gone(key) {
         waiting = waiting.filter(e => e.key !== key);
+        queue = W.drop(queue, key);
         if (current?.key === key)
             next();
     }
@@ -136,9 +152,23 @@ Scope {
         live = kept;
     }
 
+    // The next that waited and has not run out, or nothing; the queue goes before the criticals set aside.
+    function release() {
+        if (held)
+            return false;
+        const r = W.take(queue, Date.now());
+        queue = r.rest;
+        if (!r.next)
+            return false;
+        present(r.next.entry);
+        return true;
+    }
+
     function next() {
         current = null;
         hold.stop();
+        if (release())
+            return;
         const e = waiting.find(w => N.shows(w, N.ruleOf(rules, w.app), dnd));
         if (e)
             show(e);
@@ -184,6 +214,7 @@ Scope {
     function clear() {
         current = null;
         waiting = [];
+        queue = [];
         hold.stop();
         for (const k in live)
             live[k]?.dismiss();
