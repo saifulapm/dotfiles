@@ -40,7 +40,8 @@ sleep 1
 
 files=$(grep -oE '/[^ ]+\.(ttf|otf|ttc)' "/proc/$pid/maps" | sort -u | xargs -rn1 basename)
 echo "     font files: $(tr '\n' ' ' <<<"$files")"
-others=$(grep -vE '^(MapleMono|AdwaitaMono)-|^Noto-COLRv1\.ttf$|^Amiri-Regular\.ttf$|^NotoSansBengali\[wght\]\.ttf$|^NotoSans\[wght\]\.ttf$' <<<"$files")
+# Board 2's island icons are Symbols Nerd Font glyphs (VFYKV0ZQ), so its file is mapped too.
+others=$(grep -vE '^(MapleMono|AdwaitaMono)-|^Noto-COLRv1\.ttf$|^Amiri-Regular\.ttf$|^NotoSansBengali\[wght\]\.ttf$|^NotoSans\[wght\]\.ttf$|^SymbolsNerdFontMono-Regular\.ttf$' <<<"$files")
 check "no other font file is mapped${others:+: $(tr '\n' ' ' <<<"$others")}" test -z "$others"
 check "Adwaita Mono draws the symbols" grep -q '^AdwaitaMono-' <<<"$files"
 
