@@ -4,6 +4,7 @@
 fake=$(mktemp -d)
 calls=$fake/calls
 cat >"$fake/mem" <<EOF
+#!/bin/sh
 printf '%s\n' "\$*" >>"$calls"
 EOF
 chmod +x "$fake/mem"
