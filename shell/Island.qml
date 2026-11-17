@@ -874,8 +874,9 @@ Item {
 
     // The output the island follows, niri's focused one, as the surfaces' window it draws in does.
     readonly property var output: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
-    // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it; an open surface shows over it (BRQAT409).
-    visible: !!surface || !niri.edgeToEdge(niri.focusedOutput, output.width)
+    // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it: the resting island, media, the mic and notifications hide, while an open surface and every question show over it (BRQAT409, 4AEWRR0H).
+    readonly property bool overFullscreen: niri.edgeToEdge(niri.focusedOutput, output.width)
+    visible: !!surface || !overFullscreen || !!question
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
     property real fillStartedAt: 0
@@ -903,11 +904,11 @@ Item {
         questionsWaiting = [];
         mediaWaiting = false;
     }
-    // Notifications wait while a surface is open, and those that waited keep waiting while a question shows, so it goes first (3WG2NHE3).
+    // Notifications wait while a surface is open or a fullscreen window hides the island, and those that waited keep waiting while a question shows, so it goes first (3WG2NHE3).
     Binding {
         target: island.notifs
         property: "held"
-        value: !!island.surface || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
+        value: !!island.surface || island.overFullscreen || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
     }
     readonly property var takeover: null
     // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
