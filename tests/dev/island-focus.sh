@@ -14,7 +14,8 @@ typed=$DOTS_DEV_DIR/typed
 cleanup() { kill "$player" 2>/dev/null; }
 
 until_ok 3000 island_is '.mode == "rest"'
-notify-send -t 0 -A ok=OK "Deploy?"
+# notify-send -A waits for an action, so it runs in the background until the card is put away.
+notify-send -t 0 -A ok=OK "Deploy?" >/dev/null &
 until_ok 3000 island_is '.mode == "notification" and .animating == false'
 mod_i
 check "Mod+I on a notification card makes the window's keyboard Exclusive and focused true" bash -c "$(declare -f keyboard_is island island_is); keyboard_is Exclusive && island_is '.focused'"
