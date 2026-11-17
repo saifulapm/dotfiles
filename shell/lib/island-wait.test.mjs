@@ -32,11 +32,12 @@ test('a notification whose time ran out is expired, one that never expires is ne
   assert.deepEqual(crit.expired, []);
 });
 
-test('a replaced notification counts once, keeps its place and comes out with the new entry', () => {
+test('a replaced notification counts once, keeps its place, arrival and expiry, and comes out with the new entry', () => {
   const q = fill([note('a', 1, 5000, 'first'), note('b', 2), note('a', 9, 8000, 'second')]);
   assert.equal(count(q), 2);
-  assert.deepEqual(q.map((i) => [i.key, i.at, i.entry, i.expires]), [['a', 1, 'second', 8000], ['b', 2, 'b', null]]);
+  assert.deepEqual(q.map((i) => [i.key, i.at, i.entry, i.expires]), [['a', 1, 'second', 5000], ['b', 2, 'b', null]]);
   assert.equal(take(q, 0).next.entry, 'second');
+  assert.deepEqual(take(q, 6000).expired.map((i) => i.key), ['a']);
 });
 
 test('drop removes only the named key, and arrive, take and drop leave their input alone', () => {

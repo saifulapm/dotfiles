@@ -3,12 +3,12 @@
 // When a notification that arrived at at runs out, or null when it stays until dismissed (a hold of 0).
 export const expiry = (at, holdMs) => (holdMs > 0 ? at + holdMs : null);
 
-// The queue with item added at the end; an item whose key is already queued takes that one's place and arrival time, with the new entry and expiry.
+// The queue with item added at the end; an item whose key is already queued takes that one's place, arrival time and expiry, with the new entry, since its time runs from when it first arrived (3WG2NHE3).
 export function arrive(queue, item) {
   const i = queue.findIndex((q) => q.key === item.key);
   if (i < 0) return [...queue, item];
   const out = [...queue];
-  out[i] = Object.assign({}, item, { at: queue[i].at });
+  out[i] = Object.assign({}, item, { at: queue[i].at, expires: queue[i].expires });
   return out;
 }
 
