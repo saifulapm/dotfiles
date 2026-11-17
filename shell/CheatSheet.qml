@@ -38,6 +38,15 @@ Item {
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray" })
 
     implicitHeight: column.implicitHeight
+    // Maple Mono is monospaced, so one glyph's advance at the titles' size measures any word in them.
+    readonly property real glyphWidth: glyph.advanceWidth
+
+    TextMetrics {
+        id: glyph
+        font.family: sheet.fonts.ui ?? ""
+        font.pixelSize: 13
+        text: "M"
+    }
     // The last row is in by this many ms after the open (rowFade's cap).
     readonly property int introEnd: H.rowFade(99).delay + H.rowFade(99).ms
     // Milliseconds since the open began, which each row's fade reads; at rest every row is in.
@@ -100,6 +109,18 @@ Item {
         }
     }
 
+    function squeezedTitles() {
+        const out = [];
+        for (let i = 0; i < groupRepeater.count; i++) {
+            const g = groupRepeater.itemAt(i);
+            for (const r of [g.groupRows, g.tailRows])
+                for (let j = 0; j < r.count; j++)
+                    if (r.itemAt(j).squeezed)
+                        out.push(r.itemAt(j).entry.title);
+        }
+        return out;
+    }
+
     function state() {
         const drawn = [];
         const rowKeys = [];
@@ -109,7 +130,7 @@ Item {
             for (const r of [g.groupRows, g.tailRows]) {
                 for (let j = 0; j < r.count; j++) {
                     const row = r.itemAt(j);
-                    rs.push({ key: row.entry.key, surface: row.entry.surface ?? null, width: row.width });
+                    rs.push({ key: row.entry.key, surface: row.entry.surface ?? null, caption: row.entry.caption ?? null, width: row.width });
                     rowKeys.push(row.entry.key);
                 }
             }
@@ -119,6 +140,8 @@ Item {
             open: shown,
             rows: rows.length,
             truncated: truncated,
+            // Titles drawn wider than their room, or broken inside a word, which a word wrap leaves only when a word cannot fit.
+            squeezed: squeezedTitles(),
             groups: Lib.GROUPS_SIX,
             columns: drawn,
             query: query,
@@ -307,25 +330,37 @@ Item {
         }
     }
 
-    // A title, then its keys in one 20 px chip; a chip per key cost the shell 10 MiB of idle memory across the sheet's rows.
-    component KeyRow: RowLayout {
+    // A title, then its keys in one 20 px chip; a chip per key cost the shell 10 MiB of idle memory across the sheet's rows. A caption row names the surface the rows under it belong to.
+    component KeyRow: GridLayout {
+        id: keyRow
         required property var entry
-        spacing: 6
+        readonly property bool caption: !!entry.caption
+        // The chip goes under its title when the title's longest word and the chip do not fit side by side, so no word breaks.
+        readonly property bool stacked: keyBox.implicitWidth + columnSpacing + Math.max(...keyRow.entry.title.split(" ").map(w => w.length)) * sheet.glyphWidth > width
+        readonly property bool squeezed: title.contentWidth > title.width + 0.5
+        columns: stacked ? 1 : 2
+        columnSpacing: 6
+        rowSpacing: 3
 
         Text {
+            id: title
             textFormat: Text.PlainText
             Layout.fillWidth: true
-            text: parent.entry.title
-            // Titles wrap rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
-            wrapMode: Text.Wrap
+            topPadding: keyRow.caption ? 6 : 0
+            text: keyRow.entry.title
+            // Titles wrap at word boundaries rather than elide: Mod+Ctrl+1 to 9 differ only past "Move Column to Workspace".
+            wrapMode: Text.WordWrap
             onTruncatedChanged: sheet.truncated += truncated ? 1 : -1
             Component.onDestruction: if (truncated) sheet.truncated -= 1
-            color: sheet.on
+            color: keyRow.caption ? sheet.tones.muted : sheet.on
             font.family: sheet.fonts.ui ?? ""
-            font.pixelSize: 13
+            font.pixelSize: keyRow.caption ? 11 : 13
+            font.weight: keyRow.caption ? Font.Bold : Font.Normal
         }
 
         Rectangle {
+            id: keyBox
+            visible: !keyRow.caption
             Layout.alignment: Qt.AlignTop
             implicitWidth: Math.max(20, keyText.implicitWidth + 12)
             implicitHeight: 20
@@ -336,7 +371,7 @@ Item {
                 id: keyText
                 anchors.centerIn: parent
                 textFormat: Text.PlainText
-                text: Lib.chipsOf(parent.parent.entry.key).join("  ")
+                text: Lib.chipsOf(keyRow.entry.key).join("  ")
                 color: sheet.on
                 font.family: sheet.fonts.mono ?? ""
                 font.pixelSize: 11

@@ -136,7 +136,7 @@ test('the real binds, the surface keys and the touchpad fill six groups in six c
   const groups = groupRowsSix(parseBinds(binds).concat(IN_SURFACES, TOUCHPAD));
   assert.deepEqual(groups.map((g) => g.name), ['SURFACES', 'IN SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD']);
   for (const g of groups) assert.ok(g.rows.length > 0, g.name);
-  assert.deepEqual(groups[1].rows, IN_SURFACES);
+  assert.deepEqual(groups[1].rows.filter((r) => !r.caption), IN_SURFACES);
   assert.deepEqual(columnsOfSix(groups).map((col) => col.map((g) => g.name)), [['SURFACES'], ['IN SURFACES'], ['WORK'], ['WINDOWS'], ['SYSTEM'], ['TOUCHPAD']]);
 });
 
@@ -202,4 +202,20 @@ test('a / that is the key itself stays a key, as the cheat sheet\'s own Mod / do
   assert.deepEqual(chipsOf('Mod ⇧ /'), ['Mod', '⇧', '/']);
   const own = parseBinds(readFileSync(new URL('../../home/dot_config/niri/binds.kdl', import.meta.url), 'utf8')).find((r) => r.title === 'Cheat Sheet' || /cheat/i.test(r.title));
   assert.deepEqual(chipsOf(own.key), ['Mod', '/']);
+});
+
+test('IN SURFACES names each surface in a caption row before its keys, the shared keys under Every Surface', () => {
+  const group = groupRowsSix(IN_SURFACES).find((g) => g.name === 'IN SURFACES');
+  const captions = group.rows.filter((r) => r.caption).map((r) => r.caption);
+  assert.deepEqual(captions, ['Every Surface', 'Launcher', 'Control', 'Notifications', 'Pass', 'Tailscale', 'Accounts', 'DNS', 'Goals']);
+  group.rows.forEach((r, i) => {
+    if (r.caption) return;
+    const above = group.rows.slice(0, i).reverse().find((x) => x.caption);
+    assert.equal(above.surface, r.surface, `${r.title} sits under ${above.caption}`);
+  });
+});
+
+test('a filtered IN SURFACES keeps only the captions of surfaces with a row left', () => {
+  const group = groupRowsSix(filterRows(IN_SURFACES, 'kid')).find((g) => g.name === 'IN SURFACES');
+  assert.deepEqual(group.rows.map((r) => r.caption ?? r.title), ['DNS', 'Kid Mode']);
 });

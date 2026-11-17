@@ -30,6 +30,7 @@ check "Mod+/ shows the cheat sheet with exclusive keyboard" sheet_shown
 # Each surface's own keys and seven touchpad rows follow the binds: three swipes, two pinches and two corners.
 check "state counts $titled rows, one per titled bind, the $in_surfaces in surfaces and the 7 touchpad rows" state_is --argjson n "$((titled + in_surfaces + 7))" '.rows == $n'
 check "no row's title is cut short" state_is '.truncated == 0'
+check "no row's title is squeezed past a word by its key chip ($(sheet_state | jq -c .squeezed))" state_is '.squeezed == []'
 check "the drawn rows include the switcher's Alt+Tab key" state_is '.rowKeys | index("⌥ Tab") != null'
 check "the drawn rows include the Notes corner" state_is '.rowKeys | index("↗ corner") != null'
 check "state lists the six groups" state_is '.groups == ["SURFACES", "IN SURFACES", "WORK", "WINDOWS", "SYSTEM", "TOUCHPAD"]'

@@ -105,8 +105,24 @@ export const IN_SURFACES = [
   ['goals', 'D', 'Delete'],
 ].map(([surface, key, title]) => ({ title, key, group: 'IN SURFACES', surface }));
 
+// How a caption names each surface in IN SURFACES.
+const SURFACE_NAMES = { shared: 'Every Surface', launcher: 'Launcher', control: 'Control', notifications: 'Notifications', pass: 'Pass', tailscale: 'Tailscale', accounts: 'Accounts', dns: 'DNS', goals: 'Goals' };
+
+// IN SURFACES rows with a caption row before each surface's first row, so a key reads with the surface it belongs to.
+function captioned(rows) {
+  const out = [];
+  rows.forEach((r, i) => {
+    if (i === 0 || rows[i - 1].surface !== r.surface) out.push({ caption: SURFACE_NAMES[r.surface], title: SURFACE_NAMES[r.surface], key: '', group: r.group, surface: r.surface });
+    out.push(r);
+  });
+  return out;
+}
+
 export function groupRowsSix(rows) {
-  return GROUPS_SIX.map((name) => ({ name, rows: rows.filter((r) => r.group === name) }));
+  return GROUPS_SIX.map((name) => {
+    const own = rows.filter((r) => r.group === name);
+    return { name, rows: name === 'IN SURFACES' ? captioned(own) : own };
+  });
 }
 
 export function columnsOfSix(groups) {
