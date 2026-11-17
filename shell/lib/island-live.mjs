@@ -74,6 +74,9 @@ export function liveState(mode, slots, now) {
   return s && Object.assign(s, { clock: clockText(now) });
 }
 
+// The clock as the island draws it, for the cards' headers.
+export { clockText };
+
 // The widest a one-line state grows; a longer text elides before the clock.
 export const ONE_LINE_MAX = 560;
 export const LIVE = { pad: 14, icon: 14, gap: 8, bar: 56, clockGap: 16, swatch: 14 };

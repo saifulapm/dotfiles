@@ -4,7 +4,7 @@
 source "$(dirname "$0")/lib.sh"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
-state_is() { island | jq -e "$1" >/dev/null 2>&1; }
+state_is() { island | jq -e "$@" >/dev/null 2>&1; }
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
 settled() { until_ok 3000 state_is "$1 and .animating == false"; sleep 0.1; }
 # An agent unlock turns the monitors off a second later, and the shell, a Qt client, draws no new frame without niri's frame callbacks, so the check wakes them as Saiful would.

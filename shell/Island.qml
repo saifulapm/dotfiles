@@ -194,7 +194,7 @@ Item {
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
             leaseCard: [leaseLook.card.width, leaseColumn.implicitHeight],
             sharingCard: [noteLook.width, shareColumn.implicitHeight + 24],
-            notification: [noteLook.width, card.implicitHeight + noteLook.pad.top + noteLook.pad.bottom],
+            notification: [440, card.implicitHeight + 32],
             // A long question scrolls inside a card that keeps a fifth of the screen clear.
             question: [I.MAX_WIDTH, Math.min(ask.implicitHeight + 32, Math.round(output.height * 0.8))],
             calendar: [I.MAX_WIDTH, month.implicitHeight + 32],
@@ -208,6 +208,8 @@ Item {
     property var heldLive: null
     onLiveChanged: if (live)
         heldLive = live
+    // The clock as every card's header draws it.
+    readonly property string clockNow: L.clockText(clock.now)
     // The island's four tones, each lifted to 4.5:1 on its fill.
     readonly property var tones: theme.tokens ? T.islandTones(theme.tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
@@ -587,33 +589,35 @@ Item {
         };
         const shownChip = columnChip.visible ? columnChip : null;
         return {
-            app: appName.text,
-            age: age.text,
-            summary: summary.text,
-            summaryLines: summary.lineCount,
+            app: noteHead.detailItem.text,
+            age: noteHead.clockItem.text,
+            summary: noteHead.titleItem.text,
+            summaryLines: noteHead.titleItem.lineCount,
             body: body.text,
             cardBottom: card.mapToItem(null, 0, card.height).y,
             boxBottom: box.mapToItem(null, 0, box.height).y,
-            summaryFont: [summary.font.family, summary.font.pixelSize],
-            summaryBox: at(summary),
-            summaryColor: String(summary.color),
+            summaryFont: [noteHead.titleItem.font.family, noteHead.titleItem.font.pixelSize],
+            summaryBox: at(noteHead.titleItem),
+            summaryColor: String(noteHead.titleItem.color),
             bodyBox: body.visible ? at(body) : null,
             islandBox: at(box),
-            appElided: appName.truncated,
-            appEnd: appName.mapToItem(null, appName.width, 0).x,
-            ageStart: age.mapToItem(null, 0, 0).x,
-            tileBox: tile.visible ? at(tile) : null,
-            glyph: tile.visible && glyph.visible ? glyph.text : null,
-            icon: tile.visible && icon.status === Image.Ready ? String(icon.source) : null,
+            appElided: noteHead.detailItem.truncated,
+            appEnd: noteHead.detailItem.mapToItem(null, noteHead.detailItem.width, 0).x,
+            ageStart: noteHead.clockItem.mapToItem(null, 0, 0).x,
+            clockRight: Math.round(card.width - (noteHead.clockItem.x + noteHead.clockItem.width)),
+            tileBox: at(noteHead.circleItem),
+            glyph: noteHead.letterItem.visible ? noteHead.letterItem.text : null,
+            icon: noteHead.iconImage.visible ? String(noteHead.iconImage.source) : null,
+            buttons: noteButtons.visible ? Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn) : [],
             bar: noteBar.visible ? noteBar.drawn() : null,
             picture: thumb.visible ? at(thumb) : null,
             chip: shownChip ? shownChip.text : null,
             chipBox: shownChip ? at(shownChip) : null,
             chipEmpty: shownChip ? shownChip.empty : false,
-            actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn),
+            actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawn.text),
             actionBoxes: Array.from({ length: actionRepeater.count }, (_, i) => at(actionRepeater.itemAt(i))),
-            // The first chip's key and word colours, and the fill behind them: the chip's own, else the card's.
-            actionInk: actionRepeater.count ? actionRepeater.itemAt(0).ink : null,
+            // The first button's text and fill, which board 2 inverts.
+            actionInk: actionRepeater.count ? [actionRepeater.itemAt(0).drawn.ink, actionRepeater.itemAt(0).drawn.fill] : null,
             dragging: noteDragging,
             frame: [box.style.frame.width, String(box.style.frame.color)],
             faceUrl: noteFace.url
@@ -1579,187 +1583,117 @@ Item {
                 width: island.sizes.notification[0]
                 height: island.sizes.notification[1]
 
-                // Artboard's icon tile, then the app and its age over the summary and body.
-                Row {
+                // Board 2's card: the header, the body beside a file chip or picture, the level, then the actions as buttons.
+                Column {
                     id: card
-                    x: island.noteLook.pad.x
-                    y: island.noteLook.pad.top
+                    x: 16
+                    y: 16
                     width: parent.width - 2 * x
-                    spacing: 14
+                    spacing: 8
 
-                    Rectangle {
-                        id: tile
-                        visible: island.noteLook.tile !== null
-                        width: island.noteLook.tile?.size ?? 0
-                        height: width
-                        radius: island.noteLook.tile?.radius ?? 0
-                        // Artboard's board fills the tile with a picked colour, ringed in white at 28 %.
-                        color: island.heldNotification?.swatch ?? island.noteLook.tile?.fill ?? "transparent"
-                        border.width: island.heldNotification?.swatch ? 1.5 : 0
-                        border.color: Qt.rgba(1, 1, 1, 0.28)
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        Image {
-                            id: icon
-                            anchors.centerIn: parent
-                            visible: source != ""
-                            source: tile.visible ? island.heldNotification?.icon ?? "" : ""
-                            sourceSize.width: 24
-                            sourceSize.height: 24
-                        }
-
-                        Text {
-                            id: glyph
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            // An icon that is missing or fails to load leaves the letter.
-                            visible: icon.status !== Image.Ready && !island.heldNotification?.swatch
-                            text: island.noteLook.glyph(island.heldNotification?.app ?? "")
-                            color: box.style.text
-                            font.family: island.theme.tokens?.type.mono ?? ""
-                            font.pixelSize: 15
-                            font.weight: Font.DemiBold
-                        }
+                    Root.CardHead {
+                        id: noteHead
+                        width: parent.width
+                        image: island.heldNotification?.icon ?? ""
+                        letter: island.noteLook.glyph(island.heldNotification?.app ?? "")
+                        title: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
+                        detail: island.noteLook.appText(island.heldNotification?.app ?? "")
+                        clock: island.clockNow
+                        ink: box.style.text
+                        muted: island.tones.muted
+                        danger: island.tones.danger
+                        font: island.theme.tokens?.type.mono ?? ""
                     }
 
-                    Column {
-                        width: parent.width - (tile.visible ? tile.width + parent.spacing : 0) - (columnChip.visible ? columnChip.width + parent.spacing : 0) - (thumb.visible ? thumb.width + parent.spacing : 0)
-                        spacing: 2
+                    Row {
+                        id: noteContent
+                        visible: body.visible || noteBar.visible || columnChip.visible || thumb.visible
+                        width: parent.width
+                        spacing: 12
 
-                        Item {
-                            width: parent.width
-                            height: age.implicitHeight
+                        Column {
+                            width: parent.width - (columnChip.visible ? columnChip.width + parent.spacing : 0) - (thumb.visible ? thumb.width + parent.spacing : 0)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 6
 
-                            HeadText {
-                                id: appName
-                                width: Math.min(implicitWidth, Math.max(0, parent.width - age.implicitWidth - 12))
+                            Text {
+                                id: body
+                                width: parent.width
+                                visible: text !== ""
+                                text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
+                                textFormat: Text.PlainText
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 3
                                 elide: Text.ElideRight
-                                text: island.noteLook.appText(island.heldNotification?.app ?? "")
+                                color: box.style.text
+                                font.family: island.theme.tokens?.type.mono ?? ""
+                                font.pixelSize: 13
                             }
 
-                            HeadText {
-                                id: age
-                                anchors.right: parent.right
-                                text: island.noteLook.age
+                            // The value hint, in the bar the OSD draws a volume with.
+                            OsdBars {
+                                id: noteBar
+                                visible: typeof island.heldNotification?.progress === "number"
+                                width: parent.width
+                                look: island.osdLook
+                                value: island.heldNotification?.progress ?? 0
                             }
                         }
 
-                        Text {
-                            id: summary
-                            textFormat: Text.PlainText
-                            width: parent.width
-                            text: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
-                            elide: Text.ElideRight
-                            color: island.noteLook.summary.color || box.style.text
-                            font.family: island.noteLook.summary.font
-                            font.pixelSize: island.noteLook.summary.size
-                            font.weight: island.noteLook.summary.weight
-                            font.letterSpacing: island.noteLook.summary.spacing
+                        FileChip {
+                            id: columnChip
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: implicitWidth
+                            height: implicitHeight
+                            look: island.chipLook
+                            at: island.chipLook.toast
+                            files: island.heldNotification?.files ?? []
+                            empty: island.noteDragging
                         }
 
-                        Text {
-                            id: body
-                            width: parent.width
-                            visible: text !== ""
-                            text: island.noteLook.bodyText(island.heldNotification?.body ?? "")
-                            textFormat: Text.PlainText
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 3
-                            elide: Text.ElideRight
-                            color: island.noteLook.body.color || box.style.text
-                            font.family: island.noteLook.body.font
-                            font.pixelSize: island.noteLook.body.size
-                        }
+                        // The notification's picture, 48 px at the card's right.
+                        ClippingRectangle {
+                            id: thumb
+                            visible: thumbImage.status === Image.Ready
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 48
+                            height: 48
+                            radius: 12
+                            color: "transparent"
 
-                        // The value hint, in the bar the theme's OSD draws a volume with.
-                        OsdBars {
-                            id: noteBar
-                            visible: typeof island.heldNotification?.progress === "number"
-                            width: parent.width
-                            look: island.osdLook
-                            value: island.heldNotification?.progress ?? 0
-                        }
-
-                        Row {
-                            visible: island.noteChips.length > 0
-                            topPadding: 6
-                            spacing: 8
-
-                            Repeater {
-                                id: actionRepeater
-                                model: island.noteChips
-
-                                Rectangle {
-                                    id: actionChip
-                                    required property var modelData
-                                    readonly property string drawn: actionKey.text + " " + actionWord.text
-                                    readonly property var ink: [String(actionKey.color), String(actionWord.color), String(color.a > 0 ? color : box.style.fill)]
-                                    width: actionPair.implicitWidth + 14
-                                    height: actionPair.implicitHeight + 6
-                                    radius: 6
-                                    // On the dark card the chip takes the icon tile's fill and the key takes the card's text.
-                                    color: island.noteLook.tile.fill
-
-                                    Row {
-                                        id: actionPair
-                                        anchors.centerIn: parent
-                                        spacing: 6
-
-                                        Text {
-                                            id: actionKey
-                                            textFormat: Text.PlainText
-                                            text: island.keyLook.keyText(actionChip.modelData.key)
-                                            color: box.style.text
-                                            font.family: island.theme.tokens?.type.mono ?? ""
-                                            font.pixelSize: island.keyLook.small.size
-                                            font.letterSpacing: island.keyLook.small.spacing
-                                            font.bold: true
-                                        }
-                                        Text {
-                                            id: actionWord
-                                            textFormat: Text.PlainText
-                                            text: island.keyLook.tabText(V.line(actionChip.modelData.text))
-                                            color: island.noteLook.head.color
-                                            font.family: island.keyLook.small.font
-                                            font.pixelSize: island.keyLook.small.size
-                                            font.letterSpacing: island.keyLook.small.spacing
-                                        }
-                                    }
-                                }
+                            Image {
+                                id: thumbImage
+                                anchors.fill: parent
+                                source: island.heldNotification?.picture ?? ""
+                                asynchronous: true
+                                fillMode: Image.PreserveAspectCrop
+                                sourceSize.width: 96
+                                sourceSize.height: 96
                             }
                         }
                     }
 
-                    // Artboard's chip is a column of its own at the card's right.
-                    FileChip {
-                        id: columnChip
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: implicitWidth
-                        height: implicitHeight
-                        look: island.chipLook
-                        at: island.chipLook.toast
-                        files: island.heldNotification?.files ?? []
-                        empty: island.noteDragging
-                    }
+                    // The actions share the card's width, the first inverted; a notification with none has no row.
+                    Row {
+                        id: noteButtons
+                        visible: island.noteChips.length > 0
+                        width: parent.width
+                        spacing: 8
 
-                    // The notification's picture, 48 px at the card's far right, rounded as the tile is.
-                    ClippingRectangle {
-                        id: thumb
-                        visible: thumbImage.status === Image.Ready
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 48
-                        height: 48
-                        radius: island.noteLook.tile.radius
-                        color: "transparent"
+                        Repeater {
+                            id: actionRepeater
+                            model: island.noteChips
 
-                        Image {
-                            id: thumbImage
-                            anchors.fill: parent
-                            source: island.heldNotification?.picture ?? ""
-                            asynchronous: true
-                            fillMode: Image.PreserveAspectCrop
-                            sourceSize.width: 96
-                            sourceSize.height: 96
+                            Root.CardButton {
+                                required property var modelData
+                                required property int index
+                                width: (noteButtons.width - noteButtons.spacing * (actionRepeater.count - 1)) / Math.max(1, actionRepeater.count)
+                                text: V.line(modelData.text)
+                                primary: index === 0
+                                ink: box.style.text
+                                fill: box.style.fill
+                                font: island.theme.tokens?.type.mono ?? ""
+                            }
                         }
                     }
                 }

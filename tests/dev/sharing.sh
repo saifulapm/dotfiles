@@ -80,13 +80,15 @@ until_ok 3000 reads "LIVE SCREEN"
 check "with Do Not Disturb on, a share still reads LIVE SCREEN" reads "LIVE SCREEN"
 timeout 0.5 qs ipc call notifs dnd false
 
+# No notification shows while a screen is shared (61SHXHG7); it still goes to the centre's history.
 notify-send hi
-until_ok 2000 mode_is notification
-check "a notification shows over LIVE" mode_is notification
-t0=$(now_ms)
-until_ok 8000 reads "LIVE SCREEN"
-ms=$(($(now_ms) - t0))
-check "and LIVE SCREEN comes back ${ms} ms later, after the notification's 5 s" test "$ms" -ge 4000 -a "$ms" -le 6500
+saw_note=no
+for _ in $(seq 20); do
+  mode_is notification && saw_note=yes
+  sleep 0.1
+done
+check "a notification never shows over LIVE" test "$saw_note" = no
+check "and LIVE SCREEN stays" reads "LIVE SCREEN"
 
 # A share running before the shell starts is in the stream's first burst.
 systemctl --user restart "$DOTS_DEV_UNIT"
