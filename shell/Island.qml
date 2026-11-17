@@ -15,6 +15,8 @@ import "lib/control.mjs" as C
 import "lib/click.mjs" as ClickLib
 import "lib/island-host.mjs" as H
 import "lib/switch.mjs" as Sw
+import "lib/island-live.mjs" as L
+import "lib/island-tones.mjs" as T
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
 Item {
@@ -201,6 +203,7 @@ Item {
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
             label: mode === "rest" || mode === "surface" ? [H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
             lease: [leaseLook.slot.width, leaseLook.slot.height],
             sending: [sendingLook.width, sendingLook.height],
             downloading: [downloadingLook.width, downloadingLook.height],
@@ -216,7 +219,14 @@ Item {
             surface: [Math.min(surfaceWidth, output.width - 48), Math.min(surfaceHeight, output.height - 48)]
         })
     // A capture in a card theme draws in the notification's card, but it is no notification: the Mod+A history never hears of it.
-    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading", "surface"].indexOf(mode) < 0 ? "label" : mode
+    readonly property string part: mode === "capture" ? "notification" : ["notification", "question", "calendar", "osd", "lease", "leaseCard", "sharingCard", "mediaCard", "sending", "downloading", "surface"].indexOf(mode) >= 0 ? mode : live ? "live" : "label"
+    // Board 2's one-line state of this mode, picked from the same slots the mode reads, or null; heldLive keeps the last one so it leaves drawn.
+    readonly property var live: L.liveState(H.modeOf(surface, slots), slots, clock.now)
+    property var heldLive: null
+    onLiveChanged: if (live)
+        heldLive = live
+    // The island's four tones, each lifted to 4.5:1 on its fill.
+    readonly property var tones: theme.tokens ? T.islandTones(theme.tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
     // The box's size once a morph settles; the margins and `island state` read this, never a size mid-morph.
     readonly property real targetWidth: sizes[part][0]
     readonly property real targetHeight: sizes[part][1]
@@ -224,7 +234,7 @@ Item {
     readonly property real drawnWidth: box.width
     // The approved motion (38G8XV1J); none before the scheme loads, so the first frame draws at rest.
     readonly property var motion: theme.tokens ? H.hostMotion() : null
-    readonly property bool animating: morphing.running || [labelPart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
+    readonly property bool animating: morphing.running || [labelPart, livePart, leasePart, sendingPart, downloadingPart, leaseCardPart, sharingCardPart, mediaCardPart, osdPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -497,6 +507,26 @@ Item {
     function holdCaptureNote() {
         if (capture && mode === "capture")
             heldNotification = captureLook.note(capture);
+    }
+
+    // The one-line state as drawn, for `island state`: what heldLive says, the text as it shows (elided or not), and where the clock's right edge sits against the box's.
+    function liveDrawn() {
+        if (part !== "live" || !heldLive)
+            return null;
+        return {
+            icon: heldLive.icon,
+            text: liveText.text,
+            elided: liveText.truncated,
+            tail: heldLive.tail,
+            tone: heldLive.tone,
+            ink: String(livePart.ink),
+            bar: liveBar.visible ? { pct: heldLive.bar, width: liveBar.width, fill: liveFill.width } : null,
+            swatch: heldLive.swatch,
+            clock: liveClock.text,
+            clockRight: Math.round(livePart.width - (liveClock.x + liveClock.width)),
+            clockLeft: Math.round(liveClock.x),
+            textRight: Math.round(liveRow.x + liveText.x + liveText.width)
+        };
     }
 
     // What the OSD draws, for `island state`.
@@ -1224,6 +1254,111 @@ Item {
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
                     font.weight: island.mode === "rest" ? Font.Bold : Font.Medium
+                }
+            }
+
+            // Board 2's one-line state: a 14 px filled icon, the short text, a tail, a pill bar, and the clock pinned right; the danger tone colours all but the clock.
+            IslandPart {
+                id: livePart
+                shown: island.part === "live"
+                key: island.mode
+                swap: island.motion?.closeSwap ?? null
+                x: Math.round((parent.width - width) / 2)
+                width: island.sizes.live[0]
+                height: island.sizes.live[1]
+                readonly property var s: island.heldLive
+                readonly property color ink: s?.tone === "danger" ? island.tones.danger : box.style.text
+                readonly property string font: island.theme.tokens?.type.mono ?? ""
+                // What the row holds beside the text, each with its gap, so the text's width never reads the row's.
+                readonly property real beside: L.LIVE.icon + L.LIVE.gap + (liveSwatch.visible ? L.LIVE.swatch + L.LIVE.gap : 0) + (liveTail.visible ? L.LIVE.gap + liveTail.implicitWidth : 0) + (liveBar.visible ? L.LIVE.gap + L.LIVE.bar : 0)
+
+                Row {
+                    id: liveRow
+                    x: L.LIVE.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: L.LIVE.gap
+
+                    Text {
+                        id: liveIcon
+                        width: L.LIVE.icon
+                        horizontalAlignment: Text.AlignHCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: livePart.s?.icon ?? ""
+                        color: livePart.ink
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: L.LIVE.icon
+                    }
+
+                    Rectangle {
+                        id: liveSwatch
+                        visible: (livePart.s?.swatch ?? "") !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: L.LIVE.swatch
+                        height: width
+                        radius: 4
+                        color: livePart.s?.swatch || "transparent"
+                    }
+
+                    // Anyone's text, so one line, elided before the clock once the box is at its widest.
+                    Text {
+                        id: liveText
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, livePart.width - 2 * L.LIVE.pad - L.LIVE.clockGap - liveClock.implicitWidth - livePart.beside)
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                        text: livePart.s?.text ?? ""
+                        color: livePart.ink
+                        font.family: livePart.font
+                        font.pixelSize: 13
+                        font.weight: Font.Medium
+                    }
+
+                    Text {
+                        id: liveTail
+                        visible: text !== ""
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: livePart.s?.tail ?? ""
+                        color: livePart.s?.tone === "danger" ? livePart.ink : island.tones.muted
+                        font.family: livePart.font
+                        font.pixelSize: 13
+                        font.features: { "tnum": 1 }
+                    }
+
+                    // The pill bar: a track in the on colour's 14 % and its fill to the percent.
+                    Rectangle {
+                        id: liveBar
+                        visible: livePart.s?.bar !== null && livePart.s?.bar !== undefined
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: L.LIVE.bar
+                        height: 6
+                        radius: 3
+                        color: Qt.alpha(box.style.text, 0.14)
+
+                        Rectangle {
+                            id: liveFill
+                            width: Math.round(parent.width * Math.max(0, Math.min(100, livePart.s?.bar ?? 0)) / 100)
+                            height: parent.height
+                            radius: parent.radius
+                            color: livePart.ink
+                        }
+                    }
+                }
+
+                Text {
+                    id: liveClock
+                    anchors.right: parent.right
+                    anchors.rightMargin: L.LIVE.pad
+                    anchors.verticalCenter: parent.verticalCenter
+                    textFormat: Text.PlainText
+                    text: livePart.s?.clock ?? ""
+                    color: box.style.text
+                    font.family: livePart.font
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                    font.features: { "tnum": 1 }
                 }
             }
 
