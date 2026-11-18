@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# At motion slowdown 20 every surface's card springs, read from the card as drawn; the launcher, the cheat sheet, Control and the Recorder's bar grow from the island instead, on the island's motion.
+# At motion slowdown 20 every surface's card springs, read from the card as drawn; the surfaces drawn inside the island (the launcher, the cheat sheet, Control, the notification centre, the Recorder's bar and the five tools) grow from it instead, on the island's motion.
 {
 export DOTS_MOTION_SLOWDOWN=20
 source "$(dirname "$0")/lib.sh"
@@ -26,7 +26,6 @@ springs() {
   check "the $1 card still draws as its close plays" surface_is "$1" .drawing
   until_ok 9000 surface_is "$1" '.drawing == false'
 }
-for s in notifs goals; do springs "$s" "qs ipc call $s open" "qs ipc call $s close"; done
 # pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent, as in polkit.sh.
 fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
 DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &

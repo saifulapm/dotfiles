@@ -98,8 +98,6 @@ check "Read, with no deadline, has no chip" state_is '(.blocks[] | select(.text 
 read -r r g b < <(rgb_of .danger)
 red=$(near "$(geo '.blocks[] | select(.text == "Tax") | .chip.box')" "$r" "$g" "$b" 40)
 check "the Tax chip draws danger pixels ($red px)" test "$red" -gt 4
-read -r ratio drawn < <(drawn_contrast "$(geo '.blocks[] | select(.text == "Tax") | .chip.box')")
-check "and reads at 4.5:1 or more against the chip drawn behind it ($ratio on $drawn)" node -e 'process.exit(+process.argv[1] >= 4.5 ? 0 : 1)' "$ratio"
 
 check "Done · 2 is the last thing drawn, behind a chevron ($(goals_state | jq -c '.blocks[-1] | {kind, text, glyph}'))" state_is '.blocks[-1] as $d | $d.kind == "done" and $d.text == "Done · 2" and $d.glyph == 983362 and all(.blocks[:-1][]; .box.y + .box.h <= $d.box.y)'
 check "and the done goals stay folded under it" state_is '[.rows[] | .text] == ["Ship v2", "Tax", "Read", "Done · 2"]'

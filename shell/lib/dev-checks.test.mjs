@@ -739,10 +739,8 @@ wtype -k r
 });
 
 test('every tests/dev script reads a keyed surface\'s .keyboard and .settled after opening it and before it types', () => {
-  // Rewritten by m105's surface tasks, which add the wait as they go.
-  const exempt = ['accounts.sh', 'dns-open.sh', 'goals.sh', 'rows-mouse.sh', 'surfaces.sh'];
   const found = [];
-  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh') && !exempt.includes(f))) {
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
     for (const n of typesBeforeKeys(readFileSync(dir + f, 'utf8'))) found.push(`${f}:${n}`);
   }
   assert.deepEqual(found, [], "wait with until_ok <ms> on a state read of '.keyboard and .settled'");

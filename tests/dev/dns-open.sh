@@ -28,6 +28,7 @@ ipad=carried:dev00ipad
 touch "$DOTS_DEV_DIR/dns-slow-state"
 niri msg action spawn -- dots-call dns toggle
 check "a cold open draws the 8 cached rows while the full state still runs" until_ok 1500 state_is '(.rows | length) == 8 and .busy'
+until_ok 3000 state_is '.settled and .keyboard'
 idle 5000
 # The shell's start ran reconcile before the open, so only the reads are compared.
 read_calls() { grep -vx reconcile "$log" | paste -sd'|'; }

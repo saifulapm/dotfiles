@@ -148,6 +148,7 @@ const CODE = {
   'H / L': [/Key_H\b/, /Key_L\b/],
   'H J K L': [/Key_H\b/, /Key_J\b/, /Key_K\b/, /Key_L\b/],
   '- / =': [/Key_Minus\b/, /Key_Equal\b/],
+  '- / +': [/Key_Minus\b/, /Key_Plus\b/],
   '⇧ J / K': [/ShiftModifier/, /Key_J\b/, /Key_K\b/],
   '↵': [/Key_Return\b/],
   '⇧ ↵': [/ShiftModifier/, /Key_Return\b/],
@@ -199,6 +200,20 @@ test('every IN SURFACES row names a key its surface\'s code handles, a shared ro
 test('IN SURFACES lists the notification centre\'s rules keys', () => {
   const keys = IN_SURFACES.filter((r) => r.surface === 'notifications').map((r) => r.key);
   assert.deepEqual(keys, ['↵', 'D', '⇧ D', 'M', 'I', 'S', 'H / L', '/', '1-9']);
+});
+
+test('IN SURFACES lists every key Pass takes on its list and in a new entry', () => {
+  const keys = IN_SURFACES.filter((r) => r.surface === 'pass').map((r) => r.key);
+  assert.deepEqual(keys, ['Tab', '↵', 'O', 'S', 'N', '- / +', 'E', 'D', 'Q', '/']);
+});
+
+// No surface shows key hints (8HYAV3GE): the five tools in the island draw no legend, so the sheet is where their keys are.
+test('none of the island\'s tools draws a key strip or a key hint', () => {
+  const tools = { pass: ['Pass.qml', 'lib/pass.mjs'], tailscale: ['Tailscale.qml', 'lib/tailscale.mjs'], accounts: ['Accounts.qml', 'lib/accounts.mjs'], dns: ['Dns.qml', 'lib/dns.mjs'], goals: ['Goals.qml', 'lib/goals-view.mjs'] };
+  for (const [name, files] of Object.entries(tools)) {
+    const code = files.map(read).join('\n');
+    for (const hint of [/\bKeyPair\b/, /\.keys\(\[/, /\bkeyText\(/, /\bhint:/]) assert.doesNotMatch(code, hint, `${name} draws a key hint: ${hint}`);
+  }
 });
 
 test('IN SURFACES lists Control\'s - and = under Control', () => {

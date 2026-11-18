@@ -98,7 +98,7 @@ check "and Pass closed" pass_is '.open | not'
 # While d asks whether to delete an entry, a click on a row copies nothing and the question stays.
 printf 'unchanged' | wl-copy
 niri msg action spawn -- dots-call pass toggle
-until_ok 5000 pass_is '.open and (.rows | length) == 3 and .listed'
+until_ok 5000 pass_is '.open and (.rows | length) == 3 and .listed and .settled and .keyboard'
 # d deletes from the list; in the query it would type.
 wtype -k Tab
 until_ok 2000 pass_is '.focus == "list"'
