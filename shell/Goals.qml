@@ -3,8 +3,10 @@ import QtQuick.Layouts
 import "." as Root
 import "lib/goals.mjs" as G
 import "lib/goals-view.mjs" as V
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as T
 
-// Active goals in your order with their tasks, then the done group; drawn in the Surfaces window, saved through the goals service.
+// Active goals in your order with their tasks, then the done group; drawn inside the island on its fill (board 8), saved through the goals service.
 Item {
     id: view
 
@@ -30,8 +32,17 @@ Item {
     readonly property var list: V.rows(store, unfolded, doneOpen, now)
     readonly property var row: list[selected] ?? null
     readonly property int count: G.activeGoals(store).length
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and fill, the tones lifted to read on it, and board 8's tile, selected tile and chip.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property color fill: S.surfaceStyle(tokens, "island").fill
+    readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
+    readonly property color muted: tones.muted
+    readonly property color danger: tones.danger
+    readonly property color tile: Qt.alpha(on, 0.07)
+    readonly property color sel: Qt.alpha(on, 0.12)
+    readonly property color circle: Qt.alpha(on, 0.12)
     // The island reports this as its surface while Goals shows, and grows to this width for it (board 8).
     readonly property string name: "goals"
     readonly property int wantWidth: 640
@@ -71,7 +82,6 @@ Item {
     }
 
     function state() {
-        const selBlock = Array.from({ length: blockRepeater.count }, (_, i) => blockRepeater.itemAt(i)).find(b => b && b.sel && b.head.kind === "goal");
         return JSON.stringify({
             open: shown,
             selected: selected,
@@ -79,12 +89,20 @@ Item {
             active: G.activeGoals(store).map(g => g.title),
             done: G.doneGoals(store).map(g => g.title),
             count: count,
-            hint: count === 0 ? "n to add a goal" : "",
+            empty: emptyLoader.item ? emptyLoader.item.text : null,
             prompt: prompt ? { kind: prompt.kind, text: input.text, error: prompt.error } : null,
             confirm: confirm,
-            // The drawn warnings: the selected goal's due date, and the confirm label.
-            due: selBlock ? selBlock.drawnDue() : null,
+            // Each goal tile and the done row as drawn, top to bottom: its fill, its chip and its tasks' checkboxes.
+            blocks: Array.from({ length: blockRepeater.count }, (_, i) => blockRepeater.itemAt(i)?.item).filter(b => b).map(b => b.drawn()),
+            heading: { text: heading.text, color: String(heading.color), box: box(heading) },
             confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), box: box(promptLabel) } : null,
+            // The island's ink and fill, its tones, and the tile fills the blocks draw in.
+            on: String(on),
+            fill: String(fill),
+            muted: String(muted),
+            danger: String(danger),
+            tile: String(tile),
+            sel: String(sel),
             openMs: openMs,
             opens: opens,
             settled: view.settled,
@@ -125,6 +143,12 @@ Item {
     function closePrompt() {
         prompt = null;
         keys.forceActiveFocus();
+    }
+
+    // The heading's +: a new goal, as n starts one.
+    function newGoal() {
+        if (!confirm && prompt === null)
+            ask({ kind: "title" });
     }
 
     function move(by) {
@@ -232,7 +256,7 @@ Item {
         focus: true
         Keys.onPressed: event => {
             event.accepted = true;
-            // While delete? y is up, any other key only cancels it.
+            // While the delete question is up, y deletes and any other key only cancels it.
             if (view.confirm) {
                 view.confirm = false;
                 if (event.key === Qt.Key_Y && event.text === "y")
@@ -265,204 +289,123 @@ Item {
         Root.Surface {
             id: panel
             width: parent.width
-            height: column.implicitHeight
+            height: column.implicitHeight + 32
             tokens: view.theme.tokens
             // The island draws the fill and plays the open.
             bare: true
 
-            ColumnLayout {
+            Column {
                 id: column
-                width: parent.width
-                spacing: 0
+                x: 16
+                y: 16
+                width: parent.width - 32
+                spacing: 8
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.topMargin: 16
-                    Layout.bottomMargin: 12
-                    spacing: 14
+                Item {
+                    width: column.width
+                    height: 36
 
                     Text {
                         id: heading
+                        anchors.verticalCenter: parent.verticalCenter
                         textFormat: Text.PlainText
                         text: "Goals"
-                        color: c.ink
-                        font.family: fonts.display
-                        font.pixelSize: 28
+                        color: view.on
+                        font.family: view.fonts.ui ?? ""
+                        font.pixelSize: 15
+                        font.weight: Font.Bold
                     }
-                    Text {
-                        textFormat: Text.PlainText
-                        Layout.alignment: Qt.AlignBaseline
-                        text: view.count + " active"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 13
-                    }
-                    Item {
-                        Layout.fillWidth: true
+
+                    // A new goal, as n starts one.
+                    Rectangle {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 32
+                        height: 32
+                        radius: 16
+                        color: view.tile
+
+                        Text {
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: String.fromCodePoint(0xF0415)
+                            color: view.on
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 15
+                        }
+                        Root.Click {
+                            name: "goals-new"
+                            onTapped: view.newGoal()
+                        }
                     }
                 }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.line
-                }
-
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.margins: 12
-                    spacing: 6
-
-                    Text {
-                        visible: view.count === 0
-                        Layout.fillWidth: true
-                        Layout.topMargin: 12
-                        Layout.bottomMargin: 12
+                Loader {
+                    id: emptyLoader
+                    width: column.width
+                    active: view.list.length === 0
+                    sourceComponent: Text {
+                        topPadding: 12
+                        bottomPadding: 12
                         horizontalAlignment: Text.AlignHCenter
                         textFormat: Text.PlainText
-                        text: "n to add a goal"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 14
+                        text: "No goals yet"
+                        color: view.muted
+                        font.family: view.fonts.ui ?? ""
+                        font.pixelSize: 13
                     }
+                }
 
-                    Repeater {
-                        id: blockRepeater
-                        model: V.blocks(view.list)
+                // A goal's tile or the done row, each built only as its kind.
+                Repeater {
+                    id: blockRepeater
+                    model: V.blocks(view.list)
 
-                        Rectangle {
-                            id: block
-                            required property var modelData
-                            readonly property var head: modelData.head
-                            readonly property bool sel: view.selected >= modelData.row && view.selected <= modelData.row + modelData.tasks.length
-                            readonly property var parts: head.kind === "goal" ? head.count.split("/").map(Number) : [0, 0]
-                            // The due date as drawn, for state().
-                            function drawnDue() {
-                                return { text: dueText.text, color: String(dueText.color), box: view.box(dueText) };
+                    Loader {
+                        id: blockLoader
+                        required property var modelData
+                        width: column.width
+                        sourceComponent: modelData.head.kind === "done" ? doneRow : goalTile
+
+                        Component {
+                            id: goalTile
+                            GoalTile {
+                                block: blockLoader.modelData
                             }
-                            Layout.fillWidth: true
-                            implicitHeight: inner.implicitHeight + 24
-                            radius: 0
-                            color: sel && head.kind === "goal" ? c.surface : "transparent"
-                            border.width: sel ? 2 : 0
-                            border.color: c.accent
-
-                            ColumnLayout {
-                                id: inner
-                                x: 14
-                                y: 12
-                                width: parent.width - 28
-                                spacing: 8
-
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 10
-
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        Layout.fillWidth: block.head.kind === "goal"
-                                        elide: Text.ElideRight
-                                        text: block.head.kind === "done" ? (view.doneOpen ? "▾ " : "▸ ") + block.head.text : block.head.text
-                                        color: block.head.kind === "goal" && !block.head.done ? c.ink : c.muted
-                                        font.family: block.head.kind === "done" ? fonts.mono : fonts.display
-                                        font.pixelSize: block.head.kind === "done" ? 11 : 18
-                                        font.letterSpacing: block.head.kind === "done" ? 1.2 : 0
-
-                                        Root.Click {
-                                            name: "goals-row:" + block.modelData.row
-                                            onTapped: view.clickRow(block.modelData.row)
-                                        }
-                                    }
-                                    Text {
-                                        visible: block.head.kind === "goal"
-                                        textFormat: Text.PlainText
-                                        text: block.head.count ?? ""
-                                        color: c.muted
-                                        font.family: fonts.mono
-                                        font.pixelSize: 12
-                                    }
-                                    Text {
-                                        id: dueText
-                                        visible: block.head.kind === "goal"
-                                        textFormat: Text.PlainText
-                                        text: block.head.due ?? ""
-                                        color: block.sel ? c.danger : c.muted
-                                        font.family: fonts.mono
-                                        font.pixelSize: 12
-                                    }
-                                }
-
-                                // The selected goal's share of ticked tasks.
-                                Rectangle {
-                                    visible: block.sel && block.head.kind === "goal" && block.parts[1] > 0
-                                    Layout.fillWidth: true
-                                    implicitHeight: 4
-                                    radius: 0
-                                    color: c.line
-
-                                    Rectangle {
-                                        width: parent.width * block.parts[0] / Math.max(1, block.parts[1])
-                                        height: parent.height
-                                        radius: parent.radius
-                                        color: c.accent
-                                    }
-                                }
-
-                                Repeater {
-                                    model: block.modelData.tasks
-
-                                    Text {
-                                        id: task
-                                        required property var modelData
-                                        readonly property bool on: view.selected === modelData.row
-                                        Layout.fillWidth: true
-                                        Layout.leftMargin: 4
-                                        textFormat: Text.PlainText
-                                        elide: Text.ElideRight
-                                        text: (modelData.done ? "✓ " : "○ ") + modelData.text
-                                        font.strikeout: modelData.done
-                                        color: on ? c.accent : modelData.done ? c.muted : c.ink
-                                        font.family: fonts.ui
-                                        font.pixelSize: 14
-                                        font.weight: on ? Font.DemiBold : Font.Normal
-
-                                        Root.Click {
-                                            name: "goals-row:" + task.modelData.row
-                                            onTapped: view.clickRow(task.modelData.row)
-                                        }
-                                    }
-                                }
+                        }
+                        Component {
+                            id: doneRow
+                            DoneRow {
+                                block: blockLoader.modelData
                             }
                         }
                     }
                 }
 
-                // The prompt for a title, a deadline or a task; Enter takes it, Esc drops it.
+                // The prompt for a title, a deadline or a task, or the delete question; Enter takes it, Esc drops it.
                 RowLayout {
                     visible: view.prompt !== null || view.confirm
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.bottomMargin: 12
+                    width: column.width
+                    height: 36
                     spacing: 10
 
                     Text {
                         id: promptLabel
+                        Layout.leftMargin: 14
                         textFormat: Text.PlainText
-                        text: view.confirm ? "delete? y" : !view.prompt ? "" : view.prompt.kind === "deadline" ? "deadline (3d, 5h, 2026-10-21 or empty)" : view.prompt.kind === "task" ? "task" : "goal"
-                        color: view.confirm ? c.danger : c.muted
-                        font.family: fonts.ui
+                        text: view.confirm ? "Delete “" + (view.row?.text ?? "") + "”?" : !view.prompt ? "" : view.prompt.kind === "deadline" ? "Deadline (3d, 5h, 2026-10-21 or empty)" : view.prompt.kind === "task" ? "Task" : "Goal"
+                        color: view.confirm ? view.danger : view.muted
+                        font.family: view.fonts.ui ?? ""
                         font.pixelSize: 13
                     }
                     TextInput {
                         id: input
                         visible: view.prompt !== null
                         Layout.fillWidth: true
-                        color: c.ink
-                        font.family: fonts.ui
-                        font.pixelSize: 14
+                        color: view.on
+                        selectionColor: Qt.alpha(view.on, 0.3)
+                        font.family: view.fonts.ui ?? ""
+                        font.pixelSize: 13
                         clip: true
                         Keys.onPressed: event => {
                             if (event.key === Qt.Key_Escape)
@@ -476,52 +419,219 @@ Item {
                     }
                     Text {
                         visible: (view.prompt?.error ?? "") !== ""
+                        Layout.rightMargin: 14
                         textFormat: Text.PlainText
                         text: view.prompt?.error ?? ""
-                        color: c.danger
-                        font.family: fonts.ui
+                        color: view.danger
+                        font.family: view.fonts.ui ?? ""
                         font.pixelSize: 12
                     }
                 }
+            }
+        }
+    }
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    implicitHeight: 1
-                    color: c.line
+    // A goal: its title bold with its deadline chip at the right, then its tasks when unfolded; the tile holding the selection is lighter.
+    component GoalTile: Rectangle {
+        id: tileItem
+        required property var block
+        readonly property var head: block.head
+        readonly property bool holdsSelection: view.selected >= block.row && view.selected <= block.row + block.tasks.length
+
+        function drawn() {
+            const tasks = [];
+            for (let i = 0; i < taskRepeater.count; i++)
+                tasks.push(taskRepeater.itemAt(i).drawn());
+            return { kind: "goal", text: title.text, color: String(color), box: view.box(tileItem), chip: chipLoader.item ? chipLoader.item.drawn() : null, tasks: tasks };
+        }
+
+        implicitHeight: tileColumn.implicitHeight + 24
+        radius: 14
+        color: holdsSelection ? view.sel : view.tile
+
+        Column {
+            id: tileColumn
+            x: 14
+            y: 12
+            width: parent.width - 28
+            spacing: 4
+
+            Item {
+                width: tileColumn.width
+                height: 26
+
+                Text {
+                    id: title
+                    anchors.left: parent.left
+                    anchors.right: chipLoader.left
+                    anchors.rightMargin: 8
+                    anchors.verticalCenter: parent.verticalCenter
+                    textFormat: Text.PlainText
+                    elide: Text.ElideRight
+                    text: tileItem.head.text
+                    color: tileItem.head.done ? view.muted : view.on
+                    font.family: view.fonts.ui ?? ""
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
                 }
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.topMargin: 11
-                    Layout.bottomMargin: 12
-                    spacing: 14
+                Loader {
+                    id: chipLoader
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    active: tileItem.head.chip !== null
+                    sourceComponent: Rectangle {
+                        id: chip
+                        function drawn() {
+                            return { text: chipText.text, color: String(chipText.color), glyph: chipGlyph.text.codePointAt(0), box: view.box(chip) };
+                        }
+                        width: chipRow.implicitWidth + 18
+                        height: 22
+                        radius: 11
+                        color: view.circle
 
-                    Repeater {
-                        model: ["j/k", "↵ fold", "n goal", "t task", "␣ tick", "e edit", "d delete", "J/K reorder"]
+                        Row {
+                            id: chipRow
+                            anchors.centerIn: parent
+                            spacing: 5
 
-                        Text {
-                            required property string modelData
-                            textFormat: Text.PlainText
-                            text: modelData
-                            color: c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 11
+                            Text {
+                                id: chipGlyph
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF00ED)
+                                color: chipText.color
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 11
+                            }
+                            Text {
+                                id: chipText
+                                textFormat: Text.PlainText
+                                text: tileItem.head.chip ?? ""
+                                color: tileItem.head.chipTone === "danger" ? view.danger : view.muted
+                                font.family: view.fonts.ui ?? ""
+                                font.pixelSize: 11
+                            }
                         }
                     }
-                    Item {
-                        Layout.fillWidth: true
+                }
+
+                Root.Click {
+                    name: "goals-row:" + tileItem.block.row
+                    onTapped: view.clickRow(tileItem.block.row)
+                }
+            }
+
+            Repeater {
+                id: taskRepeater
+                model: tileItem.block.tasks
+
+                // A task: a 16 px round checkbox, filled with the ink and a check once done, and its text, struck through when done.
+                Rectangle {
+                    id: taskRow
+                    required property var modelData
+                    function drawn() {
+                        return {
+                            text: label.text,
+                            done: modelData.done,
+                            check: { w: check.width, h: check.height, radius: check.radius, color: String(check.color), ring: String(check.border.color), ringWidth: check.border.width, glyph: checkGlyph.item ? checkGlyph.item.text.codePointAt(0) : null, box: view.box(check) },
+                            strike: label.font.strikeout,
+                            ink: String(label.color)
+                        };
+                    }
+                    x: -6
+                    width: tileColumn.width + 12
+                    height: 28
+                    radius: 8
+                    color: view.selected === modelData.row ? view.tile : "transparent"
+
+                    Rectangle {
+                        id: check
+                        x: 6
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 16
+                        height: 16
+                        radius: 8
+                        color: taskRow.modelData.done ? view.on : "transparent"
+                        border.width: taskRow.modelData.done ? 0 : 1.5
+                        border.color: view.muted
+
+                        Loader {
+                            id: checkGlyph
+                            anchors.centerIn: parent
+                            active: taskRow.modelData.done
+                            sourceComponent: Text {
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF012C)
+                                color: view.fill
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 11
+                            }
+                        }
                     }
                     Text {
+                        id: label
+                        anchors.left: check.right
+                        anchors.leftMargin: 10
+                        anchors.right: parent.right
+                        anchors.rightMargin: 6
+                        anchors.verticalCenter: parent.verticalCenter
                         textFormat: Text.PlainText
-                        text: "Esc"
-                        color: c.muted
-                        font.family: fonts.mono
-                        font.pixelSize: 11
+                        elide: Text.ElideRight
+                        text: taskRow.modelData.text
+                        font.strikeout: taskRow.modelData.done
+                        color: taskRow.modelData.done ? view.muted : view.on
+                        font.family: view.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+
+                    Root.Click {
+                        name: "goals-row:" + taskRow.modelData.row
+                        onTapped: view.clickRow(taskRow.modelData.row)
                     }
                 }
             }
+        }
+    }
+
+    // The done goals, folded behind a chevron at the bottom.
+    component DoneRow: Rectangle {
+        id: doneItem
+        required property var block
+
+        function drawn() {
+            return { kind: "done", text: doneText.text, glyph: chevron.text.codePointAt(0), color: String(color), box: view.box(doneItem) };
+        }
+
+        implicitHeight: 40
+        radius: 12
+        color: view.selected === block.row ? view.tile : "transparent"
+
+        Row {
+            x: 14
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 8
+
+            Text {
+                id: chevron
+                textFormat: Text.PlainText
+                text: String.fromCodePoint(view.doneOpen ? 0xF0140 : 0xF0142)
+                color: view.muted
+                font.family: "Symbols Nerd Font Mono"
+                font.pixelSize: 13
+            }
+            Text {
+                id: doneText
+                textFormat: Text.PlainText
+                text: doneItem.block.head.text
+                color: view.muted
+                font.family: view.fonts.ui ?? ""
+                font.pixelSize: 13
+            }
+        }
+
+        Root.Click {
+            name: "goals-row:" + doneItem.block.row
+            onTapped: view.clickRow(doneItem.block.row)
         }
     }
 }

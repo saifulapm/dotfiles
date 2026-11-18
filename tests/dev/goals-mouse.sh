@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Goals by mouse: a click on a task ticks it as Space does and a second click unticks it; a click on a goal folds it as Enter does.
+# Goals by mouse: the heading's + starts a new goal as n does, a click on a task ticks it as Space does and a second click unticks it, and a click on a goal folds it as Enter does.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -24,7 +24,9 @@ rows() { goals_state | jq -c '{selected, rows: [.rows[] | [.kind, .text, .done]]
 
 until_ok 5000 shell_status >/dev/null
 open_goals
-wtype n
+click_box goals-new
+until_ok 2000 state_is '.prompt.kind == "title"'
+check "a click on the heading's + asks for a new goal's title, as n does ($(goals_state | jq -c .prompt))" state_is '.prompt.kind == "title" and .prompt.text == ""'
 answer title Read
 answer deadline ""
 until_ok 2000 state_is '.active == ["Read"] and .prompt == null'

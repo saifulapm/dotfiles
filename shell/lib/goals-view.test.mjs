@@ -15,20 +15,33 @@ store = G.toggleGoal(store, 'c', now);
 
 test('active goals list in order, an unfolded goal shows its tasks, and the done group folds', () => {
   assert.deepEqual(rows(store, { b: true }, false, now), [
-    { kind: 'goal', id: 'a', goal: 'a', text: 'Ship v2', done: false, count: '0/0', due: '3d · Wed 21 Oct' },
-    { kind: 'goal', id: 'b', goal: 'b', text: 'Read', done: false, count: '1/2', due: 'no deadline' },
+    { kind: 'goal', id: 'a', goal: 'a', text: 'Ship v2', done: false, chip: '3d', chipTone: 'muted' },
+    { kind: 'goal', id: 'b', goal: 'b', text: 'Read', done: false, chip: null, chipTone: null },
     { kind: 'task', id: 't1', goal: 'b', text: 'ch 1', done: true },
     { kind: 'task', id: 't2', goal: 'b', text: 'ch 2', done: false },
-    { kind: 'done', id: 'done', goal: '', text: 'done · 1' },
+    { kind: 'done', id: 'done', goal: '', text: 'Done · 1' },
   ]);
 });
 
-test('an unfolded done group lists the done goals, and a past deadline reads late', () => {
+test('an unfolded done group lists the done goals, and a past deadline reads late in danger', () => {
   const late = G.addGoal(G.emptyStore(), 'Tax', now - 60000, now - 120000, 'x');
   assert.deepEqual(rows(G.toggleGoal(late, 'x', now), {}, true, now), [
-    { kind: 'done', id: 'done', goal: '', text: 'done · 1' },
-    { kind: 'goal', id: 'x', goal: 'x', text: 'Tax', done: true, count: '0/0', due: 'late · Sun 18 Oct' },
+    { kind: 'done', id: 'done', goal: '', text: 'Done · 1' },
+    { kind: 'goal', id: 'x', goal: 'x', text: 'Tax', done: true, chip: 'late', chipTone: 'danger' },
   ]);
+});
+
+const chipOf = (deadline, at) => {
+  const [r] = rows(G.addGoal(G.emptyStore(), 'G', deadline, at, 'g'), {}, false, at);
+  return [r.chip, r.chipTone];
+};
+
+test('a deadline later the same day is danger, read in hours', () => {
+  assert.deepEqual(chipOf(new Date(2026, 9, 19, 23, 59).getTime(), now), ['24h', 'danger']);
+});
+
+test('a deadline under a day away but on the next day stays muted', () => {
+  assert.deepEqual(chipOf(new Date(2026, 9, 20, 0, 30).getTime(), new Date(2026, 9, 19, 23, 0).getTime()), ['2h', 'muted']);
 });
 
 test('an empty store has no rows', () => {

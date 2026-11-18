@@ -1,19 +1,21 @@
 #!/usr/bin/env bash
-# Mod+G opens Goals; its keys add, tick, reorder and delete goals through the store, and the order survives a restart.
+# Mod+G grows the island into Goals; its keys add, tick, reorder and delete goals through the store, a new goal's chip and the margin read its countdown, and the order survives a restart.
 {
 source "$(dirname "$0")/lib.sh"
 
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
+island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_g() { niri msg action spawn -- dots-call goals toggle; }
 desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
-# Opens Goals and waits for its own keyboard, since niri lists the layer Exclusive before its keys arrive.
+# Opens Goals and waits for its own keyboard and the island at rest on it, since niri lists the layer Exclusive before its keys arrive.
 open_goals() {
   until_ok 10000 desk_up
   mod_g
-  until_ok 3000 state_is '.open and .keyboard'
+  until_ok 3000 state_is '.open and .keyboard and .settled'
 }
 # Types $2 into the prompt of kind $1 once it is up, then Enter.
 answer() {
@@ -41,13 +43,19 @@ until_ok 5000 shell_status >/dev/null
 check "the store starts empty" test ! -s "$store"
 open_goals
 check "Mod+G opens Goals with the keyboard" state_is '.open and .keyboard'
-check "an empty Goals shows n to add a goal" state_is '.count == 0 and .hint == "n to add a goal"'
+check "and sets the island's surface to goals ($(timeout 0.5 qs ipc call island state | jq -c .surface))" island_is '.surface == "goals"'
+check "an empty Goals says No goals yet, with no key hint in its state ($(goals_state | jq -c '{empty, hint}'))" state_is '.count == 0 and .empty == "No goals yet" and (has("hint") | not)'
 
 wtype n
 answer title "Ship v2"
 answer deadline 3d
 t0=$(now_ms)
 until_ok 2000 state_is '.active == ["Ship v2"] and .prompt == null'
+ship_chip() { goals_state | jq -c '.blocks[] | select(.text == "Ship v2") | .chip | {text, color}'; }
+check "Ship v2's tile carries a 3d chip in the muted tone ($(ship_chip))" state_is '(.blocks[] | select(.text == "Ship v2") | .chip) as $c | $c.text == "3d" and $c.color == .muted'
+margin_ship() { margins | jq -e '.right.goal == "Ship v2 · 3d"' >/dev/null 2>&1; }
+until_ok 3000 margin_ship
+check "and the margin reads Ship v2 · 3d ($(margins | jq -c .right.goal))" margin_ship
 wtype n
 answer title Read
 answer deadline ""

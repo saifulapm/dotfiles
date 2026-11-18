@@ -1,11 +1,13 @@
 // The Goals window's rows, from the store and the window's own fold state; j/k step over these.
 import { activeGoals, doneGoals, liveTasks, countdown } from './goals.mjs';
-import { dateText } from './margins.mjs';
+
+// A deadline is danger on its own calendar day and once it has passed.
+const onTheDay = (deadline, now) => deadline <= now || new Date(deadline).toDateString() === new Date(now).toDateString();
 
 function goalRow(g, now) {
-  const tasks = liveTasks(g);
-  const due = g.deadline === null ? 'no deadline' : countdown(g.deadline, now) + ' · ' + dateText(new Date(g.deadline));
-  return { kind: 'goal', id: g.id, goal: g.id, text: g.title, done: g.done, count: tasks.filter((t) => t.done).length + '/' + tasks.length, due };
+  const chip = g.deadline === null ? null : countdown(g.deadline, now);
+  const chipTone = g.deadline === null ? null : onTheDay(g.deadline, now) ? 'danger' : 'muted';
+  return { kind: 'goal', id: g.id, goal: g.id, text: g.title, done: g.done, chip, chipTone };
 }
 
 function withTasks(out, g, unfolded, now) {
@@ -19,7 +21,7 @@ export function rows(store, unfolded, doneOpen, now) {
   activeGoals(store).forEach((g) => withTasks(out, g, unfolded, now));
   const done = doneGoals(store);
   if (done.length) {
-    out.push({ kind: 'done', id: 'done', goal: '', text: 'done · ' + done.length });
+    out.push({ kind: 'done', id: 'done', goal: '', text: 'Done · ' + done.length });
     if (doneOpen) done.forEach((g) => withTasks(out, g, unfolded, now));
   }
   return out;
