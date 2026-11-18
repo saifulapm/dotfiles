@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+/ grows the island into the six-column cheat sheet over the margins; Esc, a click outside or another surface's key closes it, and a live state that arrives takes the island from it.
+# Mod+/ grows the island into the six-column cheat sheet over the margins; Esc or a click outside closes it, another surface's key turns it into that surface, and a live state that arrives takes the island from it.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -54,9 +54,9 @@ open_sheet
 launcher_is() { timeout 0.5 qs ipc call launcher state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
 t0=$(now_ms)
 niri msg action spawn -- dots-call launcher toggle
-until_ok 1000 eval 'island_is ".surface == null" && launcher_is ".open"'
+until_ok 1000 eval 'island_is ".surface == \"launcher\"" && launcher_is ".open"'
 took=$(($(now_ms) - t0))
-check "Mod+Space closes the sheet and opens the launcher card within 500 ms (${took} ms)" test "$took" -le 500
+check "Mod+Space turns the sheet into the launcher within 500 ms (${took} ms)" test "$took" -le 500
 timeout 0.5 qs ipc call launcher close
 until_ok 2000 at_rest
 

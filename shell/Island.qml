@@ -259,12 +259,15 @@ Item {
     }
     // What the box last morphed for; a size change with the same content, such as a font loading or a theme switch, snaps instead.
     property string morphedFor: ""
-    onTargetWidthChanged: morph()
-    onTargetHeightChanged: morph()
+    // The morph runs once the change that moved the target has settled every binding, so a switch reads the new surface's name with its new size, whichever binding ran first; callLater also folds the width's and the height's call into one.
+    onTargetWidthChanged: Qt.callLater(morph)
+    onTargetHeightChanged: Qt.callLater(morph)
 
     function morph() {
-        const content = part + ":" + (notification?.key ?? question?.id ?? "");
+        // An open surface's content is its name, so a switch from one surface to another morphs as well.
+        const content = part + ":" + (notification?.key ?? question?.id ?? (part === "surface" ? surface : ""));
         const fresh = morphedFor !== "" && content !== morphedFor;
+        const switching = fresh && part === "surface" && morphedFor.startsWith("surface:");
         morphedFor = content;
         // Width and height each call this; the second lands on the morph the first started.
         if (!fresh && morphing.running) {
@@ -290,8 +293,8 @@ Item {
         curve = I.isCompact(mode) ? motion.close : motion.open;
         morphing.duration = curve.ms;
         progress = 0;
-        // A surface's open changes the window's input and keyboard, which draws a frame of its own; the box starts moving two frames later, so that frame is not one of the morph's.
-        if (part === "surface") {
+        // A surface's open changes the window's input and keyboard, which draws a frame of its own; the box starts moving two frames later, so that frame is not one of the morph's. A switch keeps both, so it moves at once.
+        if (part === "surface" && !switching) {
             morphing.stop();
             morphWaits = 2;
             return;

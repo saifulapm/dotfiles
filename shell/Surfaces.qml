@@ -93,12 +93,12 @@ PanelWindow {
         }
     }
 
-    // t0 is taken before the first load, so a cold open's time includes loading.
+    // t0 is taken before the first load, so a cold open's time includes loading. The launcher and the cheat sheet open before the other closes, so the island goes straight from one to the other and never reads null between.
     function openLauncher(t0, mode, typed) {
         launcherFromOverview = !!typed;
         launcherLoader.active = true;
-        closeOthers(launcher);
         launcher.open(t0, mode, typed);
+        closeOthers(launcher);
     }
 
     function openNotifs(t0) {
@@ -109,8 +109,8 @@ PanelWindow {
 
     function openCheatsheet(t0) {
         cheatsheetLoader.active = true;
-        closeOthers(cheatsheet);
         cheatsheet.open(t0);
+        closeOthers(cheatsheet);
     }
 
     function openControl(t0) {
