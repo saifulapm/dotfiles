@@ -86,7 +86,7 @@ check "and no card opened" state_is '.open | not'
 : >"$marker"
 
 # Two requests at once: the second waits behind the first, and neither hangs. The prompt is not gpg's Passphrase:, so the only passphrase on the card is its heading.
-ask() { printf 'SETDESC %s\nSETPROMPT Secret:\nGETPIN\nBYE\n' "$1" | "$repo/bin/dots-pinentry" >"$out/$1.assuan" & echo $!; }
+ask() { printf 'SETDESC %s\nSETPROMPT Secret:\nGETPIN\nBYE\n' "$1" | "$repo/bin/dots-pinentry" >"$out/$1.assuan" 9>&- & echo $!; }
 a=$(ask first-request)
 until_ok 3000 state_is '.open and .description == "first-request"'
 b=$(ask second-request)

@@ -143,7 +143,7 @@ until_ok 3000 prop_is "$phone" Paired true
 check "and Test Phone pairs" prop_is "$phone" Paired true
 
 # A service asked for by an untrusted device; the knob's answer is what the agent told BlueZ.
-authorize() { knob Authorize os "$speaker" 0000110d-0000-1000-8000-00805f9b34fb >"$DOTS_DEV_DIR/authorize" 2>&1 & }
+authorize() { knob Authorize os "$speaker" 0000110d-0000-1000-8000-00805f9b34fb >"$DOTS_DEV_DIR/authorize" 2>&1 9>&- & }
 answered() { grep -q "$1" "$DOTS_DEV_DIR/authorize"; }
 authorize
 until_ok 3000 asks "Test Speaker wants Audio"

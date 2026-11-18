@@ -355,7 +355,8 @@ export function backgroundWithLock(text) {
   const found = [];
   text.split('\n').forEach((line, i) => {
     const code = line.replace(/(^|\s)#.*$/, '');
-    if (/(^|[^&;|>])&\s*$/.test(code) && !/9>&-/.test(code)) found.push(i + 1);
+    // A start mid-line is followed by what a helper does next: echo $!, a pid kept in a name, or the function's close.
+    if (/(^|[^&;|>])&(\s*$|\s+(echo\b|[A-Za-z_][A-Za-z_0-9]*\+?=|\}))/.test(code) && !/9>&-/.test(code)) found.push(i + 1);
   });
   return found;
 }
@@ -370,6 +371,9 @@ test('the fake and notify-send lints catch the shapes that broke the island chec
   assert.deepEqual(backgroundWithLock('sleep 30 & # held\n'), [1]);
   assert.deepEqual(backgroundWithLock('"$fake/NetworkManager" >"$log" 2>&1 9>&- &\nsleep 30 9>&- & # held\n'), []);
   assert.deepEqual(backgroundWithLock('a && b &&\n  c\ncase $x in a) b ;& c) d ;;& esac\n'), []);
+  // A background start in the middle of a line, as a helper writes one, counts too.
+  assert.deepEqual(backgroundWithLock('ask() { notify-send "$@" >"$out" & sender=$!; }\nrun() { sleep 9 2>&1 & }\n'), [1, 2]);
+  assert.deepEqual(backgroundWithLock('ask() { notify-send "$@" >"$out" 9>&- & sender=$!; }\nx 2>&1 | y\n'), []);
 });
 
 test('every background process a tests/dev script starts closes the nested-check lock fd 9', () => {

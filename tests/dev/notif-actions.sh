@@ -19,7 +19,7 @@ chips() { island | jq -c '[.note.actions[] | ascii_downcase]'; }
 chips_are() { [ "$(chips)" = "$1" ]; }
 printed() { [ "$(cat "$out")" = "$1" ]; }
 # notify-send -A waits for an action or the close, and prints the action's key; it is let go at the end of each step.
-ask() { notify-send -a T "$@" >"$out" & sender=$!; }
+ask() { notify-send -a T "$@" >"$out" 9>&- & sender=$!; }
 done_asking() {
   [ -z "$sender" ] || kill "$sender" 2>/dev/null
   wait "$sender" 2>/dev/null

@@ -27,7 +27,7 @@ record_stop() { niri msg action spawn -- dots-call record toggle; until_ok 6000 
 # Samples the island every 100 ms for $1 s and prints each text it read, once each.
 texts_for() { for _ in $(seq $(($1 * 10))); do island_text; sleep 0.1; done | sed -E 's/^REC [0-9]{2}:[0-9]{2}$/REC mm:ss/' | sort -u | paste -sd'|'; }
 wf=
-share() { wf-recorder -y -f "$DOTS_DEV_DIR/share-$1.mp4" >/dev/null 2>&1 & wf=$!; }
+share() { wf-recorder -y -f "$DOTS_DEV_DIR/share-$1.mp4" >/dev/null 2>&1 9>&- & wf=$!; }
 unshare() { kill -INT "$wf"; wait "$wf" 2>/dev/null || true; wf=; }
 cleanup() { [ -z "$wf" ] || unshare; }
 

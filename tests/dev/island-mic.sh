@@ -20,7 +20,7 @@ mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 not_mode() { ! mode_is "$1"; }
 lock_is() { timeout 0.5 qs ipc call lock state 2>/dev/null | jq -e "$1" >/dev/null 2>&1; }
 # A capture stream from the default source that records silence until killed; its pid is the last in recs.
-record() { pw-record -P "$1" --raw - >/dev/null 2>&1 & recs+=($!); }
+record() { pw-record -P "$1" --raw - >/dev/null 2>&1 9>&- & recs+=($!); }
 node_id() { pw-dump 2>/dev/null | jq -e --arg k "$1" --arg v "$2" 'first(.[] | select(.info.props[$k]? == $v) | .id)'; }
 # The capture node names linked from the source named $1, one per line.
 linked_from() { pw-link -l 2>/dev/null | awk -v s="$1" '/^[^ ]/ { port = $1 } $0 ~ "\\|-> " { sub(/^ *\|-> /, ""); if (port ~ "^" s ":") { sub(/:.*/, ""); print } }' | sort -u; }

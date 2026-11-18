@@ -28,7 +28,7 @@ select_row() {
   return 1
 }
 # A stream that plays silence until killed.
-play() { pw-play -P "$1" --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null & players+=($!); }
+play() { pw-play -P "$1" --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null 9>&- & players+=($!); }
 node_id() { pw-dump 2>/dev/null | jq -e --arg k "$1" --arg v "$2" 'first(.[] | select(.info.props[$k]? == $v) | .id)'; }
 serial_of() { pw-dump 2>/dev/null | jq -e --arg n "$1" 'first(.[] | select(.info.props["node.name"]? == $n) | .info.props["object.serial"])'; }
 # The sink node names the stream with $1 is linked to, one per line.
