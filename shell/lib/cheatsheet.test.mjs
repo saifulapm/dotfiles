@@ -158,7 +158,12 @@ const CODE = {
   '⇧ D': [/ShiftModifier/, /Key_D\b/],
   '⇧ O': [/Key_O\b/, /"O"/],
   'w␣': [/'w '/],
+  'v␣': [/'v '/],
+  ':␣': [/': '/],
   '=␣': [/'= '/],
+  '>␣': [/'> '/],
+  'r␣': [/'r '/],
+  'c␣': [/'c '/],
 };
 const pattern = (key) => CODE[key] || (/^[A-Z]$/.test(key) ? [new RegExp(`Key_${key}\\b`)] : null);
 
@@ -223,4 +228,10 @@ test('a filtered IN SURFACES keeps only the captions of surfaces with a row left
 test('minus, equal, [ and ] read as the keys they print', () => {
   const rows = parseBinds(['Mod+Minus hotkey-overlay-title="Column Narrower" { set-column-width "-10%"; }', 'Mod+Equal hotkey-overlay-title="Column Wider" { set-column-width "+10%"; }', 'Mod+BracketLeft hotkey-overlay-title="Pull In or Push Out Left" { consume-or-expel-window-left; }', 'Mod+BracketRight hotkey-overlay-title="Pull In or Push Out Right" { consume-or-expel-window-right; }'].join('\n'));
   assert.deepEqual(rows.map((r) => r.key), ['Mod -', 'Mod =', 'Mod [', 'Mod ]']);
+});
+
+// The launcher draws no legend, so the sheet is the only place its prefixes show.
+test('IN SURFACES lists every launcher prefix', () => {
+  const keys = IN_SURFACES.filter((r) => r.surface === 'launcher').map((r) => r.key);
+  for (const k of ['w␣', 'v␣', ':␣', '=␣', '>␣', 'r␣', 'c␣']) assert.ok(keys.includes(k), `no launcher row for ${k}`);
 });

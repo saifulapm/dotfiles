@@ -296,12 +296,15 @@ PanelWindow {
         }
     }
 
+    // The launcher draws inside the island, on the island's fill, so it reads the scheme's own tokens; it shows while it is the island's surface, or the last one through its close.
     Loader {
         id: launcherLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.launcher
         active: false
         sourceComponent: Root.Launcher {
-            theme: panelTheme
+            theme: host.theme
             apps: host.apps
             schemes: host.themeList
             reminders: host.reminders
@@ -328,6 +331,7 @@ PanelWindow {
         id: cheatsheetLoader
         parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.cheatsheet
         active: false
         sourceComponent: Root.CheatSheet {
             theme: host.theme
@@ -335,7 +339,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [cheatsheet]
+    readonly property var islandSurfaces: [launcher, cheatsheet]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null

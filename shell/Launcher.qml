@@ -9,12 +9,19 @@ import "lib/emoji.mjs" as Emoji
 import "lib/voice.mjs" as L
 import "lib/reminders.mjs" as Rem
 import "lib/notes.mjs" as N
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as T
 
-// Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn in the Surfaces window.
+// Apps, windows, clipboard, calculator and commands, picked by the query's prefix, drawn inside the island on its fill.
 Item {
     id: launcher
 
     required property var theme
+    // The island reports this as its surface while the launcher is shown.
+    readonly property string name: "launcher"
+    // The island grows to this width for the launcher, as board 3 draws it.
+    readonly property int wantWidth: 640
+    readonly property bool busy: false
     property bool shown: false
     readonly property string query: input.text
     // selected counts from scrollTop, the first of the eight rows drawn out of every row found.
@@ -26,10 +33,15 @@ Item {
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
 
-    readonly property var c: theme.color
     // Enter acted on a row and closed the launcher; Esc never sends it.
     signal launched
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and the tones lifted to read on its fill.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue" })
+    // The search field's glyph, a magnifier from Symbols Nerd Font.
+    readonly property string searchGlyph: String.fromCodePoint(0xF0349)
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
     required property var apps
     // themes.json's colorschemes, as the shell read them.
@@ -51,8 +63,10 @@ Item {
     // This machine's id, read as Goals reads it; the Remote rows leave this machine out.
     readonly property string machine: N.machineId(Quickshell.env("DOTS_MACHINE"), chezmoiFile.text(), hostnameFile.text())
     readonly property string clipDb: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clips.db"
-    // Every mode supplies rows as {title, detail, exec?, copy?}; a new mode adds a case here.
+    // Every mode supplies rows as {title, detail, exec?, copy?}, a new mode adding a case here; nothing lists until a key is typed.
     readonly property var found: {
+        if (query === "")
+            return [];
         switch (mode) {
         case "windows":
             return Lib.windowRows(windowList, parsed.q);
@@ -83,10 +97,7 @@ Item {
     }
     readonly property var rows: found.slice(scrollTop, scrollTop + 8)
     readonly property var look: L.launcherLook(theme.tokens)
-    readonly property Root.Motion motion: Root.Motion {
-        shown: launcher.shown
-        tokens: launcher.theme.tokens
-    }
+    implicitHeight: column.implicitHeight + 32
 
     // mode is clipboard, emoji or colorschemes when a key opened the launcher straight into one; typed is the key that opened it from the overview.
     function open(t0, mode, typed) {
@@ -186,18 +197,11 @@ Item {
             Quickshell.execDetached(["wl-copy", "--", row.copy]);
     }
 
-    // The rows of the footer: one unless its prefixes wrap.
-    function legendLines() {
-        return Math.max(1, new Set(footer.children.filter(k => k.visible && k.width > 0).map(k => k.y)).size);
-    }
-
     function state() {
         const cur = rowRepeater.itemAt(selected);
         const box = cur ? cur.box : null;
         const p = box ? box.mapToItem(null, 0, 0) : null;
-        const q = input.mapToItem(null, 0, 0);
-        const nameBox = cur ? cur.nameText : null;
-        const n = nameBox ? nameBox.mapToItem(null, 0, 0) : null;
+        const f = field.mapToItem(null, 0, 0);
         return JSON.stringify({
             open: shown,
             mode: mode,
@@ -212,41 +216,18 @@ Item {
             strips: rows.map((r, i) => rowRepeater.itemAt(i)?.stripColors ?? null),
             openMs: openMs,
             opens: opens,
-            motion: motion.curves?.kind ?? null,
-            settleMs: motion.settleMs,
-            motionMs: motion.curves ? { open: motion.curves.openMs, close: motion.curves.closeMs } : null,
-            curve: motion.curves?.curve ?? null,
-            rise: motion.curves?.rise ?? 0,
-            closeTookMs: motion.closeTook,
-            settled: motion.settled,
-            drawing: launcher.visible,
-            cardBox: card.drawnBox(),
-            glassFill: String(card.drawnFill),
-            nameFont: nameBox ? nameBox.fontInfo.family : null,
-            prompt: { text: look.prompt.text, color: look.prompt.color },
-            keyColor: footerKeys.count > 0 ? String(footerKeys.itemAt(0).keyGlyph.color) : null,
-            keyFont: footerKeys.count > 0 ? footerKeys.itemAt(0).keyGlyph.fontInfo.family : null,
-            keyBox: footerKeys.count > 0 ? { x: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).x, y: footerKeys.itemAt(0).keyGlyph.mapToItem(null, 0, 0).y, w: footerKeys.itemAt(0).keyGlyph.width, h: footerKeys.itemAt(0).keyGlyph.height } : null,
-            cursorBadge: cur ? cur.badgeText : null,
-            label: pill.text,
+            drawing: shown,
             count: found.length,
-            slots: rows.map(r => r.icon || r.glyph || "tile"),
-            cursorName: nameBox ? nameBox.text : null,
-            cursorNameBox: n ? { x: n.x, y: n.y, w: nameBox.width, h: nameBox.height } : null,
+            cursorName: cur ? cur.nameText.text : null,
             cursorFill: box ? String(box.color) : null,
             cursorBox: box ? { x: p.x, y: p.y, w: box.width, h: box.height } : null,
-            cursorElided: cur ? cur.elided : null,
-            cursorDetailWidth: cur ? cur.detailWidth : null,
-            keys: rows.map((r, i) => rowRepeater.itemAt(i)?.keyText ?? null),
+            // Each drawn row's height and whether it has a fill; only the selected one has.
+            rowHeights: rows.map((r, i) => rowRepeater.itemAt(i)?.box.height ?? null),
+            filled: rows.map((r, i) => rowRepeater.itemAt(i) ? rowRepeater.itemAt(i).box.color.a > 0 : null),
+            field: { x: f.x, y: f.y, w: field.width, h: field.height, placeholder: placeholder.visible ? placeholder.text : null },
+            empty: empty.visible ? empty.text : null,
             heads: rows.map((r, i) => rowRepeater.itemAt(i)?.headText ?? null),
             pending: pending.length,
-            queryFont: [input.font.family, input.font.pixelSize],
-            queryBox: { x: q.x, y: q.y, w: input.width, h: input.height },
-            detailFont: [look.detail.font, look.detail.size, look.detail.italic],
-            legend: look.legendLine(mode),
-            legendKeys: footerKeys.count,
-            legendLines: legendLines(),
-            legendOverflow: legendLines() > 1,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: launcher.Window.active
         });
@@ -330,70 +311,58 @@ Item {
 
     Component.onCompleted: Root.State.loaded.push("launcher")
 
-    visible: motion.drawing
+    // The click-outside test reads a press on this as one on the launcher.
+    Column {
+        id: column
+        objectName: "card"
+        x: 16
+        y: 16
+        width: launcher.width - 32
+        spacing: 8
 
-    Item {
-        anchors.fill: parent
-
+        // The search field: a tile a shade above the island's fill, the magnifier, then the query.
         Rectangle {
-            anchors.fill: parent
-            color: card.wash
-        }
+            id: field
+            width: parent.width
+            height: 48
+            radius: 14
+            color: Qt.alpha(launcher.on, 0.07)
 
-        Root.Surface {
-            id: card
-            x: Math.round((parent.width - width) / 2)
-            y: 168
-            width: 640
-            height: column.implicitHeight
-            tokens: launcher.theme.tokens
-            motion: launcher.motion
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 14
+                anchors.rightMargin: 14
+                spacing: 10
 
-            ColumnLayout {
-                id: column
-                width: parent.width
-                spacing: 0
+                Text {
+                    textFormat: Text.PlainText
+                    text: launcher.searchGlyph
+                    color: launcher.tones.muted
+                    font.family: "Symbols Nerd Font Mono"
+                    font.pixelSize: 18
+                }
 
-                RowLayout {
-                    id: field
+                Item {
                     Layout.fillWidth: true
-                    Layout.leftMargin: 18
-                    Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: 16
-                    Layout.bottomMargin: 16
-                    spacing: 12
+                    implicitHeight: input.implicitHeight
 
-                    // The magnifier: a ring and a handle at 45 degrees.
-                    Item {
-                        implicitWidth: 18
-                        implicitHeight: 18
-                        Rectangle {
-                            x: 2.5
-                            y: 2.5
-                            width: 11
-                            height: 11
-                            radius: 5.5
-                            color: "transparent"
-                            border.width: 1.6
-                            border.color: look.prompt.color
-                        }
-                        Rectangle {
-                            x: 11.5
-                            y: 13.3
-                            width: 6
-                            height: 1.6
-                            radius: 0.8
-                            rotation: 45
-                            color: look.prompt.color
-                        }
+                    Text {
+                        id: placeholder
+                        anchors.fill: parent
+                        visible: input.text === ""
+                        verticalAlignment: Text.AlignVCenter
+                        textFormat: Text.PlainText
+                        text: "Search"
+                        color: launcher.tones.muted
+                        font: input.font
                     }
 
                     TextInput {
                         id: input
-                        Layout.fillWidth: true
-                        color: c.ink
-                        font.family: look.query.font
-                        font.pixelSize: look.query.size
+                        anchors.fill: parent
+                        color: launcher.on
+                        font.family: launcher.fonts.ui ?? ""
+                        font.pixelSize: 15
                         clip: true
                         focus: true
                         Keys.onPressed: event => {
@@ -413,327 +382,193 @@ Item {
                             event.accepted = true;
                         }
                     }
-
-                    Rectangle {
-                        implicitWidth: pill.implicitWidth + 18
-                        implicitHeight: pill.implicitHeight + 6
-                        radius: 8
-                        color: look.label.fill
-                        Text {
-                            id: pill
-                            textFormat: Text.PlainText
-                            anchors.centerIn: parent
-                            text: look.label.text(launcher.mode)
-                            color: look.label.color
-                            font.family: fonts.ui
-                            font.pixelSize: 12
-                            font.weight: Font.Medium
-                        }
-                    }
                 }
+            }
+        }
 
-                Rule {}
+        // Holds focus after Tab, where plain j/k move and / returns to the query.
+        Item {
+            id: results
+            width: parent.width
+            visible: launcher.query !== ""
+            height: visible ? list.implicitHeight : 0
+            Keys.onPressed: event => {
+                if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
+                    launcher.move(1);
+                else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
+                    launcher.move(-1);
+                else if (event.key === Qt.Key_Slash)
+                    input.forceActiveFocus();
+                else if (event.key === Qt.Key_D && launcher.mode === "reminder")
+                    launcher.deleteReminder();
+                else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                    launcher.launch(event.modifiers & Qt.ShiftModifier);
+                else if (event.key === Qt.Key_Escape)
+                    launcher.close();
+                else
+                    return;
+                event.accepted = true;
+            }
 
-                // Holds focus after Tab, where plain j/k move and / returns to the query.
-                Item {
-                    id: results
-                    Layout.fillWidth: true
-                    implicitHeight: list.implicitHeight + 16
-                    Keys.onPressed: event => {
-                        if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
-                            launcher.move(1);
-                        else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
-                            launcher.move(-1);
-                        else if (event.key === Qt.Key_Slash)
-                            input.forceActiveFocus();
-                        else if (event.key === Qt.Key_D && launcher.mode === "reminder")
-                            launcher.deleteReminder();
-                        else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                            launcher.launch(event.modifiers & Qt.ShiftModifier);
-                        else if (event.key === Qt.Key_Escape)
-                            launcher.close();
-                        else
-                            return;
-                        event.accepted = true;
-                    }
+            // Under the rows, so a turn anywhere over the list scrolls it; a row's click area takes no wheel.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                onWheel: event => launcher.turn(event.angleDelta.y)
+            }
 
-                    // Under the rows, so a turn anywhere over the list scrolls it; a row's click area takes no wheel.
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.NoButton
-                        onWheel: event => launcher.turn(event.angleDelta.y)
-                    }
+            Column {
+                id: list
+                width: parent.width
+                spacing: 4
 
-                    Column {
-                        id: list
-                        y: 8
-                        x: 8
-                        width: parent.width - 2 * x
+                // Nothing found: a muted magnifier over the query as typed.
+                Column {
+                    visible: launcher.rows.length === 0
+                    width: parent.width
+                    height: 96
+                    topPadding: 18
+                    spacing: 8
 
-                        Text {
-                            textFormat: Text.PlainText
-                            visible: rows.length === 0
-                            leftPadding: 20
-                            topPadding: 11
-                            bottomPadding: 11
-                            text: "NO MATCH · ↑↓ OR CTRL+J/K MOVE · TAB THEN J/K · ↵ OPEN · ESC CLOSE"
-                            color: c.muted
-                            font.family: fonts.ui
-                            font.pixelSize: 10
-                            font.letterSpacing: 1.2
-                        }
-
-                        Repeater {
-                            id: rowRepeater
-                            model: rows
-
-                            // A row, under the pending head when it is the first pending reminder.
-                            Column {
-                                required property var modelData
-                                required property int index
-                                readonly property bool current: index === launcher.selected
-                                readonly property bool elided: title.truncated
-                                readonly property real detailWidth: detail.width
-                                readonly property string keyText: keyChip.visible ? keyLabel.text : ""
-                                readonly property string badgeText: badgeBox.visible ? badge.text : ""
-                                readonly property string headText: modelData.head ? headLabel.text : ""
-                                // A colorscheme row's strip as drawn, for the state.
-                                readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
-                                readonly property Item box: rowBox
-                                readonly property Item nameText: title
-                                width: list.width
-
-                                RowLayout {
-                                    visible: !!modelData.head
-                                    width: parent.width
-                                    Text {
-                                        id: headLabel
-                                        Layout.fillWidth: true
-                                        leftPadding: 12
-                                        topPadding: 10
-                                        bottomPadding: 4
-                                        textFormat: Text.PlainText
-                                        text: look.pendingHead(launcher.pending.length).text
-                                        color: look.small.color
-                                        font.family: look.small.font
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: look.small.spacing
-                                    }
-                                    Text {
-                                        rightPadding: 12
-                                        topPadding: 10
-                                        bottomPadding: 4
-                                        textFormat: Text.PlainText
-                                        text: look.pendingHead(launcher.pending.length).right
-                                        color: look.small.color
-                                        font.family: look.small.font
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: look.small.spacing
-                                    }
-                                }
-
-                            Rectangle {
-                                id: rowBox
-                                width: list.width
-                                implicitHeight: row.implicitHeight + 20
-                                radius: look.cursor.radius
-                                color: current ? look.cursor.fill : "transparent"
-
-                                Root.Click {
-                                    name: "launcher-row:" + index
-                                    onTapped: launcher.runRow(index)
-                                }
-
-                                RowLayout {
-                                    id: row
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: anchors.leftMargin
-                                    spacing: 12
-
-                                    // A colorscheme row's slot holds the current scheme's dot instead of a tile.
-                                    Text {
-                                        visible: !!modelData.swatches
-                                        Layout.preferredWidth: 10
-                                        textFormat: Text.PlainText
-                                        text: modelData.current ? "●" : ""
-                                        color: c.accent
-                                        font.family: fonts.mono
-                                        font.pixelSize: 12
-                                    }
-
-                                    // An app's own icon at 32 px, else a tile holding the row's glyph, or a plain tile when it has neither.
-                                    Rectangle {
-                                        visible: !modelData.swatches
-                                        implicitWidth: look.tile.size
-                                        implicitHeight: look.tile.size
-                                        radius: look.tile.radius
-                                        color: modelData.icon ? "transparent" : look.tile.fill
-                                        Image {
-                                            anchors.fill: parent
-                                            visible: !!modelData.icon
-                                            source: modelData.icon || ""
-                                            sourceSize.width: look.tile.size
-                                            sourceSize.height: look.tile.size
-                                            asynchronous: true
-                                        }
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: !modelData.icon && !!modelData.glyph
-                                            textFormat: Text.PlainText
-                                            text: modelData.glyph ?? ""
-                                            color: c.ink
-                                            font.family: fonts.mono
-                                            font.pixelSize: 16
-                                        }
-                                    }
-
-                                    // The detail sits under the name.
-                                    GridLayout {
-                                        Layout.fillWidth: true
-                                        columns: 1
-                                        rowSpacing: 0
-
-                                        Text {
-                                            id: title
-                                            textFormat: Text.PlainText
-                                            Layout.fillWidth: true
-                                            // The slot shows the row's glyph, so the title drops it.
-                                            text: look.title(modelData.bare ? modelData.bare : modelData.title)
-                                            elide: Text.ElideRight
-                                            color: current ? look.cursor.text : look.name.color
-                                            font.family: look.name.font
-                                            font.pixelSize: look.name.size
-                                            font.weight: current ? look.cursor.weight : look.name.weight
-                                            font.letterSpacing: look.name.spacing
-                                        }
-                                        Text {
-                                            id: detail
-                                            textFormat: Text.PlainText
-                                            Layout.fillWidth: true
-                                            text: look.rowDetail(modelData)
-                                            elide: Text.ElideRight
-                                            color: current ? look.cursor.detail : look.detail.color
-                                            font.family: look.detail.font
-                                            font.italic: look.detail.italic
-                                            font.pixelSize: look.detail.size
-                                            font.letterSpacing: look.detail.spacing ?? 0
-                                        }
-                                    }
-
-                                    // A colorscheme's paper, surface, accent and four ANSI colours.
-                                    Row {
-                                        id: strip
-                                        visible: !!modelData.swatches
-                                        Repeater {
-                                            model: modelData.swatches ?? []
-                                            Rectangle {
-                                                required property string modelData
-                                                width: 14
-                                                height: 14
-                                                color: modelData
-                                            }
-                                        }
-                                    }
-
-                                    // A row with a global key names it.
-                                    Item {
-                                        visible: !!modelData.key
-                                        implicitWidth: keyChip.implicitWidth
-                                        implicitHeight: keyChip.implicitHeight
-                                        Rectangle {
-                                            id: keyChip
-                                            anchors.right: parent.right
-                                            visible: !!modelData.key
-                                            implicitWidth: keyLabel.implicitWidth + 14
-                                            implicitHeight: keyLabel.implicitHeight + 4
-                                            radius: look.keyChip.radius
-                                            color: current ? look.keyChip.cursorFill : look.keyChip.fill
-                                            border.width: look.keyChip.border
-                                            border.color: current ? look.keyChip.cursorBorder : look.keyChip.borderColor
-                                            Text {
-                                                id: keyLabel
-                                                anchors.centerIn: parent
-                                                textFormat: Text.PlainText
-                                                text: look.rowKey(modelData.key)
-                                                color: current ? look.keyChip.cursorText : look.keyChip.text
-                                                font.family: look.small.font
-                                                font.pixelSize: look.keyChip.size
-                                                font.letterSpacing: look.keyChip.spacing
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: badgeBox
-                                        visible: current && look.cursor.badge !== ""
-                                        implicitWidth: badge.implicitWidth + 14
-                                        implicitHeight: badge.implicitHeight + 4
-                                        radius: 6
-                                        color: c.surface
-                                        Text {
-                                            id: badge
-                                            textFormat: Text.PlainText
-                                            anchors.centerIn: parent
-                                            text: look.cursor.badge
-                                            color: look.cursor.text
-                                            font.family: fonts.mono
-                                            font.pixelSize: 11
-                                        }
-                                    }
-                                }
-                            }
-                            }
-                        }
-                    }
-                }
-
-                Rule {}
-
-                // The prefixes start at the left as chips, and the moving keys end the line at the right.
-                RowLayout {
-                    Layout.fillWidth: true
-                    Layout.leftMargin: 14
-                    Layout.rightMargin: Layout.leftMargin
-                    Layout.topMargin: 10
-                    Layout.bottomMargin: Layout.topMargin
-                    spacing: 14
-
-                    Flow {
-                        id: footer
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        Repeater {
-                            id: footerKeys
-                            model: look.legend(launcher.mode).keys
-
-                            KeyPair {
-                                theme: launcher.theme
-                                look: launcher.look
-                            }
-                        }
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        textFormat: Text.PlainText
+                        text: launcher.searchGlyph
+                        color: launcher.tones.muted
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 26
                     }
 
                     Text {
-                        id: tail
+                        id: empty
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Math.min(implicitWidth, parent.width)
+                        elide: Text.ElideRight
                         textFormat: Text.PlainText
-                        Layout.alignment: Qt.AlignRight | Qt.AlignTop
-                        topPadding: 3
-                        text: look.legend(launcher.mode).tail
-                        color: c.muted
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size
-                        font.letterSpacing: look.small.spacing
+                        text: "No match for '" + look.title(launcher.parsed.q) + "'"
+                        color: launcher.tones.muted
+                        font.family: launcher.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+                }
+
+                Repeater {
+                    id: rowRepeater
+                    model: launcher.rows
+
+                    // A row, under the pending head when it is the first pending reminder.
+                    Column {
+                        required property var modelData
+                        required property int index
+                        readonly property bool current: index === launcher.selected
+                        readonly property string headText: modelData.head ? headLabel.text : ""
+                        // A colorscheme row's strip as drawn, for the state.
+                        readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
+                        readonly property Item box: rowBox
+                        readonly property Item nameText: title
+                        width: list.width
+
+                        Text {
+                            id: headLabel
+                            visible: !!modelData.head
+                            leftPadding: 10
+                            topPadding: 6
+                            bottomPadding: 4
+                            textFormat: Text.PlainText
+                            text: look.pendingHead(launcher.pending.length).text
+                            color: launcher.tones.muted
+                            font.family: launcher.fonts.ui ?? ""
+                            font.pixelSize: 11
+                        }
+
+                        // 48 px and flat: only the selected row has a fill.
+                        Rectangle {
+                            id: rowBox
+                            width: list.width
+                            height: 48
+                            radius: 12
+                            color: current ? Qt.alpha(launcher.on, 0.07) : "transparent"
+
+                            Root.Click {
+                                name: "launcher-row:" + index
+                                onTapped: launcher.runRow(index)
+                            }
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+                                spacing: 12
+
+                                // The app's own icon at 32 px, else the row's glyph or its first letter in a circle.
+                                Rectangle {
+                                    implicitWidth: 32
+                                    implicitHeight: 32
+                                    radius: modelData.glyph ? 16 : 10
+                                    color: modelData.icon ? "transparent" : Qt.alpha(launcher.on, 0.10)
+                                    Image {
+                                        anchors.fill: parent
+                                        visible: !!modelData.icon
+                                        source: modelData.icon || ""
+                                        sourceSize.width: 32
+                                        sourceSize.height: 32
+                                        asynchronous: true
+                                    }
+                                    Text {
+                                        anchors.centerIn: parent
+                                        visible: !modelData.icon
+                                        textFormat: Text.PlainText
+                                        text: modelData.glyph || look.title(modelData.bare || modelData.title).charAt(0).toUpperCase()
+                                        color: launcher.on
+                                        font.family: launcher.fonts.ui ?? ""
+                                        font.pixelSize: modelData.glyph ? 16 : 14
+                                        font.weight: Font.Bold
+                                    }
+                                }
+
+                                Text {
+                                    id: title
+                                    textFormat: Text.PlainText
+                                    // The name keeps its own width, up to 60% of the row, and the note takes what is left.
+                                    Layout.preferredWidth: Math.min(implicitWidth, parent.width * 0.6)
+                                    // The slot shows the row's glyph, so the title drops it.
+                                    text: look.title(modelData.bare ? modelData.bare : modelData.title)
+                                    elide: Text.ElideRight
+                                    color: launcher.on
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                }
+
+                                Text {
+                                    textFormat: Text.PlainText
+                                    Layout.fillWidth: true
+                                    text: look.rowDetail(modelData)
+                                    elide: Text.ElideRight
+                                    color: launcher.tones.muted
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                }
+
+                                // A colorscheme's paper, surface, accent and four ANSI colours.
+                                Row {
+                                    id: strip
+                                    visible: !!modelData.swatches
+                                    Repeater {
+                                        model: modelData.swatches ?? []
+                                        Rectangle {
+                                            required property string modelData
+                                            width: 14
+                                            height: 14
+                                            color: modelData
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-
-    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
-    component Rule: Item {
-        Layout.fillWidth: true
-        implicitHeight: 1
     }
 }
