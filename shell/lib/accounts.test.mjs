@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listLook } from './voice.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
-import { accountsView, accountsItems, accountsKeys, accountsLook, useTarget, activeNotice, context7Target, context7Notice } from './accounts.mjs';
+import { accountsView, accountsItems, useTarget, activeNotice, context7Target, context7Notice, limitBar, resetIn, updatedText, splitFigure } from './accounts.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -38,7 +36,6 @@ test('the recorded rows give two Claude accounts, five balances and two usage ro
   assert.deepEqual(v.accounts.map((a) => [a.id, a.label, a.plan, a.active]), [['main', 'main', 'Max', true], ['work', 'work', 'Pro', false]]);
   assert.equal(v.balances.length, 5);
   assert.equal(v.usage.length, 2);
-  assert.deepEqual(v.groups, [['Claude', 2], ['Balances', 5], ['Usage', 2]]);
 });
 
 test("main's limits read as the board draws them: percent used and the reset in local time", () => {
@@ -84,8 +81,6 @@ test("a Console org's spend reads under usage as money spent this month, with no
   const v = view([...rows, spend]);
   assert.equal(v.balances.length, 5);
   assert.deepEqual(v.usage.map((u) => [u.label, u.figure, u.fraction, u.reset]).at(-1), ['Anthropic main', '$87.62 this month', null, '']);
-  const item = accountsItems(v).at(-1);
-  assert.equal(accountsLook(schemeTokens('artboard')).figure(item), '$87.62 this month');
 });
 
 test("a Console grant reads as a balance of what is left of it, with its UTC expiry date under the name", () => {
@@ -93,8 +88,6 @@ test("a Console grant reads as a balance of what is left of it, with its UTC exp
   const v = view([...rows, grant]);
   assert.deepEqual(v.balances.map((b) => [b.label, b.figure, b.reset]).at(-1), ['Anthropic alt', '$170.93 of $200', 'expires 24 Oct']);
   assert.equal(v.balances.at(-1).fraction, 170.931814 / 200);
-  const item = accountsItems(v).filter((i) => i.kind === 'balance').at(-1);
-  assert.equal(accountsLook(schemeTokens('artboard')).figure(item), '$170.93 of $200 left');
 });
 
 test('a balance kept in tokens reads as a whole count of tokens among the balances, with no bar', () => {
@@ -163,54 +156,56 @@ test('a currency other than USD reads after the amount', () => {
   assert.equal(view(r).balances[0].figure, '80.00 CNY');
 });
 
-test('the footer says when the last fetch answered, and refreshing while one runs', () => {
-  assert.equal(view().footer, 'as of 15:12');
-  assert.equal(view(rows, registry, true).footer, 'refreshing…');
-  assert.equal(view([]).footer, '');
+test('the view keeps when the last fetch answered, and whether one runs', () => {
+  assert.equal(view().latest, NOW);
+  assert.equal(view(rows, registry, true).busy, true);
+  assert.equal(view([]).latest, 0);
 });
 
-test('the cursor stops on account and provider rows, never on a limit or a group label', () => {
-  const items = accountsItems(view());
+test('a limit bar is a share from 0 to 1, in the danger tone from 0.8', () => {
+  assert.deepEqual(limitBar(0.79), { share: 0.79, danger: false });
+  assert.deepEqual(limitBar(0.8), { share: 0.8, danger: true });
+  assert.deepEqual(limitBar(-0.5), { share: 0, danger: false });
+  assert.deepEqual(limitBar(1.4), { share: 1, danger: true });
+});
+
+test('a reset reads as the time left: minutes, hours and minutes, whole hours, then days', () => {
+  const at = (ms) => new Date(NOW + ms).toISOString();
   assert.deepEqual(
-    items.filter((i) => i.stop).map((i) => i.kind + ':' + i.label),
-    ['account:main', 'account:work', 'balance:DeepSeek', 'balance:OpenRouter', 'balance:ZenMux', 'balance:Vercel AI', 'balance:fal', 'usage:ElevenLabs', 'usage:Codex'],
+    [100 * 60e3, 40 * 60e3, 2 * 3600e3, 2 * 86400e3 + 3 * 3600e3, -60e3].map((ms) => resetIn(at(ms), NOW)),
+    ['1 h 40', '40 m', '2 h', '2 d', ''],
   );
-  assert.deepEqual(items.slice(0, 5).map((i) => i.kind), ['group', 'account', 'limit', 'limit', 'limit']);
-  assert.equal(items.find((i) => i.kind === 'account' && i.label === 'work').account, 'work');
-  assert.equal(items.find((i) => i.kind === 'balance').account, null);
+  assert.equal(resetIn(null, NOW), '');
 });
 
-test('the key strip is the board\'s', () => {
-  const look = { keys: (pairs) => pairs };
-  assert.deepEqual(accountsKeys(look), [['↵', 'make active'], ['r', 'refresh'], ['esc', '']]);
+test('the header says how long ago the rows were fetched', () => {
+  assert.deepEqual([NOW - 20e3, NOW - 2 * 60e3, NOW - 125 * 60e3, NOW - 50 * 3600e3, 0].map((t) => updatedText(t, NOW)), ['updated just now', 'updated 2 min ago', 'updated 2 h ago', 'updated 2 d ago', '']);
 });
 
-const artboard = () => accountsLook(schemeTokens('artboard'));
-
-test('the key strip reads in plain words', () => {
-  const strip = accountsKeys(listLook(schemeTokens('artboard'))).map((k) => `${k.key} ${k.word}`.trim());
-  assert.deepEqual(strip, ['↵ make active', 'r refresh', 'esc']);
+test('a limit reads as the board draws it: a short name and its percent with the time to reset', () => {
+  const [main, work] = view().accounts;
+  assert.deepEqual(main.limits.map((l) => [l.label, l.right]), [['5 h', '34% · 1 h 48'], ['Week', '61% · 6 d'], ['Week Fable', '22% · 6 d']]);
+  assert.deepEqual(work.limits.map((l) => [l.label, l.right]), [['5 h', '8% · 1 h 28'], ['Week', '12%']]);
+  assert.equal(work.line, '5 h 8% · week 12%');
 });
 
-test('a figure reads as a bare percent, what is left of a balance, and chars for characters', () => {
-  const look = artboard();
-  const v = view();
-  const five = Object.assign({ kind: 'limit' }, v.accounts[0].limits[0]);
-  const open = Object.assign({ kind: 'balance' }, v.balances[1]);
-  const eleven = Object.assign({ kind: 'usage' }, v.usage[0]);
-  assert.deepEqual([five, open, eleven].map(look.figure), ['34%', '$3.10 of $10 left', '11,500 of 32,000 chars']);
-  assert.equal(look.limitName('Weekly'), 'weekly');
+test('a figure splits into its bold part and the muted rest that follows of', () => {
+  assert.deepEqual(['$3.10 of $10', '11,500 of 32,000 characters', '$12.40', '0% of monthly window'].map(splitFigure), [['$3.10', 'of $10'], ['11,500', 'of 32,000 characters'], ['$12.40', ''], ['0%', 'of monthly window']]);
 });
 
-test("a warning draws in the scheme's danger token, a stale row in its muted one, and ACTIVE as an ink chip with a dot", () => {
-  const look = artboard();
-  assert.deepEqual([look.warn, look.dim], ['#CF222E', '#57606A']);
-  assert.deepEqual(look.active, { text: 'ACTIVE', color: '#FFFFFF', fill: '#15171B', border: 'transparent', radius: 8, dot: '#6C83FF' });
-  assert.deepEqual(look.bar, { track: '#E3E6EB', fill: '#3D5AFE' });
+test('the tiles keep their figure split, and the device\'s Context7 key says so', () => {
+  const key = (id) => row({ provider: 'context7', label: 'Context7 ' + id, account: id, metric: 'requests', kind: 'count', value: 240, limit: 1000, unit: 'requests' });
+  const items = accountsItems(view([...rows, key('main'), key('alt')]));
+  const at = (label) => items.find((i) => i.label === label);
+  assert.deepEqual([at('OpenRouter'), at('ElevenLabs')].map((i) => [i.name, i.main, i.rest]), [['OpenRouter', '$3.10', 'of $10'], ['ElevenLabs', '11,500', 'of 32,000 characters']]);
+  assert.deepEqual([at('Context7 main'), at('Context7 alt')].map((i) => i.name), ['Context7 main · this device', 'Context7 alt']);
 });
 
-test("ACTIVE's text is the surface it sits on in a dark scheme too, never white on light ink", () => {
-  assert.equal(accountsLook(schemeTokens('gruvbox-dark')).active.color, '#282828');
+test('the cursor stops on what Enter acts on: an account that is not active and a Context7 key that is not the device\'s', () => {
+  const keys = ['main', 'alt'].map((id) => row({ provider: 'context7', label: 'Context7 ' + id, account: id, metric: 'requests', kind: 'count', value: 24, limit: 1000, unit: 'requests' }));
+  const stops = (r) => accountsItems(view(r)).filter((i) => i.stop).map((i) => i.kind + ':' + i.label);
+  assert.deepEqual(stops(rows), ['account:work']);
+  assert.deepEqual(stops([...rows, ...keys]), ['account:work', 'usage:Context7 alt']);
 });
 
 test("the device's Context7 key reads ACTIVE, main when none was picked, and Enter on another makes it the device's", () => {

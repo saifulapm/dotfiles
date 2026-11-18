@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+U draws Claude accounts with their limits, balances and usage from the collector's rows: the cache at once, then a full fetch; r fetches again, and nothing runs once it closes.
+# Mod+U draws Claude accounts inside the island as board 8 does, with their limits, balances and usage from the collector's rows: the cache at once, then a full fetch; r and the refresh button fetch again, and nothing runs once it closes.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -22,6 +22,8 @@ EOF
 
 acc_state() { timeout 0.5 dots-call accounts state 2>/dev/null; }
 state_is() { acc_state | jq -e "$@" >/dev/null 2>&1; }
+island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
+island_is() { island | jq -e "$@" >/dev/null 2>&1; }
 # The fake logs its arguments once per call, so a full fetch is an empty line.
 calls() { [ -e "$log" ] && paste -sd'|' "$log"; }
 ncalls() { if [ -e "$log" ]; then wc -l <"$log"; else echo 0; fi; }
@@ -30,18 +32,23 @@ fakes() { pgrep -f -- "$repo/bin/dev-fake-accounts" >/dev/null; }
 open_acc() { niri msg action spawn -- dots-call accounts toggle; until_ok 3000 state_is '.open and .settled and .keyboard'; }
 close_acc() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 fetched() { until_ok "${1:-3000}" state_is '.busy == false and (.accounts | length) == 2'; }
-# Pixels of geometry $1 farther than 12 from the hex colour $2, so a drawn label shows as pixels off the card's colour.
-off_colour() {
-  grim -s 1 -t ppm -g "$1" - | node -e '
+# The colour of the pixel at x,y on the output, as lowercase hex without the #.
+px() { grim -g "$1,$2 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n'; }
+# The pixel at the middle of a box {x, y, w, h}, as the colour px reads, so a drawn colour shows as pixels.
+box_px() { px "$(jq -r '(.x + .w / 2) | floor' <<<"$1")" "$(jq -r '(.y + .h / 2) | floor' <<<"$1")"; }
+# Pixels of box $1 within 24 of the hex colour $2 on each channel, so drawn text shows as pixels in its ink.
+near_colour() {
+  local geo
+  geo=$(jq -r '"\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"' <<<"$1")
+  grim -s 1 -t ppm -g "$geo" - | node -e '
     const b = require("fs").readFileSync(0), hex = process.argv[1];
     const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
     let n = 0;
-    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - r) > 12 || Math.abs(px[i * 3 + 1] - g) > 12 || Math.abs(px[i * 3 + 2] - bl) > 12) n++;
+    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - r) <= 24 && Math.abs(px[i * 3 + 1] - g) <= 24 && Math.abs(px[i * 3 + 2] - bl) <= 24) n++;
     console.log(n);
   ' "$2"
 }
-group_geo() { acc_state | jq -r '.groups[0] | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"'; }
 
 timers_before=$(shell_status | jq .timers)
 check "before Mod+U the surface is not loaded" state_is '.loaded == false'
@@ -49,56 +56,85 @@ check "and the fake has no calls" test "$(ncalls)" = 0
 
 open_acc
 fetched
-echo "     accounts: $(acc_state | jq -c '{accounts: [.accounts[] | [.id, .plan, .active, [.limits[] | .figure]]], balances: [.balances[].figure], usage: [.usage[].figure], footer, groups: [.groups[].text]}')"
+echo "     accounts: $(acc_state | jq -c '{title, updated, accounts: [.accounts[] | [.id, .plan, .active, [.limits[] | .figure]]], balances: [.balances[].figure], usage: [.usage[].figure], captions, others}')"
+read -r ow _ < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
+want=$((ow - 48 < 640 ? ow - 48 : 640))
+check "Mod+U sets the surface to accounts and the island $want px wide ($(island | jq -c '{surface, width}'))" island_is --argjson w "$want" '.surface == "accounts" and .width == $w'
 check "Mod+U draws 2 accounts, 6 balances and 3 usage rows" state_is '(.accounts | length) == 2 and (.balances | length) == 6 and (.usage | length) == 3'
-check "Context7 reads its requests of the plan's ($(acc_state | jq -c '[.rows[] | select(.name == "Context7 main") | [.figure, .reset]]'))" state_is 'any(.rows[]; .kind == "usage" and .name == "Context7 main" and .figure == "240 of 1,000 requests")'
-check "a Console grant reads what is left of it, with its expiry under the name ($(acc_state | jq -c '[.rows[] | select(.name == "Anthropic main") | [.figure, .reset]]'))" state_is 'any(.rows[]; .name == "Anthropic main" and .figure == "$38.87 of $205 left" and (.reset | test("^expires [0-9]+ [A-Z][a-z]{2}$")))'
-check "Jina reads its tokens among the balances" state_is 'any(.rows[]; .kind == "balance" and .name == "Jina" and .figure == "953,604,107 tokens")'
-check "main is active, work is not" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
-check "main's 5-hour reads 34% used, resets 17:00 ($(acc_state | jq -c '.accounts[0].limits[0]'))" state_is '.accounts[0].limits[0] | .name == "5-hour" and .figure == "34% used" and .reset == "resets 17:00" and .warning == false'
-check "the card draws that row as 34% and resets 17:00" state_is 'any(.rows[]; .kind == "limit" and .name == "5-hour" and .figure == "34%" and .reset == "resets 17:00")'
-check "the fake ran --cached, then the full fetch ($(calls))" test "$(calls)" = "--cached|"
-check "the footer reads as of HH:MM ($(acc_state | jq -c .footer))" state_is '.footer | test("^as of [0-9]{2}:[0-9]{2}$")'
-check "the cursor starts on main" state_is '.selected == "account:main"'
-wtype j
-check "j moves past main's limits to work" until_ok 1000 state_is '.selected == "account:work"'
-wtype -k Down
-check "Down moves on to the first balance" until_ok 1000 state_is '.selected == "balance:DeepSeek"'
+check "no legend or key strip is in the state" state_is 'has("hint") == false and has("footer") == false and has("groups") == false'
 
-# Enter on a provider row runs nothing: the registry keeps its bytes and the island says nothing about Claude.
+# Board 8's header: the title, when the rows came, and a refresh button.
+check "the header reads Accounts ($(acc_state | jq -c '[.title, .updated]'))" state_is '.title == "Accounts" and .updated == "updated just now"'
+check "with a 32 px refresh button drawn as the nerd-font glyph U+F0450" state_is '.refreshButton | .glyph == "󰑐" and .w == 32 and .h == 32'
+touch "$DOTS_DEV_DIR/accounts-aged"
+wtype r
+until_ok 3000 bash -c "[ \$(wc -l <'$log') -ge 3 ]"
+check "rows fetched five minutes ago make the header read updated 5 min ago ($(acc_state | jq -c .updated))" until_ok 3000 state_is '.busy == false and .updated == "updated 5 min ago"'
+rm "$DOTS_DEV_DIR/accounts-aged"
+wtype r
+until_ok 3000 bash -c "[ \$(wc -l <'$log') -ge 4 ]"
+fetched
+
+# Text draws on the island's own fill, in the island's ink.
+island_fill=$(island | jq -r '.fill.color | ascii_downcase')
+check "the card's fill is the island's ($(acc_state | jq -r .fillColor))" state_is --arg f "$island_fill" '.fillColor | ascii_downcase == $f'
+check "a pixel of the card beside the heading is the island's fill #$island_fill" test "$(px "$(acc_state | jq -r '(.box.x + .box.w / 2) | floor')" "$(acc_state | jq -r '(.box.y + 4) | floor')")" = "${island_fill#\#}"
+ink=$(acc_state | jq -r '.ink | ascii_downcase')
+check "the heading draws pixels in the island's ink $ink" test "$(near_colour "$(acc_state | jq -c .titleBox)" "$ink")" -ge 10
+
+# The active account: shaded, an inverted Active chip, and 5 h and Week bars 8 px high.
+echo "     active: $(acc_state | jq -c '{active, bars: [.bars[] | del(.meterBox)]}')"
+check "main is active, work is not" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
+check "the active account is a tile named main, shaded at 12% of the ink" state_is '.active | .name == "main" and (.fill | ascii_downcase | test("^#1f"))'
+check "its chip reads Active, filled with the ink and written in the island's fill" state_is '.ink as $i | .fillColor as $f | .active | .chip == "Active" and (.chipFill | ascii_downcase) == ($i | ascii_downcase) and (.chipInk | ascii_downcase) == ($f | ascii_downcase)'
+check "the chip is drawn in the ink" test "$(box_px "$(acc_state | jq -c '.active.chipBox | .w = 8')")" = "${ink#\#}"
+check "its first two bars are 5 h and Week, each 8 px high" state_is '[.bars[0:2][] | [.label, .height]] == [["5 h", 8], ["Week", 8]]'
+check "5 h reads 34% and its bar is a third full, in the ink on a track at 16% of it" state_is '.ink as $i | .bars[0] | (.right | startswith("34%")) and ((.share - 0.34) | fabs) < 0.01 and (.trackFill | ascii_downcase | test("^#29")) and (.meterFill | ascii_downcase) == ($i | ascii_downcase)'
+check "Week reads 61%" state_is '.bars[1].right | startswith("61%")'
+check "the 5 h bar is drawn in the ink" test "$(box_px "$(acc_state | jq -c '.bars[0].meterBox | .w = 4')")" = "${ink#\#}"
+check "work, the other account, is one line: its name, then 5 h and week as percents ($(acc_state | jq -c '.others'))" state_is '[.others[] | [.name, .line]] == [["work", "5 h 8% · week 12%"]]'
+check "the cursor starts on work, the one row Enter acts on" state_is '.selected == "account:work" and .others[0].selected'
+
+# Under BALANCES the balances draw as tiles, two to a row.
+check "a BALANCES caption sits over the tiles ($(acc_state | jq -c '.captions'))" state_is '.captions == ["BALANCES"]'
+check "the balances draw two to a row and stack in rows" state_is '[.tiles[] | select(.kind == "balance") | .box] as $b | $b[0].y == $b[1].y and $b[1].x >= $b[0].x + $b[0].w and $b[0].w == $b[1].w and $b[2].y > $b[0].y and $b[2].y == $b[3].y and $b[4].y > $b[2].y'
+check "a tile is the ink at 7% with the name over its figure ($(acc_state | jq -c '[.tiles[] | select(.name == "OpenRouter") | [.name, .main, .rest, .fill]]'))" state_is 'any(.tiles[]; .name == "OpenRouter" and .main == "$3.10" and .rest == "of $10" and (.fill | ascii_downcase | test("^#12")))'
+check "a Console grant reads what is left of it with its expiry ($(acc_state | jq -c '[.tiles[] | select(.name == "Anthropic main") | [.main, .rest, .reset]]'))" state_is 'any(.tiles[]; .name == "Anthropic main" and .main == "$38.87" and .rest == "of $205" and (.reset | test("^expires [0-9]+ [A-Z][a-z]{2}$")))'
+check "Jina reads its tokens among the balances" state_is 'any(.tiles[]; .kind == "balance" and .name == "Jina" and .main == "953,604,107 tokens")'
+check "Context7 reads its requests of the plan's, the device's key by that name ($(acc_state | jq -c '[.tiles[] | select(.name | startswith("Context7")) | [.name, .main, .rest]]'))" state_is 'any(.tiles[]; .kind == "usage" and .name == "Context7 main · this device" and .main == "240" and .rest == "of 1,000 requests")'
+check "the fake ran --cached, then the full fetch, then the two r fetches ($(calls))" test "$(calls)" = "--cached|||"
+
+# j and k move between the rows Enter acts on: work, then Context7 alt.
+wtype j
+check "j moves on to Context7 alt" until_ok 1000 state_is '.selected == "usage:Context7 alt" and any(.tiles[]; .name == "Context7 alt" and .selected)'
+wtype -k Down
+sleep 0.2
+check "Down past the last stays there" state_is '.selected == "usage:Context7 alt"'
+
+# Enter on a Context7 key runs dots context7 use, which finds no key in the nested pass store and changes nothing. The nested shell shares the live ~/.config, so the check never lets a use succeed: the live login keeps its bytes.
+ctx7_active=$XDG_STATE_HOME/dots/context7-active
+creds=${XDG_CONFIG_HOME:-$HOME/.config}/context7/credentials.json
+creds_sum=$(sha256sum <"$creds" 2>/dev/null || true)
 reg=$XDG_STATE_HOME/dots/claude-accounts.json
-island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 reg_sum=$(sha256sum <"$reg")
+c7() { acc_state | jq -c '[.tiles[] | select(.name | startswith("Context7")) | .name]'; }
+check "with no key picked, Context7 main is this device's ($(c7))" state_is '[.tiles[] | select(.name | startswith("Context7")) | .name] == ["Context7 main · this device", "Context7 alt"]'
 wtype -k Return
 sleep 1
-check "Enter on DeepSeek leaves the registry's bytes as they were" test "$(sha256sum <"$reg")" = "$reg_sum"
-check "and the island says nothing of Claude ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Claude\")' >/dev/null"
-check "and main stays active" state_is '[.accounts[] | [.id, .active]] == [["main", true], ["work", false]]'
+check "Enter on a key the store lacks writes no choice" test ! -e "$ctx7_active"
+check "and the device's key stays main ($(c7))" state_is '[.tiles[] | select(.name | startswith("Context7")) | .name] == ["Context7 main · this device", "Context7 alt"]'
+check "and the island says nothing of Context7 ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Context7\")' >/dev/null"
+check "and the live ctx7 login keeps its bytes" test "$(sha256sum <"$creds" 2>/dev/null || true)" = "$creds_sum"
+check "and the registry keeps its bytes" test "$(sha256sum <"$reg")" = "$reg_sum"
 
 wtype k
 until_ok 1000 state_is '.selected == "account:work"'
 wtype -k Return
 active_is() { [ "$(jq -r .active "$reg")" = "$1" ]; }
 check "Enter on work makes it the registry's active account" until_ok 3000 active_is work
-check "and moves ACTIVE to work ($(acc_state | jq -c '[.accounts[] | [.id, .active]]'))" until_ok 2000 state_is '[.accounts[] | [.id, .active]] == [["main", false], ["work", true]]'
-check "the drawn ACTIVE mark sits on work's row" state_is '[.rows[] | select(.kind == "account") | [.name, .active]] == [["main", ""], ["work", "ACTIVE"]]'
+check "and moves the Active tile to work ($(acc_state | jq -c '[.accounts[] | [.id, .active]]'))" until_ok 2000 state_is '[.accounts[] | [.id, .active]] == [["main", false], ["work", true]] and .active.name == "work" and [.others[].name] == ["main"]'
 island_says() { island | jq -e '.text == "Claude · work is active for new sessions"' >/dev/null; }
 check "the island reads Claude · work is active for new sessions ($(island | jq -c .text))" until_ok 3000 island_says
-
-# Enter on a Context7 key runs dots context7 use, which finds no key in the nested pass store and changes nothing. The nested shell shares the live ~/.config, so the check never lets a use succeed: the live login keeps its bytes.
-ctx7_active=$XDG_STATE_HOME/dots/context7-active
-creds=${XDG_CONFIG_HOME:-$HOME/.config}/context7/credentials.json
-creds_sum=$(sha256sum <"$creds" 2>/dev/null || true)
-c7() { acc_state | jq -c '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]]'; }
-check "with no key picked, Context7 main reads ACTIVE ($(c7))" state_is '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]] == [["Context7 main", "ACTIVE"], ["Context7 alt", ""]]'
-for _ in $(seq 12); do state_is '.selected == "usage:Context7 alt"' && break; wtype -k Down; sleep 0.1; done
-check "Down reaches Context7 alt" state_is '.selected == "usage:Context7 alt"'
-wtype -k Return
-sleep 1
-check "Enter on a key the store lacks writes no choice" test ! -e "$ctx7_active"
-check "and ACTIVE stays on main ($(c7))" state_is '[.rows[] | select(.name | startswith("Context7")) | [.name, .active]] == [["Context7 main", "ACTIVE"], ["Context7 alt", ""]]'
-check "and the island says nothing of Context7 ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Context7\")' >/dev/null"
-check "and the live ctx7 login keeps its bytes" test "$(sha256sum <"$creds" 2>/dev/null || true)" = "$creds_sum"
 
 # A new cx session runs claude in work's home: cx runs the account wrapper at ~/.local/libexec/dots/claude, which runs ~/.local/bin/claude, so a scratch HOME holds this tree's wrapper and a stub claude that prints the CLAUDE_CONFIG_DIR it was given.
 stub_home=$DOTS_DEV_DIR/stub-home
@@ -110,34 +146,46 @@ cx_dir=$(HOME=$stub_home fish --no-config -c "source $repo/home/dot_config/fish/
 check "a new cx session runs in work's home ($cx_dir)" test "$cx_dir" = "$XDG_STATE_HOME/dots/claude-accounts/work"
 
 wtype r
-check "r runs one more full fetch" until_ok 3000 bash -c "[ \"\$(paste -sd'|' '$log')\" = '--cached||' ]"
+check "r runs one more full fetch" until_ok 3000 bash -c "[ \"\$(paste -sd'|' '$log')\" = '--cached||||' ]"
 fetched
 
-# The near-full variant also takes 3 s, so the footer shows the fetch running and a second r starts nothing.
+# The near-full variant also takes 3 s, so the header shows the fetch running and a second r starts nothing.
 touch "$DOTS_DEV_DIR/accounts-near-full"
 wtype r
-check "while a fetch runs the footer reads refreshing… ($(acc_state | jq -c .footer))" until_ok 2000 state_is '.footer == "refreshing…" and .busy'
+check "while a fetch runs the header reads refreshing… ($(acc_state | jq -c .updated))" until_ok 2000 state_is '.updated == "refreshing…" and .busy'
+before=$(ncalls)
 wtype r
 fetched 6000
-check "an r while the fetch ran started none ($(calls))" test "$(ncalls)" = 4
-check "a limit at 92% warns and one at 79% does not ($(acc_state | jq -c '[.accounts[0].limits[0, 1] | [.figure, .warning]]'))" state_is '.accounts[0].limits[0] | .figure == "92% used" and .warning == true'
+check "an r while the fetch ran started none ($(calls))" test "$(ncalls)" = "$before"
+# main is no longer active after Enter on work, so its limits read on its one line.
+check "a limit at 92% reads in the danger tone and one at 79% does not ($(acc_state | jq -c '[.accounts[0].limits[0, 1] | [.figure, .warning]]'))" state_is '.accounts[0].limits[0] | .figure == "92% used" and .warning == true'
 check "and the 79% one does not" state_is '.accounts[0].limits[1] | .figure == "79% used" and .warning == false'
-check "the 92% row draws its warning triangle" state_is 'any(.rows[]; .kind == "limit" and .figure == "92%" and .warning) and ([.rows[] | select(.warning)] | length) == 1'
+check "with work active the cursor is on main" state_is '.selected == "account:main"'
+wtype -k Return
+until_ok 3000 active_is main
+fetched 6000
+echo "     near full: $(acc_state | jq -c '[.bars[0:2][] | del(.meterBox) | {label, right, meterFill, rightColor, warning}]')"
+check "a bar at 92% is in the danger tone, its figure too, and not in the ink" state_is '.ink as $i | .bars[0] | .warning and (.meterFill | ascii_downcase) != ($i | ascii_downcase) and .meterFill == .rightColor and (.right | startswith("92%"))'
+check "a bar at 79% keeps the ink and the muted figure" state_is '.ink as $i | .bars[1] | (.warning | not) and (.meterFill | ascii_downcase) == ($i | ascii_downcase) and .meterFill != .rightColor and (.right | startswith("79%"))'
+# The island may still be settling its height after the use, so the bar's pixel is read until it shows.
+danger_drawn() {
+  local tone
+  tone=$(acc_state | jq -r '.bars[0].meterFill | ascii_downcase | ltrimstr("#")')
+  [ -n "$tone" ] && [ "$(box_px "$(acc_state | jq -c '.bars[0].meterBox | .w = 4')")" = "$tone" ]
+}
+check "the danger bar is drawn in its tone ($(acc_state | jq -r '.bars[0].meterFill'))" until_ok 3000 danger_drawn
 
 # A close and a second open while the slow fetch runs leave that one fetch to finish.
+touch "$DOTS_DEV_DIR/accounts-slow-full"
 before=$(ncalls)
 close_acc
 open_acc
 until_ok 2000 bash -c "[ \$(wc -l <'$log') -ge $((before + 2)) ]"
 close_acc
 open_acc
-fetched 6000
+fetched 15000
 check "a second open while a fetch ran started no second fetch ($(calls))" test "$(ncalls)" = $((before + 2))
-rm "$DOTS_DEV_DIR/accounts-near-full"
-
-check "the Claude group label reads Claude ($(acc_state | jq -c '.groups[0].text'))" state_is '.groups[0].text == "Claude"'
-px=$(off_colour "$(group_geo)" "#FFFFFF")
-check "the label's strip $(group_geo) draws $px px off the card's #FFFFFF" test "$px" -ge 10
+rm "$DOTS_DEV_DIR/accounts-near-full" "$DOTS_DEV_DIR/accounts-slow-full"
 
 # A quick second Mod+U closes the card while the cache is read; that close starts no full fetch.
 close_acc
@@ -153,20 +201,23 @@ rm "$DOTS_DEV_DIR/accounts-slow-cached"
 open_acc
 fetched 6000
 
+closed_at=$(ncalls)
 close_acc
+sleep 1
+check "1 s after Esc the fake's log gains no new line ($(calls))" test "$(ncalls)" = "$closed_at"
 check "within 10 s of Esc no dev-fake-accounts runs" until_ok 10000 eval '! fakes'
 until_ok 33000 state_is '.loaded == false'
 check "30 s after close shell status no longer lists accounts as loaded" bash -c "timeout 0.5 qs ipc call shell status | jq -e 'all(.loaded[]; . != \"accounts\")' >/dev/null"
 check "and its timers are back to $timers_before ($(shell_status | jq .timers))" test "$(shell_status | jq .timers)" = "$timers_before"
 
-# With no network the collector serves every source's cached rows as stale, and the card still opens with them. A cold open draws its card within 50 ms (#166PQ300); its rows follow once the 17 delegates are built, 45 to 80 ms, so that time is printed only.
+# With no network the collector serves every source's cached rows as stale, and the card still opens with them. A cold open draws its card within 50 ms; its rows follow once the delegates are built, so that time is printed only.
 touch "$DOTS_DEV_DIR/accounts-offline"
 cold=()
 card=()
 for i in 1 2 3 4 5; do
   until_ok 33000 state_is '.loaded == false'
   niri msg action spawn -- dots-call accounts toggle
-  until_ok 3000 state_is '.openMs != null'
+  until_ok 3000 state_is '.openMs != null and .keyboard and .settled'
   cold+=("$(acc_state | jq .openMs)")
   card+=("$(acc_state | jq .cardMs)")
   fetched 6000
@@ -181,17 +232,18 @@ done
 for ms in "${cold[@]}"; do
   check "and its rows are timed to their first frame ($ms ms)" timed "$ms"
 done
-echo "     offline: $(acc_state | jq -c '{accounts: [.accounts[].note], providers: [(.balances + .usage)[] | [.note, .error]]}')"
+echo "     offline: $(acc_state | jq -c '{updated, accounts: [.accounts[].note], providers: [(.balances + .usage)[] | [.note, .error]]}')"
+check "offline, the header reads updated 2 h ago" state_is '.updated == "updated 2 h ago"'
 check "offline, every account reads stale · as of HH:MM" state_is 'all(.accounts[]; .note | test("^stale · as of [0-9]{2}:[0-9]{2}$"))'
-check "every balance and usage row keeps its figure with as of HH:MM" state_is 'all((.balances + .usage)[]; (.note | test("^as of [0-9]{2}:[0-9]{2}$")) and .figure != "")'
-check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .error == false) and all(.rows[]; (.note | startswith("✕")) | not)'
-# Every drawn text of a row ends inside the card: a stale row once ran its reset past the right border.
-inside() { state_is '.cardBox as $c | all(.rows[]; .right <= $c.x + $c.w + 0.5)'; }
-edges() { acc_state | jq -c '[(.cardBox.x + .cardBox.w | floor), ([.rows[].right] | max | floor)]'; }
-check "offline, every row stays inside the card (card, rows right: $(edges))" inside
-check "offline, no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
-# A reset column once kept 50 px idle while a figure beside its note was cut short; ElevenLabs' longer figure fills its row and may elide.
-check "offline, Anthropic alt's figure is whole beside its bar and note ($(acc_state | jq -c '[.rows[] | select(.name == "Anthropic alt") | [.figure, .figureElided]]'))" state_is 'any(.rows[]; .name == "Anthropic alt" and .figureElided == false)'
+check "every balance and usage tile keeps its figure with as of HH:MM, not in the ink" state_is '.ink as $i | all(.tiles[]; (.note | test("^as of [0-9]{2}:[0-9]{2}$")) and .main != "" and (.noteColor | ascii_downcase) != ($i | ascii_downcase))'
+check "nothing is drawn as an error" state_is 'all((.balances + .usage)[]; .error == false)'
+# Every drawn text of a tile ends inside the card: a stale row once ran its reset past the right border.
+inside() { state_is '.box as $c | all(.tiles[]; .right <= $c.x + $c.w + 0.5) and all(.others[]; .right <= $c.x + $c.w + 0.5)'; }
+edges() { acc_state | jq -c '[(.box.x + .box.w | floor), ([.tiles[].right] | max | floor)]'; }
+check "offline, every tile stays inside the card (card, tiles right: $(edges))" inside
+check "offline, no note is cut short ($(acc_state | jq -c '[.tiles[] | select(.noteElided) | .note]'))" state_is 'all(.tiles[]; .noteElided == false)'
+# A reset column once kept 50 px idle while a figure beside its note was cut short.
+check "offline, Anthropic alt's figure is whole beside its note ($(acc_state | jq -c '[.tiles[] | select(.name == "Anthropic alt") | [.main, .mainElided]]'))" state_is 'any(.tiles[]; .name == "Anthropic alt" and .mainElided == false)'
 rm "$DOTS_DEV_DIR/accounts-offline"
 close_acc
 
@@ -211,15 +263,15 @@ node -e '
 out_h=$(niri msg -j outputs | jq -r 'first(.[]).logical.height')
 open_acc
 fetched 6000
-check "forged rows stay inside the card (card, rows right: $(edges))" inside
-check "no note is cut short ($(acc_state | jq -c '[.rows[] | select(.noteElided) | .note]'))" state_is 'all(.rows[]; .noteElided != true)'
-check "the expired account's note is whole or ends in an ellipsis, never cut at its start ($(acc_state | jq -c '[.rows[] | select(.kind == "account") | .note]'))" state_is 'any(.rows[]; .kind == "account" and (.note | test("^stale")) and .noteCut == false)'
-check "a thousand rows draw at most 50, on a card no taller than the screen ($(acc_state | jq -c '[(.rows | length), (.cardBox.h | floor)]') of $out_h)" state_is --argjson h "$out_h" '(.rows | length) <= 50 and .cardBox.h <= $h'
+check "forged rows stay inside the card (card, tiles right: $(edges))" inside
+check "no note is cut short ($(acc_state | jq -c '[.tiles[] | select(.noteElided) | .note]'))" state_is 'all(.tiles[]; .noteElided == false)'
+check "the expired account's line ends inside the card, whole or in an ellipsis ($(acc_state | jq -c '[.others[] | .line]'))" state_is 'any(.others[]; .line | test("stale"))'
+check "a thousand rows draw at most 16 tiles, on a card no taller than the screen ($(acc_state | jq -c '[(.tiles | length), (.box.h | floor)]') of $out_h)" state_is --argjson h "$out_h" '(.tiles | length) <= 16 and .box.h <= $h'
 close_acc
 # The same rows again keep their delegates, which must draw their notes after the card was hidden.
 open_acc
 fetched 6000
-check "reopened with the same rows, every balance and usage row draws its note ($(acc_state | jq -c '[.rows[] | select(.kind == "balance" or .kind == "usage") | .note] | unique'))" state_is '[.rows[] | select(.kind == "balance" or .kind == "usage") | .note] | length > 0 and all(test("as of"; "i"))'
+check "reopened with the same rows, every tile draws its note ($(acc_state | jq -c '[.tiles[].note] | unique'))" state_is '[.tiles[].note] | length > 0 and all(test("as of"; "i"))'
 close_acc
 rm "$DOTS_DEV_DIR/accounts-rows.json"
 

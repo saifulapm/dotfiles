@@ -36,7 +36,22 @@ acc_is() { acc_state | jq -e "$@" >/dev/null 2>&1; }
 niri msg action spawn -- dots-call accounts toggle
 until_ok 3000 acc_is '.open and .settled and .keyboard'
 until_ok 6000 acc_is '.busy == false and (.accounts | length) == 2'
-check "Accounts opens with the cursor on main" acc_is '.selected == "account:main"'
+check "Accounts opens with the cursor on work, the one row Enter acts on" acc_is '.selected == "account:work"'
+# The refresh button does what r does: one more full fetch.
+accounts_log=$DOTS_DEV_DIR/accounts.log
+before=$(wc -l <"$accounts_log")
+click_box accounts-refresh
+until_ok 3000 bash -c "[ \$(wc -l <'$accounts_log') -eq $((before + 1)) ]"
+check "a click on the refresh button runs one more full fetch ($(paste -sd'|' "$accounts_log"))" test "$(wc -l <"$accounts_log")" = $((before + 1))
+until_ok 6000 acc_is '.busy == false'
+# The rows the fetch brought are laid out over the next frames, so the click waits for work's row to hold one place.
+work_steady() {
+  local a
+  a=$(acc_state | jq -c '.others[0].box')
+  sleep 0.5
+  [ "$(acc_state | jq -c '.others[0].box')" = "$a" ] && jq -e '.w > 0' <<<"$a" >/dev/null
+}
+until_ok 6000 work_steady
 click_box accounts-row:account:work
 active_is() { [ "$(jq -r .active "$reg")" = "$1" ]; }
 until_ok 5000 active_is work
