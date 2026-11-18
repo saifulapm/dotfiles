@@ -88,3 +88,15 @@ test('rows lists newest first with a question and an age', () => {
     { file: 'd.json', start: now - 172800000, title: 'D', question: 'old', age: '2 d' },
   ]);
 });
+
+// A history file is plain data anyone can write, so its messages are checked and what the page draws is cleaned.
+test('parse drops a message that is not an object with a role and text, and keeps the rest', () => {
+  const conv = parse(JSON.stringify({ start: 1, messages: [null, 7, { role: 'user', content: 'hi' }, { role: 'assistant', content: { x: 1 } }, { role: 'assistant', content: 'yo' }] }));
+  assert.deepEqual(conv.messages, [{ role: 'user', content: 'hi' }, { role: 'assistant', content: 'yo' }]);
+});
+
+test('the history rows draw their title and question without control characters or bidi marks', () => {
+  const r = rows([{ start: 1, title: 'evil\x1b[31mred\u202Eevil', messages: [{ role: 'user', content: 'q\u2066x\x07' }] }], 1000);
+  assert.equal(r[0].title, 'evil[31mredevil');
+  assert.equal(r[0].question, 'qx');
+});

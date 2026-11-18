@@ -1,4 +1,6 @@
 // The mem tools the model may call. Each runs as an argv with no shell, and only the read commands search, show and wiki can ever sit in command position.
+import { clean } from './chat.mjs';
+
 export const RESULT_MAX = 8192;
 export const CALLS_MAX = 10;
 const ARG_MAX = 200;
@@ -59,7 +61,11 @@ export function argvFor(name, argsJson) {
 export function chipFor(name, argsJson) {
   const a = parseArgs(argsJson) || {};
   const arg = name === 'mem_wiki' ? [a.project, a.slug] : [name === 'mem_show' ? a.id : a.query];
-  return { name, arg: arg.every((s) => typeof s === 'string') ? arg.join(' · ') : '' };
+  const shown = (s) => {
+    const c = clean(s);
+    return c.length > 120 ? c.slice(0, 120) + '…' : c;
+  };
+  return { name: shown(String(name)), arg: arg.every((s) => typeof s === 'string') ? shown(arg.join(' · ')) : '' };
 }
 
 // Qt's JS engine has no TextEncoder, so the UTF-8 length is counted from code points.

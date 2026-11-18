@@ -21,7 +21,7 @@ function textBlocks(src) {
   return blocks;
 }
 
-// The island's question draws Q.linkify's html, which escapes the text before it adds links (questions.test.mjs), and a chat reply's block draws chat.mjs's render, which escapes the reply before it adds bold and code (chat.test.mjs); those Texts alone may be StyledText.
+// The island's question draws Q.linkify's html, which escapes the text before it adds links (questions.test.mjs), and a chat reply's block draws chat.mjs's render, which escapes the reply before it adds bold and code (chat.test.mjs); those Texts alone may be StyledText, or RichText for the chat's tinted inline code.
 const STYLED = ['Island.qml:askText', 'Chat.qml:styledBlock'];
 
 test('every Text in the shell sets textFormat: Text.PlainText, but the escaped question links', () => {
@@ -29,7 +29,7 @@ test('every Text in the shell sets textFormat: Text.PlainText, but the escaped q
   for (const f of readdirSync(shell).filter((f) => f.endsWith('.qml'))) {
     for (const b of textBlocks(readFileSync(shell + f, 'utf8'))) {
       const id = (b.body.match(/\bid:\s*(\w+)/) || [])[1];
-      if (STYLED.includes(`${f}:${id}`) && /textFormat:[^\n]*Text\.StyledText/.test(b.body)) continue;
+      if (STYLED.includes(`${f}:${id}`) && /textFormat:[^\n]*Text\.(StyledText|RichText)/.test(b.body)) continue;
       if (!/textFormat:\s*Text\.PlainText/.test(b.body)) found.push(`${f}:${b.at}`);
     }
   }

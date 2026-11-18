@@ -3,7 +3,12 @@
 {
 source "$(dirname "$0")/lib-chat.sh"
 source "$(dirname "$0")/lib.sh"
-cleanup() { chat_cleanup; }
+source "$(dirname "$0")/pointer.bash"
+cleanup() {
+  pointer_stop
+  chat_cleanup
+}
+click_at() { local at; at=$(shell_spot "$1") && point click $at; }
 
 lines() { if [ -f "$1" ]; then wc -l <"$1"; else echo 0; fi; }
 sent_since() { (($(lines "$requests") > $1)); }
@@ -45,6 +50,37 @@ check "eleven calls in one round run ten ($(turn_mem | wc -l))" turn_mem_is 'len
 check "the eleventh is not run ($(tail -1 "$requests" | jq -c '.messages[-1]'))" last_request_is '.messages[-1].tool_call_id == "call_11" and (.messages[-1].content | startswith("not run: "))'
 
 check "mem never ran a write command" jq -se '[.[][]] | any(IN("decide","ask","answer","plan","roadmap","log","idea","finding","handoff","--stdin")) | not' "$mem_log"
-check "every request carries the three tools" jq -se 'all(.tools | length == 3)' "$requests"
+check "every request carries the three tools, but the one after the turn's 10 calls are spent" jq -se 'all(.[]; (.tools | length) == 3 or .messages[-1].tool_call_id == "call_11")' "$requests"
+
+# The default alias is offered the same tools.
+wtype -k Tab
+until_ok 2000 chat_is '.focus == "replies"'
+wtype m
+until_ok 2000 chat_is '.alias == "default"'
+wtype -k Tab
+wtype -k Tab
+until_ok 2000 chat_is '.focus == "input" and .keyboard'
+turn "what about the shape"
+check "a request on the default alias carries the three tools too ($(tail -1 "$requests" | jq -c '{model, n: (.tools | length)}'))" sent 'any(.[]; .model == "default" and (.tools | length) == 3)'
+
+# Stop while a mem call runs: the round leaves the conversation, and the late answer joins no later turn.
+say "slow tool"
+until_ok 3000 chat_is '.tools | any(.arg == "slowly")'
+click_at chat-send
+check "stop during a mem call ends the turn ($(chat | jq -c .streaming))" until_ok 2000 chat_is '.streaming == false'
+n=$(wc -l <"$requests")
+say "write a fish loop"
+until_ok 10000 chat_is '.streaming == false and .blocks == 3'
+sleep 3
+check "the next message sends one request, with no unanswered tool call in it ($(tail -1 "$requests" | jq -c '[.messages[] | .role]'))" \
+  eval '[ "$(wc -l <"$requests")" -eq $((n + 1)) ] && sent ".[-1].messages[-2:] | map(.content) == [\"slow tool\", \"write a fish loop\"]"'
+
+# A request after a tool round that fails can be asked again.
+say "tool fail"
+check "a failure after the tool round shows pxy's line ($(chat | jq -c .error))" until_ok 5000 chat_is '.error == "fake pxy: failed after the tools"'
+n=$(wc -l <"$requests")
+click_at chat-retry
+check "Retry asks pxy again with the tool's answer ($(tail -1 "$requests" | jq -c '.messages[-1].role'))" \
+  until_ok 3000 eval '[ "$(wc -l <"$requests")" -gt "$n" ] && sent ".[-1].messages[-1].role == \"tool\""'
 exit "$fails"
 }

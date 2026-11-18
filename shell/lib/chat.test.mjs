@@ -116,3 +116,23 @@ test('a line over 4000 characters draws cut and keeps its whole text', () => {
   assert.ok(r.closed[1].html.length < 4100);
   assert.match(r.closed[1].html, /…$/);
 });
+
+// A code fence draws through a PlainText Text, so its drawn text is cut as a paragraph's is, while the block keeps the whole code to copy.
+test('a code block over 4000 characters a line, or 400 lines, draws cut and keeps its whole text', () => {
+  const wide = blocks().end('see:\n\n```json\n' + 'x'.repeat(1 << 20) + '\n```').closed[1];
+  assert.equal(wide.text.length, 1 << 20);
+  assert.ok(wide.html.length < 4100);
+  const tall = blocks().end('```\n' + 'line\n'.repeat(5000) + '```').closed[0];
+  assert.equal(tall.text.split('\n').length, 5000);
+  assert.ok(tall.html.split('\n').length <= 401);
+  assert.match(tall.html, /…$/);
+});
+
+test('a code block draws its text as is, for a PlainText Text: no entities', () => {
+  assert.equal(blocks().end('```\na < b && c\n```').closed[0].html, 'a < b && c');
+});
+
+test('a block draws at most 20000 characters however its lines fall', () => {
+  const many = blocks().end(Array.from({ length: 100 }, () => 'w'.repeat(3000)).join(' \n')).closed[0];
+  assert.ok(many.html.length < 21000, String(many.html.length));
+});

@@ -11,9 +11,11 @@ open_chat
 say "write a fish loop"
 until_ok 10000 chat_is '.streaming == false and .blocks == 3'
 wtype -k Tab
-check "Tab moves to the reply list, on the reply's last block ($(chat | jq -c '{focus, pick}'))" until_ok 2000 chat_is '.focus == "replies" and .pick == 3'
+check "Tab moves to the reply list, on the reply's code block ($(chat | jq -c '{focus, pick}'))" until_ok 2000 chat_is '.focus == "replies" and .pick == 2'
+wtype j
+check "j picks the paragraph after it" until_ok 2000 chat_is '.pick == 3'
 wtype k
-check "k picks the code block" until_ok 2000 chat_is '.pick == 2'
+check "k picks the code block again" until_ok 2000 chat_is '.pick == 2'
 wtype y
 check "y puts the code block on the clipboard ($(wl-paste --no-newline 2>/dev/null | head -1))" until_ok 2000 pasted $'for f in *\n    echo $f\nend'
 wtype -M shift -k y -m shift
@@ -39,15 +41,18 @@ until_ok 3000 chat_is '.streaming'
 # The shell is asked its status all through the 1 MiB reply, and the slowest answer counts.
 slowest=0
 deadline=$(($(now_ms) + 20000))
-while chat_is '.streaming' && (($(now_ms) < deadline)); do
+# The status is timed before the stream is read, so a stall shows in the time instead of ending the loop.
+while (($(now_ms) < deadline)); do
   t0=$(now_ms)
   shell_status >/dev/null
   t=$(($(now_ms) - t0))
   ((t > slowest)) && slowest=$t
+  chat_is '.streaming == false' && break
   sleep 0.05
 done
 check "all through a 1 MiB reply the shell answers within 500 ms (slowest ${slowest} ms)" test "$slowest" -lt 500
-check "the reply draws without ESC or U+202E ($(chat | jq -c '.drawn[0].html'))" chat_is '.drawn | length == 3 and (map(.html) | join("") | test("[\u001b‮]") | not)'
+check "the reply draws without ESC or U+202E ($(chat | jq -c '.drawn[0].html'))" chat_is '.drawn | length == 4 and (map(.html) | join("") | test("[\u001b\u202e]") | not)'
 check "the 1 MiB line draws cut" chat_is '.drawn[1].html | length < 4100'
+check "and a 1 MiB line in a code fence draws cut too ($(chat | jq -c '.drawn[2] | {kind, n: (.html | length)}'))" chat_is '.drawn[2].kind == "code" and (.drawn[2].html | length) < 4100'
 exit "$fails"
 }

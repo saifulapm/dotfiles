@@ -45,18 +45,20 @@ export function sse() {
   };
 }
 
-// A line this long laid out in one Text stalls the shell, so it draws cut; the block's text keeps all of it to copy.
+// A line this long, or a block this tall, laid out in one Text stalls the shell, so it draws cut; the block's text keeps all of it to copy.
 const LINE_MAX = 4000;
+const LINES_MAX = 400;
+const DRAWN_MAX = 20000;
 
 function escape(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function cutLines(text) {
-  return text
-    .split('\n')
-    .map((l) => (l.length > LINE_MAX ? l.slice(0, LINE_MAX) + '…' : l))
-    .join('\n');
+  const lines = text.split('\n');
+  const shown = lines.slice(0, LINES_MAX).map((l) => (l.length > LINE_MAX ? l.slice(0, LINE_MAX) + '…' : l));
+  const out = shown.join('\n') + (lines.length > LINES_MAX ? '\n…' : '');
+  return out.length > DRAWN_MAX ? out.slice(0, DRAWN_MAX) + '…' : out;
 }
 
 // Inline Markdown as Qt styled text: code spans first, so nothing inside them is read as emphasis.
@@ -73,7 +75,8 @@ function inline(text) {
 }
 
 export function render(block) {
-  if (block.kind === 'code') return escape(cutLines(block.text));
+  // A code block draws in a PlainText Text, so its text goes as is.
+  if (block.kind === 'code') return cutLines(block.text);
   return inline(block.text).replace(/\n/g, '<br>');
 }
 

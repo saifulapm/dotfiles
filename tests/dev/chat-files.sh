@@ -3,8 +3,14 @@
 {
 source "$(dirname "$0")/lib-chat.sh"
 source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/pointer.bash"
 files=$(mktemp -d)
-cleanup() { chat_cleanup; rm -rf "$files"; }
+cleanup() {
+  pointer_stop
+  chat_cleanup
+  rm -rf "$files"
+}
+click_at() { local at; at=$(shell_spot "$1") && point click $at; }
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 pk_is() { pk_state | jq -e "$@" >/dev/null 2>&1; }
 lines() { if [ -f "$requests" ]; then wc -l <"$requests"; else echo 0; fi; }
@@ -31,8 +37,8 @@ until_ok 5000 island_is '.surface == null'
 open_chat
 
 wtype -- "read this"
-wtype -M ctrl o -m ctrl
-check "Ctrl+O opens the island's file picker over the chat ($(island | jq -c '{surface, takeover}'))" until_ok 4000 island_is '.takeover == "picker" and .surface == "chat"'
+click_at chat-attach
+check "a click on the paperclip opens the island's file picker over the chat ($(island | jq -c '{surface, takeover}'))" until_ok 4000 island_is '.takeover == "picker" and .surface == "chat"'
 until_ok 4000 pk_is '.open and .settled and .keyboard and .listed'
 wtype -M ctrl l -m ctrl
 until_ok 2000 pk_is '.pathMode'
@@ -57,6 +63,7 @@ check "the image turn asks the vision model with the image as a data URL ($(tail
 until_ok 10000 chat_is '.streaming == false'
 say "and now"
 check "the next turn goes back to the alias ($(tail -1 "$requests" | jq -c .model))" until_ok 3000 sent '.[-1].model == "chat" and .[-1].messages[-1].content == "and now"'
+check "and carries no image from the turn before" sent '[.[-1].messages[] | .content | arrays | .[] | select(.type == "image_url")] == []'
 until_ok 10000 chat_is '.streaming == false'
 
 before=$(lines)
@@ -72,8 +79,12 @@ wtype -M ctrl n -m ctrl
 until_ok 2000 chat_is '.conversation == null'
 attach "$files/one"
 check "notes.txt is attached again ($(chat | jq -c .attachments))" until_ok 3000 chat_is '.attachments | length == 1'
+click_at chat-unattach:0
+check "a click on the chip's remove drops it ($(chat | jq -c .attachments))" until_ok 2000 chat_is '.attachments == []'
+attach "$files/one"
+until_ok 3000 chat_is '.attachments | length == 1'
 wtype -k BackSpace
-check "Backspace in the empty field drops the chip ($(chat | jq -c .attachments))" until_ok 2000 chat_is '.attachments == []'
+check "Backspace in the empty field drops the chip too ($(chat | jq -c .attachments))" until_ok 2000 chat_is '.attachments == []'
 say "plain"
 check "the request carries no trace of it ($(tail -1 "$requests" | jq -c '.messages[-1]'))" until_ok 3000 sent '(.[-1].messages[-1] == {role: "user", content: "plain"}) and (.[-1] | tostring | contains("MARKER-NOTES") | not)'
 exit "$fails"

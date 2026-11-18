@@ -1,4 +1,6 @@
 // Conversations kept as one JSON file each, named by start time; the list and the files are plain data so the shell only reads and writes them.
+import { clean } from './chat.mjs';
+
 export const KEEP = 50;
 
 // ':' and '.' are swapped so the name is a safe filename, and the ISO form sorts by time as a string.
@@ -18,11 +20,16 @@ export function serialize(conv) {
   return JSON.stringify({ start: conv.start, title: conv.title, alias: conv.alias, model: conv.model, messages: conv.messages.map(keep) });
 }
 
-// A broken file is skipped, so the list still draws.
+// A broken file is skipped and a message that is not an object with a role and text is dropped, so a hand-written file cannot break the list.
+const isMessage = (m) => !!m && typeof m === 'object' && typeof m.role === 'string' && (typeof m.content === 'string' || m.content === null);
+
 export function parse(text) {
   try {
     const conv = JSON.parse(text);
-    if (conv && typeof conv.start === 'number' && Array.isArray(conv.messages)) return conv;
+    if (conv && typeof conv.start === 'number' && Array.isArray(conv.messages)) {
+      conv.messages = conv.messages.filter(isMessage);
+      return conv;
+    }
   } catch (e) {
     // not JSON
   }
@@ -58,5 +65,5 @@ function ageText(s) {
 export function rows(convs, nowMs) {
   return [...convs]
     .sort((a, b) => b.start - a.start)
-    .map((c) => ({ file: c.file, start: c.start, title: c.title, question: cutTo(firstLine(c), 80), age: ageText((nowMs - c.start) / 1000) }));
+    .map((c) => ({ file: c.file, start: c.start, title: cutTo(clean(String(c.title ?? '')), 60), question: cutTo(clean(firstLine(c)), 80), age: ageText((nowMs - c.start) / 1000) }));
 }

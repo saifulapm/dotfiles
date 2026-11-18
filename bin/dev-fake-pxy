@@ -16,7 +16,10 @@ const call = (name, args, i = 0) => ({ index: i, id: `call_${i + 1}`, type: 'fun
 
 // What each word asks of the fake: a reply, tool calls for the first round, an HTTP error, an error in the stream, or a stall.
 const SCENARIOS = [
-  ['hostile', { reply: `Red \x1b[31mtext\u202Eevil.\n\n${'x'.repeat(1 << 20)}\n\nend.`, chunk: 65536, every: 100 }],
+  ['hostile', { reply: `Red \x1b[31mtext\u202Eevil.\n\n${'x'.repeat(1 << 20)}\n\n\`\`\`\n${'y'.repeat(1 << 20)}\n\`\`\`\n\nend.`, chunk: 65536, every: 100 }],
+  // A tool round whose mem call takes 3 s, so stop can land while it runs; it goes before 'slow', since it holds that word.
+  ['slow tool', { tools: [call('mem_search', { query: 'slowly' })], reply: 'Done slowly.' }],
+  ['tool fail', { tools: [call('mem_search', { query: 'island shape' })], afterTools: { status: 500, error: 'fake pxy: failed after the tools' } }],
   ['stall', { reply: 'Thinking about it', stall: 60000 }],
   ['401', { status: 401, error: 'fake pxy: invalid API key' }],
   ['stream error', { reply: 'Part', streamError: 'fake pxy: upstream overloaded' }],
@@ -47,6 +50,7 @@ async function answer(req, res, body) {
   if (s.status) return refuse(res, s.status, s.error);
   const model = modelFor(body.model);
   const lastIsTool = body.messages?.at(-1)?.role === 'tool';
+  if (lastIsTool && s.afterTools) return refuse(res, s.afterTools.status, s.afterTools.error);
   res.writeHead(200, { 'content-type': 'text/event-stream' });
   const send = (delta, finish = null) =>
     res.write(`data: ${JSON.stringify({ id: 'fake', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);

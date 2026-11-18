@@ -107,3 +107,11 @@ test('take runs at most 10 calls a turn', () => {
   assert.deepEqual(take([1, 2], 10), { run: [], skipped: [1, 2] });
   assert.deepEqual(take([1, 2], 0), { run: [1, 2], skipped: [] });
 });
+
+// A chip draws model output, so it is cleaned and cut like a reply.
+test('a chip draws its name and argument cleaned and cut to 120 characters', () => {
+  const chip = chipFor('mem_search\u202E', JSON.stringify({ query: 'a\x1b' + 'q'.repeat(1 << 20) }));
+  assert.equal(chip.name, 'mem_search');
+  assert.ok(chip.arg.length <= 121);
+  assert.ok(!chip.arg.includes('\x1b'));
+});

@@ -57,6 +57,9 @@ Item {
     readonly property color bubble: Qt.alpha(on, 0.12)
     // The danger tone as a colour, so a check compares it with what the alert draws in.
     readonly property color dangerTone: tones.danger
+    // Inline code's tint, mixed opaque into the island's fill, since rich text reads one colour per span.
+    readonly property color codeTint: Qt.tint(fill, Qt.alpha(on, 0.14))
+    readonly property string codeOpen: '<span style="background-color: ' + String(codeTint) + ';">&nbsp;'
     // Code sits on a panel darker than the island's fill.
     readonly property color panel: Qt.darker(fill, 1.35)
     // The island reports this as its surface while the chat shows, and grows to this width for it (board 6).
@@ -78,6 +81,8 @@ Item {
     // The round's calls still to answer, one mem at a time, and the tool messages answered so far.
     property var queue: []
     property var answered: []
+    // Counts turns, so a mem run or a deferred step from a turn that stop, a new message or a new chat ended does nothing.
+    property int turn: 0
     // The chips drawn in this conversation, as {name, arg}.
     property var tools: []
     // The chat page or the history page, and while history shows, its rows newest first, the files they came from and the row picked.
@@ -119,6 +124,12 @@ Item {
         const text = field.text.trim();
         if (text === "" || streaming)
             return;
+        // Typed or pasted text rides in the message, so it answers to the same 512 KiB as a text file.
+        const over = F.check({ name: "the message", kind: "text", size: text.length });
+        if (over) {
+            refusal = over;
+            return;
+        }
         field.text = "";
         if (!conversation) {
             conversation = Date.now();
@@ -132,6 +143,7 @@ Item {
         messages = messages.concat([message]);
         rows.append({ kind: "user", bkind: "", lang: "", html: "", text: text });
         spent = 0;
+        turn += 1;
         ask();
     }
 
@@ -166,10 +178,15 @@ Item {
         req.setRequestHeader("Authorization", "Bearer pxy-local");
         req.setRequestHeader("Content-Type", "application/json");
         // Attachments go on the wire only inside their message's content, and only the turn whose message has an image asks the vision model.
-        const wire = messages.map(m => m.attachments ? { role: m.role, content: F.content(m.content, m.attachments) } : m);
         const users = messages.filter(m => m.role === "user");
-        const asked = F.modelFor(alias, users.length ? users[users.length - 1].attachments : []);
-        req.send(JSON.stringify({ model: asked, stream: true, messages: wire, tools: M.TOOLS }));
+        const last = users.length ? users[users.length - 1] : null;
+        // An earlier turn's images stay out of later requests, which a text model would refuse and which would ride again on every turn.
+        const wire = messages.map(m => m.attachments ? { role: m.role, content: F.content(m.content, m === last ? m.attachments : m.attachments.filter(a => a.kind !== "image")) } : m);
+        const body = { model: F.modelFor(alias, last ? last.attachments : []), stream: true, messages: wire };
+        // Once the turn's 10 calls are spent the tools are left out, so the model has to answer.
+        if (spent < M.CALLS_MAX)
+            body.tools = M.TOOLS;
+        req.send(JSON.stringify(body));
     }
 
     function pickFiles() {
@@ -340,11 +357,12 @@ Item {
             todo.push({ id: call.id, note: "not run: this turn's " + M.CALLS_MAX + " tool calls are spent" });
         queue = todo;
         answered = [];
-        next();
+        next(turn);
     }
 
-    function next() {
-        if (!streaming)
+    // A call answered after stop, a new message or a new chat belongs to a turn that is over, and is dropped.
+    function next(from) {
+        if (!streaming || from !== turn)
             return;
         if (queue.length === 0) {
             messages = messages.concat(answered);
@@ -354,18 +372,21 @@ Item {
         const job = queue[0];
         queue = queue.slice(1);
         if (!job.argv) {
-            answer(job.id, job.note);
+            answer(job.id, job.note, turn);
             return;
         }
         memRun.callId = job.id;
+        memRun.turn = turn;
         memRun.command = ["mem"].concat(job.argv);
         memRun.running = true;
     }
 
     // The next call starts on a later turn of the event loop, so mem's Process is never restarted from inside its own exit.
-    function answer(id, content) {
+    function answer(id, content, from) {
+        if (from !== turn)
+            return;
         answered = answered.concat([{ role: "tool", tool_call_id: id, content: content }]);
-        Qt.callLater(chat.next);
+        Qt.callLater(chat.next, from);
     }
 
     function finish(req) {
@@ -398,6 +419,15 @@ Item {
         const req = xhr;
         xhr = null;
         queue = [];
+        turn += 1;
+        // Stopped between tool rounds, the calls asked have no answers, which pxy would refuse on the next message, so the round leaves the conversation.
+        if (!req) {
+            memRun.running = false;
+            let at = messages.length;
+            while (at > 0 && messages[at - 1].role !== "user")
+                at -= 1;
+            messages = messages.slice(0, at);
+        }
         if (req) {
             req.abort();
             draw(cutter.end(replyText));
@@ -462,7 +492,8 @@ Item {
         if (!conv || streaming)
             return;
         newChat();
-        const kept = conv.messages.filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content !== "").map(m => ({ role: m.role, content: m.content }));
+        // A history file is plain data anyone can write, so what it holds is cleaned as a reply is, and only the two aliases are asked.
+        const kept = conv.messages.filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content !== "").map(m => ({ role: m.role, content: C.clean(m.content) }));
         for (const m of kept) {
             if (m.role === "user") {
                 rows.append({ kind: "user", bkind: "", lang: "", html: "", text: m.content });
@@ -476,9 +507,9 @@ Item {
         }
         messages = kept;
         conversation = conv.start;
-        title = conv.title || H.title(conv);
-        alias = conv.alias || alias;
-        model = conv.model || "";
+        title = C.clean(String(conv.title || H.title(conv))).slice(0, 60);
+        alias = conv.alias === "default" ? "default" : "chat";
+        model = C.clean(String(conv.model || "")).slice(0, 80);
     }
 
     // pxy's own line from its error body, else the HTTP status, else the refused connection.
@@ -497,6 +528,7 @@ Item {
     function newChat() {
         if (streaming)
             return;
+        turn += 1;
         rows.clear();
         messages = [];
         replies = [];
@@ -515,9 +547,10 @@ Item {
         alias = alias === "chat" ? "default" : "chat";
     }
 
-    // r asks again for the last message after pxy failed it.
+    // r asks again after pxy failed the last message, or the request that follows a tool round.
     function retry() {
-        if (streaming || error === "" || messages.length === 0 || messages[messages.length - 1].role !== "user")
+        const last = messages.length ? messages[messages.length - 1].role : "";
+        if (streaming || error === "" || (last !== "user" && last !== "tool"))
             return;
         ask();
     }
@@ -531,10 +564,11 @@ Item {
         return out;
     }
 
-    // Tab moves to the reply list on its last block, and stops there with nothing picked while there is no reply yet, so Tab cycles the same three stops every time.
+    // Tab moves to the reply list on the last reply's code block, so Tab then y copies the code, else on its last block; with no reply yet it stops there with nothing picked, so Tab cycles the same three stops every time.
     function focusReplies() {
         const found = blockRows();
-        pick = found.length ? found[found.length - 1] : -1;
+        const code = found.filter(i => i >= replyRow && rows.get(i).bkind === "code");
+        pick = code.length ? code[code.length - 1] : found.length ? found[found.length - 1] : -1;
         focusArea = "replies";
         replyKeys.forceActiveFocus();
     }
@@ -743,7 +777,8 @@ Item {
         stderr: StdioCollector {
             id: memErr
         }
-        onExited: code => chat.answer(callId, M.cut(code === 0 ? memOut.text : memErr.text))
+        property int turn: 0
+        onExited: code => chat.answer(callId, M.cut(code === 0 ? memOut.text : memErr.text), turn)
     }
 
     // The shell's own file picker, asked over its socket as the island's attach asks it: one request line, one answer line.
@@ -903,6 +938,11 @@ Item {
                         font.family: "Symbols Nerd Font Mono"
                         font.pixelSize: 15
                     }
+
+                    Root.Click {
+                        name: "chat-history"
+                        onTapped: chat.openHistory()
+                    }
                 }
 
                 Rectangle {
@@ -921,6 +961,11 @@ Item {
                         color: chat.on
                         font.family: "Symbols Nerd Font Mono"
                         font.pixelSize: 15
+                    }
+
+                    Root.Click {
+                        name: "chat-new"
+                        onTapped: chat.newChat()
                     }
                 }
             }
@@ -980,7 +1025,8 @@ Item {
                 contentHeight: messageColumn.implicitHeight
                 clip: true
                 boundsBehavior: Flickable.StopAtBounds
-                onContentHeightChanged: if (chat.streaming)
+                // A failure's line with Retry under the message scrolls into view too.
+                onContentHeightChanged: if (chat.streaming || chat.error !== "")
                     contentY = Math.max(0, contentHeight - height)
 
                 Column {
@@ -1020,6 +1066,7 @@ Item {
                                 readonly property string lang: row.lang
                                 readonly property string html: row.html
                                 readonly property string text: row.text
+                                readonly property int rowIndex: row.index
                                 width: parent.width
                                 sourceComponent: row.kind === "user" ? userRow : row.kind === "tool" ? toolRow : row.bkind === "code" ? codeRow : blockRow
                             }
@@ -1159,10 +1206,10 @@ Item {
                                 font.family: "Symbols Nerd Font Mono"
                                 font.pixelSize: 14
 
-                                MouseArea {
-                                    anchors.fill: parent
+                                Root.Click {
+                                    name: "chat-unattach:" + chipLine.parent.index
                                     anchors.margins: -4
-                                    onClicked: chat.removeAttachment(chipLine.parent.index)
+                                    onTapped: chat.removeAttachment(chipLine.parent.index)
                                 }
                             }
                         }
@@ -1187,10 +1234,10 @@ Item {
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: 18
 
-                    MouseArea {
-                        anchors.fill: parent
+                    Root.Click {
+                        name: "chat-attach"
                         anchors.margins: -6
-                        onClicked: chat.pickFiles()
+                        onTapped: chat.pickFiles()
                     }
                 }
 
@@ -1372,9 +1419,10 @@ Item {
 
         Text {
             id: styledBlock
-            textFormat: Text.StyledText
+            // Rich text, so inline code can sit on a tint, the nearest a Text comes to board 6's pill.
+            textFormat: Text.RichText
             wrapMode: Text.Wrap
-            text: parent.html
+            text: parent.html.replace(/<code>/g, chat.codeOpen).replace(/<\/code>/g, "&nbsp;</span>")
             color: chat.on
             font.family: parent.bkind === "table" ? (chat.fonts.mono ?? "") : (chat.fonts.ui ?? "")
             font.pixelSize: parent.bkind === "heading" ? 15 : 13
@@ -1419,6 +1467,11 @@ Item {
                 color: chat.tones.muted
                 font.family: "Symbols Nerd Font Mono"
                 font.pixelSize: 14
+
+                Root.Click {
+                    name: "chat-copy:" + parent.parent.parent.rowIndex
+                    onTapped: chat.copy(parent.parent.parent.text)
+                }
             }
 
             Text {
@@ -1428,7 +1481,7 @@ Item {
                 width: parent.width - 28
                 textFormat: Text.PlainText
                 wrapMode: Text.WrapAnywhere
-                text: parent.parent.text
+                text: parent.parent.html
                 color: chat.on
                 font.family: chat.fonts.mono ?? ""
                 font.pixelSize: 12
