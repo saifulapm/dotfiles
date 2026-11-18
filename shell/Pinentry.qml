@@ -4,7 +4,7 @@ import QtQuick
 import "." as Root
 import "lib/pinentry.mjs" as P
 
-// bin/dots-pinentry's other end: each connection is one gpg request, held open until the card answers it; a request that comes while one shows waits its turn.
+// bin/dots-pinentry's other end: each connection is one gpg-agent pinentry run, whose requests come one line at a time, the retries after a wrong passphrase among them; the prompt holds the island until the run hangs up, and a connection that comes while one shows waits its turn.
 Scope {
     id: pinentry
 
@@ -21,27 +21,35 @@ Scope {
         const c = waiting[0];
         waiting = waiting.slice(1);
         current = c;
+        show(c);
+    }
+
+    function show(c) {
         surfaces.active = true;
         surfaces.item.openPinentry({
             kind: c.request.kind,
             description: c.request.description,
             prompt: c.request.prompt,
             error: c.request.error,
-            answer: text => pinentry.answer(c, text)
+            answer: text => pinentry.answer(c, text),
+            hangUp: () => pinentry.hangUp(c)
         });
     }
 
-    // The card's answer goes to the stub, which hands it to gpg as it is.
+    // The card's answer goes to the stub, which hands it to gpg as it is; the connection stays current, so the prompt holds the island while gpg-agent checks the answer.
     function answer(c, text) {
+        if (current !== c || !c.socket.connected)
+            return;
+        c.socket.write(text);
+        c.socket.flush();
+    }
+
+    // Esc or Cancel while gpg-agent checks an answer: the stub cancels whatever gpg-agent asks next.
+    function hangUp(c) {
         if (current !== c)
             return;
-        current = null;
-        if (c.socket.connected) {
-            c.socket.write(text);
-            c.socket.flush();
-            c.socket.connected = false;
-        }
-        next();
+        c.socket.connected = false;
+        hungUp(c.socket);
     }
 
     // gpg gave up (the client went, or the agent interrupted its pinentry), so its card goes too.
@@ -68,6 +76,12 @@ Scope {
                         connection.write(P.CANCEL);
                         connection.flush();
                         connection.connected = false;
+                        return;
+                    }
+                    // gpg-agent asking again on the shown connection, after a wrong passphrase, shows in the same prompt.
+                    if (pinentry.current?.socket === connection) {
+                        pinentry.current.request = request;
+                        pinentry.show(pinentry.current);
                         return;
                     }
                     pinentry.waiting = pinentry.waiting.concat([{ socket: connection, request: request }]);

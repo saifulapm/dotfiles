@@ -9,8 +9,10 @@ Item {
 
     required property var theme
     property bool shown: false
-    // {kind, description, prompt, error, answer} from the Pinentry service, while a request shows.
+    // {kind, description, prompt, error, answer, hangUp} from the Pinentry service, while a request shows.
     property var request: null
+    // Answered, while gpg-agent checks the answer: the field is empty and inert, and only Esc or Cancel does anything.
+    property bool checking: false
     // The request as the prompt draws it, kept after it closes since the island still draws it on its way out.
     property var seen: null
     // The surface this prompt returns to, as its chip's words; the surfaces' window sets it.
@@ -30,16 +32,19 @@ Item {
         shownAt = Date.now();
         request = r;
         seen = r;
+        checking = false;
         card.input.text = "";
         shown = true;
         (words.field ? card.input : keys).forceActiveFocus();
     }
 
+    // The prompt stays shown after an answer until gpg-agent asks again or its pinentry hangs up, so the island never hands back in between; keys go to the inert keys item meanwhile.
     function reply(text) {
         const r = request;
         request = null;
-        shown = false;
+        checking = true;
         card.input.text = "";
+        keys.forceActiveFocus();
         r?.answer(text);
     }
 
@@ -52,15 +57,20 @@ Item {
             reply(P.pinAnswer(card.input.text));
     }
 
-    // Esc, Cancel or Deny answers the request so gpg never waits on a prompt nobody sees.
+    // Esc, Cancel or Deny answers the request so gpg never waits on a prompt nobody sees, then hangs up, which also cancels a check under way.
     function close() {
+        if (!shown)
+            return;
+        const r = seen;
         if (request)
             reply(seen.kind === "confirm" ? P.DENY : P.CANCEL);
+        r.hangUp();
     }
 
     // gpg went away on its own, so there is nothing to answer.
     function dismiss() {
         request = null;
+        checking = false;
         shown = false;
         card.input.text = "";
     }
@@ -76,6 +86,7 @@ Item {
             settled: prompt.settled,
             drawing: prompt.visible,
             keyboard: card.input.activeFocus || keys.activeFocus,
+            checking: prompt.checking,
             kind: seen?.kind ?? null,
             description: seen?.description ?? "",
             drawnDescription: d.request,
@@ -127,6 +138,7 @@ Item {
         request: prompt.seen?.description ?? ""
         field: prompt.words.field
         placeholder: "Passphrase"
+        input.enabled: !prompt.checking
         error: P.errorLine(prompt.seen?.error ?? "")
         quiet: prompt.words.quiet
         primary: prompt.words.primary

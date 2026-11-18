@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gpg-agent's pinentry-program: speaks Assuan on stdin and stdout, and has the shell draw each prompt, over a socket held open until the card is answered.
+# gpg-agent's pinentry-program: speaks Assuan on stdin and stdout, and has the shell draw each prompt, over one socket held open until the stub exits.
 set -uo pipefail
 {
 
@@ -19,6 +19,19 @@ hang_up() {
 trap hang_up EXIT
 # gpg-agent interrupts its pinentry when the client goes away; hanging up closes the card.
 trap 'exit 1' INT TERM
+# A request written to a shell that hung up meets a closed pipe, which cancels that request instead of ending the stub.
+trap '' PIPE
+
+# gpg-agent asks again in the same run after a wrong passphrase, so one connection carries every request, and the shell's prompt holds the island while gpg-agent checks an answer.
+connect() {
+  local dir
+  dir=$(mktemp -d "${XDG_RUNTIME_DIR:-/tmp}/dots-pinentry.XXXXXX")
+  mkfifo "$dir/to" "$dir/from"
+  socat - "UNIX-CONNECT:$sock" <"$dir/to" >"$dir/from" 2>/dev/null &
+  card_PID=$!
+  exec {to_card}>"$dir/to" {from_card}<"$dir/from"
+  rm -r "$dir"
+}
 
 # ask <kind>: one request line to the shell, then its answer to gpg, which ends at OK or ERR; a shell that hangs up first cancels. gpg's text stays percent-escaped, and tabs are escaped too, since they split the fields; the shell escapes the passphrase, so its D line is relayed as it came.
 ask() {
@@ -29,9 +42,9 @@ ask() {
     error=
     return
   fi
-  coproc card { socat - "UNIX-CONNECT:$sock" 2>/dev/null; }
-  printf '%s\t%s\t%s\t%s\n' "$1" "${desc//$'\t'/%09}" "${prompt//$'\t'/%09}" "${error//$'\t'/%09}" >&"${card[1]}"
-  while IFS= read -r line <&"${card[0]}"; do
+  [[ -n $card_PID ]] || connect
+  printf '%s\t%s\t%s\t%s\n' "$1" "${desc//$'\t'/%09}" "${prompt//$'\t'/%09}" "${error//$'\t'/%09}" 2>/dev/null >&"$to_card"
+  while IFS= read -r line <&"$from_card"; do
     case $line in
       'D '*) printf '%s\n' "$line" ;;
       OK | 'OK '* | 'ERR '*)
@@ -42,9 +55,6 @@ ask() {
     esac
   done
   [[ -n $answered ]] || echo "$cancelled"
-  hang_up
-  wait "$card_PID" 2>/dev/null
-  card_PID=
   # The error belongs to one try.
   error=
 }
