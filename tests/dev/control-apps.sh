@@ -14,7 +14,7 @@ cleanup() { [ ${#players[@]} -eq 0 ] || kill "${players[@]}" 2>/dev/null; }
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # The detail drawn on the row titled $1.
-detail_of() { control_state | jq -r --arg t "$1" '(.rows | index($t)) as $i | if $i == null then empty else .detailsDrawn[$i] end'; }
+detail_of() { control_state | jq -r --arg t "$1" '(.rows | index($t)) as $i | if $i == null then empty else .details[$i] end'; }
 # Presses j or k until the row titled $1 is selected.
 select_row() {
   local i n
@@ -63,7 +63,8 @@ wpctl set-volume "$player" 0.40
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
 until_ok 2000 volume_of "$player" "Volume: 0.40"
 
-niri msg action spawn -- dots-call control toggle
+# Control opens on Home; its Sound page is the section Audio.
+niri msg action spawn -- dots-call control section audio
 until_ok 3000 state_is '.open and .section == "audio" and .keyboard'
 # Rows of a kind keep PipeWire's order, so each kind is read as a set.
 rows_are() { state_is --argjson a "$1" '(.rows[0:2] | sort) == ["Dots null sink","Dots second sink"] and (.rows[2:-1] | sort) == $a and .rows[-1] == "Dots null source"'; }
@@ -109,14 +110,14 @@ check "the detail names Dots null sink" detail_is "Test Player" "Dots null sink 
 
 # The nested PipeWire holds no device, so p and r on an output with none, or on an app, change nothing.
 until_ok 3000 select_row "Dots null sink"
-before=$(control_state | jq -c '[.rows, .detailsDrawn]')
+before=$(control_state | jq -c '[.rows, .details]')
 wtype p
 wtype r
 until_ok 3000 select_row "Test Player"
 wtype p
 wtype r
 sleep 0.5
-check "p and r change no row without a device" test "$(control_state | jq -c '[.rows, .detailsDrawn]')" = "$before"
+check "p and r change no row without a device" test "$(control_state | jq -c '[.rows, .details]')" = "$before"
 
 until_ok 3000 select_row "Bare stream"
 pw-cli destroy "$(node_id node.name bare-stream)" >/dev/null

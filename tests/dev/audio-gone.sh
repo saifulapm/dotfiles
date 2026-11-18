@@ -12,7 +12,8 @@ shell_pid() { systemctl --user show -p MainPID --value "$DOTS_DEV_UNIT"; }
 gone_id() { pw-dump 2>/dev/null | jq -e 'first(.[] | select(.info.props["node.name"]? == "dots-gone") | .id)'; }
 
 until_ok 5000 shell_status >/dev/null
-niri msg action spawn -- dots-call control toggle
+# Control opens on Home; its Sound page is the section Audio.
+niri msg action spawn -- dots-call control section audio
 until_ok 3000 state_is '.open and .section == "audio"'
 
 # The node exists before the defaults name it, so the shell's handle on it is older than either default's.

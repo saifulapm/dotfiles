@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { btHint, btOrder, btRow, wifiLook, wifiOrder, wifiRow } from './control-net.mjs';
+import { btEmpty, btHint, btLook, btOrder, btRow, wifiLook, wifiOrder, wifiRow } from './control-net.mjs';
 
 test('Bluetooth lists connected devices, then paired, then new ones, by name in each', () => {
   const devs = [
@@ -100,4 +100,16 @@ test('a Wi-Fi page row reads as board 4 draws it: glyph by signal, what it is, a
   assert.equal(locked.glyph, String.fromCodePoint(0xf0922));
   assert.equal(locked.mark, String.fromCodePoint(0xf033e));
   assert.equal(wifiLook({ connected: false, known: false, secured: false, signalStrength: 0.1 }).sub, 'Open');
+});
+
+test('a Bluetooth page row: a glyph by kind, Connected with its battery, and a check while connected', () => {
+  const pods = btLook({ icon: 'audio-headset', connected: true, paired: true, battery: 0.8, batteryAvailable: true });
+  assert.equal(pods.glyph, String.fromCodePoint(0xf02cb));
+  assert.equal(pods.sub, 'Connected · 80%');
+  assert.equal(pods.mark, String.fromCodePoint(0xf012c));
+  assert.equal(btLook({ icon: 'input-keyboard', connected: false, paired: true, battery: 0, batteryAvailable: false }).sub, 'Paired');
+  assert.equal(btLook({ icon: '', connected: false, paired: false, battery: 0, batteryAvailable: false }).glyph, String.fromCodePoint(0xf00af));
+  assert.equal(btEmpty({ adapter: false, enabled: false }), 'No Bluetooth');
+  assert.equal(btEmpty({ adapter: true, enabled: false }), 'Bluetooth is off');
+  assert.equal(btEmpty({ adapter: true, enabled: true }), '');
 });

@@ -25,17 +25,12 @@ select_row() {
   return 1
 }
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-section_not() { ! section_is "$1"; }
-tab_to() {
-  local n s
-  until_ok 3000 state_is '.keyboard' || return 1
-  for n in 1 2 3 4 5 6; do
-    section_is "$1" && return 0
-    s=$(control_state | jq -r .section)
-    wtype -k Tab
-    until_ok 2000 section_not "$s" || return 1
-  done
-  section_is "$1"
+# Control opens on the Bluetooth page as Enter on its tile opens it.
+open_bluetooth() {
+  niri msg action spawn -- dots-call control section bluetooth
+  until_ok 3000 section_is bluetooth
+  until_ok 3000 control_focus
+  until_ok 3000 state_is '.keyboard'
 }
 
 # Quickshell's BlueZ client talks to the system bus, which in the nested session is the nested session bus.
@@ -68,10 +63,7 @@ registered() { knob Calls | grep -q RequestDefaultAgent; }
 until_ok 5000 registered
 check "dots-bt-agent registers as the default agent" registered
 
-niri msg action spawn -- dots-call control toggle
-until_ok 3000 section_is audio
-until_ok 3000 control_focus
-tab_to bluetooth
+open_bluetooth
 wtype s
 until_ok 3000 state_is '.rows | index("Test Keyboard") != null'
 check "a scan lists Test Keyboard" detail_is "Test Keyboard" new
@@ -82,7 +74,6 @@ wtype -k Return
 until_ok 3000 asks "Pair Test Keyboard? 123456"
 check "Enter on Test Keyboard asks Pair Test Keyboard? 123456 ($(island | jq -c '{mode, text}'))" asks "Pair Test Keyboard? 123456"
 check "the island names its keys, ↵ yes and esc no" island_is '.pairing.keys == ["↵ yes", "esc no"]'
-check "Control's legend names them too ($(control_state | jq -c .legend))" state_is '.legend | ascii_downcase | contains("yes") and contains("no")'
 # A person may take a while to compare the code: the answer still counts after D-Bus's 25 s default.
 sleep 27
 check "27 s on, the question still shows" asks "Pair Test Keyboard? 123456"
@@ -132,7 +123,7 @@ check "a passkey to type reads Type 111111 on Test Phone" asks "Type 111111 on T
 knob Mistyped o "$phone"
 until_ok 3000 toast_is "Pairing failed: Test Phone"
 check "typed wrong on the device, the question goes and the island shows Pairing failed: Test Phone ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: Test Phone"
-check "and Control's keys move again" state_is '.legend | ascii_downcase | contains("move")'
+check "and Control's keys move again" state_is '.typing | not'
 
 # A PIN typed in the island.
 knob SetPairing osu "$phone" pin 0
@@ -182,10 +173,7 @@ check "with Control closed, Mod+I then Enter allows it" answered allowed
 timeout 0.5 qs ipc call notifs dnd false
 
 # Left unanswered, the agent gives up and the island says the pair failed.
-niri msg action spawn -- dots-call control toggle
-until_ok 3000 section_is audio
-until_ok 3000 control_focus
-tab_to bluetooth
+open_bluetooth
 wtype s
 until_ok 3000 state_is '.rows | index("00:00:00:00:00:07") != null'
 knob SetPairing osu "$nameless" confirm 333333

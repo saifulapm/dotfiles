@@ -4,7 +4,7 @@ import "." as Root
 import "lib/control-net.mjs" as Lib
 import "lib/voice.mjs" as V
 
-// Control's Bluetooth section: the default adapter's devices, from BlueZ's own change events.
+// Control's Bluetooth section: the default adapter's devices, from BlueZ's own change events; Control draws its page.
 Item {
     id: section
 
@@ -23,6 +23,7 @@ Item {
     // A device that sent no name has only BlueZ's alias of its address, so it reads as nameless.
     readonly property var plain: all.map(d => ({
                 name: d.deviceName ? d.name : "",
+                icon: d.icon,
                 address: d.address,
                 connected: d.connected,
                 paired: d.paired,
@@ -32,7 +33,13 @@ Item {
             }))
     readonly property var order: Lib.btOrder(plain, discovering)
     readonly property var devices: order.map(i => all[i])
-    readonly property var rows: order.map(i => Lib.btRow(plain[i]))
+    // Each row's text, and its look on the page: a glyph by kind, what it is and a check while connected.
+    readonly property var rows: order.map(i => Object.assign(Lib.btRow(plain[i]), Lib.btLook(plain[i])))
+    // What the page says in place of rows with no adapter or one turned off.
+    readonly property string empty: Lib.btEmpty({
+        adapter: !!adapter,
+        enabled: on
+    })
 
     // The item a key last acted on: the reorder its connect causes keeps the selection on it, and moving away lets it go.
     property var picked: null
@@ -90,26 +97,9 @@ Item {
     function state() {
         return {
             details: rows.map(r => r.detail),
-            hint: hint.text,
+            empty: empty,
             powered: on,
             discovering: discovering
         };
-    }
-
-    implicitHeight: hint.implicitHeight
-
-    Text {
-        id: hint
-        textFormat: Text.PlainText
-        leftPadding: 20
-        text: section.look.tabText(Lib.btHint({
-            adapter: !!section.adapter,
-            enabled: section.on,
-            discovering: section.discovering
-        }))
-        color: section.look.small.color
-        font.family: section.look.small.font
-        font.pixelSize: section.look.small.size
-        font.letterSpacing: section.look.small.spacing
     }
 }

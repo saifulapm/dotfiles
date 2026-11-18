@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { appStreams, appTitle, appRow, nextSink, devices, nextProfile, nextRoute, deviceParts, changeToast } from './control-audio.mjs';
+import { appStreams, appTitle, appRow, nextSink, devices, nextProfile, nextRoute, deviceParts, changeToast, soundLook } from './control-audio.mjs';
 
 // The MacBook's two Built-in Audio cards, as pw-dump read them on 2026-10-30: 45 with off, HiFi and pro-audio, 46 with a route each way.
 const dump = JSON.parse(readFileSync(new URL('./testdata/pw-dump-builtin.json', import.meta.url)));
@@ -92,4 +92,19 @@ test('a wpctl or pw-metadata call that fails says so, and one that works says no
 test("an app's title keeps to one line whatever its name holds", () => {
   assert.equal(appTitle({ 'application.name': 'مرحبا\nworld' }), 'مرحبا world');
   assert.equal(appTitle({ 'application.name': ' Test \t\r\n Player ' }), 'Test Player');
+});
+
+test('a Sound page row: a caption over the first of each kind, its percent or muted, and a check on the default', () => {
+  const out = soundLook({ kind: 'sink', first: true, volume: 0.62, muted: false, isDefault: true });
+  assert.equal(out.cap, 'OUTPUT');
+  assert.equal(out.value, '62%');
+  assert.equal(out.level, 0.62);
+  assert.equal(out.mark, String.fromCodePoint(0xf012c));
+  assert.equal(soundLook({ kind: 'app', first: true, volume: 1, muted: false }).cap, 'PLAYING');
+  const mic = soundLook({ kind: 'source', first: false, volume: 0.4, muted: true, isDefault: false });
+  assert.equal(mic.cap, '');
+  assert.equal(mic.value, 'muted');
+  assert.equal(mic.level, 0);
+  assert.equal(mic.glyph, String.fromCodePoint(0xf036d));
+  assert.equal(soundLook({ kind: 'source', first: true, volume: 1.5, muted: false }).level, 1);
 });

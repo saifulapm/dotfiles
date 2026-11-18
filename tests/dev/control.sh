@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+C opens Control on Audio; Tab moves between sections; h/l, m and Enter act on the nested PipeWire's nodes.
+# Mod+C opens Control on Home; Enter on Sound opens its page of outputs, playing apps and inputs, where = and -, h/l, m and Enter act on the nested PipeWire's nodes.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -13,13 +13,6 @@ state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_c() { niri msg action spawn -- dots-call control toggle; }
 control_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-# The Audio tab's left padding, left of its text, drawn in the pill's tint only while Control shows on audio.
-tab_rgb() {
-  local geo
-  geo=$(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x + (.width / 2 | floor) - 339),\(.y + 186) 5x16"')
-  grim -s 1 -t ppm -g "$geo" - | mean_rgb
-}
-tab_is_tint() { local r g b; read -r r g b < <(tab_rgb); ((r > 230 && r < 246 && g > 233 && g < 249 && b > 247)); }
 section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 volume_is() { [ "$(wpctl get-volume @DEFAULT_AUDIO_SINK@)" = "$1" ]; }
 # Presses j until the row titled $1 is selected.
@@ -41,27 +34,25 @@ wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
 wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 mod_c
-control_shown() { section_is audio && state_is .settled && control_focus Exclusive && tab_is_tint; }
+control_shown() { section_is home && state_is .settled && control_focus Exclusive; }
 until_ok 3000 control_shown
-check "Mod+C shows Control on audio with exclusive keyboard" control_shown
+check "Mod+C shows Control on Home with exclusive keyboard" control_shown
 check "state lists the six sections in order" state_is '.sections == ["audio","wifi","bluetooth","power","display","route"]'
 until_ok 3000 state_is '(.openMs | type) == "number" and .opens == 1'
 check "the open reports a numeric openMs" state_is '(.openMs | type) == "number"'
 
-# Tabs sent before Control has the keyboard arrive late, so they wait for it.
+# Keys sent before Control has the keyboard arrive late, so they wait for it.
 until_ok 3000 state_is '.keyboard'
-wtype -k Tab
-wtype -k Tab
-until_ok 2000 section_is bluetooth
-check "Tab twice is bluetooth" section_is bluetooth
-wtype -M shift -k Tab -m shift
-until_ok 2000 section_is wifi
-check "Shift+Tab once is wifi" section_is wifi
-wtype -M shift -k Tab -m shift
+wtype l
+wtype l
+until_ok 2000 state_is '.cursor == "sound"'
+wtype -k Return
 until_ok 2000 section_is audio
-
+check "Enter on the Sound tile opens the Sound page" section_is audio
 until_ok 3000 state_is '.rows | index("Dots second sink") != null'
 check "Audio lists both sinks and the source" state_is '.rows | (index("Dots null sink") != null and index("Dots second sink") != null and index("Dots null source") != null)'
+check "under OUTPUT and INPUT captions ($(control_state | jq -c .caps))" state_is '.caps[0] == "OUTPUT" and (.caps | index("INPUT")) == (.rows | index("Dots null source"))'
+check "each with its percent ($(control_state | jq -c .detailsDrawn))" state_is '.detailsDrawn[.rows | index("Dots null sink")] == "40%"'
 until_ok 3000 select_row "Dots null sink"
 wtype l
 until_ok 2000 volume_is "Volume: 0.45"
@@ -72,6 +63,12 @@ check "m mutes it" volume_is "Volume: 0.45 [MUTED]"
 wtype m
 until_ok 2000 volume_is "Volume: 0.45"
 check "m again unmutes it" volume_is "Volume: 0.45"
+wtype =
+until_ok 2000 volume_is "Volume: 0.50"
+check "= on its row raises it 5%" volume_is "Volume: 0.50"
+wtype -k minus
+until_ok 2000 volume_is "Volume: 0.45"
+check "and - lowers it 5%" volume_is "Volume: 0.45"
 
 until_ok 3000 select_row "Dots second sink"
 wtype -k Return
@@ -82,9 +79,12 @@ check "state reports dots-null-2 as the default sink" state_is '.defaultSink == 
 echo "     state: $(control_state)"
 
 wtype -k Escape
-control_gone() { state_is '.open == false and .drawing == false' && control_focus None && ! tab_is_tint; }
+until_ok 2000 section_is home
+check "Esc returns to Home with Sound focused" state_is '.open and .cursor == "sound"'
+wtype -k Escape
+control_gone() { state_is '.open == false and .drawing == false' && control_focus None; }
 until_ok 2000 control_gone
-check "Esc closes Control and releases the keyboard" control_gone
+check "Esc again closes Control and releases the keyboard" control_gone
 
 timeout 0.5 qs ipc call control section power
 until_ok 3000 section_is power

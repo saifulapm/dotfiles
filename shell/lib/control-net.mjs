@@ -23,6 +23,27 @@ export function btRow(dev) {
   return { title: line((dev.name || '').replace(CONTROL, ' ')) || dev.address, detail: (dev.connected ? 'connected' : dev.paired ? 'paired' : 'new') + trusted + battery };
 }
 
+// A Bluetooth page row as board 4 draws it: a glyph by the device's kind, Connected with its battery, Paired or New, and a check while connected.
+export function btLook(dev) {
+  const icon = dev.icon || '';
+  const glyph = /audio|head/.test(icon) ? 0xf02cb : /keyboard/.test(icon) ? 0xf030c : /mouse/.test(icon) ? 0xf037d : /phone/.test(icon) ? 0xf011c : 0xf00af;
+  const percent = Math.round(dev.battery * 100);
+  const battery = dev.connected && dev.batteryAvailable && percent >= 0 && percent <= 100 ? ' · ' + percent + '%' : '';
+  return {
+    glyph: String.fromCodePoint(glyph),
+    sub: (dev.connected ? 'Connected' : dev.paired ? 'Paired' : 'New') + battery,
+    mark: dev.connected ? String.fromCodePoint(0xf012c) : '',
+    markTone: 'accent',
+  };
+}
+
+// What the Bluetooth page says in place of its rows when it has none to list: no adapter, or one turned off.
+export function btEmpty(a) {
+  if (!a.adapter) return 'No Bluetooth';
+  if (!a.enabled) return 'Bluetooth is off';
+  return '';
+}
+
 // With the adapter off its other keys do nothing, so the hint offers only o.
 export function btHint(a) {
   if (!a.adapter) return 'No Bluetooth';

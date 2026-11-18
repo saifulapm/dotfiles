@@ -81,3 +81,16 @@ export function deviceParts(device, direction, cardDevice) {
 export function changeToast(exitCode) {
   return exitCode === 0 ? null : 'Audio change failed';
 }
+
+// A Sound page row as board 4 draws it: OUTPUT, PLAYING or INPUT over the first of its kind, a glyph in a circle, a pill slider, the percent and a check on the default; kind is sink, app or source.
+export function soundLook(r) {
+  const glyph = r.kind === 'app' ? 0xf075a : r.kind === 'source' ? (r.muted ? 0xf036d : 0xf036c) : r.muted ? 0xf0581 : 0xf04c3;
+  return {
+    cap: r.first ? { sink: 'OUTPUT', app: 'PLAYING', source: 'INPUT' }[r.kind] : '',
+    glyph: String.fromCodePoint(glyph),
+    level: r.muted ? 0 : Math.max(0, Math.min(1, r.volume)),
+    value: r.muted ? 'muted' : Math.round(r.volume * 100) + '%',
+    mark: r.isDefault ? String.fromCodePoint(0xf012c) : '',
+    markTone: 'accent',
+  };
+}

@@ -33,33 +33,21 @@ powered_is() { [ "$(bus get-property org.bluez /org/bluez/hci0 org.bluez.Adapter
 methods() { bus call org.bluez /org/bluez org.dots.FakeBluez Methods; }
 
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
-section_not() { ! section_is "$1"; }
-tab_to() {
-  local n s
-  until_ok 3000 state_is '.keyboard' || return 1
-  for n in 1 2 3 4 5 6; do
-    section_is "$1" && return 0
-    s=$(control_state | jq -r .section)
-    wtype -k Tab
-    until_ok 2000 section_not "$s" || return 1
-  done
-  section_is "$1"
-}
+# Control opens on the Bluetooth page as Enter on its tile opens it.
 open_bluetooth() {
-  niri msg action spawn -- dots-call control toggle
-  until_ok 3000 section_is audio
+  niri msg action spawn -- dots-call control section bluetooth
+  until_ok 3000 section_is bluetooth
   until_ok 3000 control_focus
-  tab_to bluetooth
+  until_ok 3000 state_is '.keyboard'
 }
-# The hint as drawn, which a caps voice draws upper case.
-hint_is() { state_is --arg h "$1" '(.hint | ascii_downcase) == $h'; }
+# What the page says in place of rows, which a caps voice draws upper case.
+empty_is() { state_is --arg h "$1" '(.empty | ascii_downcase) == $h'; }
 
 # With no BlueZ on the bus there is no adapter.
 open_bluetooth
-until_ok 2000 hint_is "no bluetooth"
-check "with no adapter the hint reads No Bluetooth ($(control_state | jq -c .hint))" hint_is "no bluetooth"
-wtype -k Escape
+until_ok 2000 empty_is "no bluetooth"
+check "with no adapter the page reads No Bluetooth ($(control_state | jq -c .empty))" empty_is "no bluetooth"
+timeout 0.5 qs ipc call control close
 until_ok 3000 state_is '.open == false'
 
 DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
@@ -78,7 +66,7 @@ until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 
 open_bluetooth
-check "Tab twice is bluetooth" section_is bluetooth
+check "Control opens on the Bluetooth page" section_is bluetooth
 check "Bluetooth opens on its first row, Test Headphones" state_is '.selected == 0 and .rows[0] == "Test Headphones"'
 until_ok 3000 detail_is "Test Headphones" "paired · trusted"
 echo "     state: $(control_state)"
@@ -92,7 +80,8 @@ until_ok 3000 detail_is "Test Mouse" new
 check "the scan lists Test Mouse as new" detail_is "Test Mouse" new
 check "Test Speaker reads new while the scan runs" detail_is "Test Speaker" new
 check "the nameless device shows its address, last and after Test Mouse ($(control_state | jq -c .rows))" state_is '.rows[-1] == "00:00:00:00:00:07" and (.rows | index("00:00:00:00:00:07")) > (.rows | index("Test Mouse"))'
-check "the hint offers s stop ($(control_state | jq -c .hint))" state_is '.hint | ascii_downcase | contains("s stop")'
+check "a scanning row shows under the devices" state_is '.scanning'
+check "each row reads as board 4 draws it ($(control_state | jq -c .detailsDrawn))" state_is '.detailsDrawn[.rows | index("Test Mouse")] == "New"'
 
 until_ok 3000 select_row "Test Headphones"
 wtype -k Return
@@ -154,8 +143,8 @@ check "and Test Mouse leaves the list" state_is '.rows | index("Test Mouse") == 
 wtype o
 until_ok 3000 powered_is false
 check "o turns the adapter off (BlueZ reports Powered false)" powered_is false
-until_ok 2000 hint_is "bluetooth off · o turn on"
-check "the hint reads Bluetooth off · o turn on ($(control_state | jq -c .hint))" hint_is "bluetooth off · o turn on"
+until_ok 2000 empty_is "bluetooth is off"
+check "the page reads Bluetooth is off ($(control_state | jq -c .empty))" empty_is "bluetooth is off"
 check "an adapter that is off lists no devices" state_is '.rows == []'
 before=$(methods)
 wtype s
@@ -175,7 +164,7 @@ until_ok 3000 discovering_is true
 check "a scan runs again" discovering_is true
 wtype -k Escape
 until_ok 3000 discovering_is false
-check "Esc closing Control mid-scan stops the scan" discovering_is false
+check "Esc leaving the page mid-scan stops the scan" discovering_is false
 
 exit $((fails > 0))
 }

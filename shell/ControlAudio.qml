@@ -50,7 +50,19 @@ Item {
     property var devices: ({})
     // A profile change makes its device's nodes anew, so a new set of nodes is read again.
     readonly property string nodeIds: all.map(n => n.id).join(",")
-    readonly property var rows: entries.map(e => e.sink ? A.appRow({
+    // Each row's text, and its look on the Sound page: a caption over the first of its kind, a glyph, a slider, the percent and a check on the default.
+    readonly property var rows: entries.map((e, i) => Object.assign(rowText(e), A.soundLook({
+                    kind: kindOf(e),
+                    first: i === 0 || kindOf(entries[i - 1]) !== kindOf(e),
+                    volume: e.node.audio.volume,
+                    muted: e.node.audio.muted,
+                    isDefault: !e.sink && e.node === (e.node.isSink ? defaultSink : defaultSource)
+                })))
+    function kindOf(e) {
+        return e.sink ? "app" : e.node.isSink ? "sink" : "source";
+    }
+    function rowText(e) {
+        return e.sink ? A.appRow({
                     title: A.appTitle(e.node.properties ?? {}),
                     sink: e.sink.description || e.sink.name,
                     volume: e.node.audio.volume,
@@ -63,7 +75,8 @@ Item {
                     muted: e.node.audio.muted,
                     isDefault: e.node === (e.node.isSink ? defaultSink : defaultSource),
                     device: deviceOf(e.node) ? A.deviceParts(deviceOf(e.node), direction(e.node), cardDevice(e.node)) : []
-                }))
+                });
+    }
 
     // The selected row's node, so an app starting or stopping above it never moves the cursor onto another row; once its node goes, the cursor stays put, never past the last row.
     property var held: null
