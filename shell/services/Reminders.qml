@@ -1,6 +1,7 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import ".." as Root
 import "../lib/reminders.mjs" as R
 
 // The launcher's reminders, kept in the state dir so they outlive a restart or a reboot.
@@ -15,6 +16,28 @@ Scope {
     property var now: null
 
     onNowChanged: ring()
+
+    // The soonest reminder rings at its own second, not at the next minute tick; the timer runs only while one waits.
+    readonly property real soonest: list.length ? Math.min(...list.map(r => r.due)) : 0
+    onSoonestChanged: {
+        dueTick.stop();
+        if (soonest) {
+            dueTick.interval = Math.max(0, Math.min(soonest - Date.now(), 2147483647));
+            dueTick.start();
+        }
+    }
+
+    // A coarse timer may fire a little early, so one that finds nothing due yet waits the rest.
+    Root.Tick {
+        id: dueTick
+        onTriggered: {
+            reminders.ring();
+            if (reminders.soonest > Date.now()) {
+                interval = reminders.soonest - Date.now() + 50;
+                start();
+            }
+        }
+    }
 
     // Rings each due reminder as an ordinary notification, after dropping it from the file, so a crash between the two never rings it twice.
     function ring() {

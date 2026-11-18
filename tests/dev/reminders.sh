@@ -124,7 +124,7 @@ set_at=$(date +%s)
 until_ok 125000 island_says "Reminder · tea"
 took=$(($(date +%s) - set_at))
 echo "     rang after ${took} s"
-check "r 1m tea rings Reminder · tea in the island 60 to 120 s later" bash -c "[ $took -ge 59 ] && [ $took -le 121 ]"
+check "r 1m tea rings Reminder · tea in the island 1 min later, at its own second, not the next minute's tick" bash -c "[ $took -ge 59 ] && [ $took -le 63 ]"
 check "and drops it from the file" stored 'length == 0'
 
 exit $((fails > 0))
