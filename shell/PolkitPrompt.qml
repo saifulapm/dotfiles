@@ -115,6 +115,7 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("polkit")
+    Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "polkit")
 
     // A press anywhere on the prompt is on its card, so the surfaces' window never takes it for a click outside.
     Item {

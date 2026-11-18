@@ -262,7 +262,7 @@ PanelWindow {
         interval: 50
         repeat: true
         onTriggered: {
-            const next = [launcherLoader, notifsLoader, cheatsheetLoader, controlLoader, recorderLoader, polkitLoader, goalsLoader].find(l => !l.active && (l !== goalsLoader || host.goals));
+            const next = [launcherLoader, notifsLoader, cheatsheetLoader, controlLoader, recorderLoader, goalsLoader].find(l => !l.active && (l !== goalsLoader || host.goals));
             if (next)
                 next.active = true;
             else
@@ -563,6 +563,13 @@ PanelWindow {
             onShownChanged: if (!shown)
                 host.handBack(host.polkit)
         }
+    }
+
+    // Built on its first request rather than warmed, so the island card costs no idle memory; it unloads 30 s after it hands the island back.
+    Root.Tick {
+        interval: 30000
+        running: !!host.polkit && !host.polkit.shown
+        onTriggered: polkitLoader.active = false
     }
 
     // The pairing prompt draws inside the island the same way, over the surface it covers (board 7).

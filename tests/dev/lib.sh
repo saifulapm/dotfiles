@@ -158,7 +158,7 @@ live_lock() { timeout 2 env -u QS_CONFIG_PATH WAYLAND_DISPLAY="$live_wl" "$repo/
 # The EXIT trap compares the lock state against this, since the live state has no lock time.
 lock_start=$(live_lock)
 # The shell makes its surfaces a second after its first frame, with its warm-up's Ticks running, so a check starts once the shell is at rest.
-at_rest() { shell_status | jq -e '.timers == 1 and (.loaded | length) >= 7' >/dev/null 2>&1; }
+at_rest() { shell_status | jq -e '.timers == 1 and (.loaded | length) >= 6' >/dev/null 2>&1; }
 until_ok 6000 at_rest
 
 
