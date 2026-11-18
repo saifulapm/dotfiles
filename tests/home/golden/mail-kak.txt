@@ -167,6 +167,7 @@ three
 
 -- kak
 set-option buffer mail_msgs '1:t1@x.test' '10:t2@x.test' '21:t3@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000001
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Bob <bob@people.test>
@@ -179,6 +180,7 @@ Friday at one?
 
 -- kak
 set-option buffer mail_msgs '1:imbox@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000002
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Bob <bob@people.test>
@@ -191,6 +193,7 @@ old news
 
 -- kak
 set-option buffer mail_msgs '1:seen@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000003
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Carol <carol@new.test>
@@ -212,6 +215,7 @@ again
 
 -- kak
 set-option buffer mail_msgs '1:scr1@x.test' '10:scr2@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000004
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: News <news@feed.test>
@@ -224,6 +228,7 @@ this week
 
 -- kak
 set-option buffer mail_msgs '1:feed1@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000005
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: News <news@feed.test>
@@ -236,6 +241,7 @@ that week
 
 -- kak
 set-option buffer mail_msgs '1:feed2@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000006
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Shop <hi@shop.test>
@@ -252,6 +258,7 @@ References
 
 -- kak
 set-option buffer mail_msgs '1:h1@shop.test'
+set-option buffer mail_start 1
 == show thread:0000000000000007
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Dee <dee@people.test>
@@ -264,6 +271,7 @@ when you can
 
 -- kak
 set-option buffer mail_msgs '1:later@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000008
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Eve <eve@people.test>
@@ -276,6 +284,7 @@ keep these
 
 -- kak
 set-option buffer mail_msgs '1:aside@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000009
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Fay <fay@people.test>
@@ -288,6 +297,7 @@ bubble up
 
 -- kak
 set-option buffer mail_msgs '1:bubble@x.test'
+set-option buffer mail_start 1
 == show thread:000000000000000a
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Gus <gus@people.test>
@@ -300,6 +310,7 @@ read it
 
 -- kak
 set-option buffer mail_msgs '1:read@x.test'
+set-option buffer mail_start 1
 == show thread:000000000000000b
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Me <me@x.test>
@@ -312,6 +323,7 @@ remember
 
 -- kak
 set-option buffer mail_msgs '1:note@x.test'
+set-option buffer mail_start 1
 == show thread:000000000000000c
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: List <l@lists.test>
@@ -324,6 +336,7 @@ noise
 
 -- kak
 set-option buffer mail_msgs '1:muted@x.test'
+set-option buffer mail_start 1
 == show thread:000000000000000d
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Me <me@x.test>
@@ -336,6 +349,7 @@ yes
 
 -- kak
 set-option buffer mail_msgs '1:sent@x.test'
+set-option buffer mail_start 1
 == show thread:000000000000000f
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Ivy <ivy@people.test>
@@ -348,6 +362,7 @@ plain wins
 
 -- kak
 set-option buffer mail_msgs '1:alt@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000010
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Jo <jo@people.test>
@@ -360,6 +375,7 @@ un café crème
 
 -- kak
 set-option buffer mail_msgs '1:cp1252@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000011
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Kim <kim@people.test>
@@ -374,6 +390,7 @@ see attached, and https://x.test/doc
 
 -- kak
 set-option buffer mail_msgs '1:att@x.test'
+set-option buffer mail_start 1
 == show thread:0000000000000012
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 From: Lee <lee@people.test>
@@ -393,3 +410,4 @@ inner body
 
 -- kak
 set-option buffer mail_msgs '1:fwd@x.test'
+set-option buffer mail_start 1
