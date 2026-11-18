@@ -6,6 +6,7 @@ import "lib/surface.mjs" as S
 import "lib/island-tones.mjs" as T
 import "lib/chat.mjs" as C
 import "lib/chat-tools.mjs" as M
+import "lib/chat-history.mjs" as H
 
 // The AI chat inside the island, as board 6 draws it: Saiful's messages in a bubble, replies streamed from pxy as Markdown blocks, each closed block drawn once and kept.
 Item {
@@ -78,6 +79,13 @@ Item {
     property var answered: []
     // The chips drawn in this conversation, as {name, arg}.
     property var tools: []
+    // The chat page or the history page, and while history shows, its rows newest first, the files they came from and the row picked.
+    property string page: "chat"
+    property var listed: []
+    property var found: []
+    property int historyPick: 0
+    // Where each conversation is kept, one JSON file each.
+    readonly property string store: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share") + "/dots/chat"
 
     function open(t0) {
         openT0 = t0;
@@ -274,6 +282,7 @@ Item {
         xhr = null;
         unseen = !shown;
         streaming = false;
+        save();
     }
 
     // The stop button ends the turn where it stands: the stream is cut off, what came stays drawn, and no tool call after it runs.
@@ -292,6 +301,78 @@ Item {
             }
         }
         streaming = false;
+        save();
+    }
+
+    // The whole conversation is written over its file after each turn, then the oldest past 50 are deleted.
+    function save() {
+        if (!conversation)
+            return;
+        saver.createObject(chat, { file: H.fileName(conversation), text: H.serialize({ start: conversation, title: title, alias: alias, model: model, messages: messages }) });
+    }
+
+    function pruneFrom(names) {
+        const old = H.prune(names.split("\n"));
+        if (old.length)
+            remover.createObject(chat, { command: ["rm", "-f", "--"].concat(old.map(n => store + "/" + n)) });
+    }
+
+    // The files are read only while the history page shows, so nothing of them is held at rest.
+    function openHistory() {
+        page = "history";
+        focusArea = "history";
+        historyPick = 0;
+        listed = [];
+        found = [];
+        historyKeys.forceActiveFocus();
+        lister.running = true;
+    }
+
+    // Each line is a file's name, a tab, then its JSON, which JSON.stringify writes with no raw newline.
+    function listFrom(out) {
+        if (page !== "history")
+            return;
+        const convs = [];
+        for (const line of out.split("\n")) {
+            const tab = line.indexOf("\t");
+            const conv = tab > 0 ? H.parse(line.slice(tab + 1)) : null;
+            if (!conv)
+                continue;
+            conv.file = line.slice(0, tab);
+            convs.push(conv);
+        }
+        found = convs;
+        listed = H.rows(convs, Date.now());
+    }
+
+    function moveHistory(by) {
+        historyPick = Math.max(0, Math.min(listed.length - 1, historyPick + by));
+    }
+
+    // Tool rounds cannot be replayed, so a reopened conversation keeps only its typed messages and the replies' text.
+    function reopen() {
+        const row = listed[historyPick];
+        const conv = row ? found.find(c => c.start === row.start) : null;
+        if (!conv || streaming)
+            return;
+        newChat();
+        const kept = conv.messages.filter(m => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content !== "").map(m => ({ role: m.role, content: m.content }));
+        for (const m of kept) {
+            if (m.role === "user") {
+                rows.append({ kind: "user", bkind: "", lang: "", html: "", text: m.content });
+                continue;
+            }
+            replyRow = rows.count;
+            for (const block of C.blocks().end(m.content).closed)
+                put(rows.count, block);
+            replyBlocks = rows.count - replyRow;
+            replies = replies.concat([{ row: replyRow, text: m.content }]);
+        }
+        messages = kept;
+        conversation = conv.start;
+        title = conv.title || H.title(conv);
+        alias = conv.alias || alias;
+        model = conv.model || "";
     }
 
     // pxy's own line from its error body, else the HTTP status, else the refused connection.
@@ -352,7 +433,11 @@ Item {
         replyKeys.forceActiveFocus();
     }
 
+    // Back in the field the history page closes, and its rows are let go.
     function focusInput() {
+        page = "chat";
+        listed = [];
+        found = [];
         focusArea = "input";
         field.forceActiveFocus();
     }
@@ -404,6 +489,8 @@ Item {
             focus: focusArea,
             pick: pick,
             drawn: drawn(),
+            page: page,
+            history: page === "history" ? listed.map(r => ({ title: r.title, question: r.question, age: r.age })) : [],
             failure: { drawn: failureLine.visible, retry: retryButton.visible, alert: String(alertGlyph.color) },
             danger: String(dangerTone),
             openMs: openMs,
@@ -448,6 +535,26 @@ Item {
             else if (event.key === Qt.Key_R)
                 chat.retry();
             else if (event.key === Qt.Key_Tab)
+                chat.openHistory();
+            else if (event.key === Qt.Key_Escape)
+                chat.close();
+            else
+                return;
+            event.accepted = true;
+        }
+    }
+
+    // The history page's keys, held while Tab has moved there.
+    Item {
+        id: historyKeys
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
+                chat.moveHistory(1);
+            else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
+                chat.moveHistory(-1);
+            else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                chat.reopen();
+            else if (event.key === Qt.Key_Tab)
                 chat.focusInput();
             else if (event.key === Qt.Key_Escape)
                 chat.close();
@@ -455,6 +562,49 @@ Item {
                 return;
             event.accepted = true;
         }
+    }
+
+    // The JSON goes on stdin into a hidden temp file that mv puts in place, so a reader never sees half a file; the names that follow let the oldest be pruned.
+    Component {
+        id: saver
+
+        Process {
+            property string file
+            property string text
+            running: true
+            stdinEnabled: true
+            command: ["sh", "-c", 'mkdir -p "$1" && cat > "$1/.$2.tmp" && mv "$1/.$2.tmp" "$1/$2" && ls -1 "$1"', "sh", chat.store, file]
+            stdout: StdioCollector {
+                id: savedNames
+            }
+            onStarted: {
+                write(text);
+                stdinEnabled = false;
+            }
+            onExited: code => {
+                if (code === 0)
+                    chat.pruneFrom(savedNames.text);
+                destroy();
+            }
+        }
+    }
+
+    Component {
+        id: remover
+
+        Process {
+            running: true
+            onExited: destroy()
+        }
+    }
+
+    Process {
+        id: lister
+        command: ["sh", "-c", 'cd "$1" 2>/dev/null || exit 0; for f in *.json; do [ -f "$f" ] || continue; printf "%s\\t" "$f"; tr -d "\\n" < "$f"; echo; done', "sh", chat.store]
+        stdout: StdioCollector {
+            id: listedFiles
+        }
+        onExited: chat.listFrom(listedFiles.text)
     }
 
     // wl-copy serves the copy itself, so it outlives the chat; the text goes on stdin, since one argument is capped at 128 KiB.
@@ -603,9 +753,18 @@ Item {
                 }
             }
 
+            // The history page, made only while it shows: one tile per conversation, its title, its first question and its age.
+            Loader {
+                id: historyLoader
+                active: chat.page === "history"
+                visible: active
+                width: column.width
+                sourceComponent: historyPage
+            }
+
             // A new chat: a sparkle in a circle and what the chat can do.
             Item {
-                visible: rows.count === 0
+                visible: rows.count === 0 && chat.page === "chat"
                 width: column.width
                 height: visible ? 150 : 0
 
@@ -643,7 +802,7 @@ Item {
             // The conversation, scrolled to its end while a reply arrives.
             Flickable {
                 id: list
-                visible: rows.count > 0
+                visible: rows.count > 0 && chat.page === "chat"
                 width: column.width
                 height: visible ? Math.min(contentHeight, 440) : 0
                 contentHeight: messageColumn.implicitHeight
@@ -1005,6 +1164,97 @@ Item {
                 color: chat.on
                 font.family: chat.fonts.mono ?? ""
                 font.pixelSize: 12
+            }
+        }
+    }
+
+    // The picked conversation sits on the lit tile, and the page scrolls to keep it in view.
+    Component {
+        id: historyPage
+
+        Flickable {
+            id: historyList
+            readonly property int picked: chat.historyPick
+            implicitHeight: chat.listed.length ? Math.min(contentHeight, 440) : 60
+            contentHeight: historyColumn.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+            onPickedChanged: {
+                const item = historyRepeater.itemAt(picked);
+                if (!item)
+                    return;
+                if (item.y < contentY)
+                    contentY = item.y;
+                else if (item.y + item.height > contentY + height)
+                    contentY = item.y + item.height - height;
+            }
+
+            Text {
+                visible: chat.listed.length === 0
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "No conversations yet"
+                color: chat.tones.muted
+                font.family: chat.fonts.ui ?? ""
+                font.pixelSize: 13
+            }
+
+            Column {
+                id: historyColumn
+                width: historyList.width
+                spacing: 6
+
+                Repeater {
+                    id: historyRepeater
+                    model: chat.listed
+
+                    delegate: Rectangle {
+                        id: historyRow
+                        required property int index
+                        required property var modelData
+                        width: historyColumn.width
+                        height: 52
+                        radius: 12
+                        color: chat.historyPick === index ? chat.bubble : chat.tile
+
+                        Text {
+                            x: 14
+                            y: 8
+                            width: parent.width - 28 - ageText.implicitWidth - 12
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            text: historyRow.modelData.title || "New chat"
+                            color: chat.on
+                            font.family: chat.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                        }
+
+                        Text {
+                            x: 14
+                            y: 28
+                            width: parent.width - 28
+                            textFormat: Text.PlainText
+                            elide: Text.ElideRight
+                            text: historyRow.modelData.question
+                            color: chat.tones.muted
+                            font.family: chat.fonts.ui ?? ""
+                            font.pixelSize: 12
+                        }
+
+                        Text {
+                            id: ageText
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
+                            y: 8
+                            textFormat: Text.PlainText
+                            text: historyRow.modelData.age
+                            color: chat.tones.muted
+                            font.family: chat.fonts.ui ?? ""
+                            font.pixelSize: 12
+                        }
+                    }
+                }
             }
         }
     }

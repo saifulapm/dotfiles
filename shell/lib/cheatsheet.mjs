@@ -121,7 +121,7 @@ export const IN_SURFACES = [
   // The chat's field sends on Enter; Tab moves to the reply list, where the letters work.
   ['chat', '↵', 'Send'],
   ['chat', '⇧ ↵', 'New Line'],
-  ['chat', 'Tab', 'Go to the Replies or Back'],
+  ['chat', 'Tab', 'Go to the Replies, the History or Back'],
   ['chat', '⌃ N', 'New Chat'],
   ['chat', 'Y', 'Copy the Block'],
   ['chat', '⇧ Y', 'Copy the Whole Reply'],
