@@ -152,18 +152,24 @@ export function schemeList(list) {
 }
 
 // The selection moves over every row found, and the window of size rows follows it, staying full when rows go; selected counts from the window's top.
-export function scroll(top, selected, by, total, size) {
+export function scroll(top, selected, by, total, size, cols = 1) {
   const at = Math.max(0, Math.min(total - 1, top + selected + by));
-  const next = Math.min(at < top ? at : at >= top + size ? at - size + 1 : top, Math.max(0, total - size));
+  // A grid of cards moves by whole rows, so each card keeps its column.
+  const row = Math.floor(at / cols), first = Math.floor(top / cols), rows = size / cols;
+  const last = Math.max(0, Math.ceil(total / cols) - rows);
+  const next = Math.min(row < first ? row : row >= first + rows ? row - rows + 1 : first, last) * cols;
   return { top: next, selected: at - next };
 }
 
 // One wheel event over the list: a notch, 120 of Qt's angle and down when negative, moves the window three rows, a touchpad's smaller angles add up in rest; the selected row keeps its place while it stays shown, else the nearest shown row takes it.
-export function wheel(at, angle, total, size) {
+export function wheel(at, angle, total, size, cols = 1) {
+  // A notch is three rows of a list, or one row of a grid of cards.
+  const step = cols > 1 ? 120 : 40;
   const rest = at.rest + angle;
-  const rows = Math.trunc(-rest / 40);
-  const top = Math.max(0, Math.min(Math.max(0, total - size), at.top + rows));
+  const rows = Math.trunc(-rest / step);
+  const last = Math.max(0, Math.ceil(total / cols) - size / cols) * cols;
+  const top = Math.max(0, Math.min(last, at.top + rows * cols));
   const row = at.top + at.selected;
   const selected = row < top ? 0 : row >= top + size ? size - 1 : row - top;
-  return { top, selected, rest: rest + rows * 40 };
+  return { top, selected, rest: rest + rows * step };
 }

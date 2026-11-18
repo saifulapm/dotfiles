@@ -181,20 +181,20 @@ Item {
             return;
         reminders.remove(row.reminderId);
         // A scrolled list keeps its window on the rows that are left.
-        const s = Lib.scroll(scrollTop, selected, 0, found.length, pageSize);
+        const s = Lib.scroll(scrollTop, selected, 0, found.length, pageSize, columns);
         scrollTop = s.top;
         selected = s.selected;
     }
 
     function move(by) {
-        const s = Lib.scroll(scrollTop, selected, by, found.length, pageSize);
+        const s = Lib.scroll(scrollTop, selected, by, found.length, pageSize, columns);
         scrollTop = s.top;
         selected = s.selected;
     }
 
     // The wheel moves the window of rows; wheelRest holds a touchpad's part of a row.
     function turn(angle) {
-        const s = Lib.wheel({ top: scrollTop, selected, rest: wheelRest }, angle, found.length, pageSize);
+        const s = Lib.wheel({ top: scrollTop, selected, rest: wheelRest }, angle, found.length, pageSize, columns);
         scrollTop = s.top;
         selected = s.selected;
         wheelRest = s.rest;

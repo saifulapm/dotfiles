@@ -26,7 +26,7 @@ artboard_strip='["#e4e6ea","#ffffff","#3d5afe","#cf222e","#1a7f37","#9a6700","#8
 check "the artboard row draws paper, surface, accent and ANSI 1, 2, 3 and 5" state_is ".strips[0] == $artboard_strip"
 for _ in $(seq 1 10); do wtype -M ctrl -k j -m ctrl; done
 until_ok 2000 state_is '.top + .selected == 10'
-check "ten moves down page the cards: the tenth card after the first is lit and drawn ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 5 and .selected == 5 and (.results | length) == 6 and .cursorName == .results[5]'
+check "ten moves down page the cards a row at a time: the tenth card after the first is lit and drawn in its column ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 6 and .selected == 4 and (.results | length) == 6 and .cursorName == .results[4]'
 for _ in $(seq 1 10); do wtype -M ctrl -k k -m ctrl; done
 until_ok 2000 state_is '.top + .selected == 0'
 check "ten moves up bring Artboard back to the top" state_is '.top == 0 and .selected == 0 and .cursorName == "Artboard"'

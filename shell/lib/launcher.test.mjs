@@ -299,3 +299,20 @@ test('each command draws a Symbols Nerd Font glyph, and record draws in the dang
     ],
   );
 });
+
+// A card grid pages by whole rows, so a card keeps its column as the page moves.
+test('in a grid, moving past a page scrolls one whole row and the card keeps its column', () => {
+  assert.deepEqual(scroll(0, 5, 1, 40, 6, 3), { top: 3, selected: 3 });
+  assert.deepEqual(scroll(3, 3, -1, 40, 6, 3), { top: 3, selected: 2 });
+  assert.deepEqual(scroll(3, 0, -1, 40, 6, 3), { top: 0, selected: 2 });
+  assert.deepEqual(scroll(0, 0, 39, 40, 6, 3), { top: 36, selected: 3 });
+  assert.deepEqual(scroll(0, 3, 1, 10, 4, 2), { top: 2, selected: 2 });
+  assert.deepEqual(scroll(0, 0, 1, 0, 6, 3), { top: 0, selected: 0 });
+});
+
+test('in a grid, a wheel notch moves one whole row and stops at the last full page', () => {
+  assert.deepEqual(wheel({ top: 0, selected: 0, rest: 0 }, -120, 40, 6, 3), { top: 3, selected: 0, rest: 0 });
+  assert.deepEqual(wheel({ top: 36, selected: 0, rest: 0 }, -120, 40, 6, 3), { top: 36, selected: 0, rest: 0 });
+  assert.deepEqual(wheel({ top: 3, selected: 4, rest: 0 }, 120, 40, 6, 3), { top: 0, selected: 5, rest: 0 });
+  assert.deepEqual(wheel({ top: 0, selected: 0, rest: 0 }, -60, 40, 6, 3), { top: 0, selected: 0, rest: -60 });
+});
