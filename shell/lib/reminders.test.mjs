@@ -214,3 +214,28 @@ test('a pending text from another machine lists as one clean line', () => {
   assert.equal(S.pendingList(s)[0].text, 'a bc [31m');
   assert.equal(reminderRows('', now, S.pendingList(s))[0].title, 'a bc [31m');
 });
+
+test('a reminder due under a minute ago rings at once, and one due a minute or more ago waits for a reminders round', () => {
+  const list = [
+    { id: 'a', text: 'x', due: now - 59000, created: now - 600000 },
+    { id: 'b', text: 'y', due: now - 60000, created: now - 600000 },
+    { id: 'c', text: 'z', due: now + 1, created: now },
+    { id: 'd', text: 'w', due: now, created: now - 60000 },
+  ];
+  const { fresh, stale } = S.dueSplit(list, now);
+  assert.deepEqual([fresh.map((r) => r.id), stale.map((r) => r.id)], [['a', 'd'], ['b']]);
+});
+
+test('a round pulled when dots sync exits 0 or 5, and not when it skipped with no Dropbox remote or failed', () => {
+  assert.equal(S.roundPulled(0, ''), true);
+  assert.equal(S.roundPulled(5, ''), true);
+  assert.equal(S.roundPulled(0, 'dots sync: skipped, no Dropbox: remote in rclone yet\n'), false);
+  assert.equal(S.roundPulled(1, ''), false);
+  assert.equal(S.roundPulled(124, ''), false);
+});
+
+test('one rung without a pull says rang late and the time it was due', () => {
+  const r = { id: 'a', text: 'tea', due: at('2026-10-22T14:30:00+06:00'), created: at('2026-10-22T14:10:00+06:00') };
+  assert.deepEqual(S.lateText(r, now), { summary: 'Reminder · tea', body: 'rang late · due at 14:30 · set at 14:10' });
+  assert.equal(S.lateText({ ...r, due: at('2026-10-21T09:05:00+06:00'), created: at('2026-10-21T08:00:00+06:00') }, now).body, 'rang late · due yesterday at 09:05 · set yesterday at 08:00');
+});

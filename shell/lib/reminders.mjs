@@ -90,12 +90,31 @@ export function addReminder(list, parsed, now) {
   return { list: list.concat([r]).sort((a, b) => a.due - b.due), error: '' };
 }
 
+// "at 14:51", "yesterday at 09:05" or "Mon at 09:05": a past instant, seen from now.
+const pastAt = (ms, now) => {
+  const days = daysBetween(ms, now);
+  const day = days === 0 ? '' : days === 1 ? 'yesterday ' : `${WEEKDAYS[new Date(ms).getDay()]} `;
+  return `${day}at ${clock(ms)}`;
+};
+
 // The notification a rung reminder raises.
 export function firedText(r, now) {
-  const days = daysBetween(r.created, now);
-  const day = days === 0 ? '' : days === 1 ? 'yesterday ' : `${WEEKDAYS[new Date(r.created).getDay()]} `;
-  return { summary: `Reminder · ${r.text}`, body: `set ${day}at ${clock(r.created)}` };
+  return { summary: `Reminder · ${r.text}`, body: `set ${pastAt(r.created, now)}` };
 }
+
+// The same, for one rung without a pull, so the reader knows another machine may have rung it already.
+export function lateText(r, now) {
+  return { summary: `Reminder · ${r.text}`, body: `rang late · due ${pastAt(r.due, now)} · set ${pastAt(r.created, now)}` };
+}
+
+// Due under a minute ago rings at once; due longer ago, the machine was off or asleep, and it waits for a reminders round, as another machine may have rung it.
+export function dueSplit(list, now) {
+  const due = list.filter((r) => r.due <= now);
+  return { fresh: due.filter((r) => now - r.due < MIN), stale: due.filter((r) => now - r.due >= MIN) };
+}
+
+// A round pulled the other machines' files when dots sync exits 0, or 5, which still merged what parsed; with no Dropbox remote it exits 0 having pulled nothing.
+export const roundPulled = (code, out) => (code === 0 || code === 5) && !/^dots sync: skipped/m.test(out);
 
 // The launcher's rows in `r ` mode: the reminder the query would set (or why it cannot), then the pending ones, the first under the pending head; broken is why nothing can be set, or ''.
 export function reminderRows(q, now, list, broken) {

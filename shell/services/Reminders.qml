@@ -57,19 +57,57 @@ Scope {
         }
     }
 
-    // Rings each due reminder as an ordinary notification, after marking it rung in the store, so a crash between the two never rings it twice.
+    // Rings what came due under a minute ago; one due longer ago waits for a reminders round, which may bring it back rung by another machine.
     function ring() {
         if (!ready)
             return;
         const t = Date.now();
-        const due = list.filter(r => r.due <= t);
-        if (!due.length)
+        const due = R.dueSplit(list, t);
+        notify(due.fresh, [], t);
+        if (due.stale.length && !round.running)
+            round.running = true;
+    }
+
+    // After a round: each due reminder still pending rings, and one overdue rings late when the round could not pull.
+    function settle() {
+        const pulled = roundResult === "pulled";
+        roundResult = "";
+        const t = Date.now();
+        const due = R.dueSplit(list, t);
+        if (pulled)
+            notify(due.fresh.concat(due.stale), [], t);
+        else
+            notify(due.fresh, due.stale, t);
+    }
+
+    // Marks each rung in the store, then raises its notification, so a crash between the two never rings it twice.
+    function notify(plain, late, t) {
+        const all = plain.concat(late);
+        if (!all.length || !save(all.reduce((s, r) => R.endReminder(s, r.id, "rung", t), store)))
             return;
-        if (!save(due.reduce((s, r) => R.endReminder(s, r.id, "rung", t), store)))
-            return;
-        for (const r of due) {
+        for (const r of plain) {
             const f = R.firedText(r, t);
             Quickshell.execDetached(["notify-send", "-a", "Reminders", f.summary, f.body]);
+        }
+        for (const r of late) {
+            const f = R.lateText(r, t);
+            Quickshell.execDetached(["notify-send", "-a", "Reminders", f.summary, f.body]);
+        }
+    }
+
+    // "pulled" or "failed" once a round ends, until the store it left is read.
+    property string roundResult: ""
+
+    // A round that waits on the sync lock or a dead network still lets the reminder ring, late, within 30 s.
+    Process {
+        id: round
+        command: ["timeout", "30", Quickshell.shellDir + "/bin/dots", "sync", "--only", "reminders"]
+        stdout: StdioCollector {
+            id: roundOut
+        }
+        onExited: code => {
+            reminders.roundResult = R.roundPulled(code, roundOut.text) ? "pulled" : "failed";
+            storeFile.reload();
         }
     }
 
@@ -142,22 +180,28 @@ Scope {
         printErrors: false
         onFileChanged: reload()
         onLoaded: {
-            if (text() === reminders.written && reminders.ready && !reminders.storeBroken)
-                return;
-            const parsed = R.parseStore(text());
-            reminders.storeBroken = parsed === null;
-            if (parsed === null)
-                console.warn("reminders: " + reminders.path + " does not parse; nothing is saved until it does");
-            else
-                reminders.store = parsed;
-            reminders.ready = true;
-            reminders.migrate();
-            // One that came due while the shell was stopped rings now.
-            reminders.ring();
+            const own = text() === reminders.written && reminders.ready && !reminders.storeBroken;
+            if (!own) {
+                const parsed = R.parseStore(text());
+                reminders.storeBroken = parsed === null;
+                if (parsed === null)
+                    console.warn("reminders: " + reminders.path + " does not parse; nothing is saved until it does");
+                else
+                    reminders.store = parsed;
+                reminders.ready = true;
+                reminders.migrate();
+            }
+            if (reminders.roundResult)
+                reminders.settle();
+            else if (!own)
+                // One that came due while the shell was stopped rings now, or after its round.
+                reminders.ring();
         }
         onLoadFailed: {
             reminders.ready = true;
             reminders.migrate();
+            if (reminders.roundResult)
+                reminders.settle();
         }
     }
 
