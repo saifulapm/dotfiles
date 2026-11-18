@@ -4,7 +4,7 @@ dev:
 
 # fails past 5 s, so the fast suite stays fast
 test:
-    tests/scratch.sh timeout 5 node --test 'shell/lib/**/*.test.mjs'
+    bin/dots-calm && tests/scratch.sh timeout 5 node --test 'shell/lib/**/*.test.mjs'
 
 # dots sync between two scratch machines over a local alias remote
 test-sync:

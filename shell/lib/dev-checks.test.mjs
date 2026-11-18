@@ -919,3 +919,39 @@ test('lib.sh unsets PINENTRY_USER_DATA and GPG_TTY before any check runs', () =>
   const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
   assert.match(lib, /^unset\b[^\n]*\bPINENTRY_USER_DATA\b[^\n]*\bGPG_TTY\b/m);
 });
+
+// Other projects' suites on this machine made nested checks, benches and the 5 s fast suite read red at load 7 to 11 (m105, m106), so each waits for a calm machine first and refuses with the reason when it stays busy.
+test('dots-calm passes on a calm machine and refuses a busy one, naming the load and the memory', () => {
+  const proc = mkdtempSync(join(tmpdir(), 'calm-'));
+  const run = (load, availKiB) => {
+    writeFileSync(join(proc, 'loadavg'), `${load} 3.00 3.00 2/900 1234\n`);
+    writeFileSync(join(proc, 'meminfo'), `MemTotal: 7675000 kB\nMemFree: 100000 kB\nMemAvailable: ${availKiB} kB\n`);
+    return spawnSync(new URL('../../bin/dots-calm', import.meta.url).pathname, [], {
+      encoding: 'utf8',
+      timeout: 3000,
+      env: { ...process.env, DOTS_CALM_PROC: proc, DOTS_CALM_WAIT_S: '0' },
+    });
+  };
+  try {
+    assert.equal(run('1.20', 2000000).status, 0);
+    const busy = run('9.50', 2000000);
+    assert.equal(busy.status, 1);
+    assert.match(busy.stderr, /load 9\.50/);
+    const short = run('1.20', 300000);
+    assert.equal(short.status, 1);
+    assert.match(short.stderr, /292 MiB available/);
+  } finally {
+    rmSync(proc, { recursive: true, force: true });
+  }
+});
+
+test('every nested check, the bench and the fast suite wait for dots-calm', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const lock = lib.search(/flock\s+-w\s+\d+\s+9\b/);
+  const calm = lib.search(/"\$repo\/bin\/dots-calm"/);
+  const start = lib.search(/"\$repo\/bin\/dots-dev"[^\n]*9>&-/);
+  assert.ok(calm > lock && calm < start, 'lib.sh runs dots-calm after the lock and before dots-dev');
+  assert.match(readFileSync(new URL('../../bin/dots-bench', import.meta.url), 'utf8'), /source "\$\(dirname "\$0"\)\/\.\.\/tests\/dev\/lib\.sh"/);
+  const just = readFileSync(new URL('../../justfile', import.meta.url), 'utf8');
+  assert.match(just, /\ntest:\n\s+bin\/dots-calm && tests\/scratch\.sh timeout 5 node --test/);
+});

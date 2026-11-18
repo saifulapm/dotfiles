@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+{
+# Waits until the machine is calm enough to time a nested check, a bench or the 5 s fast suite: other projects' suites at load 7 to 11 read as red checks (m105, m106). Calm is a 1-minute load under DOTS_CALM_LOAD (4) and at least DOTS_CALM_MIB (768) MiB available; swap used is not read, since it stays high long after the pressure ends.
+proc=${DOTS_CALM_PROC:-/proc}
+max_load=${DOTS_CALM_LOAD:-4}
+min_mib=${DOTS_CALM_MIB:-768}
+deadline=$(($(date +%s) + ${DOTS_CALM_WAIT_S:-900}))
+said=
+while :; do
+  read -r load _ <"$proc/loadavg"
+  mib=$(awk '/^MemAvailable:/ { print int($2 / 1024) }' "$proc/meminfo")
+  if awk -v l="$load" -v m="$max_load" 'BEGIN { exit !(l < m) }' && [ "$mib" -ge "$min_mib" ]; then
+    exit 0
+  fi
+  reason="load $load (calm is under $max_load), $mib MiB available (calm is $min_mib)"
+  if [ "$(date +%s)" -ge "$deadline" ]; then
+    echo "dots-calm: the machine stayed busy: $reason" >&2
+    exit 1
+  fi
+  [ -n "$said" ] || { echo "dots-calm: waiting for a calm machine: $reason" >&2; said=1; }
+  sleep 5
+done
+exit
+}

@@ -74,6 +74,9 @@ fi
 exec 9>"${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock"
 flock -w 900 9 || { echo "FAIL another nested check held the lock for 15 min; held by:"; "$repo/tests/dev/lib-lock-holders.sh" "${XDG_RUNTIME_DIR:-/tmp}/dots-dev-check.lock" | grep -v "^$$:"; exit 1; }
 
+# A busy machine reads as red checks, so a check waits for a calm one while it holds the lock.
+"$repo/bin/dots-calm" || { echo "FAIL the machine stayed busy for 15 min"; exit 1; }
+
 dev_out=$(mktemp)
 dev_log=$(mktemp)
 # An edit under the shell a check runs hot-reloads that shell mid-check, so the trap fails a check whose shell changed (m82, m84).
