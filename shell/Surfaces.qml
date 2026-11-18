@@ -334,46 +334,54 @@ PanelWindow {
         }
     }
 
+    // The surfaces that draw inside the island, and the one of them shown, or null.
+    readonly property var islandSurfaces: [cheatsheet]
+    readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
+    // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
+    property var islandLast: null
+    onIslandSurfaceChanged: if (islandSurface)
+        islandLast = islandSurface
+
     // While a card is open, a click on the island is a click outside that card, so the island takes no input.
     Binding {
         when: !!host.island
         target: host.island
         property: "cardOpen"
-        value: host.shown && !(host.cheatsheet?.shown ?? false)
+        value: host.shown && !host.islandSurface
     }
 
     Binding {
         when: !!host.island
         target: host.island
         property: "surface"
-        value: host.cheatsheet?.shown ? "cheatsheet" : null
+        value: host.islandSurface?.name ?? null
     }
 
     Binding {
-        when: !!host.island && !!host.cheatsheet
+        when: !!host.island && !!host.islandLast
         target: host.island
         property: "surfaceWidth"
-        value: host.cheatsheet?.wantWidth ?? 0
+        value: host.islandLast?.wantWidth ?? 0
     }
 
     Binding {
-        when: !!host.island && !!host.cheatsheet
+        when: !!host.island && !!host.islandLast
         target: host.island
         property: "surfaceHeight"
-        value: host.cheatsheet?.implicitHeight ?? 0
+        value: host.islandLast?.implicitHeight ?? 0
     }
 
     Binding {
-        when: !!host.island && !!host.cheatsheet
+        when: !!host.island && !!host.islandLast
         target: host.island
         property: "surfaceBusy"
-        value: host.cheatsheet?.busy ?? false
+        value: host.islandLast?.busy ?? false
     }
 
     Connections {
         target: host.island
         function onSurfaceYielded() {
-            host.cheatsheet?.close();
+            host.islandSurface?.close();
         }
     }
 

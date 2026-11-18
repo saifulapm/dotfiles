@@ -13,6 +13,8 @@ Item {
     id: sheet
 
     required property var theme
+    // The island reports this as its surface while the sheet is shown.
+    readonly property string name: "cheatsheet"
     property bool shown: false
     property var rows: []
     // False until the binds file is first read and its rows are built.
