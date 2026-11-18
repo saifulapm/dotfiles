@@ -23,6 +23,8 @@ Item {
 
     readonly property var battery: UPower.displayDevice
     readonly property bool hasBattery: battery.ready && battery.isLaptopBattery && battery.isPresent
+    // The profile as board 4 words it on the Battery tile: Power saver, Balanced or Performance.
+    readonly property string profileName: ({ [PowerProfile.PowerSaver]: "Power saver", [PowerProfile.Balanced]: "Balanced", [PowerProfile.Performance]: "Performance" })[PowerProfiles.profile] ?? ""
     readonly property var profiles: PowerProfiles.hasPerformanceProfile ? [PowerProfile.PowerSaver, PowerProfile.Balanced, PowerProfile.Performance] : [PowerProfile.PowerSaver, PowerProfile.Balanced]
     readonly property var items: (hasBattery ? [{
                     id: "battery",

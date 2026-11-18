@@ -115,8 +115,8 @@ PanelWindow {
 
     function openControl(t0) {
         controlLoader.active = true;
-        closeOthers(control);
         control.open(t0);
+        closeOthers(control);
     }
 
     function openGoals(t0) {
@@ -339,7 +339,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [launcher, cheatsheet]
+    readonly property var islandSurfaces: [launcher, cheatsheet, control]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null
@@ -397,15 +397,27 @@ PanelWindow {
         }
     }
 
+    // Control draws inside the island, on the island's fill, so it reads the scheme's own tokens.
     Loader {
         id: controlLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.control
         active: false
         sourceComponent: Root.Control {
-            theme: panelTheme
+            theme: host.theme
             notifs: host.notifs
             sync: host.sync
+            clock: host.island ? host.island.clock : null
         }
+    }
+
+    // A check waits on this before it reads Control's pixels.
+    Binding {
+        when: !!host.control && !!host.island
+        target: host.control
+        property: "settled"
+        value: host.island?.surface === "control" && !(host.island?.animating ?? true)
     }
 
     Loader {

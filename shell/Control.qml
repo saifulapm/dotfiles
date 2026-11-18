@@ -1,57 +1,114 @@
+import Quickshell
 import QtQuick
-import QtQuick.Layouts
 import "." as Root
 import "lib/control.mjs" as Lib
-import "lib/voice.mjs" as V
+import "lib/control-home.mjs" as Home
+import "lib/control-system.mjs" as Sys
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as T
 
-// A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); optional readonly property bool levels (true when every row has a volume or brightness that h/l steps, so the wheel steps it); function key(event): bool for keys other than Tab, Shift+Tab, j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object; its implicitHeight sizes its band above the rows.
+// Control drawn inside the island on its fill (board 4): Home's clock and tiles, and a page per section behind its tile. A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); optional readonly property bool levels (true when every row has a volume or brightness that h/l steps); function key(event): bool for keys other than j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object.
 Item {
     id: control
 
     required property var theme
     required property var notifs
     required property var sync
+    // The Desk's clock service, null until the Desk loads.
+    property var clock: null
+    // The island reports this as its surface while Control is shown.
+    readonly property string name: "control"
+    // The island grows to this width for Control, as board 4 draws it.
+    readonly property int wantWidth: 640
+    readonly property bool busy: false
     property bool shown: false
+    // True once the island has come to rest on Control; the surfaces' window sets it.
+    property bool settled: false
     // The shell makes Control in its warm-up, before anyone opens it; the sections that probe the system wait for this.
     property bool opened: false
-    property int current: 0
+    // The section whose page shows, or "" on Home.
+    property string page: ""
+    // The tile Home's keys act on.
+    property string cursor: "wifi"
     property real wheelRest: 0
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
 
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and fill, and the tones lifted to read on it.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property color fill: S.surfaceStyle(tokens, "island").fill
+    readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
     readonly property var sections: [audio, wifi, bluetooth, power, display, route]
+    readonly property int current: Math.max(0, Lib.SECTIONS.indexOf(page))
     readonly property var section: sections[current]
-    readonly property var rows: section.rows
-    readonly property var look: V.listLook(theme.tokens)
-    readonly property var legend: look.keys(section.typing ? (section.typingKeys ?? [["↵", "join"], ["ctrl+v", "paste"], ["esc", "cancel"]]) : [["tab", "section"], ["j/k", "move"], ["esc", "close"]])
-    readonly property Root.Motion motion: Root.Motion {
-        shown: control.shown
-        tokens: control.theme.tokens
-    }
+    readonly property var rows: page === "" ? [] : section.rows
+    readonly property var now: clock ? clock.now : new Date()
+
+    // What Home's tiles read, from the sections that already watch each service.
+    readonly property var wifiNet: wifi.networks.find(n => n.connected) ?? null
+    readonly property var btDevice: bluetooth.devices.find(d => d.connected) ?? null
+    readonly property var sink: audio.defaultSink
+    readonly property var tiles: Home.tiles({
+        wifi: wifiNet ? { name: wifiNet.name, signal: Math.round(wifiNet.signalStrength * 100) } : null,
+        wifiOn: wifi.wifi.length > 0,
+        bt: btDevice ? { name: btDevice.name, battery: btDevice.batteryAvailable ? Math.round(btDevice.battery * 100) : null } : null,
+        btOn: bluetooth.on,
+        sink: sink?.audio ? { name: sink.description || sink.name, volume: sink.audio.volume, muted: sink.audio.muted } : null,
+        panel: display.panels.length ? display.panels[0].percent : null,
+        recordingMs: Root.State.recordingSince > 0 ? now.getTime() - Root.State.recordingSince : 0,
+        battery: power.hasBattery ? { percent: Math.round(power.battery.percentage * 100), profile: power.profileName, left: Home.leftText(power.battery.timeToEmpty) } : null,
+        units: control.sync ? control.sync.units : {},
+        dnd: control.notifs.dnd,
+        awakeUntil: Root.State.awakeUntil,
+        now: now.getTime()
+    })
+
+    implicitHeight: (page === "" ? Home.height() : pageColumn.implicitHeight) + 32
 
     function open(t0) {
         openT0 = t0;
         openMs = null;
         opens += 1;
         opened = true;
-        current = 0;
+        page = "";
+        cursor = "wifi";
         shown = true;
         forceActiveFocus();
     }
 
+    // Opens a section's page by name, as the power key opens Power.
     function show(name) {
-        current = Math.max(0, Lib.SECTIONS.indexOf(name));
+        if (Lib.SECTIONS.indexOf(name) >= 0)
+            page = name;
     }
 
     function close() {
         shown = false;
-        // Only the secret clears as Control closes; the rest of the line is drawn until the close stops drawing.
+        // Only the secret clears as Control closes; the rest is drawn until the close stops drawing.
         wifi.psk = "";
         bluetooth.stopScan();
+    }
+
+    // Esc on a page goes back to the tile that opened it; on Home it closes Control.
+    function back() {
+        if (page === "") {
+            close();
+            return;
+        }
+        cursor = Home.TILE_OF[page] ?? cursor;
+        page = "";
+    }
+
+    // A click outside closes an open field first, and Control only once nothing is open inside (2TM85BFB).
+    function stepBack() {
+        if (page !== "" && section.typing && section.closeLine)
+            section.closeLine();
+        else
+            close();
     }
 
     function swapped() {
@@ -65,23 +122,19 @@ Item {
         section.selected = Math.max(0, Math.min(rows.length - 1, section.selected + by));
     }
 
-    // A click on a row selects it and hands its section the Enter its key() handles; the open password line takes only keys.
+    // Enter on a tile opens its page; the rest act in place.
+    function act(id) {
+        cursor = id;
+        if (Home.PAGES[id])
+            page = Home.PAGES[id];
+    }
+
+    // A click on a page's row selects it and hands its section the Enter its key() handles; an open password line takes only keys.
     function runRow(index) {
         if (section.typing)
             return;
         section.selected = index;
         section.key({ key: Qt.Key_Return, modifiers: 0, text: "" });
-    }
-
-    // A wheel turn over a level row selects it and takes one h or l step its key() handles for each whole notch; wheelRest holds a touchpad's part of one.
-    function turnRow(index, angle) {
-        if (!section.levels || section.typing)
-            return;
-        const t = Lib.wheelSteps(wheelRest, angle);
-        wheelRest = t.rest;
-        section.selected = index;
-        for (let i = 0; i < Math.abs(t.steps); i++)
-            section.key({ key: t.steps > 0 ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
     }
 
     // An item's box in window coordinates.
@@ -91,313 +144,512 @@ Item {
     }
 
     function state() {
-        const cur = rowRepeater.itemAt(section.selected);
-        const tab = tabRepeater.itemAt(current);
+        const cur = page === "" ? null : rowRepeater.itemAt(section.selected);
         return JSON.stringify(Object.assign({
             open: shown,
-            section: Lib.SECTIONS[current],
+            page: page || "home",
+            section: page || "home",
             sections: Lib.SECTIONS,
-            selected: section.selected,
+            cursor: cursor,
+            tiles: tiles.map((t, i) => {
+                const item = tileRepeater.itemAt(i);
+                return Object.assign({}, t, item ? { fill: String(item.color), box: box(item), focused: item.focused } : {});
+            }),
+            selected: page === "" ? -1 : section.selected,
             rows: rows.map(r => r.title),
             detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
-            openMs: openMs,
-            opens: opens,
-            motion: motion.curves?.kind ?? null,
-            settleMs: motion.settleMs,
-            firstFrame: motion.firstFrame,
-            settled: motion.settled,
-            drawing: control.visible,
-            cardBox: card.drawnBox(),
-            cardFill: String(card.drawnFill),
-            tabFill: tab ? String(tab.color) : null,
-            tabText: tab ? tab.text : null,
-            tabBox: tab ? box(tab) : null,
-            ruleBox: box(topRule),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
-            cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
-            cursorDetail: cur ? Object.assign(box(cur.detailItem), { truncated: cur.detailItem.truncated }) : null,
-            legend: legend.map(k => k.key + " " + k.word).join("  "),
-            legendDrawn: Array.from({ length: legendRepeater.count }, (_, i) => legendRepeater.itemAt(i).drawn).join("  "),
-            legendSpacing: look.small.spacing,
+            clock: { text: bigClock.text, px: bigClock.font.pixelSize, box: box(bigClock) },
+            date: dateText.text,
+            openMs: openMs,
+            opens: opens,
+            settled: settled,
+            drawing: shown,
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
             keyboard: control.Window.active
-        }, section.state()));
+        }, page === "" ? {} : section.state()));
     }
 
     Component.onCompleted: Root.State.loaded.push("control")
-    visible: motion.drawing
 
     Keys.onPressed: event => {
-        // A section's open password line takes every key first, so j, k and Tab type and Esc closes only the line.
-        if (section.typing) {
+        const k = event.key;
+        // A section's open password line takes every key first, so j, k and - type and Esc closes only the line.
+        if (page !== "" && section.typing) {
             section.key(event);
             event.accepted = true;
             return;
         }
-        const back = event.key === Qt.Key_Backtab || (event.key === Qt.Key_Tab && (event.modifiers & Qt.ShiftModifier));
-        if (back)
-            current = Lib.cycle(current, -1);
-        else if (event.key === Qt.Key_Tab)
-            current = Lib.cycle(current, 1);
-        else if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
-            move(1);
-        else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
-            move(-1);
-        else if (event.key === Qt.Key_Escape)
-            close();
-        else if (!section.key(event))
-            return;
+        if (k === Qt.Key_Escape)
+            back();
+        else if (page !== "") {
+            if (k === Qt.Key_J || k === Qt.Key_Down)
+                move(1);
+            else if (k === Qt.Key_K || k === Qt.Key_Up)
+                move(-1);
+            else if (k === Qt.Key_Equal || k === Qt.Key_Minus)
+                // - and = step the focused slider as h and l always have.
+                section.key({ key: k === Qt.Key_Equal ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
+            else if (!section.key(event))
+                return;
+        } else {
+            const dx = k === Qt.Key_H || k === Qt.Key_Left ? -1 : k === Qt.Key_L || k === Qt.Key_Right ? 1 : 0;
+            const dy = k === Qt.Key_K || k === Qt.Key_Up ? -1 : k === Qt.Key_J || k === Qt.Key_Down ? 1 : 0;
+            if (dx || dy)
+                cursor = Home.move(cursor, dx, dy);
+            else if (k === Qt.Key_Return || k === Qt.Key_Enter)
+                act(cursor);
+            else
+                return;
+        }
         event.accepted = true;
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: card.wash
+    // The sections hold each page's rows and keys; each is visible while its page shows, as pw-dump and the scans wait for that, but draws nothing here but the Wi-Fi password line.
+    Item {
+        width: 0
+        height: 0
+        clip: true
+
+        Root.ControlAudio {
+            id: audio
+            visible: control.page === "audio"
+            theme: control.theme
+        }
+        Root.ControlBluetooth {
+            id: bluetooth
+            visible: control.page === "bluetooth"
+            theme: control.theme
+        }
+        Root.ControlPower {
+            id: power
+            visible: control.page === "power"
+            probe: control.opened
+            theme: control.theme
+        }
+        Root.ControlDisplay {
+            id: display
+            visible: control.page === "display"
+            probe: control.opened
+            theme: control.theme
+        }
+        Root.ControlRoute {
+            id: route
+            visible: control.page === "route"
+            probe: control.opened
+            theme: control.theme
+            notifs: control.notifs
+            sync: control.sync
+        }
     }
 
-    Root.Surface {
-        id: card
-        x: Math.round((parent.width - width) / 2)
-        y: 168
-        width: 720
-        height: column.implicitHeight
-        tokens: control.theme.tokens
-        motion: control.motion
+    // Home: the clock with today's date, then the tiles; the click-outside check reads a press on this as one on Control.
+    Item {
+        id: home
+        objectName: "card"
+        visible: control.page === ""
+        x: 16
+        y: 16
+        width: Home.WIDTH
+        height: Home.height()
 
-        ColumnLayout {
-            id: column
-            width: parent.width
-            spacing: 0
+        Row {
+            height: Home.ROWS[0]
+            x: 4
+            spacing: 14
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.topMargin: 14
-                Layout.bottomMargin: 14
-                spacing: 4
+            Text {
+                id: bigClock
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: Qt.formatTime(control.now, "HH:mm")
+                color: control.on
+                font.family: control.fonts.mono ?? ""
+                font.pixelSize: 34
+                font.weight: Font.Bold
+                font.letterSpacing: -1
+            }
 
-                Repeater {
-                    id: tabRepeater
-                    model: Lib.TITLES
+            Rectangle {
+                id: calendarBox
+                readonly property bool focused: control.cursor === "calendar"
+                anchors.verticalCenter: parent.verticalCenter
+                width: dateColumn.implicitWidth + 16
+                height: dateColumn.implicitHeight + 8
+                radius: 10
+                color: focused ? Qt.alpha(control.on, 0.1) : "transparent"
 
-                    // The current tab takes the launcher's mode label, its tint pill.
+                Column {
+                    id: dateColumn
+                    anchors.centerIn: parent
+
+                    Text {
+                        id: dateText
+                        textFormat: Text.PlainText
+                        text: Qt.formatDate(control.now, "dddd, d MMMM")
+                        color: control.on
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+                    Text {
+                        textFormat: Text.PlainText
+                        text: "Calendar"
+                        color: control.tones.muted
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 11
+                    }
+                }
+
+                Root.Click {
+                    name: "control-tile:calendar"
+                    onTapped: control.act("calendar")
+                }
+            }
+        }
+
+        Repeater {
+            id: tileRepeater
+            // One delegate per tile for good; each reads its tile from control.tiles, so a change of volume or time redraws text, not the tiles.
+            model: Home.TILES.length - 1
+
+            // A tile: its fill only, no edge (8B5MMCB6); on, it inverts.
+            Rectangle {
+                id: tile
+                required property int index
+                readonly property var t: control.tiles[index]
+                readonly property var at: Home.TILES[index + 1]
+                readonly property bool focused: control.cursor === at.id
+                readonly property color ink: t.on ? control.fill : control.on
+                readonly property color sub: t.on ? Qt.alpha(control.fill, 0.7) : control.tones.muted
+                x: at.x
+                y: Home.rowTop(at.row)
+                width: at.w
+                height: Home.ROWS[at.row]
+                radius: 14
+                // The focused tile is a shade above the rest, as the launcher's selected card is; an inverted one dims a little instead.
+                color: t.on ? Qt.alpha(control.on, focused ? 0.8 : 1) : Qt.alpha(control.on, focused ? 0.1 : 0.05)
+
+                Root.Click {
+                    name: "control-tile:" + tile.t.id
+                    onTapped: control.act(tile.t.id)
+                }
+
+                // Wi-Fi, Bluetooth, Record screen, Battery and Sync: a round icon beside the name and a line under it.
+                Row {
+                    visible: ["wifi", "bluetooth", "record", "battery", "sync"].indexOf(tile.t.id) >= 0
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 12
+                    spacing: 10
+
                     Rectangle {
-                        required property string modelData
-                        required property int index
-                        readonly property bool on: index === control.current
-                        readonly property string text: tab.text
-                        implicitWidth: tab.implicitWidth + 20
-                        implicitHeight: tab.implicitHeight + 10
-                        radius: look.tab.radius
-                        color: on ? look.tab.fill : "transparent"
+                        width: 36
+                        height: 36
+                        radius: 18
+                        // Inverted, the circle is the island's fill again, as board 4 draws Wi-Fi.
+                        color: tile.t.on ? control.fill : Qt.alpha(control.on, 0.1)
                         Text {
-                            id: tab
-                            textFormat: Text.PlainText
                             anchors.centerIn: parent
-                            text: look.tabText(modelData)
-                            color: on ? look.tab.text : c.muted
-                            font.family: look.name.font
+                            textFormat: Text.PlainText
+                            text: String.fromCodePoint(({ wifi: 0xF0928, bluetooth: 0xF00AF, record: 0xF044A, battery: 0xF0082, sync: 0xF04E6 })[tile.t.id] ?? 0xF0928)
+                            color: tile.t.id === "record" || tile.t.danger ? control.tones.danger : control.on
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 18
+                        }
+                    }
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: tile.width - 12 - 36 - 10 - 12
+
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
+                            text: tile.t.label
+                            color: tile.ink
+                            font.family: control.fonts.ui ?? ""
                             font.pixelSize: 13
-                            font.weight: on ? Font.Medium : Font.Normal
+                            font.weight: Font.Bold
                         }
-                        Root.Click {
-                            name: "control-tab:" + Lib.SECTIONS[index]
-                            // The open password line takes only keys, as the rows do.
-                            onTapped: {
-                                if (!control.section.typing)
-                                    control.current = index;
-                            }
-                        }
-                    }
-                }
-            }
-
-            Rule {
-                id: topRule
-            }
-
-            Item {
-                Layout.fillWidth: true
-                Layout.topMargin: 12
-                implicitHeight: control.section.implicitHeight
-
-                Root.ControlAudio {
-                    id: audio
-                    width: parent.width
-                    visible: control.current === 0
-                    theme: control.theme
-                }
-                Root.ControlWifi {
-                    id: wifi
-                    width: parent.width
-                    visible: control.current === 1
-                    theme: control.theme
-                }
-                Root.ControlBluetooth {
-                    id: bluetooth
-                    width: parent.width
-                    visible: control.current === 2
-                    theme: control.theme
-                }
-                Root.ControlPower {
-                    probe: control.opened
-                    id: power
-                    width: parent.width
-                    visible: control.current === 3
-                    theme: control.theme
-                }
-                Root.ControlDisplay {
-                    probe: control.opened
-                    id: display
-                    width: parent.width
-                    visible: control.current === 4
-                    theme: control.theme
-                }
-                Root.ControlRoute {
-                    probe: control.opened
-                    id: route
-                    width: parent.width
-                    visible: control.current === 5
-                    theme: control.theme
-                    notifs: control.notifs
-                    sync: control.sync
-                }
-            }
-
-            Column {
-                id: list
-                Layout.fillWidth: true
-                Layout.topMargin: 8
-                Layout.bottomMargin: 8
-                // The rows sit inset as tiles.
-                Layout.leftMargin: 8
-                Layout.rightMargin: Layout.leftMargin
-
-                Repeater {
-                    id: rowRepeater
-                    model: control.rows
-
-                    Rectangle {
-                        required property var modelData
-                        required property int index
-                        readonly property bool on: index === control.section.selected
-                        readonly property string drawnDetail: detailLabel.text
-                        readonly property Item nameItem: nameLabel
-                        readonly property Item detailItem: detailLabel
-                        // The width the name and detail share, from the row and its other parts' own widths, never the grid's, so the grid lays out once.
-                        readonly property real textWidth: row.width - (badgeBox.visible ? badgeBox.implicitWidth + row.spacing : 0)
-                        width: list.width
-                        implicitHeight: row.implicitHeight + 22
-                        radius: look.cursor.radius
-                        color: on ? look.cursor.fill : "transparent"
-
-                        // Under the click area, which takes no wheel; off for a section with no level rows, so the turn passes through.
-                        MouseArea {
-                            anchors.fill: parent
-                            acceptedButtons: Qt.NoButton
-                            enabled: control.section.levels === true
-                            onWheel: event => control.turnRow(index, event.angleDelta.y)
-                        }
-
-                        Root.Click {
-                            name: "control-row:" + index
-                            onTapped: control.runRow(index)
-                        }
-
-                        RowLayout {
-                            id: row
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: anchors.leftMargin
-                            spacing: 14
-
-                            GridLayout {
-                                Layout.fillWidth: true
-                                // The detail sits under the name.
-                                columns: 1
-                                rowSpacing: 0
-                                columnSpacing: 14
-
-                                Text {
-                                    id: nameLabel
-                                    textFormat: Text.PlainText
-                                    Layout.fillWidth: true
-                                    text: look.title(modelData.title)
-                                    // A right-to-left name would otherwise set itself against the detail.
-                                    horizontalAlignment: Text.AlignLeft
-                                    elide: Text.ElideRight
-                                    color: on ? look.cursor.text : look.name.color
-                                    font.family: look.name.font
-                                    font.pixelSize: look.name.size
-                                    font.weight: on ? look.cursor.weight : look.name.weight
-                                    font.letterSpacing: look.name.spacing
-                                }
-                                Text {
-                                    id: detailLabel
-                                    textFormat: Text.PlainText
-                                    // A detail too long for the row elides in the width the name leaves it.
-                                    Layout.maximumWidth: textWidth
-                                    elide: Text.ElideRight
-                                    text: look.detailText(modelData.detail)
-                                    color: on ? look.cursor.detail : look.detail.color
-                                    font.family: look.detail.font
-                                    font.italic: look.detail.italic
-                                    font.pixelSize: look.detail.size
-                                    font.letterSpacing: look.detail.spacing ?? 0
-                                }
-                            }
-
-                            Rectangle {
-                                id: badgeBox
-                                visible: on && look.cursor.badge !== ""
-                                implicitWidth: badge.implicitWidth + 14
-                                implicitHeight: badge.implicitHeight + 4
-                                radius: 6
-                                color: c.surface
-                                Text {
-                                    id: badge
-                                    textFormat: Text.PlainText
-                                    anchors.centerIn: parent
-                                    text: look.cursor.badge
-                                    color: look.cursor.text
-                                    font.family: fonts.mono
-                                    font.pixelSize: 11
-                                }
-                            }
+                        Text {
+                            width: parent.width
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
+                            text: tile.t.detail
+                            color: tile.t.danger ? control.tones.danger : tile.sub
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 11
                         }
                     }
                 }
+
+                // Sound: its name and output over a pill slider.
+                Column {
+                    visible: tile.t.id === "sound"
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 12
+                    width: tile.width - 24
+                    spacing: 7
+
+                    Item {
+                        width: parent.width
+                        height: soundName.implicitHeight
+                        Text {
+                            id: soundName
+                            textFormat: Text.PlainText
+                            text: tile.t.label
+                            color: tile.ink
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                        }
+                        Text {
+                            anchors.right: parent.right
+                            anchors.baseline: soundName.baseline
+                            width: Math.min(implicitWidth, parent.width - soundName.implicitWidth - 8)
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
+                            text: tile.t.detail
+                            color: tile.sub
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 11
+                        }
+                    }
+
+                    Pill {
+                        width: parent.width
+                        height: 18
+                        level: tile.t.level ?? 0
+                        glyph: 0xF057E
+                    }
+                }
+
+                // Brightness: its name, a pill slider and the percent.
+                Row {
+                    visible: tile.t.id === "brightness"
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 14
+                    spacing: 12
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 92
+                        textFormat: Text.PlainText
+                        text: tile.t.label
+                        color: tile.ink
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                    }
+                    Pill {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: tile.width - 28 - 92 - 38 - 24
+                        height: 22
+                        level: tile.t.level ?? 0
+                        glyph: 0xF05A8
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 38
+                        horizontalAlignment: Text.AlignRight
+                        textFormat: Text.PlainText
+                        text: tile.t.detail
+                        color: control.tones.muted
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+                }
+
+                // Do Not Disturb and Stay awake: a glyph, the name and a switch.
+                Row {
+                    visible: tile.t.id === "dnd" || tile.t.id === "awake"
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 12
+                    spacing: 10
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: String.fromCodePoint(tile.t.id === "dnd" ? 0xF0F65 : 0xF0176)
+                        color: tile.t.on ? tile.ink : control.tones.muted
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 16
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: tile.width - 12 - 16 - 10 - 10 - 38 - 12
+                        elide: Text.ElideRight
+                        textFormat: Text.PlainText
+                        text: tile.t.label
+                        color: tile.ink
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+                    Switch {
+                        anchors.verticalCenter: parent.verticalCenter
+                        on: tile.t.on
+                        inverted: tile.t.on
+                    }
+                }
+
+                // Lock and Power: a square button with its glyph, Power in the danger tone.
+                Text {
+                    visible: tile.t.id === "lock" || tile.t.id === "power"
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: String.fromCodePoint(tile.t.id === "lock" ? 0xF033E : 0xF0425)
+                    color: tile.t.danger ? control.tones.danger : control.on
+                    font.family: "Symbols Nerd Font Mono"
+                    font.pixelSize: 17
+                }
             }
+        }
+    }
 
-            Rule {}
+    // A page: the back circle and the section's name, then its rows.
+    Column {
+        id: pageColumn
+        objectName: "card"
+        visible: control.page !== ""
+        x: 16
+        y: 16
+        width: control.width - 32
+        spacing: 6
 
-            // The keys, as chips in Artboard.
-            Flow {
-                Layout.fillWidth: true
-                Layout.leftMargin: 14
-                Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: 10
-                Layout.bottomMargin: Layout.topMargin
-                spacing: 8
+        Row {
+            height: 40
+            spacing: 12
 
-                Repeater {
-                    id: legendRepeater
-                    model: control.legend
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 32
+                height: 32
+                radius: 16
+                color: Qt.alpha(control.on, 0.1)
+                Text {
+                    anchors.centerIn: parent
+                    textFormat: Text.PlainText
+                    text: String.fromCodePoint(0xF0141)
+                    color: control.on
+                    font.family: "Symbols Nerd Font Mono"
+                    font.pixelSize: 16
+                }
+                Root.Click {
+                    name: "control-back"
+                    onTapped: control.back()
+                }
+            }
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                textFormat: Text.PlainText
+                text: Lib.TITLES[control.current]
+                color: control.on
+                font.family: control.fonts.ui ?? ""
+                font.pixelSize: 15
+                font.weight: Font.Bold
+            }
+        }
 
-                    KeyPair {
-                        theme: control.theme
-                        look: control.look
+        // Wi-Fi's section draws its password line in place.
+        Root.ControlWifi {
+            id: wifi
+            width: parent.width
+            visible: control.page === "wifi"
+            theme: control.theme
+        }
+
+        Repeater {
+            id: rowRepeater
+            model: control.rows
+
+            Rectangle {
+                required property var modelData
+                required property int index
+                readonly property bool on: index === control.section.selected
+                readonly property string drawnDetail: detail.text
+                width: pageColumn.width
+                height: 48
+                radius: 12
+                color: Qt.alpha(control.on, on ? 0.1 : 0.05)
+
+                Root.Click {
+                    name: "control-row:" + index
+                    onTapped: control.runRow(index)
+                }
+
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: 12
+                    spacing: 12
+
+                    Text {
+                        textFormat: Text.PlainText
+                        width: Math.min(implicitWidth, 260)
+                        elide: Text.ElideRight
+                        text: modelData.title
+                        color: control.on
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        id: detail
+                        textFormat: Text.PlainText
+                        width: pageColumn.width - 24 - 12 - 260
+                        elide: Text.ElideRight
+                        text: modelData.detail
+                        color: control.tones.muted
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 11
                     }
                 }
             }
         }
     }
 
-    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
-    component Rule: Item {
-        Layout.fillWidth: true
-        implicitHeight: 1
+    // A pill slider: the track in the island's text at 12%, the level filled in the text with its glyph.
+    component Pill: Rectangle {
+        property real level: 0
+        property int glyph: 0
+        radius: height / 2
+        color: Qt.alpha(control.on, 0.12)
+
+        Rectangle {
+            width: Math.max(parent.height, parent.width * Math.max(0, Math.min(1, parent.level)))
+            height: parent.height
+            radius: parent.radius
+            visible: parent.level > 0
+            color: control.on
+
+            Text {
+                anchors.verticalCenter: parent.verticalCenter
+                x: 7
+                textFormat: Text.PlainText
+                text: String.fromCodePoint(parent.parent.glyph)
+                color: control.fill
+                font.family: "Symbols Nerd Font Mono"
+                font.pixelSize: parent.height <= 18 ? 11 : 13
+            }
+        }
+    }
+
+    // A 38 x 22 switch: the knob at the right and filled while on.
+    component Switch: Rectangle {
+        property bool on: false
+        property bool inverted: false
+        width: 38
+        height: 22
+        radius: 11
+        color: on ? (inverted ? control.fill : control.on) : Qt.alpha(control.on, 0.12)
+
+        Rectangle {
+            x: parent.on ? parent.width - width - 3 : 3
+            anchors.verticalCenter: parent.verticalCenter
+            width: 16
+            height: 16
+            radius: 8
+            color: parent.on ? (parent.inverted ? control.on : control.fill) : control.tones.muted
+        }
     }
 }

@@ -146,6 +146,8 @@ const CODE = {
   'J / K': [/Key_J\b/, /Key_K\b/],
   '↑ / ↓': [/Key_Up\b/, /Key_Down\b/],
   'H / L': [/Key_H\b/, /Key_L\b/],
+  'H J K L': [/Key_H\b/, /Key_J\b/, /Key_K\b/, /Key_L\b/],
+  '- / =': [/Key_Minus\b/, /Key_Equal\b/],
   '⇧ J / K': [/ShiftModifier/, /Key_J\b/, /Key_K\b/],
   '↵': [/Key_Return\b/],
   '⇧ ↵': [/ShiftModifier/, /Key_Return\b/],
@@ -192,6 +194,12 @@ test('every IN SURFACES row names a key its surface\'s code handles, a shared ro
       for (const p of want) assert.ok(p.test(code), `${s} ${r.key} ${r.title}: no ${p}`);
     }
   }
+});
+
+test('IN SURFACES lists Control\'s - and = under Control', () => {
+  const keys = IN_SURFACES.filter((r) => r.surface === 'control').map((r) => r.key);
+  assert.ok(keys.includes('- / ='), keys.join());
+  assert.deepEqual(chipsOf('- / ='), ['-', '=']);
 });
 
 test('a row key draws as one chip per key, with the / between a pair dropped', () => {
