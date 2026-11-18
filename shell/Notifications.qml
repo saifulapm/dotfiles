@@ -66,6 +66,9 @@ Item {
         selected = C.firstNote(rows);
         shown = true;
         forceActiveFocus();
+        // It opens at the top, the first app's head in view, wherever the last open left the list; queued after the rows' own re-position.
+        list.positionViewAtBeginning();
+        Qt.callLater(() => list.positionViewAtBeginning());
     }
 
     function close() {
@@ -710,13 +713,16 @@ Item {
                                             return Object.assign(centre.box(this), { text: word.text, key: modelData.key, inverted, fill: String(color), ink: String(word.color) });
                                         }
                                         objectName: "click:notif-chip:" + modelData.key
-                                        width: word.implicitWidth + 24
+                                        // A sender's long label elides, so the buttons share the tile's width at most.
+                                        width: Math.min(word.implicitWidth + 24, (noteColumn.width - 8 * (row.chips.length - 1)) / row.chips.length)
                                         height: 30
                                         radius: 10
                                         color: inverted ? centre.on : Qt.alpha(centre.on, 0.12)
                                         Text {
                                             id: word
                                             anchors.centerIn: parent
+                                            width: Math.min(implicitWidth, parent.width - 24)
+                                            elide: Text.ElideRight
                                             textFormat: Text.PlainText
                                             text: V.line(modelData.text)
                                             color: parent.inverted ? centre.fill : centre.on

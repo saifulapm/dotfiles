@@ -63,9 +63,27 @@ until_ok 15000 island_is '.mode == "rest"'
 open_centre
 check "with 44 notifications the island is $((oh - 48)) px tall ($(island | jq -c '{height}'))" island_is --argjson h $((oh - 48)) '.height == $h'
 check "the list holds more than it shows ($(notifs | jq -c '{contentHeight, h: .listBox.h}'))" notifs_is '.contentHeight > .listBox.h'
+check "it opens at the top, the first app's head in view ($(notifs | jq -c '{scrollY}'))" notifs_is '.scrollY == 0'
 for _ in $(seq 1 30); do wtype -k j; sleep 0.05; done
 until_ok 2000 notifs_is '.scrollY > 0'
 check "moving down scrolls the list ($(notifs | jq -c '{selected, scrollY}'))" notifs_is '.scrollY > 0'
 close_centre
+# Reopened after a scroll, it opens at the top again.
+open_centre
+check "reopened, it opens at the top again ($(notifs | jq -c '{scrollY}'))" notifs_is '.scrollY == 0'
+close_centre
+
+# A 300-character button label elides inside its tile, and the next button stays on the island.
+timeout 0.5 qs ipc call notifs clear >/dev/null
+long=$(printf 'L%.0s' {1..300})
+notify-send -a Long -A "long=$long" -A second=Second "Long" >/dev/null 9>&- &
+long_sender=$!
+until_ok 2000 notifs_is '.count == 1'
+until_ok 8000 island_is '.mode == "rest"'
+open_centre
+fit() { notifs | jq -e '.notes[0].box as $t | all(.actions[]; .x >= $t.x and .x + .w <= $t.x + $t.w)' >/dev/null; }
+check "both buttons stay inside the tile ($(notifs | jq -c '[.notes[0].box, [.actions[] | {x, w}]]'))" fit
+close_centre
+kill "$long_sender" 2>/dev/null
 exit "$fails"
 }
