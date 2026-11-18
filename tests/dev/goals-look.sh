@@ -91,6 +91,7 @@ ink=$(near "$(geo .heading.box)" "$r" "$g" "$b" 24)
 check "and draws ink pixels ($ink px)" test "$ink" -gt 10
 check "no key hint is in the state, and nothing is drawn under Done · 2 ($(goals_state | jq -c '{hint, last: .blocks[-1].text, cardBox, done: .blocks[-1].box}'))" state_is '(has("hint") | not) and (.cardBox.y + .cardBox.h - (.blocks[-1].box.y + .blocks[-1].box.h)) <= 20'
 
+check "the first tile sits 8 px under the heading row, nothing reserved between ($(goals_state | jq -c '[.headingRow.box, .blocks[0].box]'))" state_is '(.blocks[0].box.y - (.headingRow.box.y + .headingRow.box.h)) as $gap | $gap >= 8 and $gap <= 12'
 check "each goal is a tile, the selected one lighter ($(goals_state | jq -c '[.blocks[] | select(.kind == "goal") | .color]'))" state_is '. as $s | [.blocks[] | select(.kind == "goal") | .color] as $c | ($c | length) == 3 and ([$c[] | select(. == $s.sel)] | length) == 1 and all($c[]; . == $s.tile or . == $s.sel)'
 check "Ship v2's chip reads 3d in the muted tone ($(goals_state | jq -c '.blocks[] | select(.text == "Ship v2") | .chip | {text, color}'))" state_is '(.blocks[] | select(.text == "Ship v2") | .chip) as $c | $c.text == "3d" and $c.color == .muted'
 check "Tax, due today, has its chip in the danger tone ($(goals_state | jq -c '.blocks[] | select(.text == "Tax") | .chip | {text, color, glyph}'))" state_is '(.blocks[] | select(.text == "Tax") | .chip) as $c | ($c.text | test("^([0-9]+h|late)$")) and $c.color == .danger and $c.glyph == 983277'

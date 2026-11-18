@@ -94,6 +94,7 @@ Item {
             confirm: confirm,
             // Each goal tile and the done row as drawn, top to bottom: its fill, its chip and its tasks' checkboxes.
             blocks: Array.from({ length: blockRepeater.count }, (_, i) => blockRepeater.itemAt(i)?.item).filter(b => b).map(b => b.drawn()),
+            headingRow: { box: box(headingRow) },
             heading: { text: heading.text, color: String(heading.color), box: box(heading) },
             confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), box: box(promptLabel) } : null,
             // The island's ink and fill, its tones, and the tile fills the blocks draw in.
@@ -302,6 +303,7 @@ Item {
                 spacing: 8
 
                 Item {
+                    id: headingRow
                     width: column.width
                     height: 36
 
@@ -344,6 +346,8 @@ Item {
                     id: emptyLoader
                     width: column.width
                     active: view.list.length === 0
+                    // An unloaded Loader keeps the height of the text it held, and a hidden item takes no spacing in the Column.
+                    visible: active
                     sourceComponent: Text {
                         topPadding: 12
                         bottomPadding: 12
