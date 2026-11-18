@@ -177,6 +177,8 @@ Item {
     property real modeSince: Date.now()
     onModeChanged: {
         modeSince = Date.now();
+        modeBefore = modeNow;
+        modeNow = mode;
         // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
         if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
             release();
@@ -247,6 +249,8 @@ Item {
     // Called on each of the window's frames while the box morphs; the last field is the frame's own work, sync to rendered, in ms.
     function swapped() {
         if (morphWaits > 0) {
+            // The frames an open waits before it moves are drawn too, so the clock's are kept.
+            morphClock.push(clockFrame());
             morphWaits -= 1;
             if (morphWaits === 0) {
                 morphT0 = Date.now();
@@ -254,9 +258,24 @@ Item {
             }
             return;
         }
-        if (morphing.running)
+        if (morphing.running) {
             morphFrames.push([Date.now() - morphT0, box.width, box.height, parent ? parent.width : 0, parent ? parent.height : 0, renderedAt - syncedAt]);
+            // Each frame's clock: whether the glide drew it, its left edge in the window, its top, its scale, and the resting label's opacity.
+            morphClock.push(clockFrame());
+        }
     }
+    function clockFrame() {
+        return [glideClock.visible ? 1 : 0, Math.round(box.x + glideClock.x), Math.round(glideClock.y), Math.round(glideClock.scale * 1000) / 1000, labelPart.visible ? Math.round(labelPart.opacity * label.opacity * 100) / 100 : 0];
+    }
+    property var morphClock: []
+    // The resting clock glides into Control's big clock, and only there (5YYRZVBB): set as the open from rest starts, cleared as it lands.
+    property bool clockGlide: false
+    property point glideFrom: Qt.point(0, 0)
+    // Control's big clock, the glide's target; the surfaces' window sets it.
+    property Item clockTarget: null
+    // The mode before the current one, so an open can tell it started from the resting clock.
+    property string modeNow: "rest"
+    property string modeBefore: "rest"
     // What the box last morphed for; a size change with the same content, such as a font loading or a theme switch, snaps instead.
     property string morphedFor: ""
     // The morph runs once the change that moved the target has settled every binding, so a switch reads the new surface's name with its new size, whichever binding ran first; callLater also folds the width's and the height's call into one.
@@ -268,7 +287,11 @@ Item {
         const content = part + ":" + (part === "surface" ? surface : notification?.key ?? question?.id ?? "");
         const fresh = morphedFor !== "" && content !== morphedFor;
         const switching = fresh && part === "surface" && morphedFor.startsWith("surface:");
+        const glide = fresh && part === "surface" && surface === "control" && modeBefore === "rest" && !!clockTarget;
         morphedFor = content;
+        // A new morph that is not the glide ends any glide still drawn; the second of the width's and height's calls keeps it.
+        if (fresh && !glide)
+            clockGlide = false;
         // Width and height each call this; the second lands on the morph the first started, or on one still waiting its two frames to start.
         if (!fresh && (morphing.running || morphWaits > 0)) {
             toWidth = targetWidth;
@@ -287,6 +310,12 @@ Item {
         morphKind = I.isCompact(mode) ? "close" : "open";
         morphFrom = [fromWidth, fromHeight];
         morphFrames = [];
+        morphClock = [];
+        if (glide) {
+            const s0 = 13 / 34;
+            glideFrom = Qt.point((fromWidth - glideClock.implicitWidth * s0) / 2, (fromHeight - glideClock.implicitHeight * s0) / 2);
+            clockGlide = true;
+        }
         morphT0 = Date.now();
         toWidth = targetWidth;
         toHeight = targetHeight;
@@ -974,6 +1003,7 @@ Item {
         property: "progress"
         from: 0
         to: 1
+        onFinished: island.clockGlide = false
     }
 
     PwObjectTracker {
@@ -1184,6 +1214,8 @@ Item {
                     width: Math.min(implicitWidth, parent.width - 28)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
+                    // The glide draws the clock while it moves into Control, so it never fades out here.
+                    opacity: island.clockGlide ? 0 : 1
                     color: box.style.text
                     font.family: island.theme.tokens?.type.mono ?? ""
                     font.pixelSize: 13
@@ -2316,6 +2348,31 @@ Item {
                     }
                 }
             }
+        }
+
+        // The resting clock on its way into Control's big clock: the same text at 34 px, scaled down to the label's 13 px at the start, moving and growing on the box's own progress.
+        Text {
+            id: glideClock
+            readonly property real e: island.curve && island.progress < 1 ? I.ease(island.curve.points, island.progress) : 1
+            readonly property real s0: 13 / 34
+            // Read each frame, as the target moves with the box that centres it.
+            readonly property point to: {
+                island.progress;
+                box.width;
+                return island.clockTarget ? island.clockTarget.mapToItem(box, 0, 0) : Qt.point(0, 0);
+            }
+            visible: island.clockGlide
+            textFormat: Text.PlainText
+            text: island.clockTarget ? island.clockTarget.text : ""
+            color: box.style.text
+            font.family: island.theme.tokens?.type.mono ?? ""
+            font.pixelSize: 34
+            font.weight: Font.Bold
+            font.letterSpacing: -1
+            transformOrigin: Item.TopLeft
+            scale: s0 + (1 - s0) * e
+            x: island.glideFrom.x + (to.x - island.glideFrom.x) * e
+            y: island.glideFrom.y + (to.y - island.glideFrom.y) * e
         }
 
         // The waiting dot: 6 px in the accent, at an open surface's top right, or after the resting clock (2VC2VCJR).

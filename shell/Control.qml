@@ -28,6 +28,9 @@ Item {
     property bool opened: false
     // The section whose page shows, or "" on Home.
     property string page: ""
+    // Control's big clock, which the island's resting clock glides into; hidden while the glide draws it.
+    readonly property Item clockItem: bigClock
+    property bool clockHidden: false
     // The tile Home's keys act on.
     property string cursor: "wifi"
     property real wheelRest: 0
@@ -269,6 +272,7 @@ Item {
                 font.pixelSize: 34
                 font.weight: Font.Bold
                 font.letterSpacing: -1
+                opacity: control.clockHidden ? 0 : 1
             }
 
             Rectangle {

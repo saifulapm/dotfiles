@@ -412,6 +412,21 @@ PanelWindow {
         }
     }
 
+    // The resting clock glides into Control's big clock, which hides while the glide draws it.
+    Binding {
+        when: !!host.island
+        target: host.island
+        property: "clockTarget"
+        value: host.control?.clockItem ?? null
+    }
+
+    Binding {
+        when: !!host.control && !!host.island
+        target: host.control
+        property: "clockHidden"
+        value: host.island?.clockGlide ?? false
+    }
+
     // A check waits on this before it reads Control's pixels.
     Binding {
         when: !!host.control && !!host.island
