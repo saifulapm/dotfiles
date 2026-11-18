@@ -391,6 +391,40 @@ export function backgroundWithLock(text) {
   return found;
 }
 
+// A check that sources lib.sh runs on the nested session's scratch XDG_DATA_HOME, and a bin/ node tool started there without mise's own dirs makes mise install node afresh (241 MB in /tmp in m109), so each such line names $mise_dirs.
+export function nodeToolsWithoutMise(text, tools) {
+  const run = new RegExp(`\\bbin/(${tools.join('|')})\\b`);
+  const found = [];
+  let scratch = false;
+  text.split('\n').forEach((line, i) => {
+    const code = line.replace(/(^|\s)#.*$/, '');
+    if (/^\s*(source|\.)\s.*\blib\.sh\b/.test(code)) scratch = true;
+    if ((scratch || /\bXDG_(DATA|CACHE)_HOME=/.test(code)) && run.test(code) && !/\$mise_dirs\b/.test(code)) found.push(i + 1);
+  });
+  return found;
+}
+
+const binDir = new URL('../../bin/', import.meta.url).pathname;
+const nodeTools = () => readdirSync(binDir).filter((f) => statSync(binDir + f).isFile() && /^#!.*\bnode\b/.test(readFileSync(binDir + f, 'utf8').split('\n')[0]));
+
+test('the mise lint flags a node tool run after sourcing lib.sh or beside a scratch XDG_DATA_HOME without $mise_dirs, and passes one that names it', () => {
+  const cli = readFileSync(dir + 'reminder-cli.sh', 'utf8');
+  assert.deepEqual(nodeToolsWithoutMise(cli, nodeTools()), []);
+  const bare = cli.replace('reminder() { env $mise_dirs "$repo/bin/reminder"', 'reminder() { "$repo/bin/reminder"');
+  assert.notEqual(bare, cli);
+  assert.equal(nodeToolsWithoutMise(bare, nodeTools()).length, 1);
+  assert.deepEqual(nodeToolsWithoutMise('"$repo/bin/reminder" list\n', ['reminder']), []);
+  assert.deepEqual(nodeToolsWithoutMise('XDG_DATA_HOME=$w "$repo/bin/reminder" list\n', ['reminder']), [1]);
+  assert.deepEqual(nodeToolsWithoutMise('XDG_DATA_HOME=$w "$repo/bin/dots-youtube"\n', ['reminder']), []);
+});
+
+test('every tests/dev line that runs a bin/ node tool on a scratch data dir names $mise_dirs', () => {
+  const tools = nodeTools();
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) nodeToolsWithoutMise(readFileSync(dir + f, 'utf8'), tools).forEach((n) => found.push(`${f}:${n}`));
+  assert.deepEqual(found, [], 'put env $mise_dirs before the tool');
+});
+
 test('the fake and notify-send lints catch the shapes that broke the island checks', () => {
   assert.deepEqual(fakesWithoutShebang('cat >"$fake/mem" <<EOF\nprintf hi\nEOF\nchmod +x "$fake/mem"\n'), [1]);
   assert.deepEqual(fakesWithoutShebang("printf 'echo hi\\n' >\"$f/claude\"\nchmod +x \"$f/claude\"\n"), [1]);
