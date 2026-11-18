@@ -240,6 +240,36 @@ ${body}`], { encoding: 'utf8', timeout: 3000 });
   }
 });
 
+// m104's live session idle-locked mid-batch and island-notifs-rules.sh lost keys on a 6 s hold, which read as the shell's fault; the trap says the session locked.
+test("lib.sh's EXIT trap fails a check when the live session locked while it ran, and stays quiet when it did not", () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  const fn = lib.match(/^dev_exit\(\) \{[\s\S]*?^\}/m);
+  assert.ok(fn, 'lib.sh defines dev_exit()');
+  const reader = lib.match(/^live_lock\(\) \{[^\n]*WAYLAND_DISPLAY="\$live_wl"[^\n]*bin\/dots-call" lock state[^\n]*\}$/m);
+  assert.ok(reader, 'live_lock() reads the live shell\'s lock state');
+  const start = lib.search(/^lock_start=\$\(live_lock\)$/m);
+  assert.ok(start > lib.indexOf('draws about once a second: '), 'lib.sh records the lock state once the draw-rate guard passed');
+  const run = (now) =>
+    spawnSync('bash', ['-c', `set -uo pipefail
+${fn[0]}
+qml_errors() { :; }
+cleanup() { :; }
+dev_stop() { :; }
+live_lock() { echo '${now}'; }
+lock_start='{"locked":false,"heldBy":"","monitorsOff":0,"leaseUntil":0}'
+dev_out=/nonexistent dev_log=/nonexistent shell_watch=/nonexistent started=/nonexistent
+fails=0
+trap dev_exit EXIT
+echo "ok   one"
+exit $((fails > 0))`], { encoding: 'utf8', timeout: 3000 });
+  const locked = run('{"locked":true,"heldBy":"","monitorsOff":0,"leaseUntil":0}');
+  assert.equal(locked.status, 1);
+  assert.match(locked.stdout, /^FAIL the live session locked during this check \(\{"locked":true.*\): rerun from the first FAIL under a lease$/m);
+  const unlocked = run('{"locked":false,"heldBy":"","monitorsOff":0,"leaseUntil":0}');
+  assert.equal(unlocked.status, 0);
+  assert.doesNotMatch(unlocked.stdout, /^FAIL/m);
+});
+
 // qs writes its log and QML warnings to stdout, so a check that kept only Files' stderr read an empty log and its "no QML errors" passed blind (m34).
 test('every tests/dev script that starts Files keeps its stdout and stderr in one log', () => {
   const found = [];

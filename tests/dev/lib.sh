@@ -97,8 +97,14 @@ qml_errors() {
 }
 dev_exit() {
   local rc=$? errs= changed=
+  local lock_now
   # A script that dies part way (an unbound name, a failed command) counts no FAIL, so a summary of ok and FAIL lines would read it green.
   [ "$rc" -ne 0 ] && [ "$fails" -eq 0 ] && echo "FAIL $(basename "$0") ended with exit $rc before any check failed"
+  # The live state has no lock time, so a lock that came mid-run reads as unlocked at the guard and locked now (m104 lost keys to one).
+  if [ "$(jq -r .locked <<<"${lock_start:-}" 2>/dev/null)" = false ] && lock_now=$(live_lock) && [ "$(jq -r .locked <<<"$lock_now" 2>/dev/null)" = true ]; then
+    echo "FAIL the live session locked during this check ($lock_now): rerun from the first FAIL under a lease"
+    rc=1
+  fi
   [ -n "${DOTS_DEV_UNIT:-}" ] && errs=$(qml_errors)
   if [ -n "$errs" ]; then
     echo "FAIL the shell's journal has no QML errors"
@@ -147,6 +153,10 @@ if (($(grim_ms) > 500 && $(grim_ms) > 500)); then
   echo "     live lock state: $(env -u QS_CONFIG_PATH WAYLAND_DISPLAY="$live_wl" "$repo/bin/dots-call" lock state 2>&1 | jq -c '{locked, heldBy, monitorsOff, leaseUntil}' 2>&1)"
   exit 2
 fi
+# A stale live socket can hang a call, and a hung trap holds the nested-check lock, so the read is bounded.
+live_lock() { timeout 2 env -u QS_CONFIG_PATH WAYLAND_DISPLAY="$live_wl" "$repo/bin/dots-call" lock state 2>/dev/null | jq -c '{locked, heldBy, monitorsOff, leaseUntil}' 2>/dev/null; }
+# The EXIT trap compares the lock state against this, since the live state has no lock time.
+lock_start=$(live_lock)
 # The shell makes its surfaces a second after its first frame, with its warm-up's Ticks running, so a check starts once the shell is at rest.
 at_rest() { shell_status | jq -e '.timers == 1 and (.loaded | length) >= 7' >/dev/null 2>&1; }
 until_ok 6000 at_rest
