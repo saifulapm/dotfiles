@@ -17,7 +17,7 @@ reminders. Do not write the store file yourself.
 
     reminder add <when> <text>
 
-`<when>` takes three forms:
+`<when>` takes two forms:
 
 - `20m`, `1h` or `1h30m`: that long from now.
 - `17:30`: the next 17:30 on this machine's clock, today or tomorrow.
