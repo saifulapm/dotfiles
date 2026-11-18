@@ -174,5 +174,9 @@ click_box picker-primary
 until_ok 3000 answered folder
 check "Choose this folder answers the folder shown ($(cat "$out/folder" 2>/dev/null))" answer_is folder "$(chosen "$here/pick")"
 
+# The picker unloads 30 s after its last request, whatever the island shows by then, so the next request opens it cold.
+until_ok 3000 rest
+check "the picker unloads within 35 s of its close ($(pk_state | jq -c '{loaded, open}'))" until_ok 35000 state_is '.loaded == false'
+
 exit $((fails > 0))
 }

@@ -733,10 +733,10 @@ PanelWindow {
         }
     }
 
-    // Once the island has stopped drawing it, the picker unloads 30 s after its last request.
+    // The picker unloads 30 s after its last request closes; like Pass, it waits on its own close, not on what the island draws, since the island keeps its last surface drawn.
     Root.Tick {
         interval: 30000
-        running: !!host.picker && !host.picker.visible && !host.picker.pending
+        running: !!host.picker && !host.picker.shown && !host.picker.pending
         onTriggered: pickerLoader.active = false
     }
 
