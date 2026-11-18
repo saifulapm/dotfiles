@@ -1,0 +1,6 @@
+[Unit]
+Description=dots sync, the reminders unit only
+
+[Service]
+Type=oneshot
+ExecStart={{ joinPath .chezmoi.workingTree "bin/dots" }} sync --only reminders
