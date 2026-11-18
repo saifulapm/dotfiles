@@ -41,7 +41,9 @@ Item {
     // A reply that finished while the chat was closed, until the chat opens again.
     property bool unseen: false
     // A reply streaming outlives the surface's close; the card stays loaded until it ends and is seen.
-    readonly property bool busy: streaming || unseen
+    readonly property bool held: streaming || unseen
+    // The island reads a surface's busy as its rows still settling, so a finished reply waiting unseen does not count.
+    readonly property bool busy: streaming
     readonly property string url: Quickshell.env("DOTS_CHAT_URL") || "http://127.0.0.1:4100/v1/chat/completions"
 
     readonly property var tokens: theme.tokens

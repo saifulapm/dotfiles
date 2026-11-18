@@ -710,7 +710,7 @@ PanelWindow {
 
     Root.Tick {
         interval: 30000
-        running: !!host.chat && !host.chat.shown && !host.chat.busy
+        running: !!host.chat && !host.chat.shown && !host.chat.held
         onTriggered: chatLoader.active = false
     }
 
@@ -719,7 +719,7 @@ PanelWindow {
         when: !!host.island
         target: host.island
         property: "chatWaiting"
-        value: !!host.chat && !host.chat.shown && host.chat.busy
+        value: !!host.chat && !host.chat.shown && host.chat.held
     }
 
     // A check waits on these before it reads a tool's pixels.
