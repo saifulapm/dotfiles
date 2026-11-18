@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll, wheel } from './launcher.mjs';
+import { rank, parseQuery, chipOf, prefixOf, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll, wheel } from './launcher.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -270,4 +270,12 @@ test("a touchpad's small angles add up to a row a third of a notch", () => {
   assert.deepEqual(a, { top: 0, selected: 0, rest: -15 });
   const b = wheel(a, -30, 40, 8);
   assert.deepEqual(b, { top: 1, selected: 0, rest: -5 });
+});
+
+test('a prefix mode has a chip of its glyph and name, and apps has none', () => {
+  assert.deepEqual(chipOf('calculator'), { glyph: '\u{f00ec}', name: 'Calculator' });
+  assert.deepEqual(chipOf('colorschemes'), { glyph: '\u{f03d8}', name: 'Colorschemes' });
+  assert.equal(chipOf('apps'), null);
+  assert.equal(prefixOf('clipboard'), 'v ');
+  assert.equal(prefixOf('apps'), '');
 });

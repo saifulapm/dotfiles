@@ -25,7 +25,10 @@ Item {
     property bool shown: false
     // True once the island has come to rest on the launcher; the surfaces' window sets it.
     property bool settled: false
-    readonly property string query: input.text
+    // The mode a typed prefix or a mode key picked, shown as a chip in the field in place of its prefix; "" in apps mode.
+    property string chipMode: ""
+    readonly property var chip: Lib.chipOf(chipMode)
+    readonly property string query: Lib.prefixOf(chipMode) + input.text
     // selected counts from scrollTop, the first of the eight rows drawn out of every row found.
     property int selected: 0
     property int scrollTop: 0
@@ -41,6 +44,7 @@ Item {
     readonly property var fonts: tokens ? tokens.type : ({})
     // The island's own text and the tones lifted to read on its fill.
     readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property color fill: S.surfaceStyle(tokens, "island").fill
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue" })
     // The search field's glyph, a magnifier from Symbols Nerd Font.
     readonly property string searchGlyph: String.fromCodePoint(0xF0349)
@@ -106,7 +110,8 @@ Item {
         openT0 = t0;
         openMs = null;
         opens += 1;
-        input.text = typed || ({ clipboard: "v ", emoji: ": ", colorschemes: "c " })[mode] || "";
+        chipMode = ["clipboard", "emoji", "colorschemes"].indexOf(mode) >= 0 ? mode : "";
+        input.text = typed || "";
         selected = 0;
         scrollTop = 0;
         shown = true;
@@ -233,7 +238,10 @@ Item {
             // Each drawn row's height and whether it has a fill; only the selected one has.
             rowHeights: rows.map((r, i) => rowRepeater.itemAt(i)?.box.height ?? null),
             filled: rows.map((r, i) => rowRepeater.itemAt(i) ? rowRepeater.itemAt(i).box.color.a > 0 : null),
-            field: { x: f.x, y: f.y, w: field.width, h: field.height, placeholder: placeholder.visible ? placeholder.text : null },
+            field: { x: f.x, y: f.y, w: field.width, h: field.height, text: input.text, placeholder: placeholder.visible ? placeholder.text : null },
+            chip: chip ? { name: chip.name, glyph: chip.glyph, inverted: String(chipBox.color) === String(launcher.on) } : null,
+            // Each row's name as drawn, cleaned of any control or bidi character.
+            drawn: rows.map((r, i) => rowRepeater.itemAt(i)?.nameText.text ?? null),
             empty: empty.visible ? empty.text : null,
             heads: rows.map((r, i) => rowRepeater.itemAt(i)?.headText ?? null),
             pending: pending.length,
@@ -351,6 +359,41 @@ Item {
                     font.pixelSize: 18
                 }
 
+                // The mode as an inverted chip: its glyph and name in the island's fill on the island's text.
+                Rectangle {
+                    id: chipBox
+                    visible: !!launcher.chip
+                    implicitWidth: chipRow.implicitWidth + 20
+                    implicitHeight: 26
+                    radius: 13
+                    color: launcher.on
+
+                    Row {
+                        id: chipRow
+                        anchors.centerIn: parent
+                        spacing: 6
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: launcher.chip?.glyph ?? ""
+                            color: launcher.fill
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 13
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: launcher.chip?.name ?? ""
+                            color: launcher.fill
+                            font.family: launcher.fonts.ui ?? ""
+                            font.pixelSize: 12
+                            font.weight: Font.Bold
+                        }
+                    }
+                }
+
                 Item {
                     Layout.fillWidth: true
                     implicitHeight: input.implicitHeight
@@ -358,7 +401,7 @@ Item {
                     Text {
                         id: placeholder
                         anchors.fill: parent
-                        visible: input.text === ""
+                        visible: input.text === "" && !launcher.chip
                         verticalAlignment: Text.AlignVCenter
                         textFormat: Text.PlainText
                         text: "Search"
@@ -374,6 +417,16 @@ Item {
                         font.pixelSize: 15
                         clip: true
                         focus: true
+                        // A typed prefix becomes the chip, and the field keeps only what follows it.
+                        onTextChanged: {
+                            if (launcher.chipMode !== "")
+                                return;
+                            const m = Lib.parseQuery(text).mode;
+                            if (m !== "apps") {
+                                launcher.chipMode = m;
+                                text = text.slice(2);
+                            }
+                        }
                         Keys.onPressed: event => {
                             const ctrl = event.modifiers & Qt.ControlModifier;
                             if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
@@ -386,6 +439,8 @@ Item {
                                 launcher.launch(event.modifiers & Qt.ShiftModifier);
                             else if (event.key === Qt.Key_Escape)
                                 launcher.close();
+                            else if (event.key === Qt.Key_Backspace && input.text === "" && launcher.chipMode !== "")
+                                launcher.chipMode = "";
                             else
                                 return;
                             event.accepted = true;
