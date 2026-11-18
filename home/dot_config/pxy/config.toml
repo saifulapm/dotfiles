@@ -28,8 +28,8 @@ models = [
 [groups.deepseek]
 name = "DS"
 reasoning = true
-# Five flat-rate subscriptions (free = true on each member: no marginal cost) then pay-per-token deepseek-ai, reached only after genuine quota exhaustion.
-fallback_only_on_quota_exhaustion = true
+# Five flat-rate subscriptions (free = true on each member: no marginal cost) then pay-per-token deepseek-ai, which any failure falls through to, since the subscriptions' keys expired (Saiful, 2026-11-18).
+fallback_only_on_quota_exhaustion = false
 models = [
   "opencode-go/deepseek-flash",
   "commandcode/deepseek/deepseek-v4.1-flash",
