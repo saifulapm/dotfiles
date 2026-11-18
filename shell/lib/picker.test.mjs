@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { answerLine, answersMarked, appIcon, appName, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathPills, placeMatches, previewText, primaryText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, sortText, splitPath, stampText, toggleMark } from './picker.mjs';
+import { answerLine, answersMarked, appIcon, appName, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathPills, placeMatches, isPicture, previewText, primaryText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, sortText, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -402,3 +402,9 @@ test('the lister keeps every entry when one name is not UTF-8 or a link is dangl
   ]);
 });
 
+
+// The preview decodes only a picture, so moving over a text file or an archive logs no decode error (finding 05N39AMC).
+test('only a file named as a picture Qt draws is decoded for the preview', () => {
+  for (const n of ['a.png', 'b.JPG', 'c.jpeg', 'd.webp', 'e.gif', 'f.svg', 'g.bmp']) assert.equal(isPicture(n), true, n);
+  for (const n of ['a.txt', 'b.pdf', 'c.tar.gz', 'png', '.png', 'd.png.txt', 'notes']) assert.equal(isPicture(n), false, n);
+});

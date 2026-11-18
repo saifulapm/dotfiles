@@ -89,6 +89,7 @@ until_ok 3000 eval 'pk_state | jq -e ".open == false" >/dev/null'
 check "a file chosen in the picker is attached ($(island | jq -c .ask.attached))" until_ok 2000 ask_is '.attached[1] == "report.txt"'
 check "and the island has the keyboard back" until_ok 2000 island_focus Exclusive
 check "the question is back, still open in full ($(island | jq -c '{takeover, mode, expanded: .ask.expanded}'))" until_ok 2000 ask_is '.expanded'
+check "the picker's hand-back loops no binding ($(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -c 'Binding loop detected'))" bash -c '! journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -q "Binding loop detected"'
 
 want="answer --by popup --screenshot $XDG_RUNTIME_DIR/dots-island-attach/$(island | jq -r '.ask.attached[0]') --screenshot $fake/files/report.txt -- Q1 $rest"
 wtype -k 2

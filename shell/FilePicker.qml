@@ -1440,7 +1440,7 @@ Item {
                     // A bound keeps a 12 MP photo from decoding whole; the dimensions line reads the header, not this.
                     sourceSize.width: 1024
                     sourceSize.height: 1024
-                    source: picker.previewing ? "file://" + picker.cursorPath.split("/").map(encodeURIComponent).join("/") : ""
+                    source: picker.previewing && P.isPicture(picker.cursorRow.name) ? "file://" + picker.cursorPath.split("/").map(encodeURIComponent).join("/") : ""
                 }
                 Rectangle {
                     id: badgeBox

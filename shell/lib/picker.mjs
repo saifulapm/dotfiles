@@ -294,6 +294,10 @@ export const SIZE_SCRIPT = [
   '',
 ].join('\n');
 
+// A file named as a picture Qt can draw; the preview decodes nothing else.
+const PICTURES = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'];
+export const isPicture = (name) => name.lastIndexOf('.') > 0 && PICTURES.includes(name.slice(name.lastIndexOf('.') + 1).toLowerCase());
+
 // The cursor file's meta lines: the size read from its header when there is one, the file's size, its date; the extension is a badge.
 export function previewText(row, width, height) {
   const ext = row.name.indexOf('.') > 0 ? row.name.slice(row.name.lastIndexOf('.') + 1).toUpperCase() : '';

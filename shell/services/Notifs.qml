@@ -172,9 +172,9 @@ Scope {
         live = kept;
     }
 
-    // The next that waited and has not run out, or nothing; the queue goes before the criticals set aside.
+    // The next that waited and has not run out, or nothing; the queue goes before the criticals set aside. An empty queue is left as it is, so the island's hold, which reads it, is not re-run by its own write.
     function release() {
-        if (held)
+        if (held || !queue.length)
             return false;
         // Do Not Disturb or a mute set while it waited still keeps it off the island.
         let r = W.take(queue, Date.now());

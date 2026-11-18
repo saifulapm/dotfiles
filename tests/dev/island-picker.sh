@@ -98,6 +98,8 @@ for n in a.txt b.txt c.txt; do
   wtype -M ctrl -k space -m ctrl
 done
 until_ok 2000 state_is '.marked | length == 3'
+# one.png is empty on purpose, so only a text file's decode counts here.
+check "the cursor over text files decodes no picture ($(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep 'Unsupported image format' | grep -c '\.txt'))" bash -c '! journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep "Unsupported image format" | grep -q "\.txt"'
 check "three marked files read 3 selected and Open 3 ($(pk_state | jq -c '[.foot, .marked]') $(buttons))" \
   state_is '.foot == "3 selected" and [.buttons[] | [.text, .inverted]] == [["Cancel", false], ["Open 3", true]] and all(.rows[] | select(.name | endswith(".txt")); .marked)'
 cancel multi
