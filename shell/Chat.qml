@@ -38,8 +38,10 @@ Item {
     property int pick: -1
     // Each finished reply's first row and its whole text, so Y copies the reply a picked block is in.
     property var replies: []
-    // A reply streaming outlives the surface's close; the card stays loaded until it ends.
-    readonly property bool busy: streaming
+    // A reply that finished while the chat was closed, until the chat opens again.
+    property bool unseen: false
+    // A reply streaming outlives the surface's close; the card stays loaded until it ends and is seen.
+    readonly property bool busy: streaming || unseen
     readonly property string url: Quickshell.env("DOTS_CHAT_URL") || "http://127.0.0.1:4100/v1/chat/completions"
 
     readonly property var tokens: theme.tokens
@@ -80,6 +82,7 @@ Item {
         openMs = null;
         opens += 1;
         shown = true;
+        unseen = false;
         focusInput();
     }
 
@@ -261,6 +264,7 @@ Item {
             error = failure(req);
         }
         xhr = null;
+        unseen = !shown;
         streaming = false;
     }
 
@@ -379,6 +383,7 @@ Item {
         return JSON.stringify({
             open: shown,
             streaming: streaming,
+            unseen: unseen,
             conversation: conversation || null,
             title: title,
             alias: alias,

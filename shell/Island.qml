@@ -934,8 +934,10 @@ Item {
     // What waits behind an open surface: the notifications Notifs holds, each question that arrived, and one media change (7E95CSV2).
     property var questionsWaiting: []
     property bool mediaWaiting: false
+    // The chat closed while its reply streams, or holding a reply that finished unseen; the surfaces' window sets it.
+    property bool chatWaiting: false
     // A question answered elsewhere while it waited drops out of the count; questions show one at a time, so they count as one.
-    readonly property int waiting: Wait.count(notifs.queue) + (question && questionsWaiting.indexOf(question.id) >= 0 ? 1 : 0) + (mediaWaiting ? 1 : 0)
+    readonly property int waiting: Wait.count(notifs.queue) + (question && questionsWaiting.indexOf(question.id) >= 0 ? 1 : 0) + (mediaWaiting ? 1 : 0) + (chatWaiting ? 1 : 0)
     onHolderChanged: if (!holder) {
         questionsWaiting = [];
         mediaWaiting = false;

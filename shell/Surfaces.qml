@@ -707,6 +707,14 @@ PanelWindow {
         onTriggered: chatLoader.active = false
     }
 
+    // A closed chat still streaming, or holding a reply not yet seen, waits behind the island's dot until it opens again.
+    Binding {
+        when: !!host.island
+        target: host.island
+        property: "chatWaiting"
+        value: !!host.chat && !host.chat.shown && host.chat.busy
+    }
+
     // A check waits on these before it reads a tool's pixels.
     Binding {
         when: !!host.chat && !!host.island
