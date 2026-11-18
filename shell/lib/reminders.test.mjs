@@ -133,3 +133,90 @@ test('a reminders.json holding anything but reminders is broken, so nothing is s
   assert.deepEqual(readReminders(JSON.stringify([good])), { list: [good], broken: false });
   assert.deepEqual(readReminders('[]\n'), { list: [], broken: false });
 });
+
+const S = await import('./reminders.mjs');
+const tea = parseReminder('20m tea', now);
+
+test('a reminder set in the store is a pending record with its fields stamped now', () => {
+  const { store, error } = S.setReminder(S.emptyStore(), tea, now);
+  assert.equal(error, '');
+  assert.equal(store.version, 1);
+  const [r] = store.reminders;
+  assert.deepEqual({ ...r, id: 'x' }, { id: 'x', text: 'tea', due: at('2026-10-22T15:12:00+06:00'), created: now, ended: null, stamps: { text: now, due: now, ended: now } });
+  assert.deepEqual(S.pendingList(store), [{ id: r.id, text: 'tea', due: at('2026-10-22T15:12:00+06:00'), created: now }]);
+});
+
+test('the store file reads back as written, and one of the wrong shape does not parse', () => {
+  const { store } = S.setReminder(S.emptyStore(), tea, now);
+  assert.deepEqual(S.parseStore(JSON.stringify(store)), store);
+  const good = store.reminders[0];
+  for (const file of ['{', '', '[]', '{"reminders":1}', JSON.stringify({ reminders: [1] }), JSON.stringify({ reminders: [{ ...good, id: 5 }] }), JSON.stringify({ reminders: [{ ...good, id: '' }] }), JSON.stringify({ reminders: [{ ...good, text: 5 }] }), JSON.stringify({ reminders: [{ ...good, due: 'abc' }] }), JSON.stringify({ reminders: [{ ...good, ended: 'gone' }] })]) {
+    assert.equal(S.parseStore(file), null, file);
+  }
+});
+
+test('a pulled record with no text or a due no Date holds is left out and counted, and the rest are kept', () => {
+  const { store } = S.setReminder(S.emptyStore(), tea, now);
+  const good = store.reminders[0];
+  const pulled = S.parseStore(JSON.stringify({ version: 1, reminders: [good, { ...good, id: 'e', text: '' }, { ...good, id: 'm', text: '\u202E\u001b' }, { ...good, id: 'f', due: 1e300 }] }));
+  const { store: kept, dropped } = S.usableOnly(pulled);
+  assert.equal(dropped, 3);
+  assert.deepEqual(kept.reminders.map((r) => r.id), [good.id]);
+});
+
+const setOn = (store, q, t, id) => {
+  const r = S.setReminder(store, parseReminder(q, t), t);
+  return { ...r.store, reminders: r.store.reminders.map((x) => (x.created === t && x.text === q.split(' ').slice(1).join(' ') ? { ...x, id } : x)) };
+};
+
+test('two stores that each set a reminder merge to both pending, in either order', () => {
+  const a = setOn(S.emptyStore(), '20m tea', now, 'r-a');
+  const b = setOn(S.emptyStore(), '1h coffee', now + 1000, 'r-b');
+  const ab = S.mergeStores(a, b);
+  assert.deepEqual(ab, S.mergeStores(b, a));
+  assert.deepEqual(S.pendingList(ab).map((r) => r.text), ['tea', 'coffee']);
+});
+
+test('a reminder removed on one machine is removed in the merge, and leaves the pending list', () => {
+  const a = setOn(S.emptyStore(), '20m tea', now, 'r-a');
+  const removed = S.endReminder(a, 'r-a', 'removed', now + 5000);
+  assert.deepEqual([removed.reminders[0].ended, removed.reminders[0].stamps.ended, removed.reminders[0].text], ['removed', now + 5000, 'tea']);
+  const merged = S.mergeStores(a, removed);
+  assert.equal(merged.reminders[0].ended, 'removed');
+  assert.deepEqual(S.pendingList(merged), []);
+});
+
+test('a rung reminder stays rung against a pending copy stamped later, so no clock reopens it', () => {
+  const a = setOn(S.emptyStore(), '20m tea', now, 'r-a');
+  const rung = S.endReminder(a, 'r-a', 'rung', now + 1000);
+  const later = { ...a, reminders: [{ ...a.reminders[0], stamps: { text: now, due: now, ended: now + 9e9 } }] };
+  assert.equal(S.mergeStores(rung, later).reminders[0].ended, 'rung');
+  assert.equal(S.mergeStores(later, rung).reminders[0].ended, 'rung');
+  assert.equal(S.endReminder(rung, 'r-a', 'removed', now + 2000).reminders[0].ended, 'rung');
+});
+
+test('the old reminders.json moves in with its ids, text, due and created, and a reminder already rung stays rung', () => {
+  const old = readReminders(JSON.stringify([{ id: 'mwlvjgei-bf1', text: 'renew', due: 1795046400000, created: 1763000000000 }])).list;
+  const moved = S.migrateOld(S.emptyStore(), old);
+  assert.deepEqual(moved.reminders, [{ id: 'mwlvjgei-bf1', text: 'renew', due: 1795046400000, created: 1763000000000, ended: null, stamps: { text: 1763000000000, due: 1763000000000, ended: 1763000000000 } }]);
+  const rung = S.endReminder(moved, 'mwlvjgei-bf1', 'rung', now);
+  assert.equal(S.migrateOld(rung, old).reminders[0].ended, 'rung');
+  assert.deepEqual(S.pendingList(S.migrateOld(rung, old)), []);
+});
+
+test('with 50 pending a new one is refused, and a merge of 30 and 30 keeps all 60', () => {
+  const many = (prefix, n) => ({ version: 1, reminders: Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, text: 't', due: now + (i + 1) * 60000, created: now, ended: null, stamps: { text: now, due: now, ended: now } })) });
+  const fifty = many('f', 50);
+  assert.deepEqual(S.setReminder(fifty, tea, now), { store: fifty, error: 'At most 50 reminders can wait' });
+  const sixty = S.mergeStores(many('a', 30), many('b', 30));
+  assert.equal(S.pendingList(sixty).length, 60);
+  const refused = S.setReminder(sixty, tea, now);
+  assert.equal(refused.error, 'At most 50 reminders can wait');
+  assert.equal(S.pendingList(refused.store).length, 60);
+});
+
+test('a pending text from another machine lists as one clean line', () => {
+  const s = { version: 1, reminders: [{ id: 'p', text: 'a\nb\u202Ec\u001b[31m', due: now + 60000, created: now, ended: null, stamps: { text: now, due: now, ended: now } }] };
+  assert.equal(S.pendingList(s)[0].text, 'a bc [31m');
+  assert.equal(reminderRows('', now, S.pendingList(s))[0].title, 'a bc [31m');
+});

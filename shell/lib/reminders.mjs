@@ -107,3 +107,90 @@ export function reminderRows(q, now, list, broken) {
   const top = !parsed ? [] : error ? [{ title: error, detail: '' }] : [{ title: parsed.text, detail: parsed.when, remind: { text: parsed.text, due: parsed.due } }];
   return top.concat(list.map((r, i) => ({ title: r.text, detail: whenText(r.due, now), reminderId: r.id, head: i === 0 })));
 }
+
+// The synced store, reminders/<machine>.json in the data dir: every reminder ever set, each {id, text, due, created, ended, stamps}, where ended is null while it waits, then "rung" or "removed", and stays as a marker so a merge never brings it back.
+export const emptyStore = () => ({ version: 1, reminders: [] });
+
+const FIELDS = ['text', 'due', 'ended'];
+const ENDS = [null, 'rung', 'removed'];
+const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const num = (v, fallback) => (typeof v === 'number' ? v : fallback);
+
+function readRecord(r) {
+  const from = isObject(r.stamps) ? r.stamps : {};
+  const stamps = FIELDS.reduce((s, f) => Object.assign(s, { [f]: num(from[f], r.created) }), {});
+  return { id: r.id, text: r.text, due: r.due, created: r.created, ended: r.ended ?? null, stamps };
+}
+
+const validRecord = (r) => isObject(r) && typeof r.id === 'string' && r.id !== '' && typeof r.text === 'string' && typeof r.due === 'number' && typeof r.created === 'number' && ENDS.includes(r.ended ?? null);
+
+// A file of the wrong shape is null, so nothing saves over what it holds; a record with no text or a due no Date holds still parses, for usableOnly to count.
+export function parseStore(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (!isObject(data) || !Array.isArray(data.reminders) || !data.reminders.every(validRecord)) return null;
+  return { version: 1, reminders: data.reminders.map(readRecord) };
+}
+
+const usable = (r) => oneLine(r.text) !== '' && isTime(r.due) && isTime(r.created);
+
+// Another machine's records that could never be listed or rung are left out, and counted for the sync round to name.
+export function usableOnly(store) {
+  const reminders = store.reminders.filter(usable);
+  return { store: Object.assign({}, store, { reminders }), dropped: store.reminders.length - reminders.length };
+}
+
+// Those still waiting, soonest first, each text one clean line.
+export const pendingList = (store) =>
+  store.reminders
+    .filter((r) => r.ended === null && usable(r))
+    .map((r) => ({ id: r.id, text: oneLine(r.text), due: r.due, created: r.created }))
+    .sort((a, b) => a.due - b.due || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+const record = (r, stamp) => ({ id: r.id, text: r.text, due: r.due, created: r.created, ended: null, stamps: { text: stamp, due: stamp, ended: stamp } });
+
+// Sets a parsed reminder as of now; with 50 already waiting, the store comes back unchanged with the reason.
+export function setReminder(store, parsed, now) {
+  const r = addReminder(pendingList(store), parsed, now);
+  if (r.error) return { store, error: r.error };
+  const added = r.list.find((x) => !store.reminders.some((y) => y.id === x.id));
+  return { store: Object.assign({}, store, { reminders: store.reminders.concat([record(added, now)]) }), error: '' };
+}
+
+// Ends a waiting reminder as "rung" or "removed"; one already ended keeps how it ended.
+export const endReminder = (store, id, ended, now) =>
+  Object.assign({}, store, {
+    reminders: store.reminders.map((r) => (r.id === id && r.ended === null ? Object.assign({}, r, { ended, stamps: Object.assign({}, r.stamps, { ended: now }) }) : r)),
+  });
+
+// The copy that set the field later wins it, and a tie goes to the larger value's text, so both machines pick the same one; an ended reminder never waits again, whatever the stamps say.
+function later(a, b, f) {
+  if (f === 'ended' && (a.ended === null) !== (b.ended === null)) return a.ended === null ? b : a;
+  if (a.stamps[f] !== b.stamps[f]) return a.stamps[f] > b.stamps[f] ? a : b;
+  return JSON.stringify(a[f]) >= JSON.stringify(b[f]) ? a : b;
+}
+
+function mergeRecord(a, b) {
+  const out = { id: a.id, text: '', due: 0, created: Math.min(a.created, b.created), ended: null, stamps: {} };
+  for (const f of FIELDS) {
+    const from = later(a, b, f);
+    out[f] = from[f];
+    out.stamps[f] = from.stamps[f];
+  }
+  return out;
+}
+
+export function mergeStores(a, b) {
+  const byId = {};
+  a.reminders.concat(b.reminders).forEach((r) => {
+    byId[r.id] = byId[r.id] ? mergeRecord(byId[r.id], r) : r;
+  });
+  return { version: 1, reminders: Object.keys(byId).sort().map((id) => byId[id]) };
+}
+
+// The old reminders.json's list joins the store with its ids, each stamped at its own created time, so a copy any machine already rang stays rung.
+export const migrateOld = (store, list) => mergeStores(store, { version: 1, reminders: list.map((r) => record(r, r.created)) });
