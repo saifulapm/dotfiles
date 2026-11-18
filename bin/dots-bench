@@ -112,47 +112,6 @@ echo "     control cold opens: ${control_colds[*]}; warm opens: ${control_warms[
 control_cold=$(median "${control_colds[@]}")
 control_warm=$(median "${control_warms[@]}")
 
-# The notification centre in the island, timed as Control is: open number $1, its time as the centre measured it, then closed with the keyboard back.
-notifs_state() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
-notifs_reported() { notifs_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
-notifs_count_is() { notifs_state | jq -e ".count == $1" >/dev/null; }
-notifs_closed() { notifs_state | jq -e '.open == false' >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
-notifs_once() {
-  qs ipc call notifs open >/dev/null || die "notifs open failed"
-  until_ok 3000 notifs_reported "$1" || die "notifs open $1 never reported openMs"
-  notifs_state | jq -r .openMs
-  qs ipc call notifs close >/dev/null
-  until_ok 3000 notifs_closed || die "the notification centre never gave the keyboard back"
-}
-# The centre is timed over forty notifications in its history, which outlives each kill, so the open draws a list taller than the island lets it be.
-for i in $(seq 1 40); do notify-send -a Bench "bench $i" "a body that draws on one line"; done
-until_ok 5000 notifs_count_is 40 || die "the forty notifications never reached the history"
-sleep 1
-notifs_colds=()
-for i in 1 2 3 4 5; do
-  systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
-  until_ok 3000 paper_gone || die "the killed shell's paper never went away"
-  until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
-  until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
-  notifs_colds+=("$(notifs_once 1)") || exit 1
-done
-sleep 2
-notifs_warms=()
-for i in 0 1 2 3 4 5; do
-  sleep 0.3
-  ms=$(notifs_once $((2 + i))) || exit 1
-  ((i > 0)) && notifs_warms+=("$ms")
-done
-echo "     notifs cold opens: ${notifs_colds[*]}; warm opens: ${notifs_warms[*]}"
-notifs_cold=$(median "${notifs_colds[@]}")
-notifs_warm=$(median "${notifs_warms[@]}")
-# The rows after this read the shell as they did before m104 timed the centre: no history, and a fresh process, since the forty rows' memory stays with the one that drew them.
-qs ipc call notifs clear >/dev/null
-systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
-until_ok 3000 paper_gone || die "the killed shell's paper never went away"
-until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
-until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
-
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
 pass_is() { pass_state | jq -e "$1" >/dev/null; }
@@ -376,6 +335,41 @@ t0=$(cpu_ticks)
 sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
+
+# The notification centre in the island, timed last so its kills and its forty rows' memory touch no other row: open number $1, its time as the centre measured it, then closed with the keyboard back.
+notifs_state() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+notifs_reported() { notifs_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
+notifs_count_is() { notifs_state | jq -e ".count == $1" >/dev/null; }
+notifs_closed() { notifs_state | jq -e '.open == false' >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
+notifs_once() {
+  qs ipc call notifs open >/dev/null || die "notifs open failed"
+  until_ok 3000 notifs_reported "$1" || die "notifs open $1 never reported openMs"
+  notifs_state | jq -r .openMs
+  qs ipc call notifs close >/dev/null
+  until_ok 3000 notifs_closed || die "the notification centre never gave the keyboard back"
+}
+# The centre is timed over forty notifications in its history, which outlives each kill, so the open draws a list taller than the island lets it be.
+for i in $(seq 1 40); do notify-send -a Bench "bench $i" "a body that draws on one line"; done
+until_ok 5000 notifs_count_is 40 || die "the forty notifications never reached the history"
+sleep 1
+notifs_colds=()
+for i in 1 2 3 4 5; do
+  systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+  until_ok 3000 paper_gone || die "the killed shell's paper never went away"
+  until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+  until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
+  notifs_colds+=("$(notifs_once 1)") || exit 1
+done
+sleep 2
+notifs_warms=()
+for i in 0 1 2 3 4 5; do
+  sleep 0.3
+  ms=$(notifs_once $((2 + i))) || exit 1
+  ((i > 0)) && notifs_warms+=("$ms")
+done
+echo "     notifs cold opens: ${notifs_colds[*]}; warm opens: ${notifs_warms[*]}"
+notifs_cold=$(median "${notifs_colds[@]}")
+notifs_warm=$(median "${notifs_warms[@]}")
 
 node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95" "$control_cold" "$control_warm" "$control_morph_max" "$control_p95" "$notifs_cold" "$notifs_warm"
 exit
