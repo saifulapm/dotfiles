@@ -48,6 +48,8 @@ Item {
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue" })
     // The search field's glyph, a magnifier from Symbols Nerd Font.
     readonly property string searchGlyph: String.fromCodePoint(0xF0349)
+    // A reminder tile's alarm clock.
+    readonly property string alarmGlyph: String.fromCodePoint(0xF0020)
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
     required property var apps
     // themes.json's colorschemes, as the shell read them.
@@ -242,6 +244,10 @@ Item {
             chip: chip ? { name: chip.name, glyph: chip.glyph, inverted: String(chipBox.color) === String(launcher.on) } : null,
             // Each row's name as drawn, cleaned of any control or bidi character.
             drawn: rows.map((r, i) => rowRepeater.itemAt(i)?.nameText.text ?? null),
+            // How each row draws: a flat row, a calculator's answer or a reminder's tile.
+            kinds: rows.map((r, i) => rowRepeater.itemAt(i)?.kind ?? null),
+            notes: rows.map((r, i) => rowRepeater.itemAt(i)?.noteText ?? null),
+            answer: rowRepeater.itemAt(0)?.answerDrawn ?? null,
             empty: empty.visible ? empty.text : null,
             heads: rows.map((r, i) => rowRepeater.itemAt(i)?.headText ?? null),
             pending: pending.length,
@@ -525,12 +531,15 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool current: index === launcher.selected
+                        readonly property string kind: launcher.mode === "calculator" ? "answer" : modelData.remind ? "tile" : "row"
+                        readonly property var answerDrawn: kind === "answer" ? { text: answer.text, size: answer.font.pixelSize, bold: answer.font.bold, under: under.text } : null
                         readonly property string headText: modelData.head ? headLabel.text : ""
                         // A colorscheme row's strip as drawn, for the state.
                         readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
                         readonly property Item box: rowBox
                         readonly property Item nameText: title
                         readonly property real detailWidth: note.width
+                        readonly property string noteText: note.text
                         readonly property string slot: modelData.icon || letter.text
                         width: list.width
 
@@ -547,20 +556,53 @@ Item {
                             font.pixelSize: 11
                         }
 
-                        // 48 px and flat: only the selected row has a fill.
+                        // 48 px and flat, only the selected row filled; a calculator's answer is 80 px and unfilled, a reminder to set one 56 px tile.
                         Rectangle {
                             id: rowBox
                             width: list.width
-                            height: 48
+                            height: kind === "answer" ? 80 : kind === "tile" ? 56 : 48
                             radius: 12
-                            color: current ? Qt.alpha(launcher.on, 0.07) : "transparent"
+                            color: kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
 
                             Root.Click {
                                 name: "launcher-row:" + index
                                 onTapped: launcher.runRow(index)
                             }
 
+                            // The answer at 40 px bold with the expression under it.
+                            Column {
+                                visible: kind === "answer"
+                                x: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - 28
+
+                                Text {
+                                    id: answer
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    textFormat: Text.PlainText
+                                    text: kind === "answer" ? look.title(modelData.title) : ""
+                                    color: launcher.on
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 40
+                                    font.weight: Font.Bold
+                                    font.letterSpacing: -1
+                                }
+
+                                Text {
+                                    id: under
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    textFormat: Text.PlainText
+                                    text: kind === "answer" ? look.rowDetail(modelData) : ""
+                                    color: launcher.tones.muted
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                }
+                            }
+
                             RowLayout {
+                                visible: kind !== "answer"
                                 anchors.fill: parent
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
@@ -570,7 +612,7 @@ Item {
                                 Rectangle {
                                     implicitWidth: 32
                                     implicitHeight: 32
-                                    radius: modelData.glyph ? 16 : 10
+                                    radius: modelData.glyph || kind === "tile" ? 16 : 10
                                     color: modelData.icon ? "transparent" : Qt.alpha(launcher.on, 0.10)
                                     Image {
                                         anchors.fill: parent
@@ -585,9 +627,9 @@ Item {
                                         anchors.centerIn: parent
                                         visible: !modelData.icon
                                         textFormat: Text.PlainText
-                                        text: modelData.glyph || look.title(modelData.bare || modelData.title).charAt(0).toUpperCase()
+                                        text: kind === "tile" ? launcher.alarmGlyph : modelData.glyph || look.title(modelData.bare || modelData.title).charAt(0).toUpperCase()
                                         color: launcher.on
-                                        font.family: launcher.fonts.ui ?? ""
+                                        font.family: kind === "tile" ? "Symbols Nerd Font Mono" : launcher.fonts.ui ?? ""
                                         font.pixelSize: modelData.glyph ? 16 : 14
                                         font.weight: Font.Bold
                                     }
