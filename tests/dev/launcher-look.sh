@@ -83,6 +83,9 @@ until_ok 3000 state_is '.query == "fo"'
 until_ok 3000 eval 'shell_status | jq -e ".theme == \"catppuccin-mocha\" and .transition == \"\"" >/dev/null'
 check "a switch while open keeps the query and the keyboard" state_is '.open and .query == "fo" and .keyboard'
 check "mocha: the selected row's fill is Mocha's text at 7% ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#12cdd6f4"'
+# Mocha's island is its surface #1E1E2E, so the row's fill over it reads about 42 43 60.
+tint=$(near "$(cursor_geo -70 4 8 8)" 42 43 60 4)
+check "mocha: inside the selected row reads its fill over Mocha's island on screen ($tint of 64 px)" test "$tint" -eq 64
 close_launcher
 
 exit $((fails > 0))
