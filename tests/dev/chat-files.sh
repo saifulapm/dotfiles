@@ -87,5 +87,16 @@ wtype -k BackSpace
 check "Backspace in the empty field drops the chip too ($(chat | jq -c .attachments))" until_ok 2000 chat_is '.attachments == []'
 say "plain"
 check "the request carries no trace of it ($(tail -1 "$requests" | jq -c '.messages[-1]'))" until_ok 3000 sent '(.[-1].messages[-1] == {role: "user", content: "plain"}) and (.[-1] | tostring | contains("MARKER-NOTES") | not)'
+until_ok 10000 chat_is '.streaming == false'
+
+# Pasted text answers to the same 512 KiB as a file, and the field scrolls instead of growing past the island.
+head -c $((600 * 1024)) /dev/zero | tr '\0' 'p' | fold -w 80 | wl-copy
+wtype -M ctrl v -m ctrl
+check "600 KiB of pasted text keeps the input bar to a few lines ($(chat | jq .inputHeight))" until_ok 5000 chat_is '(.input | length) > 100 and .inputHeight <= 140'
+before=$(lines)
+wtype -k Return
+check "and Enter refuses it with one line naming 512 KiB ($(chat | jq -c .refusal))" until_ok 3000 chat_is '.refusal | contains("512 KiB")'
+sleep 1
+check "sending nothing ($before then $(lines) requests)" test "$(lines)" -eq "$before"
 exit "$fails"
 }

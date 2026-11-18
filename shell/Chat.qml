@@ -507,7 +507,7 @@ Item {
         }
         messages = kept;
         conversation = conv.start;
-        title = C.clean(String(conv.title || H.title(conv))).slice(0, 60);
+        title = C.clean(String(conv.title || H.title(conv))).replace(/\s+/g, " ").trim().slice(0, 60);
         alias = conv.alias === "default" ? "default" : "chat";
         model = C.clean(String(conv.model || "")).slice(0, 80);
     }
@@ -628,7 +628,8 @@ Item {
             refusal: refusal,
             error: error,
             rows: rows.count,
-            input: field.text,
+            input: field.text.length > 200 ? field.text.slice(0, 200) : field.text,
+            inputHeight: inputBar.height,
             focus: focusArea,
             pick: pick,
             drawn: drawn(),
@@ -1220,12 +1221,13 @@ Item {
             // The paperclip, the field, and the round send button that turns into stop while a reply streams.
             Rectangle {
                 width: column.width
-                height: Math.max(52, field.implicitHeight + 28)
+                id: inputBar
+                height: Math.max(52, fieldBox.height + 28)
                 radius: 16
                 color: chat.tile
 
                 Text {
-                    id: clip
+                    id: paperclip
                     x: 16
                     anchors.verticalCenter: parent.verticalCenter
                     textFormat: Text.PlainText
@@ -1241,48 +1243,67 @@ Item {
                     }
                 }
 
-                TextEdit {
-                    id: field
-                    anchors.left: clip.right
+                // The field scrolls past about five lines, so a long paste never pushes the bar out of the island.
+                Flickable {
+                    id: fieldBox
+                    anchors.left: paperclip.right
                     anchors.leftMargin: 10
                     anchors.right: sendButton.left
                     anchors.rightMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
-                    textFormat: TextEdit.PlainText
-                    wrapMode: TextEdit.Wrap
-                    color: chat.on
-                    selectionColor: Qt.alpha(chat.on, 0.3)
-                    font.family: chat.fonts.ui ?? ""
-                    font.pixelSize: 14
-                    focus: true
-                    Keys.onPressed: event => {
-                        const shift = event.modifiers & Qt.ShiftModifier;
-                        const ctrl = event.modifiers & Qt.ControlModifier;
-                        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !shift)
-                            chat.send();
-                        else if (event.key === Qt.Key_Tab)
-                            chat.focusReplies();
-                        else if (ctrl && event.key === Qt.Key_N)
-                            chat.newChat();
-                        else if (ctrl && event.key === Qt.Key_O)
-                            chat.pickFiles();
-                        else if (ctrl && event.key === Qt.Key_V)
-                            chat.paste();
-                        else if (event.key === Qt.Key_Backspace && field.text === "" && chat.attachments.length)
-                            chat.removeAttachment(chat.attachments.length - 1);
-                        else if (event.key === Qt.Key_Escape)
-                            chat.close();
-                        else
-                            return;
-                        event.accepted = true;
+                    height: Math.min(field.implicitHeight, 100)
+                    contentWidth: width
+                    contentHeight: field.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    function follow(r) {
+                        if (r.y < contentY)
+                            contentY = r.y;
+                        else if (r.y + r.height > contentY + height)
+                            contentY = r.y + r.height - height;
                     }
 
-                    Text {
-                        visible: field.text === ""
-                        textFormat: Text.PlainText
-                        text: "Ask anything"
-                        color: chat.tones.muted
-                        font: field.font
+                    TextEdit {
+                        id: field
+                        width: fieldBox.width
+                        onCursorRectangleChanged: fieldBox.follow(cursorRectangle)
+                        textFormat: TextEdit.PlainText
+                        wrapMode: TextEdit.Wrap
+                        color: chat.on
+                        selectionColor: Qt.alpha(chat.on, 0.3)
+                        font.family: chat.fonts.ui ?? ""
+                        font.pixelSize: 14
+                        focus: true
+                        Keys.onPressed: event => {
+                            const shift = event.modifiers & Qt.ShiftModifier;
+                            const ctrl = event.modifiers & Qt.ControlModifier;
+                            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !shift)
+                                chat.send();
+                            else if (event.key === Qt.Key_Tab)
+                                chat.focusReplies();
+                            else if (ctrl && event.key === Qt.Key_N)
+                                chat.newChat();
+                            else if (ctrl && event.key === Qt.Key_O)
+                                chat.pickFiles();
+                            else if (ctrl && event.key === Qt.Key_V)
+                                chat.paste();
+                            else if (event.key === Qt.Key_Backspace && field.text === "" && chat.attachments.length)
+                                chat.removeAttachment(chat.attachments.length - 1);
+                            else if (event.key === Qt.Key_Escape)
+                                chat.close();
+                            else
+                                return;
+                            event.accepted = true;
+                        }
+
+                        Text {
+                            visible: field.text === ""
+                            textFormat: Text.PlainText
+                            text: "Ask anything"
+                            color: chat.tones.muted
+                            font: field.font
+                        }
                     }
                 }
 

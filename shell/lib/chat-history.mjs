@@ -62,8 +62,11 @@ function ageText(s) {
   return `${Math.floor(s / 86400)} d`;
 }
 
+// A row draws one line, so line breaks in a title become spaces and what a file holds is cleaned.
+const oneLine = (s) => clean(String(s ?? '')).replace(/\s+/g, ' ').trim();
+
 export function rows(convs, nowMs) {
   return [...convs]
     .sort((a, b) => b.start - a.start)
-    .map((c) => ({ file: c.file, start: c.start, title: cutTo(clean(String(c.title ?? '')), 60), question: cutTo(clean(firstLine(c)), 80), age: ageText((nowMs - c.start) / 1000) }));
+    .map((c) => ({ file: c.file, start: c.start, title: cutTo(oneLine(c.title), 60), question: cutTo(oneLine(firstLine(c)), 80), age: ageText((nowMs - c.start) / 1000) }));
 }

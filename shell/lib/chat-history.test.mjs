@@ -100,3 +100,9 @@ test('the history rows draw their title and question without control characters 
   assert.equal(r[0].title, 'evil[31mredevil');
   assert.equal(r[0].question, 'qx');
 });
+
+test('a title or question with line breaks draws as one line', () => {
+  const r = rows([{ start: 1, title: 'one\ntwo\r\nthree', messages: [{ role: 'user', content: 'a\n\nb' }] }], 1000);
+  assert.equal(r[0].title, 'one two three');
+  assert.equal(r[0].question, 'a');
+});

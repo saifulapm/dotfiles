@@ -136,3 +136,7 @@ test('a block draws at most 20000 characters however its lines fall', () => {
   const many = blocks().end(Array.from({ length: 100 }, () => 'w'.repeat(3000)).join(' \n')).closed[0];
   assert.ok(many.html.length < 21000, String(many.html.length));
 });
+
+test('bold and italics wrap inline code too', () => {
+  assert.equal(blocks().end('**`set`** builtin and *`x`*').closed[0].html, '<b><code>set</code></b> builtin and <i><code>x</code></i>');
+});

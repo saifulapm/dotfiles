@@ -61,17 +61,20 @@ function cutLines(text) {
   return out.length > DRAWN_MAX ? out.slice(0, DRAWN_MAX) + '…' : out;
 }
 
-// Inline Markdown as Qt styled text: code spans first, so nothing inside them is read as emphasis.
+// Inline Markdown as Qt styled text. Code spans are set aside behind private-use marks first, so nothing inside them is read as emphasis and emphasis can still wrap them.
+const MARK_OPEN = String.fromCharCode(0xe000);
+const MARK_CLOSE = String.fromCharCode(0xe001);
+
 function inline(text) {
-  return cutLines(text)
-    .split(/(`[^`\n]+`)/)
-    .map((part, i) => {
-      if (i % 2) return `<code>${escape(part.slice(1, -1))}</code>`;
-      return escape(part)
-        .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
-        .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<i>$2</i>');
-    })
-    .join('');
+  const spans = [];
+  const plain = cutLines(text).replace(/`([^`\n]+)`/g, (m, code) => {
+    spans.push(code);
+    return MARK_OPEN + (spans.length - 1) + MARK_CLOSE;
+  });
+  return escape(plain)
+    .replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>')
+    .replace(/(^|[^*\w])\*([^*\n]+)\*(?!\w)/g, '$1<i>$2</i>')
+    .replace(new RegExp(MARK_OPEN + '(\\d+)' + MARK_CLOSE, 'g'), (m, i) => `<code>${escape(spans[Number(i)])}</code>`);
 }
 
 export function render(block) {
