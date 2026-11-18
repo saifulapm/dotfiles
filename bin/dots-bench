@@ -146,8 +146,12 @@ done
 echo "     notifs cold opens: ${notifs_colds[*]}; warm opens: ${notifs_warms[*]}"
 notifs_cold=$(median "${notifs_colds[@]}")
 notifs_warm=$(median "${notifs_warms[@]}")
-# The rows after this read the centre as they did before m104 timed it, with no history.
+# The rows after this read the shell as they did before m104 timed the centre: no history, and a fresh process, since the forty rows' memory stays with the one that drew them.
 qs ipc call notifs clear >/dev/null
+systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+until_ok 3000 paper_gone || die "the killed shell's paper never went away"
+until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
 
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }

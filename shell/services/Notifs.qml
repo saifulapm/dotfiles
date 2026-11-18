@@ -103,9 +103,9 @@ Scope {
         save();
     }
 
-    // A notification that arrives while the centre is open joins its list there at once, so it neither shows nor waits; a replace of the one the island holds still updates it there.
+    // A notification that arrives while the centre is open joins its list there at once, so it neither shows nor waits; a critical still waits, as it stays until dismissed, and a replace of the one the island holds still updates it there.
     function arrive(e) {
-        if (seen && current?.key !== e.key)
+        if (seen && !e.critical && current?.key !== e.key)
             return;
         show(e);
     }

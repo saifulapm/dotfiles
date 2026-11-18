@@ -78,6 +78,20 @@ pinged() { island_is '.mode == "notification" and (.text | contains("ping"))'; }
 until_ok 3000 pinged
 check "and shows once the centre closes ($(island | jq -c '{mode, text}'))" pinged
 until_ok 8000 island_is '.mode == "rest"'
+
+# A critical arriving while the centre is open joins its list and still waits, since a critical stays until dismissed.
+open_centre
+notify-send -u critical -a Alarm "urgent"
+until_ok 1000 notifs_is '.groups[0].app == "Alarm"'
+check "a critical arriving while the centre is open joins its list and waits ($(island | jq -c '{waiting}'))" island_is '.waiting == 1'
+wtype -k Escape
+urgent() { island_is '.mode == "notification" and (.text | contains("urgent"))'; }
+until_ok 3000 urgent
+check "and shows once the centre closes" urgent
+niri msg action spawn -- dots-call island focus
+sleep 0.3
+wtype -k d
+until_ok 3000 island_is '.mode == "rest"'
 open_centre
 
 # Shift+D clears all, as the header's Clear all does.
