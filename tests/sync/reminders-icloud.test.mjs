@@ -206,3 +206,21 @@ test("the password reaches neither sync.json, the round's output nor any process
   const failed = await sync(a, ['--only', 'reminders']);
   for (const text of [readFileSync(a.status, 'utf8'), failed.stdout, failed.stderr]) assert.ok(!text.includes(secret) && !text.includes(b64));
 });
+
+test("a pulled record whose id or due no event can carry stays off iCloud, and the reminders beside it still go up", async (t) => {
+  const { fake, w, a } = await setup();
+  t.after(fake.close);
+  const now = Date.now();
+  const rec = (id, due, text = 'odd') => ({ id, text, due, created: now, ended: null, stamps: { text: now, due: now, ended: now } });
+  const peer = join(w.remote, 'dots-sync/reminders/c.json');
+  mkdirSync(dirname(peer), { recursive: true });
+  const good = rec('mzz1-good01', now + 10 * MIN, 'tea');
+  writeFileSync(peer, JSON.stringify({ version: 1, reminders: [rec('x\r\nBEGIN:VALARM\r\nTRIGGER:-PT1H', now + 10 * MIN), rec('a\ud800b', now + 10 * MIN), rec('far1', 1e15), rec('__proto__', now + 10 * MIN), good] }));
+  await round(a);
+  assert.deepEqual((await report(fake, 'Dots reminders')).map((e) => [e.uid, e.summary]).sort(), [['__proto__', 'odd'], [good.id, 'tea']]);
+  assert.equal(fake.count('PUT'), 2);
+  assert.equal(status(a).reminders.ok, true);
+  fake.log.length = 0;
+  await round(a);
+  assert.equal(fake.count('PUT'), 0);
+});

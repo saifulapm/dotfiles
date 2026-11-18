@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as R from './reminders.mjs';
-import { eventIcs } from './reminder-event.mjs';
+import { carriable, eventIcs } from './reminder-event.mjs';
 
 const T = Date.UTC(2026, 10, 19, 4, 30, 0);
 const MIN = 60000;
@@ -61,4 +61,12 @@ test('a long text folds at 75 octets without splitting a character, and unfolds 
 test('a due across a DST change keeps its instant in UTC', () => {
   const due = Date.UTC(2026, 2, 29, 1, 30);
   assert.deepEqual(prop(eventIcs(reminder('tea', due)), 'DTSTART'), ['20260329T013000Z']);
+});
+
+test('only a plain id, and a due and created time a DATE-TIME can hold, make an event', () => {
+  assert.ok(carriable(reminder('tea')));
+  for (const id of ['', 'x\r\nBEGIN:VALARM', 'a\ud800b', 'a/b', 'a b', 'x'.repeat(129)]) assert.ok(!carriable(Object.assign(reminder('tea'), { id })), JSON.stringify(id));
+  assert.ok(!carriable(reminder('tea', 1e15)));
+  assert.ok(!carriable(reminder('tea', -1)));
+  assert.ok(!carriable(reminder('tea', T, 1e15)));
 });

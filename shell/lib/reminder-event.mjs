@@ -25,6 +25,10 @@ function fold(line) {
   return out.concat([cur]).join('\r\n');
 }
 
+// A pulled record is anyone's: an id that is not a plain token could add lines to the event or break its path, and a due or created time past year 9999 has no DATE-TIME, so neither goes up.
+const holds = (ms) => ms >= 0 && ms < Date.UTC(10000, 0, 1);
+export const carriable = (r) => /^[A-Za-z0-9._-]{1,128}$/.test(r.id) && holds(r.due) && holds(r.due + 5 * MIN) && holds(r.created);
+
 // r is a pendingList entry, {id, text, due, created}; the same reminder always gives the same bytes, as DTSTAMP comes from its created time.
 export function eventIcs(r) {
   return [

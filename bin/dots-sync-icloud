@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as R from '../shell/lib/reminders.mjs';
-import { eventIcs } from '../shell/lib/reminder-event.mjs';
+import { carriable, eventIcs } from '../shell/lib/reminder-event.mjs';
 
 const CALENDAR = 'Dots reminders';
 // The shell's overdue round is cut at 30 s and the Dropbox part goes first, so iCloud gets 15 s in all.
@@ -28,18 +28,19 @@ const text = existsSync(storePath) ? readFileSync(storePath, 'utf8') : null;
 const store = text === null ? R.emptyStore() : R.parseStore(text);
 // The merge already failed the unit on a broken store.
 if (!store) process.exit(0);
-// Each event sent: the reminder id and a hash of the bytes iCloud holds, or gone once its removal reached iCloud.
-let sent = {};
+// Each event sent: the reminder id and a hash of the bytes iCloud holds, or gone once its removal reached iCloud; no prototype, so a pulled id like __proto__ is an ordinary key.
+const sent = Object.create(null);
 try {
-  sent = JSON.parse(readFileSync(statePath, 'utf8'));
+  Object.assign(sent, JSON.parse(readFileSync(statePath, 'utf8')));
 } catch {}
 
 const hash = (s) => createHash('sha256').update(s).digest('hex');
 const puts = R.pendingList(store)
+  .filter(carriable)
   .map((r) => ({ id: r.id, ics: eventIcs(r) }))
   .filter((e) => sent[e.id] !== hash(e.ics));
 // Only removing a reminder takes its event away; a rung one keeps it.
-const deletes = store.reminders.filter((r) => r.ended === 'removed' && sent[r.id] !== 'gone').map((r) => r.id);
+const deletes = store.reminders.filter((r) => r.ended === 'removed' && carriable(r) && sent[r.id] !== 'gone').map((r) => r.id);
 if (puts.length === 0 && deletes.length === 0) process.exit(0);
 
 function credentials() {
