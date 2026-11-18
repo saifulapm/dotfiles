@@ -30,6 +30,7 @@ grim -g "0,0 8x8" "$files/shot.png"
 until_ok 5000 island_is '.surface == null'
 open_chat
 
+wtype -- "read this"
 wtype -M ctrl o -m ctrl
 check "Ctrl+O opens the island's file picker over the chat ($(island | jq -c '{surface, takeover}'))" until_ok 4000 island_is '.takeover == "picker" and .surface == "chat"'
 until_ok 4000 pk_is '.open and .settled and .keyboard and .listed'
@@ -41,8 +42,9 @@ wtype -k Return
 until_ok 3000 pk_is '.open == false'
 until_ok 3000 chat_is '.keyboard and .settled'
 check "picking notes.txt adds its chip, notes.txt at 2 KiB ($(chat | jq -c .attachments))" until_ok 3000 chat_is '.attachments == [{name: "notes.txt", size: 2048, kind: "text"}]'
-say "read this"
-check "the request carries the file's text ($(tail -1 "$requests" | jq -c '.messages[-1].content | tostring | .[0:60]'))" until_ok 3000 sent '.[-1].messages[-1].content | contains("MARKER-NOTES")'
+check "the Enter that picked it sends nothing and keeps the typed text ($(chat | jq -c .input))" eval 'chat_is ".input == \"read this\"" && [ "$(lines)" -eq 0 ]'
+wtype -k Return
+check "the request carries the file's text ($(tail -1 "$requests" 2>/dev/null | jq -c '.messages[-1].content | tostring | .[0:60]'))" until_ok 3000 sent '.[-1].messages[-1].content | contains("MARKER-NOTES")'
 check "the chip is gone once sent ($(chat | jq -c .attachments))" chat_is '.attachments == []'
 until_ok 10000 chat_is '.streaming == false'
 
