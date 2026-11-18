@@ -1,7 +1,8 @@
 // The reminders unit's last step: each pending reminder as an event in the Dots reminders iCloud calendar, against a fake iCloud.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import * as R from '../../shell/lib/reminders.mjs';
 import { icloudEntry, machine, sync, world } from './lib.mjs';
@@ -152,4 +153,57 @@ test('a DELETE answered 404 leaves the unit ok', async (t) => {
   await round(a);
   assert.equal(fake.count('DELETE'), 1);
   assert.equal(status(a).reminders.ok, true);
+});
+
+test('with no iCloud entry in pass, a round exits 0 and sends nothing to iCloud', async (t) => {
+  const fake = await icloud();
+  t.after(fake.close);
+  const a = machine(world(), 'a');
+  a.env.DOTS_CALDAV_URL = fake.url;
+  add(a, '10m tea');
+  await round(a);
+  assert.deepEqual(fake.log, []);
+  assert.equal(status(a).reminders.ok, true);
+});
+
+test("iCloud answering 401 fails the unit with it, after this machine's reminders went up to Dropbox", async (t) => {
+  const { fake, w, a } = await setup();
+  t.after(fake.close);
+  fake.status = 401;
+  const tea = add(a, '10m tea');
+  const r = await sync(a, ['--only', 'reminders']);
+  assert.equal(r.code, 5);
+  assert.match(status(a).reminders.error, /401/);
+  assert.equal(status(a).reminders.ok, false);
+  const remote = join(w.remote, 'dots-sync/reminders/a.json');
+  assert.ok(existsSync(remote));
+  assert.deepEqual(R.parseStore(readFileSync(remote, 'utf8')).reminders.map((x) => x.id), [tea.id]);
+  fake.status = 0;
+  await round(a);
+  assert.equal(status(a).reminders.ok, true);
+  assert.deepEqual((await report(fake, 'Dots reminders')).map((e) => e.uid), [tea.id]);
+});
+
+test("the password reaches neither sync.json, the round's output nor any process's argv", async (t) => {
+  const { fake, a } = await setup();
+  t.after(fake.close);
+  fake.delay = 400;
+  add(a, '10m tea');
+  const running = sync(a, ['--only', 'reminders']);
+  const seen = [];
+  const poll = setInterval(() => seen.push(execFileSync('ps', ['-eo', 'args'], { encoding: 'utf8' })), 100);
+  const r = await running;
+  clearInterval(poll);
+  assert.equal(r.code, 0, r.stderr);
+  assert.ok(fake.log.length >= 4 && seen.length >= 10, `${fake.log.length} requests, ${seen.length} ps reads`);
+  assert.ok(seen.some((ps) => ps.includes('dots-sync-icloud')), 'ps caught the push running');
+  const secret = 'app-pass-1';
+  const b64 = Buffer.from('me@x.test:' + secret).toString('base64');
+  for (const text of [readFileSync(a.status, 'utf8'), r.stdout, r.stderr, ...seen]) {
+    assert.ok(!text.includes(secret) && !text.includes(b64));
+  }
+  fake.status = 401;
+  add(a, '20m walk');
+  const failed = await sync(a, ['--only', 'reminders']);
+  for (const text of [readFileSync(a.status, 'utf8'), failed.stdout, failed.stderr]) assert.ok(!text.includes(secret) && !text.includes(b64));
 });
