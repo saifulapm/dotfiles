@@ -96,8 +96,8 @@ check "what is typed is in no state: island, pinentry, pass" bash -c "! { timeou
 sample "$out/takeover" takeover_now 9>&- &
 sampler=$!
 sleep 0.5
-wtype -k Return -s 150 x
-check "x typed 150 ms after the wrong Enter lands while gpg-agent checks ($(pin | jq -c '{open, checking, field}'))" pin_is '.open and .checking and .field == 0'
+wtype -k Return -s 150 -k Return x
+check "a second Enter and x typed 150 ms after the wrong Enter land while gpg-agent checks ($(pin | jq -c '{open, checking, field}'))" pin_is '.open and .checking and .field == 0'
 until_ok 9000 pin_is '.open and .wrong != null and .checking == false'
 kill "$sampler"
 sampler=
@@ -118,9 +118,12 @@ rc=$(rc_of "$pid")
 check "the passphrase and Enter answer gpg: pass show exits 0 (rc $rc)" test "$rc" = 0
 check "and prints the password" grep -qxF "$password" "$out/first.out"
 until_ok 3000 island_is '.takeover == null and .animating == false'
+check "the island is handed back to the launcher with fo ($(island | jq -c '{surface, takeover}'), $(launcher | jq -c .query))" \
+  eval 'island_is ".takeover == null and .surface == \"launcher\"" && launcher_is ".open and .query == \"fo\""'
 until_ok 2000 launcher_is '.keyboard'
-check "the island is handed back to the launcher with fo and the keyboard ($(island | jq -c '{surface, takeover}'), $(launcher | jq -c '{query, keyboard}'))" \
-  eval 'island_is ".takeover == null and .surface == \"launcher\"" && launcher_is ".open and .query == \"fo\" and .keyboard"'
+wtype o
+until_ok 2000 launcher_is '.query == "foo"'
+check "the launcher has the keyboard again: o makes foo ($(launcher | jq -c .query))" launcher_is '.query == "foo"'
 
 # Esc while gpg-agent checks a wrong passphrase cancels, and the launcher comes back.
 gpgconf --kill gpg-agent
@@ -140,8 +143,8 @@ check "Esc during the check ends pass show with Operation cancelled (rc $rc)" ba
 check "and came before any retry: the error line never drew ($(sort "$out/errors" | uniq -c | tr '\n' ' '))" \
   eval '[ "$(grep -cx "\"\"" "$out/errors")" -ge 3 ] && ! grep -vqx "\"\"" "$out/errors"'
 until_ok 3000 island_is '.takeover == null and .animating == false'
-check "the launcher comes back with fo ($(island | jq -c '{surface, takeover}'), $(launcher | jq -c .query))" \
-  eval 'island_is ".takeover == null and .surface == \"launcher\"" && launcher_is ".open and .query == \"fo\""'
+check "the launcher comes back with foo ($(island | jq -c '{surface, takeover}'), $(launcher | jq -c .query))" \
+  eval 'island_is ".takeover == null and .surface == \"launcher\"" && launcher_is ".open and .query == \"foo\""'
 wtype -k Escape
 until_ok 3000 island_is '.surface == null and .animating == false'
 
