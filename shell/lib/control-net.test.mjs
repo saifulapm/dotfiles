@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { btHint, btOrder, btRow, wifiOrder, wifiRow } from './control-net.mjs';
+import { btHint, btOrder, btRow, wifiLook, wifiOrder, wifiRow } from './control-net.mjs';
 
 test('Bluetooth lists connected devices, then paired, then new ones, by name in each', () => {
   const devs = [
@@ -87,4 +87,17 @@ test('a Wi-Fi row names the network and reads connected, known or its signal', (
   assert.deepEqual(wifiRow({ name: 'home', connected: true, known: true, signalStrength: 0.9 }), { title: 'home', detail: 'connected' });
   assert.deepEqual(wifiRow({ name: 'office', connected: false, known: true, signalStrength: 0.3 }), { title: 'office', detail: 'known' });
   assert.deepEqual(wifiRow({ name: 'cafe', connected: false, known: false, signalStrength: 0.416 }), { title: 'cafe', detail: '42%' });
+});
+
+test('a Wi-Fi page row reads as board 4 draws it: glyph by signal, what it is, and its mark', () => {
+  const joined = wifiLook({ connected: true, known: true, secured: true, signalStrength: 0.94 });
+  assert.equal(joined.sub, 'Connected · 94%');
+  assert.equal(joined.glyph, String.fromCodePoint(0xf0928));
+  assert.equal(joined.mark, String.fromCodePoint(0xf012c));
+  assert.equal(wifiLook({ connected: false, known: true, secured: true, signalStrength: 0.6 }).sub, 'Saved');
+  const locked = wifiLook({ connected: false, known: false, secured: true, signalStrength: 0.4 });
+  assert.equal(locked.sub, 'Secured');
+  assert.equal(locked.glyph, String.fromCodePoint(0xf0922));
+  assert.equal(locked.mark, String.fromCodePoint(0xf033e));
+  assert.equal(wifiLook({ connected: false, known: false, secured: false, signalStrength: 0.1 }).sub, 'Open');
 });

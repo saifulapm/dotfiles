@@ -199,6 +199,9 @@ Item {
             selected: page === "" ? -1 : section.selected,
             rows: rows.map(r => r.title),
             detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
+            // The open password field as drawn, in the asking network's row.
+            field: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).fieldLook).find(f => f) ?? null,
+            rowHeights: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).height),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur) : null,
             clock: { text: bigClock.text, px: bigClock.font.pixelSize, box: box(bigClock) },
@@ -249,7 +252,7 @@ Item {
         event.accepted = true;
     }
 
-    // The sections hold each page's rows and keys; each is visible while its page shows, as pw-dump and the scans wait for that, but draws nothing here but the Wi-Fi password line.
+    // The sections hold each page's rows and keys; each is visible while its page shows, as pw-dump and the scans wait for that, but draws nothing here.
     Item {
         width: 0
         height: 0
@@ -258,6 +261,11 @@ Item {
         Root.ControlAudio {
             id: audio
             visible: control.page === "audio"
+            theme: control.theme
+        }
+        Root.ControlWifi {
+            id: wifi
+            visible: control.page === "wifi"
             theme: control.theme
         }
         Root.ControlBluetooth {
@@ -559,7 +567,7 @@ Item {
         }
     }
 
-    // A page: the back circle and the section's name, then its rows.
+    // A page: the back circle and the section's name, then its rows; a row may carry a glyph, a line under its name and a mark at its right, and the asking network's row opens its password field in place.
     Column {
         id: pageColumn
         objectName: "card"
@@ -603,43 +611,51 @@ Item {
             }
         }
 
-        // Wi-Fi's section draws its password line in place.
-        Root.ControlWifi {
-            id: wifi
-            width: parent.width
-            visible: control.page === "wifi"
-            theme: control.theme
-        }
-
         Repeater {
             id: rowRepeater
             model: control.rows
 
             Rectangle {
+                id: row
                 required property var modelData
                 required property int index
                 readonly property bool on: index === control.section.selected
+                // The secured network the password field is open for.
+                readonly property bool asking: control.page === "wifi" && wifi.typing && wifi.networks[index] === wifi.asking
                 readonly property string drawnDetail: detail.text
                 width: pageColumn.width
-                height: 48
+                height: asking ? 104 : 48
                 radius: 12
                 color: Qt.alpha(control.on, on ? 0.1 : 0.05)
 
                 Root.Click {
-                    name: "control-row:" + index
-                    onTapped: control.runRow(index)
+                    name: "control-row:" + row.index
+                    onTapped: control.runRow(row.index)
                 }
 
                 Row {
-                    anchors.verticalCenter: parent.verticalCenter
+                    y: 24 - height / 2
                     x: 12
+                    width: parent.width - 24
                     spacing: 12
 
                     Text {
+                        visible: !!row.modelData.glyph
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: 20
                         textFormat: Text.PlainText
+                        text: row.modelData.glyph ?? ""
+                        color: control.on
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 17
+                    }
+                    Text {
+                        id: title
+                        anchors.verticalCenter: parent.verticalCenter
                         width: Math.min(implicitWidth, 260)
                         elide: Text.ElideRight
-                        text: modelData.title
+                        textFormat: Text.PlainText
+                        text: row.modelData.title
                         color: control.on
                         font.family: control.fonts.ui ?? ""
                         font.pixelSize: 13
@@ -647,15 +663,94 @@ Item {
                     }
                     Text {
                         id: detail
-                        textFormat: Text.PlainText
-                        width: pageColumn.width - 24 - 12 - 260
+                        anchors.verticalCenter: parent.verticalCenter
+                        // The rest of the row less the glyph and the mark; a long line is cut on one line, never wrapped over the next row.
+                        width: parent.width - title.width - (row.modelData.glyph ? 32 : 0) - (mark.visible ? mark.width + 12 : 0) - 12
                         elide: Text.ElideRight
-                        text: modelData.detail
-                        color: control.tones.muted
+                        maximumLineCount: 1
+                        textFormat: Text.PlainText
+                        text: row.asking && wifi.message !== "" ? wifi.message : row.modelData.sub ?? row.modelData.detail
+                        color: row.asking && wifi.message !== "" || row.modelData.tone === "danger" ? control.tones.danger : control.tones.muted
                         font.family: control.fonts.ui ?? ""
                         font.pixelSize: 11
                     }
+                    Text {
+                        id: mark
+                        visible: !!row.modelData.mark
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: row.modelData.mark ?? ""
+                        color: row.modelData.markTone === "accent" ? control.tones.accent : control.tones.muted
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 15
+                    }
                 }
+
+                // The password field and Join, drawn in the asking network's row: one dot per typed character.
+                Row {
+                    visible: row.asking
+                    x: 12
+                    y: 52
+                    width: parent.width - 24
+                    spacing: 8
+
+                    Rectangle {
+                        id: field
+                        width: parent.width - join.width - 8
+                        height: 36
+                        radius: 10
+                        color: Qt.alpha(control.on, 0.1)
+
+                        Text {
+                            id: dots
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 12
+                            width: parent.width - 24
+                            clip: true
+                            textFormat: Text.PlainText
+                            text: "•".repeat([...wifi.psk].length)
+                            color: control.on
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.letterSpacing: 2
+                        }
+                        Text {
+                            id: placeholder
+                            visible: wifi.psk === ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 12
+                            textFormat: Text.PlainText
+                            text: "Password"
+                            color: control.tones.muted
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                        }
+                    }
+                    Rectangle {
+                        id: join
+                        width: joinText.implicitWidth + 32
+                        height: 36
+                        radius: 10
+                        color: control.on
+                        Text {
+                            id: joinText
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: "Join"
+                            color: control.fill
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                        }
+                        Root.Click {
+                            name: "control-join"
+                            onTapped: wifi.key({ key: Qt.Key_Return, modifiers: 0, text: "" })
+                        }
+                    }
+                }
+
+                // Read by state(): the field as drawn.
+                readonly property var fieldLook: asking ? { text: dots.text, font: dots.fontInfo.family, px: dots.font.pixelSize, ink: String(dots.color), fill: String(field.color), placeholder: placeholder.visible ? placeholder.text : null } : null
             }
         }
     }

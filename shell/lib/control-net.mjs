@@ -34,6 +34,16 @@ export function wifiOrder(nets) {
   return nets.map((n, i) => i).sort((a, b) => wifiRank(nets[a]) - wifiRank(nets[b]) || nets[b].signalStrength - nets[a].signalStrength);
 }
 
+// A Wi-Fi page row as board 4 draws it: a signal glyph by strength, what it is, and a check when joined or a lock when it asks a password.
+export function wifiLook(net) {
+  const pct = Math.round(net.signalStrength * 100);
+  const glyph = String.fromCodePoint(pct >= 75 ? 0xf0928 : pct >= 50 ? 0xf0925 : pct >= 25 ? 0xf0922 : 0xf091f);
+  if (net.connected) return { glyph, sub: `Connected · ${pct}%`, mark: String.fromCodePoint(0xf012c), markTone: 'accent' };
+  if (net.known) return { glyph, sub: 'Saved', mark: '', markTone: 'muted' };
+  if (net.secured) return { glyph, sub: 'Secured', mark: String.fromCodePoint(0xf033e), markTone: 'muted' };
+  return { glyph, sub: 'Open', mark: '', markTone: 'muted' };
+}
+
 export function wifiRow(net) {
   return { title: net.name, detail: net.connected ? 'connected' : net.known ? 'known' : Math.round(net.signalStrength * 100) + '%' };
 }

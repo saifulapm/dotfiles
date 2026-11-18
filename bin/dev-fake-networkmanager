@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# A NetworkManager on $DBUS_SYSTEM_BUS_ADDRESS with wlan0 and three networks: "Dots Open", a saved "Dots Home" (PSK dots-home-1) and a new "Dots Secured" (PSK dots-secret-1); a join with no PSK or a wrong one fails with NoSecrets, and org.dots.FakeNM on /org/freedesktop/NetworkManager has LastPsk(), the last PSK given ("" if none), and FailNext(u), which fails the next join with that device state reason.
+# A NetworkManager on $DBUS_SYSTEM_BUS_ADDRESS with wlan0 and three networks: "Dots Open", a saved "Dots Home" (PSK dots-home-1) and a new "Dots Secured" (PSK dots-secret-1, or $DOTS_FAKE_SECURED_PSK); a join with no PSK or a wrong one fails with NoSecrets, and org.dots.FakeNM on /org/freedesktop/NetworkManager has LastPsk(), the last PSK given ("" if none), and FailNext(u), which fails the next join with that device state reason.
 import os
 import sys
 import time
@@ -227,7 +227,7 @@ class NetworkManager(Object):
         self.aps = [
             AccessPoint(bus, 1, "Dots Open", 70, None),
             AccessPoint(bus, 2, "Dots Home", 60, "dots-home-1"),
-            AccessPoint(bus, 3, "Dots Secured", 40, "dots-secret-1"),
+            AccessPoint(bus, 3, "Dots Secured", 40, os.environ.get("DOTS_FAKE_SECURED_PSK") or "dots-secret-1"),
         ]
         self.device = Device(bus, self.aps)
         self.conns = {}

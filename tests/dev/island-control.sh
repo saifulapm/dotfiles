@@ -2,6 +2,7 @@
 # Mod+C grows the island into Control's Home: board 4's clock and tiles, 640 px wide, fill only; a connected network inverts the Wi-Fi tile and names it.
 {
 source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/pointer.bash"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
@@ -22,9 +23,13 @@ tile_is() { control | jq -e --arg t "$1" ".tiles[] | select(.title == \$t) | $2"
 
 # Quickshell's NetworkManager client talks to the system bus, which in the nested session is the nested session bus.
 bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" &
+# Dots Secured takes jk-hl-pass, a password of the keys that move and step Control.
+DOTS_FAKE_SECURED_PSK=jk-hl-pass DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" &
 fake_pid=$!
-cleanup() { kill "$fake_pid" 2>/dev/null; }
+cleanup() {
+  pointer_stop
+  kill "$fake_pid" 2>/dev/null
+}
 fake_up() { bus status org.freedesktop.NetworkManager >/dev/null 2>&1; }
 until_ok 5000 fake_up
 # Quickshell looks for NetworkManager once, when the shell starts, so the shell restarts to find the double.
@@ -98,5 +103,49 @@ check "its fill is the island's text, drawn" inverted
 wtype -k Escape
 until_ok 3000 at_rest
 check "Esc on Home closes Control" at_rest
+
+# The password field takes every key: jk-hl-pass types whole and moves nothing; a click outside closes only the field, the next one Control.
+last_psk() { bus call org.freedesktop.NetworkManager /org/freedesktop/NetworkManager org.dots.FakeNM LastPsk 2>/dev/null; }
+select_row() {
+  local i
+  i=$(control | jq --arg t "$1" '.rows | index($t)')
+  for _ in 1 2 3 4; do
+    control_is --argjson i "$i" '.selected == $i' && return 0
+    if control_is --argjson i "$i" '.selected < $i'; then wtype j; else wtype k; fi
+    sleep 0.15
+  done
+  return 1
+}
+secured_field() {
+  open_control
+  wtype -k Return
+  until_ok 2000 control_is '.page == "wifi"'
+  until_ok 3000 select_row "Dots Secured"
+  wtype -k Return
+  until_ok 3000 control_is '.line'
+}
+secured_field
+row=$(control | jq .selected)
+wtype jk-hl-pass
+until_ok 2000 control_is '.pskLength == 10'
+check "jk-hl-pass typed in the field reads whole ($(control | jq -c '{pskLength, field: .field.text}'))" control_is '.pskLength == 10 and .field.text == "••••••••••"'
+check "and moves no row or tile ($(control | jq -c '{page, selected, cursor}'))" control_is --argjson r "$row" '.page == "wifi" and .selected == $r and .cursor == "wifi"'
+point click 100 1000
+until_ok 2000 control_is '.line == false'
+check "a click on the paper closes only the field ($(control | jq -c '{open, page, line}'))" control_is '.open and .page == "wifi" and .line == false and .pskLength == 0'
+point click 100 1000
+until_ok 3000 at_rest
+check "the next click closes Control" control_is '.open == false'
+
+secured_field
+wtype jk-hl-pass
+until_ok 2000 control_is '.pskLength == 10'
+wtype -k Return
+until_ok 5000 control_is '.details[.rows | index("Dots Secured")] == "connected"'
+check "Enter joins Dots Secured, and its row reads connected ($(control | jq -c .detailsDrawn))" control_is '.details[.rows | index("Dots Secured")] == "connected"'
+check "with the password it was typed as ($(last_psk))" test "$(last_psk)" = 's "jk-hl-pass"'
+wtype -k Escape
+wtype -k Escape
+until_ok 3000 at_rest
 exit "$fails"
 }

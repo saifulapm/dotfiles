@@ -8,7 +8,6 @@ const shell = new URL('..', import.meta.url).pathname;
 
 // The reads from before this lint, per file: each may only go, and a file that loses one lowers its count here.
 const BASELINE = {
-  'ControlWifi.qml': 2,
   'DeenDuas.qml': 8,
   'DeenHadith.qml': 5,
   'DeenMemorise.qml': 4,
