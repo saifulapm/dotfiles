@@ -244,7 +244,7 @@ Item {
             cursor: cursor,
             tiles: tiles.map((t, i) => {
                 const item = tileRepeater.itemAt(i);
-                return Object.assign({}, t, item ? { fill: String(item.color), box: box(item), focused: item.focused } : {});
+                return Object.assign({}, t, item ? { fill: String(item.color), box: box(item), focused: item.focused, content: item.content ? box(item.content) : null } : {});
             }),
             selected: page === "" ? -1 : section.selected,
             rows: rows.map(r => r.title),
@@ -265,6 +265,8 @@ Item {
             rowHeights: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).height),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur.box) : null,
+            // The glyph each slider row's pill draws; the page rows draw none.
+            pillGlyphs: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).pillGlyph),
             cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
             clock: { text: bigClock.text, px: bigClock.font.pixelSize, box: box(bigClock) },
             date: dateText.text,
@@ -443,6 +445,8 @@ Item {
                 readonly property var t: control.tiles[index]
                 readonly property var at: Home.TILES[index + 1]
                 readonly property bool focused: control.cursor === at.id
+                // The tile's drawn content, for state(): it must sit inside the tile.
+                readonly property Item content: tileLoader.item?.children[0] ?? null
                 readonly property color ink: t.on ? control.fill : control.on
                 readonly property color sub: t.on ? Qt.alpha(control.fill, 0.7) : control.tones.muted
                 x: at.x
@@ -469,46 +473,49 @@ Item {
                 // Wi-Fi, Bluetooth, Record screen, Battery and Sync: a round icon beside the name and a line under it.
                 Component {
                     id: iconLayout
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 12
-                        spacing: 10
-                        Rectangle {
-                            width: 36
-                            height: 36
-                            radius: 18
-                            // Inverted, the circle is the island's fill again, as board 4 draws Wi-Fi.
-                            color: tile.t.on ? control.fill : Qt.alpha(control.on, 0.1)
-                            Text {
-                                anchors.centerIn: parent
-                                textFormat: Text.PlainText
-                                text: String.fromCodePoint(({ wifi: 0xF0928, bluetooth: 0xF00AF, record: 0xF044A, battery: 0xF0082, sync: 0xF04E6 })[tile.t.id] ?? 0xF0928)
-                                color: tile.t.id === "record" || tile.t.danger ? control.tones.danger : control.on
-                                font.family: "Symbols Nerd Font Mono"
-                                font.pixelSize: 18
-                            }
-                        }
-                        Column {
+                    // A Loader sizes its item to itself, so the layout sits in a plain Item that takes that size and keeps its own anchors.
+                    Item {
+                        Row {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: tile.width - 12 - 36 - 10 - 12
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                textFormat: Text.PlainText
-                                text: tile.t.label
-                                color: tile.ink
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 13
-                                font.weight: Font.Bold
+                            x: 12
+                            spacing: 10
+                            Rectangle {
+                                width: 36
+                                height: 36
+                                radius: 18
+                                // Inverted, the circle is the island's fill again, as board 4 draws Wi-Fi.
+                                color: tile.t.on ? control.fill : Qt.alpha(control.on, 0.1)
+                                Text {
+                                    anchors.centerIn: parent
+                                    textFormat: Text.PlainText
+                                    text: String.fromCodePoint(({ wifi: 0xF0928, bluetooth: 0xF00AF, record: 0xF044A, battery: 0xF0082, sync: 0xF04E6 })[tile.t.id] ?? 0xF0928)
+                                    color: tile.t.id === "record" || tile.t.danger ? control.tones.danger : control.on
+                                    font.family: "Symbols Nerd Font Mono"
+                                    font.pixelSize: 18
+                                }
                             }
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-                                textFormat: Text.PlainText
-                                text: tile.t.detail
-                                color: tile.t.danger ? control.tones.danger : tile.sub
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 11
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: tile.width - 12 - 36 - 10 - 12
+                                Text {
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    textFormat: Text.PlainText
+                                    text: tile.t.label
+                                    color: tile.ink
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                }
+                                Text {
+                                    width: parent.width
+                                    elide: Text.ElideRight
+                                    textFormat: Text.PlainText
+                                    text: tile.t.detail
+                                    color: tile.t.danger ? control.tones.danger : tile.sub
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 11
+                                }
                             }
                         }
                     }
@@ -517,40 +524,43 @@ Item {
                 // Sound: its name and output over a pill slider.
                 Component {
                     id: soundLayout
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 12
-                        width: tile.width - 24
-                        spacing: 7
-                        Item {
-                            width: parent.width
-                            height: soundName.implicitHeight
-                            Text {
-                                id: soundName
-                                textFormat: Text.PlainText
-                                text: tile.t.label
-                                color: tile.ink
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 13
-                                font.weight: Font.Bold
+                    // A Loader sizes its item to itself, so the layout sits in a plain Item that takes that size and keeps its own anchors.
+                    Item {
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            x: 12
+                            width: tile.width - 24
+                            spacing: 7
+                            Item {
+                                width: parent.width
+                                height: soundName.implicitHeight
+                                Text {
+                                    id: soundName
+                                    textFormat: Text.PlainText
+                                    text: tile.t.label
+                                    color: tile.ink
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                }
+                                Text {
+                                    anchors.right: parent.right
+                                    anchors.baseline: soundName.baseline
+                                    width: Math.min(implicitWidth, parent.width - soundName.implicitWidth - 8)
+                                    elide: Text.ElideRight
+                                    textFormat: Text.PlainText
+                                    text: tile.t.detail
+                                    color: tile.sub
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 11
+                                }
                             }
-                            Text {
-                                anchors.right: parent.right
-                                anchors.baseline: soundName.baseline
-                                width: Math.min(implicitWidth, parent.width - soundName.implicitWidth - 8)
-                                elide: Text.ElideRight
-                                textFormat: Text.PlainText
-                                text: tile.t.detail
-                                color: tile.sub
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 11
+                            Pill {
+                                width: parent.width
+                                height: 18
+                                level: tile.t.level ?? 0
+                                glyph: 0xF057E
                             }
-                        }
-                        Pill {
-                            width: parent.width
-                            height: 18
-                            level: tile.t.level ?? 0
-                            glyph: 0xF057E
                         }
                     }
                 }
@@ -558,36 +568,39 @@ Item {
                 // Brightness: its name, a pill slider and the percent.
                 Component {
                     id: brightnessLayout
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 14
-                        spacing: 12
-                        Text {
+                    // A Loader sizes its item to itself, so the layout sits in a plain Item that takes that size and keeps its own anchors.
+                    Item {
+                        Row {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: 92
-                            textFormat: Text.PlainText
-                            text: tile.t.label
-                            color: tile.ink
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-                        Pill {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: tile.width - 28 - 92 - 38 - 24
-                            height: 22
-                            level: tile.t.level ?? 0
-                            glyph: 0xF05A8
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 38
-                            horizontalAlignment: Text.AlignRight
-                            textFormat: Text.PlainText
-                            text: tile.t.detail
-                            color: control.tones.muted
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 13
+                            x: 14
+                            spacing: 12
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 92
+                                textFormat: Text.PlainText
+                                text: tile.t.label
+                                color: tile.ink
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+                            Pill {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: tile.width - 28 - 92 - 38 - 24
+                                height: 22
+                                level: tile.t.level ?? 0
+                                glyph: 0xF05A8
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 38
+                                horizontalAlignment: Text.AlignRight
+                                textFormat: Text.PlainText
+                                text: tile.t.detail
+                                color: control.tones.muted
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                            }
                         }
                     }
                 }
@@ -595,32 +608,35 @@ Item {
                 // Do Not Disturb and Stay awake: a glyph, the name and a switch.
                 Component {
                     id: switchLayout
-                    Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 12
-                        spacing: 10
-                        Text {
+                    // A Loader sizes its item to itself, so the layout sits in a plain Item that takes that size and keeps its own anchors.
+                    Item {
+                        Row {
                             anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            text: String.fromCodePoint(tile.t.id === "dnd" ? 0xF0F65 : 0xF0176)
-                            color: tile.t.on ? tile.ink : control.tones.muted
-                            font.family: "Symbols Nerd Font Mono"
-                            font.pixelSize: 16
-                        }
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: tile.width - 12 - 16 - 10 - 10 - 38 - 12
-                            elide: Text.ElideRight
-                            textFormat: Text.PlainText
-                            text: tile.t.label
-                            color: tile.ink
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 13
-                        }
-                        Switch {
-                            anchors.verticalCenter: parent.verticalCenter
-                            on: tile.t.on
-                            inverted: tile.t.on
+                            x: 12
+                            spacing: 10
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(tile.t.id === "dnd" ? 0xF0F65 : 0xF0176)
+                                color: tile.t.on ? tile.ink : control.tones.muted
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 16
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: tile.width - 12 - 16 - 10 - 10 - 38 - 12
+                                elide: Text.ElideRight
+                                textFormat: Text.PlainText
+                                text: tile.t.label
+                                color: tile.ink
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                            }
+                            Switch {
+                                anchors.verticalCenter: parent.verticalCenter
+                                on: tile.t.on
+                                inverted: tile.t.on
+                            }
                         }
                     }
                 }
@@ -628,18 +644,22 @@ Item {
                 // Lock and Power: a square button with its glyph, Power in the danger tone.
                 Component {
                     id: buttonLayout
-                    Text {
-                        anchors.centerIn: parent
-                        textFormat: Text.PlainText
-                        text: String.fromCodePoint(tile.t.id === "lock" ? 0xF033E : 0xF0425)
-                        color: tile.t.danger ? control.tones.danger : control.on
-                        font.family: "Symbols Nerd Font Mono"
-                        font.pixelSize: 17
+                    // A Loader sizes its item to itself, so the layout sits in a plain Item that takes that size and keeps its own anchors.
+                    Item {
+                        Text {
+                            anchors.centerIn: parent
+                            textFormat: Text.PlainText
+                            text: String.fromCodePoint(tile.t.id === "lock" ? 0xF033E : 0xF0425)
+                            color: tile.t.danger ? control.tones.danger : control.on
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 17
+                        }
                     }
                 }
 
                 // Each tile builds only its own layout: five layouts in every tile cost about 4 MB of idle RSS.
                 Loader {
+                    id: tileLoader
                     anchors.fill: parent
                     sourceComponent: ["wifi", "bluetooth", "record", "battery", "sync"].indexOf(tile.at.id) >= 0 ? iconLayout : tile.at.id === "sound" ? soundLayout : tile.at.id === "brightness" ? brightnessLayout : tile.at.id === "dnd" || tile.at.id === "awake" ? switchLayout : buttonLayout
                 }
@@ -812,6 +832,7 @@ Item {
                 readonly property var fieldLook: rowFill.look
                 readonly property int detailLines: level ? 1 : detail.lineCount
                 readonly property Item nameItem: level ? levelName : title
+                readonly property string pillGlyph: level ? rowPill.drawnGlyph : ""
                 width: pageColumn.width
                 height: rowFill.height + (cap ? 24 : 0)
 
@@ -885,6 +906,7 @@ Item {
                             font.weight: Font.Bold
                         }
                         Pill {
+                            id: rowPill
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width - 32 - 150 - 44 - 16 - 4 * 12
                             height: 18
@@ -934,6 +956,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             width: Math.min(implicitWidth, 260)
                             elide: Text.ElideRight
+                            maximumLineCount: 1
                             textFormat: Text.PlainText
                             text: row.modelData.title
                             color: control.on
@@ -1262,6 +1285,7 @@ Item {
     component Pill: Rectangle {
         property real level: 0
         property int glyph: 0
+        readonly property string drawnGlyph: glyph ? String.fromCodePoint(glyph) : ""
         radius: height / 2
         color: Qt.alpha(control.on, 0.12)
 
@@ -1276,7 +1300,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 x: 7
                 textFormat: Text.PlainText
-                text: String.fromCodePoint(parent.parent.glyph)
+                // A page's slider has no glyph, and code point 0 would draw a missing-glyph box.
+                text: parent.parent.glyph ? String.fromCodePoint(parent.parent.glyph) : ""
                 color: control.fill
                 font.family: "Symbols Nerd Font Mono"
                 font.pixelSize: parent.height <= 18 ? 11 : 13

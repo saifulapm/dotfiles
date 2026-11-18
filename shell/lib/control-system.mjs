@@ -1,6 +1,8 @@
 // Pure pieces of Control's Power, Display and Route sections.
 
 import { clockText } from './margins.mjs';
+import { line } from './voice.mjs';
+import { BIDI, CONTROL } from './clean.mjs';
 
 // brightnessctl -m -l prints device,class,current,percent,max per line.
 export function backlights(text) {
@@ -92,14 +94,18 @@ export const syncFailing = (units) => Object.keys(units).some((k) => units[k].ok
 // Control's detail text has no width of its own, so a long error is cut to 60 characters on screen.
 const cut = (s) => (s.length > 60 ? s.slice(0, 59) + '…' : s);
 
+// A unit's name and error come from a file another machine writes, so each draws as one plain line.
+const plain = (v) => line(String(v).replace(CONTROL, ' ').replace(BIDI, ''));
+
 // Route's rows below Questions ring on: every sync unit with when it last went through, a failed one with its error in the danger tone; none yet reads as one row.
+
 export function syncRows(units) {
   const names = Object.keys(units);
   if (names.length === 0) return [{ title: 'Sync', detail: 'no rounds yet' }];
   return names.map((k) =>
     units[k].ok === false
-      ? { title: k, detail: cut(units[k].error), tone: 'danger' }
-      : { title: k, detail: units[k].lastOk !== null ? 'ok · ' + clockText(new Date(units[k].lastOk)) : 'ok' },
+      ? { title: plain(k), detail: cut(plain(units[k].error)), tone: 'danger' }
+      : { title: plain(k), detail: units[k].lastOk !== null ? 'ok · ' + clockText(new Date(units[k].lastOk)) : 'ok' },
   );
 }
 

@@ -131,3 +131,11 @@ test('with no threshold file the charge command prints nothing and runs no busct
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, '');
 });
+
+test("a sync unit's forged name and error draw as one plain line", () => {
+  const name = 'un\nit \u202eRLO \u001b[31mesc';
+  const [row] = syncRows({ [name]: { ok: false, lastRun: null, lastOk: null, error: 'bad\nthing \u202ehere' } });
+  assert.equal(row.title, 'un it RLO [31mesc');
+  assert.equal(row.detail, 'bad thing here');
+  assert.equal(row.tone, 'danger');
+});

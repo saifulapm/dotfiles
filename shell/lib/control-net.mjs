@@ -1,6 +1,6 @@
 // Control's Bluetooth and Wi-Fi row order and text; an order is a list of indices, so the section maps rows back to its devices.
 import { line } from './voice.mjs';
-import { CONTROL } from './clean.mjs';
+import { BIDI, CONTROL } from './clean.mjs';
 
 const btRank = (d) => (d.connected ? 0 : d.paired ? 1 : 2);
 const wifiRank = (n) => (n.connected ? 0 : n.known ? 1 : 2);
@@ -65,6 +65,7 @@ export function wifiLook(net) {
   return { glyph, sub: 'Open', mark: '', markTone: 'muted' };
 }
 
+// A network names itself, so its SSID draws as one plain line, as a Bluetooth name does.
 export function wifiRow(net) {
-  return { title: net.name, detail: net.connected ? 'connected' : net.known ? 'known' : Math.round(net.signalStrength * 100) + '%' };
+  return { title: line((net.name || '').replace(CONTROL, ' ').replace(BIDI, '')), detail: net.connected ? 'connected' : net.known ? 'known' : Math.round(net.signalStrength * 100) + '%' };
 }

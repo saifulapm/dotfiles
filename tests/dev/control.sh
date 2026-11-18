@@ -52,6 +52,7 @@ check "Enter on the Sound tile opens the Sound page" section_is audio
 until_ok 3000 state_is '.rows | index("Dots second sink") != null'
 check "Audio lists both sinks and the source" state_is '.rows | (index("Dots null sink") != null and index("Dots second sink") != null and index("Dots null source") != null)'
 check "under OUTPUT and INPUT captions ($(control_state | jq -c .caps))" state_is '.caps[0] == "OUTPUT" and (.caps | index("INPUT")) == (.rows | index("Dots null source"))'
+check "no slider row draws a missing glyph at its pill's end ($(control_state | jq -c .pillGlyphs))" state_is '.pillGlyphs | all(. == "")'
 check "each with its percent ($(control_state | jq -c .detailsDrawn))" state_is '.detailsDrawn[.rows | index("Dots null sink")] == "40%"'
 until_ok 3000 select_row "Dots null sink"
 wtype l

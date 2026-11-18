@@ -133,6 +133,14 @@ until_ok 3000 state_is '.rows | index("mail") != null'
 check "Route lists each sync unit as a row ($(control_state | jq -c .rows))" state_is '.rows == ["Questions ring on", "mail", "notes"]'
 check "the failed unit's row draws in the danger tone ($(control_state | jq -c .tones))" state_is '.tones[1] == "danger" and .tones[2] == ""'
 check "its error is cut on one line with an ellipsis ($(control_state | jq -c '.detailsDrawn[1]'))" state_is '(.detailsDrawn[1] | endswith("…")) and .detailLines[1] == 1'
+
+# A forged unit name, with a newline, U+202E, an ESC and 300 more letters, draws as one plain line inside its row.
+forged=$(printf 'un\nit \u202eRLO \033[31mesc'; printf 'n%.0s' {1..300})
+jq -n --arg n "$forged" '{($n): {ok: false, lastRun: 1, lastOk: null, error: "x"}}' >"$XDG_STATE_HOME/dots/sync.json"
+until_ok 3000 state_is '.rows | length == 2'
+check "the forged name reads plain, with no control or bidi character ($(control_state | jq -c '.rows[1][:24]'))" state_is '.rows[1] | test("[\u0001-\u001f\u202e]") | not'
+select_row "$(control_state | jq -r '.rows[1]')"
+check "and its name ends inside its row ($(control_state | jq -c '[.cursorName.x + .cursorName.w, .cursorBox.x + .cursorBox.w]'))" state_is '.cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w and .cursorName.truncated'
 wtype -k Escape
 
 exit $((fails > 0))

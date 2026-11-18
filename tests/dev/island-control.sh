@@ -50,6 +50,12 @@ check "it opens on Home with Wi-Fi focused ($(control | jq -c '{page, cursor}'))
 check "the big clock is 34 px and reads the time ($(control | jq -c .clock))" control_is '.clock.px == 34 and (.clock.text | test("^[0-9]{2}:[0-9]{2}$"))'
 check "Do Not Disturb is off and its switch with it ($(tile "Do Not Disturb"))" tile_is "Do Not Disturb" '.on == false'
 
+# Each tile's content sits inside it, and a square button's glyph in its middle.
+inside_all() { control_is '[.tiles[] | .box as $b | .content | .x >= $b.x and .y >= $b.y and .x + .w <= $b.x + $b.w + 0.5 and .y + .h <= $b.y + $b.h + 0.5] | all'; }
+check "every tile's content sits inside the tile ($(control | jq -c '[.tiles[] | select(.title == "Sound") | {box, content}]'))" inside_all
+centred() { control_is --arg t "$1" '.tiles[] | select(.title == $t) | ((.content.x + .content.w / 2) - (.box.x + .box.w / 2) | fabs) <= 1 and ((.content.y + .content.h / 2) - (.box.y + .box.h / 2) | fabs) <= 1'; }
+for t in Lock Power; do check "the $t glyph is centred in its button ($(tile "$t" | jq -c '{box, content}'))" centred "$t"; done
+
 # Fill only: a tile's first row of pixels is its fill, the same as three rows further in.
 edge_free() {
   local t x y top inner

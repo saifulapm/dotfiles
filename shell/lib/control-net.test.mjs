@@ -113,3 +113,7 @@ test('a Bluetooth page row: a glyph by kind, Connected with its battery, and a c
   assert.equal(btEmpty({ adapter: true, enabled: false }), 'Bluetooth is off');
   assert.equal(btEmpty({ adapter: true, enabled: true }), '');
 });
+
+test("a network's forged SSID draws as one plain line", () => {
+  assert.equal(wifiRow({ name: 'home\nnet \u202eRLO \u001b[31m', connected: false, known: false, signalStrength: 0.5 }).title, 'home net RLO [31m');
+});
