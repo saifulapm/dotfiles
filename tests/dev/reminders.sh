@@ -63,6 +63,33 @@ check "d on the second row marks it removed and keeps it as a marker" stored '[.
 check "and the list shows the one left" state_is '.results == ["tea"] and .pending == 1'
 close_launcher
 
+# A pull that adds an earlier reminder while the list is open moves the rows; d still removes the one the cursor was on.
+put_store --argjson now $((now_s * 1000)) '{version: 1, reminders: [{id: "rw", text: "renew", due: ($now + 7200000)}, {id: "tq", text: "tea", due: ($now + 10800000)}] | map(. + {created: $now, ended: null, stamps: {text: $now, due: $now, ended: $now}})}'
+open_launcher
+wtype "r "
+until_ok 3000 state_is '.results == ["renew", "tea"]'
+wtype -k Tab
+wtype -k j
+until_ok 2000 state_is '.selected == 1'
+put_store --argjson now $((now_s * 1000)) '{version: 1, reminders: [{id: "nw", text: "pulled", due: ($now + 3600000)}, {id: "rw", text: "renew", due: ($now + 7200000)}, {id: "tq", text: "tea", due: ($now + 10800000)}] | map(. + {created: $now, ended: null, stamps: {text: $now, due: $now, ended: $now}})}'
+until_ok 3000 state_is '.results == ["pulled", "renew", "tea"]'
+check "the cursor stays on tea when a pull puts a reminder above it" state_is '.results[.selected] == "tea"'
+wtype d
+until_ok 2000 pending 'length == 2'
+check "and d removes tea, not its neighbour" stored '([.reminders[] | select(.ended == "removed") | .text] == ["tea"]) and ([.reminders[] | select(.ended == null) | .text] | sort) == ["pulled", "renew"]'
+close_launcher
+put_store '{version: 1, reminders: []}'
+open_launcher
+wtype "r 5m x"
+until_ok 3000 state_is '.results[0] == "x"'
+wtype -k Return
+until_ok 2000 pending 'length == 1'
+open_launcher
+wtype "r 1h later"
+until_ok 3000 state_is '.results[0] == "later"'
+wtype -k Return
+until_ok 2000 pending 'length == 2'
+
 open_launcher
 wtype "r 25:00 x"
 until_ok 3000 state_is '.results[0] // "" | startswith("Cannot set")'

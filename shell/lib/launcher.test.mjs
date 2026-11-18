@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rank, parseQuery, chipOf, prefixOf, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll, wheel } from './launcher.mjs';
+import { rank, parseQuery, chipOf, prefixOf, windowRows, commandRows, calcRows, convertRows, overviewChar, schemeRows, stampedExec, schemeList, scroll, wheel, keepReminder } from './launcher.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -316,4 +316,12 @@ test('in a grid, a wheel notch moves one whole row and stops at the last full pa
   assert.deepEqual(wheel({ top: 36, selected: 0, rest: 0 }, -120, 40, 6, 3), { top: 36, selected: 0, rest: 0 });
   assert.deepEqual(wheel({ top: 3, selected: 4, rest: 0 }, 120, 40, 6, 3), { top: 0, selected: 5, rest: 0 });
   assert.deepEqual(wheel({ top: 0, selected: 0, rest: 0 }, -60, 40, 6, 3), { top: 0, selected: 0, rest: -60 });
+});
+
+test('when a pull reorders the pending reminders, the cursor follows the one it was on', () => {
+  const rows = (ids) => ids.map((id) => ({ title: id, reminderId: id }));
+  assert.deepEqual(keepReminder(rows(['new', 'renew', 'tea']), 'tea', 0, 8), { top: 0, selected: 2 });
+  const many = rows(Array.from({ length: 12 }, (_, i) => `r${i}`));
+  assert.deepEqual(keepReminder(many, 'r10', 0, 8), { top: 3, selected: 7 });
+  assert.equal(keepReminder(rows(['renew']), 'tea', 0, 8), null);
 });

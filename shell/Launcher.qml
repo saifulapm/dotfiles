@@ -164,6 +164,23 @@ Item {
     onRowsChanged: if (mode === "clipboard")
         decodeThumbs()
 
+    // The pending reminder under the cursor; a pull that reorders the rows moves the cursor with it, so d removes the one the cursor was on.
+    property string heldReminder: ""
+    function holdReminder() {
+        heldReminder = found[scrollTop + selected]?.reminderId ?? "";
+    }
+    onSelectedChanged: holdReminder()
+    onScrollTopChanged: holdReminder()
+    onFoundChanged: {
+        if (mode !== "reminder" || !heldReminder)
+            return;
+        const s = Lib.keepReminder(found, heldReminder, scrollTop, pageSize, columns);
+        if (s) {
+            scrollTop = s.top;
+            selected = s.selected;
+        }
+    }
+
     function close() {
         shown = false;
     }

@@ -161,6 +161,12 @@ export function scroll(top, selected, by, total, size, cols = 1) {
   return { top: next, selected: at - next };
 }
 
+// The window and cursor that put the pending reminder with this id back under the cursor after its list changed, or null once it has gone.
+export function keepReminder(found, id, top, size, cols = 1) {
+  const i = found.findIndex((r) => r.reminderId === id);
+  return i < 0 ? null : scroll(top, i - top, 0, found.length, size, cols);
+}
+
 // One wheel event over the list: a notch, 120 of Qt's angle and down when negative, moves the window three rows, a touchpad's smaller angles add up in rest; the selected row keeps its place while it stays shown, else the nearest shown row takes it.
 export function wheel(at, angle, total, size, cols = 1) {
   // A notch is three rows of a list, or one row of a grid of cards.
