@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listLook } from './voice.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
-import { parseEntries, passRows, segments, passKeys, copiedText, failedText, pathTag, deleteText, changedText, LENGTH, qrInfo } from './pass.mjs';
+import { parseEntries, passRows, segments, copiedText, failedText, pathTag, deleteText, changedText, LENGTH, stepLength, hidesText, newRowText, qrInfo } from './pass.mjs';
 const listed = 'web/github.com\t1\nmail/icloud\t0\nweb/gitlab.com\t0\nnote\t0\n';
 
 test("dots-pass list's lines become entries with their folder, leaf and OTP tag, in its order", () => {
@@ -57,11 +55,6 @@ test("a name's bidi controls never reach the drawn row", () => {
   ]);
 });
 
-test("the key strip reads the board's keys in plain words", () => {
-  const strip = passKeys(listLook(schemeTokens('artboard'))).map((k) => `${k.key} ${k.word}`.trim()).join(' · ');
-  assert.equal(strip, '↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc');
-});
-
 test("the island's notice says what was copied, and a failure says why in one line", () => {
   assert.equal(copiedText('copy'), 'Copied · clears in 45s');
   assert.equal(copiedText('otp'), 'OTP copied · clears in 45s');
@@ -80,9 +73,27 @@ test('a new password starts at 24 characters, from 8 to 128', () => {
   assert.deepEqual(LENGTH, { start: 24, min: 8, max: 128 });
 });
 
-test('the delete question names the entry on one line, with y and n', () => {
-  const artboard = listLook(schemeTokens('artboard'));
-  assert.deepEqual(deleteText(artboard, 'web/linear\n.app'), { question: 'Delete web/linear .app?', keys: [{ key: 'y', word: 'yes' }, { key: 'n', word: 'no' }] });
+test('+ and - step the length by one, held between 8 and 128', () => {
+  assert.equal(stepLength(24, 1), 25);
+  assert.equal(stepLength(24, -1), 23);
+  assert.equal(stepLength(8, -1), 8);
+  assert.equal(stepLength(128, 1), 128);
+});
+
+test('a shown password says how many seconds it has left, rounded up', () => {
+  assert.equal(hidesText(10000), 'hides in 10 s');
+  assert.equal(hidesText(7200), 'hides in 8 s');
+  assert.equal(hidesText(0), 'hides in 0 s');
+});
+
+test('the last row offers a new entry named as typed, on one line', () => {
+  assert.equal(newRowText('git'), 'New entry “git”');
+  assert.equal(newRowText('  '), 'New entry');
+  assert.equal(newRowText('a\nb'), 'New entry “a b”');
+});
+
+test('the delete question names the entry on one line, with no keys', () => {
+  assert.equal(deleteText('web/linear\n.app'), 'Delete web/linear .app?');
 });
 
 test("the island's word after a change: done, saved but not pushed, or why not", () => {

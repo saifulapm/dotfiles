@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+P finds an entry by subsequence and copies its password out of the clipboard history, cleared 45 s later; o copies its OTP code.
+# Mod+P grows the island into Pass (board 8): names only, an entry found by subsequence copies its password out of the clipboard history, cleared 45 s later; o copies its OTP code; a shown password hides after 10 s and at any close; the last row and n make a new entry, - and + setting its length.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -26,13 +26,21 @@ pass git push -q -u origin HEAD 2>/dev/null
 pass_state() { timeout 0.5 dots-call pass state 2>/dev/null; }
 state_is() { pass_state | jq -e "$1" >/dev/null; }
 island_text() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -r .text; }
+island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+# Pass opens listed, with the island at rest on it and the keyboard its own.
+open_pass() {
+  niri msg action spawn -- dots-call pass toggle
+  until_ok 3000 state_is '.open and .listed and .settled and .keyboard'
+}
 clip() { timeout 1 wl-paste -n 2>/dev/null; }
 # What another machine on the tailnet gets when it asks this one for the clipboard.
 peer_get() { printf 'GET / HTTP/1.1\r\n\r\n' | REMOTE_ADDR=100.64.1.2 "$repo/bin/dots-clip-serve" 2>/dev/null | awk 'body { printf "%s", $0 } /^\r?$/ { body = 1 }'; }
 
 check "before Mod+P the surface is not loaded" state_is '.loaded == false'
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled and .keyboard'
+open_pass
+read -r ow _ < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
+want=$((ow - 48 < 640 ? ow - 48 : 640))
+check "Mod+P sets the island's surface to pass at $want px ($(timeout 0.5 qs ipc call island state | jq -c '{surface, width}'))" island_is --argjson w "$want" '.surface == "pass" and .width == $w'
 check "Mod+P opens Pass listing the store ($(pass_state | jq -c '[.rows[].name]'))" state_is '.open and (.rows | map(.name) | sort) == ["mail/icloud", "web/github.com", "web/gitlab.com"]'
 check "before any decrypt no entry carries the OTP tag: listing never decrypts" state_is '[.rows[] | select(.otp)] == []'
 
@@ -40,6 +48,7 @@ wtype ghb
 until_ok 2000 state_is '.query == "ghb"'
 check "ghb leaves one row, web/github.com, and the count says 1 ($(pass_state | jq -c '[.count, .rows[0]]'))" state_is '.count == 1 and .rows[0].name == "web/github.com"'
 check "its matched letters are underlined" state_is '.rows[0].underlined == "ghb"'
+check "the cursor row carries its eye and an inverted Copy ($(pass_state | jq -c .buttons))" state_is '.buttons.eye == "eye" and .buttons.copy.text == "Copy" and .buttons.copy.fill == .on and .buttons.copy.ink == .fill'
 
 wtype -k Return
 until_ok 5000 bash -c "[ \"\$(timeout 1 wl-paste -n 2>/dev/null)\" = '$password' ]"
@@ -55,15 +64,13 @@ check "Pass closed" state_is '.open | not'
 check "and the next entry used comes first: the list is recent first" bash -c '[ "$(dots-pass list | head -1 | cut -f1)" = web/github.com ]'
 
 # The copy's decrypt saw the otpauth line pass otp append put there, so the entry now carries the tag.
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled'
+open_pass
 check "after a decrypt only the entry with a TOTP secret carries the OTP tag ($(pass_state | jq -c '[.rows[] | select(.otp) | .name]'))" state_is '[.rows[] | select(.otp) | .name] == ["web/github.com"]'
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 
 # o on the cursor row copies the code oathtool gives for the same secret.
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled'
+open_pass
 wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 wtype o
@@ -74,8 +81,7 @@ until_ok 3000 bash -c 'timeout 0.5 qs ipc call island state 2>/dev/null | jq -e 
 check "and the island says the OTP was copied" bash -c '[ "$(timeout 0.5 qs ipc call island state | jq -r .text)" = "OTP copied · clears in 45s" ]'
 
 # A copy of the password again, then 45 s: the clipboard is empty.
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled'
+open_pass
 wtype ghb
 until_ok 2000 state_is '.count == 1'
 wtype -k Return
@@ -91,15 +97,14 @@ until_ok 2000 bash -c '[ "$(timeout 1 wl-paste -n 2>/dev/null)" = hello ]'
 check "a plain copy after the clear is the peer's answer ($(peer_get))" bash -c "$(declare -f peer_get); repo=$repo; [ \"\$(peer_get)\" = hello ]"
 
 # s shows the password on its row for 10 s.
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled'
+open_pass
 wtype ghb
 until_ok 2000 state_is '.count == 1'
 wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 wtype s
 until_ok 5000 state_is '.revealed != null'
-check "s shows the password in place of the name, tagged 10s ($(pass_state | jq -c '.revealed | .tag'))" state_is ".revealed.text == \"$password\" and .revealed.tag == \"10s\""
+check "s shows the password on its row, reading hides in 10 s ($(pass_state | jq -c '.revealed | .hides'))" state_is ".revealed.text == \"$password\" and .revealed.hides == \"hides in 10 s\" and .buttons.eye == \"eye-off\""
 shown_at=$(now_ms)
 until_ok 12000 state_is '.revealed == null'
 check "10 s later the row shows the name only ($(($(now_ms) - shown_at)) ms)" bash -c "timeout 0.5 dots-call pass state | jq -e '.revealed == null and .rows[0].name == \"web/github.com\"' >/dev/null && [ $(($(now_ms) - shown_at)) -ge 9000 ]"
@@ -113,8 +118,30 @@ check "s with a cold agent opens the passphrase card" bash -c 'timeout 0.5 dots-
 wtype "$passphrase"
 wtype -k Return
 until_ok 8000 state_is '.open and .revealed != null'
-check "after the passphrase, Pass comes back with the password on its row ($(pass_state | jq -c '[.open, .revealed.tag]'))" state_is ".open and .revealed.text == \"$password\" and .revealed.tag == \"10s\""
+check "after the passphrase, Pass comes back with the password on its row ($(pass_state | jq -c '[.open, .revealed.hides]'))" state_is ".open and .revealed.text == \"$password\" and .revealed.hides == \"hides in 10 s\""
 until_ok 12000 state_is '.revealed == null'
+
+# Esc, or another surface's key, within the 10 s takes the password off the island at once, and Pass opens again on names only.
+wtype s
+until_ok 5000 state_is '.revealed != null'
+wtype -k Escape
+check "Esc within the 10 s leaves no password drawn ($(pass_state | jq -c '{open, revealed}'))" bash -c "timeout 0.5 dots-call pass state | jq -e '(.open | not) and .revealed == null' >/dev/null && ! timeout 0.5 dots-call pass state | grep -qF '$password'"
+until_ok 3000 state_is '.drawing == false'
+open_pass
+check "and Pass opens again on names only" bash -c "timeout 0.5 dots-call pass state | jq -e '.revealed == null' >/dev/null && ! timeout 0.5 dots-call pass state | grep -qF '$password'"
+wtype ghb
+until_ok 2000 state_is '.count == 1'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype s
+until_ok 5000 state_is '.revealed != null'
+niri msg action spawn -- dots-call launcher toggle
+until_ok 3000 island_is '.surface == "launcher"'
+check "Mod+Space within the 10 s morphs to the launcher with no password left in Pass ($(pass_state | jq -c '{open, revealed}'))" bash -c "timeout 0.5 dots-call pass state | jq -e '(.open | not) and .revealed == null' >/dev/null && ! timeout 0.5 dots-call pass state | grep -qF '$password'"
+until_ok 2000 bash -c 'timeout 0.5 qs ipc call launcher state | jq -e ".keyboard and .settled" >/dev/null'
+wtype -k Escape
+until_ok 3000 island_is '.surface == null'
+open_pass
 
 # An otpauth line added in a terminal shows as the tag on the same open, once s has decrypted the entry.
 printf 'otpauth://totp/Mail:me?secret=%s\n' "$secret" | pass otp append -f mail/icloud >/dev/null
@@ -136,7 +163,24 @@ until_ok 2000 state_is '.count == 1'
 wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 
-# n makes a new entry with a generated 24-character password; h and l change its length.
+# The last row starts a new entry under the typed name.
+wtype -k slash
+wtype -M ctrl a -m ctrl
+wtype zzz
+until_ok 2000 state_is '.count == 0'
+check "with nothing found the last row offers a new entry named as typed ($(pass_state | jq -c .newRow))" state_is '.newRow == {"text": "New entry “zzz”", "selected": true}'
+wtype -k Return
+until_ok 3000 state_is '.mode == "new"'
+check "Enter on it opens the new entry under that name ($(pass_state | jq -c .newEntry))" state_is '.newEntry.path == "zzz" and .newEntry.length == 24'
+wtype -k Escape
+until_ok 2000 state_is '.mode == "list"'
+wtype -M ctrl a -m ctrl
+wtype ghb
+until_ok 2000 state_is '.count == 1'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+
+# n makes a new entry with a generated 24-character password; - and + change its length, from 8 to 128.
 wtype n
 until_ok 3000 state_is '.mode == "new" and .newEntry.length == 24'
 check "n opens the new-entry card with a 24-character password" state_is '.newEntry.length == 24 and .newEntry.focus == "path"'
@@ -155,16 +199,21 @@ until_ok 2000 state_is '.newEntry.path == "web/linear.app"'
 check "a new path is tagged new ($(pass_state | jq -c .newEntry.tag))" state_is '.newEntry.tag | ascii_downcase == "new"'
 wtype -k Tab
 until_ok 2000 state_is '.newEntry.focus == "length"'
-wtype l
+wtype -k plus
 until_ok 3000 state_is '.newEntry.length == 25'
-check "l lengthens the password to 25" state_is '.newEntry.length == 25'
-wtype h
-until_ok 3000 state_is '.newEntry.length == 24'
-check "h shortens it back to 24" state_is '.newEntry.length == 24'
+check "+ at 24 lengthens the password to 25 ($(pass_state | jq -c '[.newEntry.lengthText, .newEntry.length]'))" state_is '.newEntry.length == 25 and .newEntry.lengthText == "25"'
+for _ in $(seq 17); do
+  wtype -k minus
+  sleep 0.15
+done
+until_ok 3000 state_is '.newEntry.length == 8'
+wtype -k minus
+sleep 0.5
+check "- takes it down to 8 and no further ($(pass_state | jq -c '[.newEntry.lengthText, .newEntry.length]'))" state_is '.newEntry.length == 8 and .newEntry.lengthText == "8"'
 wtype -k Return
-saved() { [ "$(pass show web/linear.app 2>/dev/null | head -1 | tr -d '\n' | wc -c)" = 24 ]; }
+saved() { [ "$(pass show web/linear.app 2>/dev/null | head -1 | tr -d '\n' | wc -c)" = 8 ]; }
 until_ok 8000 saved
-check "Enter saves it: pass show web/linear.app prints a 24-character password" saved
+check "Enter saves it: pass show web/linear.app prints an 8-character password" saved
 pushed() { git -C "$remote" log -1 --format=%s | grep -qF "$1"; }
 until_ok 5000 pushed "Add given password for web/linear.app"
 check "and the store's remote has the commit ($(git -C "$remote" log -1 --format=%s))" pushed web/linear.app
@@ -180,7 +229,7 @@ wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 wtype d
 until_ok 2000 state_is '.mode == "delete"'
-check "d asks on one line ($(pass_state | jq -c .deleteLine))" state_is '.deleteLine == "Delete web/linear.app?  y yes · n no"'
+check "d asks on one line in the danger tone ($(pass_state | jq -c '[.deleteLine, .deleteColor, .danger]'))" state_is '.deleteLine == "Delete web/linear.app?" and (.deleteColor | ascii_downcase) == (.danger | ascii_downcase)'
 wtype y
 gone() { ! pass ls 2>/dev/null | grep -q linear.app; }
 until_ok 8000 gone
@@ -194,8 +243,7 @@ until_ok 3000 state_is '.drawing == false'
 qr_secret=KRSXG5CTMVRXEZLUKN2XAZLSKNSWG4TF
 qrencode -o "$DOTS_DEV_DIR/qr.png" "otpauth://totp/GitHub:saiful?secret=$qr_secret&issuer=GitHub"
 wl-copy --type image/png <"$DOTS_DEV_DIR/qr.png"
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .listed and .settled'
+open_pass
 wtype -k Tab
 until_ok 2000 state_is '.focus == "list"'
 wtype q
@@ -215,11 +263,23 @@ check "the island says the code was saved ($(island_text))" bash -c '[ "$(timeou
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 
-# Pass draws the board's key strip; the list unloads 30 s after it closes.
-hint="↵ copy · o otp · s show · n new · e edit · d delete · q qr · esc"
-niri msg action spawn -- dots-call pass toggle
-until_ok 3000 state_is '.open and .settled'
-check "the key strip reads $hint ($(pass_state | jq -c .hint))" state_is ".hint == \"$hint\""
+# e opens the entry in kak in a window of its own, and Pass closes for it.
+windows() { niri msg -j windows | jq length; }
+before=$(windows)
+open_pass
+wtype ghb
+until_ok 2000 state_is '.count == 1'
+wtype -k Tab
+until_ok 2000 state_is '.focus == "list"'
+wtype e
+until_ok 5000 bash -c "[ \"\$(niri msg -j windows | jq length)\" -gt $before ]"
+check "e opens web/github.com in an editor window and closes Pass ($(windows) windows, $before before)" bash -c "[ \"\$(niri msg -j windows | jq length)\" -gt $before ] && timeout 0.5 dots-call pass state | jq -e '.open | not' >/dev/null"
+niri msg action close-window
+until_ok 3000 bash -c "[ \"\$(niri msg -j windows | jq length)\" -le $before ]"
+
+# Pass draws no key strip; the list unloads 30 s after it closes.
+open_pass
+check "Pass draws no key strip: its keys are in the cheat sheet" state_is 'has("hint") | not'
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 until_ok 33000 state_is '.loaded == false'

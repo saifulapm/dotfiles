@@ -48,10 +48,6 @@ export function segments(row) {
   return runs;
 }
 
-export function passKeys(look) {
-  return look.keys([['↵', 'copy'], ['o', 'otp'], ['s', 'show'], ['n', 'new'], ['e', 'edit'], ['d', 'delete'], ['q', 'qr'], ['esc', '']]);
-}
-
 export const copiedText = (kind) => (kind === 'otp' ? 'OTP copied' : 'Copied') + ' · clears in 45s';
 
 export function failedText(stderr) {
@@ -68,10 +64,19 @@ export function pathTag(entries, path) {
 
 export const LENGTH = { start: 24, min: 8, max: 128 };
 
-// The delete question on one line under the list, and its keys.
-export function deleteText(look, name) {
-  return { question: `Delete ${line(name)}?`, keys: look.keys([['y', 'yes'], ['n', 'no']]) };
+export const stepLength = (n, by) => Math.max(LENGTH.min, Math.min(LENGTH.max, n + by));
+
+// A shown password's line counts down the whole seconds it has left.
+export const hidesText = (ms) => `hides in ${Math.ceil(Math.max(0, ms) / 1000)} s`;
+
+// The list's last row, which starts a new entry under the typed name.
+export function newRowText(query) {
+  const q = line(query).trim();
+  return q ? `New entry “${q}”` : 'New entry';
 }
+
+// The delete question on one line under the list; the cheat sheet lists its keys.
+export const deleteText = (name) => `Delete ${line(name)}?`;
 
 // What the island says after a change; dots-pass exits 3 when the change saved and only the push failed.
 const CHANGED = { insert: ['Saved', 'Not saved'], delete: ['Deleted', 'Not deleted'], 'qr-save': ['OTP saved', 'OTP not saved'] };

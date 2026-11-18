@@ -740,7 +740,7 @@ wtype -k r
 
 test('every tests/dev script reads a keyed surface\'s .keyboard and .settled after opening it and before it types', () => {
   // Rewritten by m105's surface tasks, which add the wait as they go.
-  const exempt = ['accounts.sh', 'dns-open.sh', 'goals.sh', 'pass.sh', 'rows-mouse.sh', 'surfaces.sh'];
+  const exempt = ['accounts.sh', 'dns-open.sh', 'goals.sh', 'rows-mouse.sh', 'surfaces.sh'];
   const found = [];
   for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh') && !exempt.includes(f))) {
     for (const n of typesBeforeKeys(readFileSync(dir + f, 'utf8'))) found.push(`${f}:${n}`);
