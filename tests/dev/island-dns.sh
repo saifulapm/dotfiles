@@ -45,14 +45,17 @@ fill=$(jq -r .fill <<<"$colours")
 paper_ink=$(jq -r .paperInk <<<"$colours")
 wife=carried:dev00wife
 
-read -r _ oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
+read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
+want=$((ow - 48 < 880 ? ow - 48 : 880))
 niri msg action spawn -- dots-call dns toggle
 until_ok 3000 island_is '.surface == "dns" and .animating == false'
 until_ok 3000 state_is '.keyboard and .settled'
 idle
 echo "     island: $(island | jq -c '{surface, width, height}'), card: $(dns_state | jq -c '{cardBox, listWidth, tileBox}')"
-check "Mod+Shift+D sets surface to dns and the island 880 px wide" island_is '.surface == "dns" and .width == 880'
+check "Mod+Shift+D sets surface to dns and the island $want px wide" island_is --argjson w "$want" '.surface == "dns" and .width == $w'
 check "the island is no taller than the output less 48 ($oh)" island_is --argjson h "$oh" '.height <= $h - 48'
+# 16 + 36 header + 8 + 2 captions of 24 and 8 rows of 44 with 4 between + 16: no legend row or key strip below.
+check "with no legend row the island is 512 px tall ($(island | jq .height))" island_is '.height == 512'
 check "the list is 340 px and the tile ends 16 px inside the island's right edge" state_is '.listWidth == 340 and ((.cardBox.x + .cardBox.w) - (.tileBox.x + .tileBox.w) - 16 | fabs) < 1'
 check "the header has the shield, DNS Shield and Add device ($(dns_state | jq -c '[.heading, .addButton]'))" state_is '.heading == "DNS Shield" and .addButton == "Add device"'
 
