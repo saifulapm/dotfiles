@@ -1,7 +1,7 @@
 // The verdict for each speed budget; bin/dots-bench gathers the numbers and runs this as a CLI.
 
 // idle RSS is 200 MiB (#7S2JD316, #KSH3FVWD): GL reads 172 MiB, no lever reached 150 without costing real memory, the picker's specimens add 3-7 MiB, and by m24 every start read 194-198.
-export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0, morphMaxMs: 36, morphP95Ms: 12, morphSwitchMaxMs: 36, morphSwitchP95Ms: 12, controlColdMs: 50, controlWarmMs: 16, morphControlMaxMs: 36, morphControlP95Ms: 12, notifsColdMs: 50, notifsWarmMs: 16 };
+export const BUDGETS = { firstFrameMs: 150, rssMiB: 200, coldMs: 50, warmMs: 16, timers: 1, switchMs: 300, idleCpu: 0.07, appFirstFrameMs: 500, appRssMiB: 250, appLeft: 0, morphMaxMs: 36, morphP95Ms: 12, morphSwitchMaxMs: 36, morphSwitchP95Ms: 12, controlColdMs: 50, controlWarmMs: 16, morphControlMaxMs: 36, morphControlP95Ms: 12, notifsColdMs: 50, notifsWarmMs: 16, chatColdMs: 50, chatWarmMs: 16 };
 
 // The measured baseline of every row that has one (mem fact 76XT47G6, just bench at d77a9e69).
 export const BASELINE = { firstFrameMs: 170, rssMiB: 204, coldMs: 38, warmMs: 3, schemesColdMs: 35, schemesWarmMs: 16, passColdMs: 3, filesColdMs: 11, switchMs: 114, idleCpu: 0.13 };
@@ -89,6 +89,9 @@ export function report(m, budgets) {
     // The notification centre in the island, new in m104, held to its budgets (6FNG38AQ): cold is the first open after a start.
     line('notifs cold', m.notifsColdMs, 'ms', '≤', b.notifsColdMs, m.notifsColdMs <= b.notifsColdMs),
     line('notifs warm', m.notifsWarmMs, 'ms', '≤', b.notifsWarmMs, m.notifsWarmMs <= b.notifsWarmMs),
+    // The AI chat in the island has no baseline, so it is held to its budgets: cold is the first open after its surface unloaded.
+    line('chat cold', m.chatColdMs, 'ms', '≤', b.chatColdMs, m.chatColdMs <= b.chatColdMs),
+    line('chat warm', m.chatWarmMs, 'ms', '≤', b.chatWarmMs, m.chatWarmMs <= b.chatWarmMs),
   ];
   // Every theme's shaders and effects loaded once; reported, not budgeted.
   const switched = `${'rss switched'.padEnd(13)} ${Math.floor(m.switchedKiB / 1024)} MiB`;
@@ -137,8 +140,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const morphControl = pair(process.argv.slice(32, 34));
   const notifsColdMs = Number(process.argv[34]);
   const notifsWarmMs = Number(process.argv[35]);
+  const chatColdMs = Number(process.argv[36]);
+  const chatWarmMs = Number(process.argv[37]);
   const env = (k, d) => (process.env[k] ? Number(process.env[k]) : d);
-  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, schemesColdMs, schemesWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, morphOpen, morphClose, morphSwitch, controlColdMs, controlWarmMs, morphControl, notifsColdMs, notifsWarmMs, cpu: process.argv[7] }, {
+  const r = report({ firstFrameMs, rssKiB, coldMs, warmMs, timers, switchMs, switchedKiB, anonShmemKiB, schemesColdMs, schemesWarmMs, passColdMs, filesColdMs, appFirstFrameMs, appRssKiB, appLeft, dekhoFirstFrameMs, dekhoRssKiB, dekhoLeft, deenFirstFrameMs, deenRssKiB, deenLeft, morphOpen, morphClose, morphSwitch, controlColdMs, controlWarmMs, morphControl, notifsColdMs, notifsWarmMs, chatColdMs, chatWarmMs, cpu: process.argv[7] }, {
     firstFrameMs: env('DOTS_BUDGET_FIRST_FRAME_MS', BUDGETS.firstFrameMs),
     rssMiB: env('DOTS_BUDGET_RSS_MIB', BUDGETS.rssMiB),
     coldMs: env('DOTS_BUDGET_COLD_MS', BUDGETS.coldMs),
@@ -159,6 +164,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     morphControlP95Ms: env('DOTS_BUDGET_MORPH_CONTROL_P95_MS', BUDGETS.morphControlP95Ms),
     notifsColdMs: env('DOTS_BUDGET_NOTIFS_COLD_MS', BUDGETS.notifsColdMs),
     notifsWarmMs: env('DOTS_BUDGET_NOTIFS_WARM_MS', BUDGETS.notifsWarmMs),
+    chatColdMs: env('DOTS_BUDGET_CHAT_COLD_MS', BUDGETS.chatColdMs),
+    chatWarmMs: env('DOTS_BUDGET_CHAT_WARM_MS', BUDGETS.chatWarmMs),
   });
   console.log(r.lines.join('\n'));
   process.exit(r.over ? 1 : 0);

@@ -371,6 +371,32 @@ echo "     notifs cold opens: ${notifs_colds[*]}; warm opens: ${notifs_warms[*]}
 notifs_cold=$(median "${notifs_colds[@]}")
 notifs_warm=$(median "${notifs_warms[@]}")
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95" "$control_cold" "$control_warm" "$control_morph_max" "$control_p95" "$notifs_cold" "$notifs_warm"
+# The AI chat loads on its first open and unloads 30 s after it closes, so cold is the open after an unload and warm one while it is still loaded; opens counts from the load, and the island is the only state that says the close has drawn. Nothing is ever sent, so no request leaves for pxy.
+chat_state() { timeout 0.5 qs ipc call chat state 2>/dev/null; }
+chat_is() { chat_state | jq -e "$1" >/dev/null; }
+chat_once() {
+  qs ipc call chat open >/dev/null || die "chat open failed"
+  until_ok 3000 chat_is ".opens == $1 and (.openMs | type) == \"number\"" || die "chat open $1 never reported openMs"
+  chat_state | jq -r .openMs
+  qs ipc call chat close >/dev/null
+  until_ok 3000 island_is '.surface == null and .animating == false' || die "the chat never closed"
+}
+chat_colds=()
+for i in 1 2 3; do
+  chat_colds+=("$(chat_once 1)") || exit 1
+  [ "$i" = 3 ] || until_ok 35000 chat_is '.loaded == false' || die "the chat never unloaded"
+done
+chat_warms=()
+for i in 2 3 4; do
+  sleep 0.3
+  chat_warms+=("$(chat_once "$i")") || exit 1
+done
+echo "     chat cold opens: ${chat_colds[*]}; warm opens: ${chat_warms[*]}"
+chat_cold=$(middle "${chat_colds[@]}")
+chat_warm=$(middle "${chat_warms[@]}")
+# Its unload Tick would count as a running timer, and the loaded card as memory, in any row measured after it.
+until_ok 35000 chat_is '.loaded == false' || die "the chat never unloaded"
+
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95" "$control_cold" "$control_warm" "$control_morph_max" "$control_p95" "$notifs_cold" "$notifs_warm" "$chat_cold" "$chat_warm"
 exit
 }

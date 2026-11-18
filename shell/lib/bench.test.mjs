@@ -4,11 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, limits, frameStats, morphIntervals, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 }, morphSwitch: { max: 17, p95: 8 }, controlColdMs: 30, controlWarmMs: 5, morphControl: { max: 18, p95: 7 }, notifsColdMs: 32, notifsWarmMs: 6 };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 }, morphSwitch: { max: 17, p95: 8 }, controlColdMs: 30, controlWarmMs: 5, morphControl: { max: 18, p95: 7 }, notifsColdMs: 32, notifsWarmMs: 6, chatColdMs: 33, chatWarmMs: 7 };
 const rest = ['180224', '0', '180', '131072', '0', '220', '141072', '0'];
 const head = ['130', '152576', '38', '4', '1', '0.03', '120', '157000', '236544', '35', '9', '3', '11', '310'];
-// The three morph pairs, then Control's cold and warm opens and its morph, then the notification centre's cold and warm opens.
-const morph = ['14', '9', '15', '10', '17', '8', '30', '5', '18', '7', '32', '6'];
+// The three morph pairs, then Control's cold and warm opens and its morph, then the notification centre's and the chat's cold and warm opens.
+const morph = ['14', '9', '15', '10', '17', '8', '30', '5', '18', '7', '32', '6', '33', '7'];
 const args = [...head, ...rest];
 
 test('the limits are the budget or the baseline plus its spread, whichever holds a row tighter', () => {
@@ -59,6 +59,8 @@ test('every measure within its limit reads ok and passes', () => {
     'control warm  5 ms    ≤ 16 ms    ok',
     'notifs cold   32 ms   ≤ 50 ms    ok',
     'notifs warm   6 ms    ≤ 16 ms    ok',
+    'chat cold     33 ms   ≤ 50 ms    ok',
+    'chat warm     7 ms    ≤ 16 ms    ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -341,4 +343,20 @@ test("the notification centre's opens read OVER past 50 ms cold and 16 ms warm (
   assert.equal(report({ ...good, notifsWarmMs: 17 }, BUDGETS).over, true);
   assert.equal(report({ ...good, notifsColdMs: 50, notifsWarmMs: 16 }, BUDGETS).over, false);
   assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /notifs cold {3}32 ms +≤ 50 ms +ok\nnotifs warm {3}6 ms/);
+});
+
+test("the chat's opens read OVER past 50 ms cold and 16 ms warm, and their env overrides move the budgets", () => {
+  assert.equal(report({ ...good, chatColdMs: 50, chatWarmMs: 16 }, BUDGETS).over, false);
+  const cold = report({ ...good, chatColdMs: 51 }, BUDGETS);
+  assert.equal(cold.over, true);
+  assert.equal(cold.lines[29], 'chat cold     51 ms   ≤ 50 ms    OVER');
+  const warm = report({ ...good, chatWarmMs: 17 }, BUDGETS);
+  assert.equal(warm.over, true);
+  assert.equal(warm.lines[30], 'chat warm     17 ms   ≤ 16 ms    OVER');
+  assert.match(execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' }), /chat cold {5}33 ms +≤ 50 ms +ok\nchat warm {5}7 ms/);
+  const env = { ...process.env, DOTS_BUDGET_CHAT_COLD_MS: '20', DOTS_BUDGET_CHAT_WARM_MS: '5' };
+  assert.throws(
+    () => execFileSync('node', [cli, ...args, ...morph], { env, stdio: 'pipe' }),
+    (e) => e.status === 1 && /chat cold {5}33 ms +≤ 20 ms +OVER\nchat warm {5}7 ms +≤ 5 ms +OVER/.test(e.stdout.toString()),
+  );
 });
