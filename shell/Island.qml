@@ -760,9 +760,9 @@ Item {
         };
     }
 
-    // Control's Calendar opens the calendar card whatever one-line state shows, a toast's included, since the card outranks them; only a question keeps the island.
+    // Control's Calendar opens the calendar card whatever one-line state shows, a toast's included, since the card outranks them; only a question or a prompt keeps the island.
     function openCalendar() {
-        if (cardOpen || mode === "question")
+        if (takeover || mode === "question")
             return;
         calendar = {
             year: clock.now.getFullYear(),
@@ -773,8 +773,9 @@ Item {
         keys.forceActiveFocus();
     }
 
+    // A prompt holds the island until it is answered, so Mod+I does nothing while one shows (M7J9ETQA).
     function focusIsland() {
-        if (cardOpen)
+        if (takeover)
             return;
         if (mode === "lease")
             leaseOpen = true;
@@ -923,9 +924,6 @@ Item {
     // The open surface's size as it asks for it, and the part its content draws in.
     property real surfaceWidth: 0
     property real surfaceHeight: 0
-    // True while a card not yet moved into the island is open; the island takes no input then.
-    property bool cardOpen: false
-    enabled: !cardOpen
     // True while the open surface's rows still fade in.
     property bool surfaceBusy: false
     // When the box and its content last came to rest, in ms since the epoch.

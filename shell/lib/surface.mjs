@@ -8,20 +8,14 @@ export const slabText = (c) => (contrast(c.paper, c.ink) >= 4.5 ? c.paper : c.su
 const islandish = (role) => role === 'island' || role === 'chip';
 
 export function surfaceStyle(tokens, role) {
-  if (!tokens) return { fill: 'transparent', text: 'transparent', frame: { width: 0, color: 'transparent' }, wash: 0 };
+  if (!tokens) return { fill: 'transparent', text: 'transparent', frame: { width: 0, color: 'transparent' } };
   const c = tokens.color;
   // A light scheme's island is an ink slab its light text reads on; a dark scheme's ink is light, so its island is its surface.
   const slab = islandish(role) && tokens.mode !== 'dark';
-  // A panel on the desk floats as a floating window does: the paper at 97% (QML's #AARRGGBB) inside a 1 px edge of the accent fading into the paper.
-  if (tokens.desk && role === 'card' && tokens.niri?.edge) {
-    const e = tokens.niri.edge;
-    return { fill: `#F7${c.paper.slice(1)}`.toUpperCase(), text: c.ink, frame: { width: 1, color: e.from, gradient: { from: e.from, to: e.to } }, wash: 0.72 };
-  }
   return {
     fill: slab ? c.ink : c.surface,
     text: slab ? slabText(c) : c.ink,
     frame: { width: islandish(role) ? 0 : 1, color: islandish(role) ? c.ink : tokens.niri?.border_inactive ?? c.line },
-    wash: 0.72,
   };
 }
 

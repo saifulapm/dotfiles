@@ -901,3 +901,15 @@ test('every takeover names a card that fills it', () => {
   const bare = takeovers.filter(([, file]) => !hasFillingCard(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')));
   assert.deepEqual(bare.map(([n, f]) => `${n} (${f})`), [], 'name an item objectName: "card" with anchors.fill: parent');
 });
+
+// m106 moved the last cards into the island: nothing in the shell's surfaces window is a card, so no veil (a wash of paper over the output), no card theme and no card-open state are left (3QDRPW73).
+test('the surfaces window holds no card host and no veil', () => {
+  const text = readFileSync(new URL('../Surfaces.qml', import.meta.url), 'utf8');
+  const files = ['Surfaces.qml', 'Island.qml', 'Surface.qml', 'lib/surface.mjs'].concat(surfaceFiles(text).map(([, f]) => f));
+  const found = [];
+  for (const f of new Set(files)) {
+    const code = jsCode(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
+    for (const name of ['panelTheme', 'cardOpen', 'wash']) if (new RegExp(`\\b${name}\\b`).test(code)) found.push(`${f}: ${name}`);
+  }
+  assert.deepEqual(found, []);
+});

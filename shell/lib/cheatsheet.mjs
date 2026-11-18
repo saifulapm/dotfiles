@@ -117,10 +117,22 @@ export const IN_SURFACES = [
   ['goals', 'E', 'Edit'],
   ['goals', '⇧ J / K', 'Reorder'],
   ['goals', 'D', 'Delete'],
+  // Polkit, gpg and Bluetooth pairing ask in one prompt; Esc cancels it as it closes any surface.
+  ['prompts', '↵', 'Allow, Unlock or Pair'],
+  ['picker', '↑ / ↓', 'Move'],
+  ['picker', '↵', 'Open, or Enter a Folder'],
+  ['picker', '← / →', 'Up a Folder, or Into One'],
+  ['picker', '⌃ ␣', 'Mark a File'],
+  ['picker', '⌃ ↵', 'Open the Marked Files'],
+  ['picker', 'Tab', 'Go to the Places, or Complete a Path'],
+  ['picker', '⇧ Tab', 'Next File Type'],
+  ['picker', '⌃ L', 'Type a Path'],
+  ['picker', '⌃ H', 'Show Hidden Files'],
+  ['picker', '⌃ ,', 'Sort by Date, Name or Size'],
 ].map(([surface, key, title]) => ({ title, key, group: 'IN SURFACES', surface }));
 
 // How a caption names each surface in IN SURFACES.
-const SURFACE_NAMES = { shared: 'Every Surface', launcher: 'Launcher', control: 'Control', notifications: 'Notifications', pass: 'Pass', tailscale: 'Tailscale', accounts: 'Accounts', dns: 'DNS', goals: 'Goals' };
+const SURFACE_NAMES = { shared: 'Every Surface', launcher: 'Launcher', control: 'Control', notifications: 'Notifications', pass: 'Pass', tailscale: 'Tailscale', accounts: 'Accounts', dns: 'DNS', goals: 'Goals', prompts: 'Prompts', picker: 'File Picker' };
 
 // IN SURFACES rows with a caption row before each surface's first row, so a key reads with the surface it belongs to.
 function captioned(rows) {

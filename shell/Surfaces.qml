@@ -4,7 +4,6 @@ import QtQuick
 import "." as Root
 import "lib/click.mjs" as ClickLib
 import "lib/launcher.mjs" as Lib
-import "lib/voice.mjs" as V
 import "lib/takeover.mjs" as T
 
 // The one Overlay window every surface draws in; it stays mapped, since a remap costs 20 to 30 ms.
@@ -22,17 +21,6 @@ PanelWindow {
 
     required property var theme
     required property var themeList
-    // Every panel floats over the desk as a floating window does, so it reads the theme as the desk's apps do: its words moved to read there, its fills veils, its card the paper inside the accent edge.
-    readonly property QtObject panelTheme: QtObject {
-        readonly property var tokens: V.deskTokens(host.theme.tokens)
-        readonly property var color: tokens ? tokens.color : host.theme.color
-        readonly property string dir: host.theme.dir
-        readonly property string name: host.theme.name
-        // A panel's notice reaches the island through the real theme, which carries the signal.
-        function notice(text) {
-            host.theme.notice(text);
-        }
-    }
     // The desktop entries with their icons, scanned by the shell after its first frame.
     required property var apps
     required property var notifs
@@ -453,14 +441,6 @@ PanelWindow {
     onDrawnSurfaceChanged: if (drawnSurface)
         islandLast = drawnSurface
 
-    // While a card is open, a click on the island is a click outside that card, so the island takes no input.
-    Binding {
-        when: !!host.island
-        target: host.island
-        property: "cardOpen"
-        value: host.shown && !host.islandSurface && !host.takeoverItem
-    }
-
     Binding {
         when: !!host.island
         target: host.island
@@ -543,7 +523,7 @@ PanelWindow {
         anchors.fill: parent
         active: false
         sourceComponent: Root.Recorder {
-            theme: panelTheme
+            theme: host.theme
             screen: host.screen
         }
     }

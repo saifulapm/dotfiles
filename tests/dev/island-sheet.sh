@@ -27,7 +27,7 @@ check "its groups are SURFACES, IN SURFACES, WORK, WINDOWS, SYSTEM and TOUCHPAD 
 check "and it draws six columns ($(sheet | jq -c '[.columns[].name]'))" sheet_is '[.columns[].name] == .groups'
 in_surfaces() { sheet_is '(.columns[] | select(.name == "IN SURFACES") | .rows) as $r | ($r | any(.key == "Esc")) and (["launcher", "control", "notifications", "pass", "tailscale", "accounts", "dns", "goals"] - [$r[].surface] | length == 0)'; }
 check "IN SURFACES holds Esc and rows for the launcher, Control, Notifications, Pass, Tailscale, Accounts, DNS and Goals" in_surfaces
-named() { sheet_is '[.columns[] | select(.name == "IN SURFACES") | .rows[] | .caption // empty] == ["Every Surface", "Launcher", "Control", "Notifications", "Pass", "Tailscale", "Accounts", "DNS", "Goals"]'; }
+named() { sheet_is '[.columns[] | select(.name == "IN SURFACES") | .rows[] | .caption // empty] == ["Every Surface", "Launcher", "Control", "Notifications", "Pass", "Tailscale", "Accounts", "DNS", "Goals", "Prompts", "File Picker"]'; }
 check "and names each surface in a caption over its keys ($(sheet | jq -c '[.columns[] | select(.name == "IN SURFACES") | .rows[] | .caption // empty]'))" named
 check "the sheet draws nothing under its columns, no legend ($(sheet | jq -c .belowColumns))" sheet_is '.belowColumns == 0'
 check "its heading reads Keys ($(sheet | jq -c .heading))" sheet_is '.heading == "Keys"'
