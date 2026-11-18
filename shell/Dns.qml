@@ -243,6 +243,8 @@ Item {
         for (let i = 0; i < openRepeater.count; i++)
             openButtons.push(openRepeater.itemAt(i).label);
         return JSON.stringify({
+            // The latest notice, drawn at the tool's foot while the island holds the tool.
+            note: toolNote.text,
             loaded: true,
             open: shown,
             visible: panel.visible,
@@ -405,6 +407,12 @@ Item {
                 return;
             event.accepted = true;
         }
+    }
+
+    // A press anywhere on the tool is on its card, so the surfaces' window never takes it for a click outside.
+    Item {
+        objectName: "card"
+        anchors.fill: parent
     }
 
     // The island draws the fill and plays the open; this is its content, 16 px in from its edge.
@@ -682,7 +690,7 @@ Item {
                             required property int index
                             readonly property bool isCurrent: index === Math.min(panel.leaseSelected, panel.leases.length - 1)
                             function drawn() {
-                                return { mac: modelData.mac, name: leaseName.text, ip: leaseIp.text, truncated: leaseName.truncated, lines: leaseName.lineCount };
+                                return { mac: modelData.mac, name: leaseName.text, ip: leaseIp.text, truncated: leaseName.truncated, lines: leaseName.lineCount, ipTruncated: leaseIp.truncated, ipRight: leaseIp.mapToItem(null, leaseIp.width, 0).x, ipLeft: leaseIp.mapToItem(null, 0, 0).x, left: leaseRow.mapToItem(null, 0, 0).x };
                             }
                             width: addList.width
                             height: 44
@@ -707,6 +715,10 @@ Item {
                                 anchors.verticalCenter: parent.verticalCenter
                                 anchors.right: parent.right
                                 anchors.rightMargin: 12
+                                // A router's lease is anyone's to write, so its address keeps to its column.
+                                width: Math.min(implicitWidth, parent.width * 0.4)
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
                                 textFormat: Text.PlainText
                                 text: leaseRow.modelData.ip
                                 color: panel.tones.muted
@@ -1101,6 +1113,9 @@ Item {
                                 anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
                                 textFormat: Text.PlainText
+                                width: Math.min(implicitWidth, parent.width * 0.6)
+                                elide: Text.ElideRight
+                                maximumLineCount: 1
                                 text: panel.lease ? panel.lease.ip : ""
                                 color: panel.on
                                 font.family: panel.fonts.ui ?? ""
@@ -1144,6 +1159,14 @@ Item {
                         }
                     }
                 }
+            }
+            // A word another part of the shell sends, which the island cannot show while DNS Shield holds it.
+            Root.ToolNote {
+                id: toolNote
+                theme: panel.theme
+                width: parent.width
+                color: panel.tones.muted
+                font.family: panel.fonts.ui ?? ""
             }
         }
     }

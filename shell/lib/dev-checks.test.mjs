@@ -424,7 +424,7 @@ test('every fake a tests/dev script marks executable starts with #!, and every n
   assert.deepEqual(found, []);
 });
 
-// m102 and m103 moved surfaces into the island and dozens of checks stalled on state keys the new state() dropped (settled, cardBox, legend, tabFill); these files' state() literals, each after its Ipc target where one is named, make a surface's keys.
+// m102 to m105 moved surfaces into the island and dozens of checks stalled on state keys the new state() dropped (settled, cardBox, legend, tabFill); these files' state() literals, each after its Ipc target where one is named, make a surface's keys.
 const stateSources = {
   island: [['Desk.qml', 'target: "island"']],
   launcher: [['shell.qml', 'target: "launcher"'], ['Launcher.qml']],
@@ -432,6 +432,11 @@ const stateSources = {
   control: [['shell.qml', 'target: "control"'], ['Control.qml'], ['ControlWifi.qml'], ['ControlAudio.qml'], ['ControlBluetooth.qml'], ['ControlPower.qml'], ['ControlDisplay.qml'], ['ControlRoute.qml']],
   notifs: [['shell.qml', 'target: "notifs"'], ['Notifications.qml']],
   record: [['shell.qml', 'target: "record"'], ['Recorder.qml']],
+  pass: [['shell.qml', 'target: "pass"'], ['Pass.qml']],
+  tailscale: [['shell.qml', 'target: "tailscale"'], ['Tailscale.qml']],
+  accounts: [['shell.qml', 'target: "accounts"'], ['Accounts.qml']],
+  dns: [['shell.qml', 'target: "dns"'], ['Dns.qml']],
+  goals: [['shell.qml', 'target: "goals"'], ['Goals.qml']],
 };
 
 // Blanks comments and string contents, so a brace or an apostrophe in either cannot shift the scan.

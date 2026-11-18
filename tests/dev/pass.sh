@@ -258,8 +258,9 @@ until_ok 8000 qr_code_ok
 check "Enter on web/github.com saves it: pass otp web/github.com prints the new code ($(pass otp web/github.com 2>/dev/null))" qr_code_ok
 check "and keeps the entry's password" bash -c "[ \"\$(pass show web/github.com | head -1)\" = '$password' ]"
 check "the shell's journal never holds the secret" bash -c "! journalctl --user -u '$DOTS_DEV_UNIT' --no-pager -o cat | grep -qF '$qr_secret'"
-until_ok 3000 bash -c 'timeout 0.5 qs ipc call island state 2>/dev/null | jq -e ".text == \"OTP saved · web/github.com\"" >/dev/null'
-check "the island says the code was saved ($(island_text))" bash -c '[ "$(timeout 0.5 qs ipc call island state | jq -r .text)" = "OTP saved · web/github.com" ]'
+# Pass stays open after the save, and the island draws Pass, not its notice, so Pass says it at its foot.
+until_ok 3000 state_is '.note == "OTP saved · web/github.com"'
+check "Pass says the code was saved at its foot ($(pass_state | jq -c .note))" state_is '.note == "OTP saved · web/github.com"'
 wtype -k Escape
 until_ok 3000 state_is '.drawing == false'
 
@@ -276,6 +277,16 @@ until_ok 5000 bash -c "[ \"\$(niri msg -j windows | jq length)\" -gt $before ]"
 check "e opens web/github.com in an editor window and closes Pass ($(windows) windows, $before before)" bash -c "[ \"\$(niri msg -j windows | jq length)\" -gt $before ] && timeout 0.5 dots-call pass state | jq -e '.open | not' >/dev/null"
 niri msg action close-window
 until_ok 3000 bash -c "[ \"\$(niri msg -j windows | jq length)\" -le $before ]"
+
+# A name longer than its row is cut to the letters the row holds and ends in an ellipsis, never clipped mid-letter.
+long=$(printf 'a%.0s' $(seq 1 99))/$(printf 'b%.0s' $(seq 1 99))/$(printf 'c%.0s' $(seq 1 99))
+printf '%s\n' "$password" | pass insert -e "$long" >/dev/null
+open_pass
+wtype abc
+until_ok 2000 state_is '.count == 1'
+check "a 299-character name ends in an ellipsis within its row ($(pass_state | jq -c '.rows[0].name | [length, .[-4:]]'))" state_is '.rows[0].name | endswith("…") and length < 299'
+wtype -k Escape
+until_ok 3000 state_is '.drawing == false'
 
 # Pass draws no key strip; the list unloads 30 s after it closes.
 open_pass

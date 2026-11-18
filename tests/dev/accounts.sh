@@ -123,7 +123,7 @@ wtype -k Return
 sleep 1
 check "Enter on a key the store lacks writes no choice" test ! -e "$ctx7_active"
 check "and the device's key stays main ($(c7))" state_is '[.tiles[] | select(.name | startswith("Context7")) | .name] == ["Context7 main · this device", "Context7 alt"]'
-check "and the island says nothing of Context7 ($(island | jq -c .text))" eval "! island | jq -e '.text | contains(\"Context7\")' >/dev/null"
+check "and Accounts says nothing of Context7 ($(acc_state | jq -c .note))" eval "! acc_state | jq -e '.note | contains(\"Context7\")' >/dev/null"
 check "and the live ctx7 login keeps its bytes" test "$(sha256sum <"$creds" 2>/dev/null || true)" = "$creds_sum"
 check "and the registry keeps its bytes" test "$(sha256sum <"$reg")" = "$reg_sum"
 
@@ -133,8 +133,9 @@ wtype -k Return
 active_is() { [ "$(jq -r .active "$reg")" = "$1" ]; }
 check "Enter on work makes it the registry's active account" until_ok 3000 active_is work
 check "and moves the Active tile to work ($(acc_state | jq -c '[.accounts[] | [.id, .active]]'))" until_ok 2000 state_is '[.accounts[] | [.id, .active]] == [["main", false], ["work", true]] and .active.name == "work" and [.others[].name] == ["main"]'
-island_says() { island | jq -e '.text == "Claude · work is active for new sessions"' >/dev/null; }
-check "the island reads Claude · work is active for new sessions ($(island | jq -c .text))" until_ok 3000 island_says
+# The island draws Accounts, not its notice, while Accounts is open, so Accounts says it at its foot.
+says_active() { state_is '.note == "Claude · work is active for new sessions"'; }
+check "Accounts reads Claude · work is active for new sessions at its foot ($(acc_state | jq -c .note))" until_ok 3000 says_active
 
 # A new cx session runs claude in work's home: cx runs the account wrapper at ~/.local/libexec/dots/claude, which runs ~/.local/bin/claude, so a scratch HOME holds this tree's wrapper and a stub claude that prints the CLAUDE_CONFIG_DIR it was given.
 stub_home=$DOTS_DEV_DIR/stub-home

@@ -33,13 +33,20 @@ export function passRows(entries, q) {
     .filter((r) => r.hits !== null);
 }
 
-// Runs of the name with the same look: the folder muted, matched letters underlined; bidi controls are dropped, so a name draws in the order it is spelt.
-export function segments(row) {
+// Runs of the name with the same look: the folder muted, matched letters underlined; bidi controls are dropped, so a name draws in the order it is spelt. With max, a longer name keeps max - 1 letters and ends in an ellipsis, since its runs cannot elide as one text.
+export function segments(row, max = Infinity) {
   const marked = new Set(row.hits);
   const runs = [];
+  let kept = 0;
+  const shown = [...row.name].filter((c) => inOrder(c)).length;
   for (let i = 0; i < row.name.length; i++) {
     const ch = inOrder(row.name[i]);
     if (!ch) continue;
+    if (shown > max && kept === max - 1) {
+      runs.push({ text: '…', folder: false, hit: false });
+      break;
+    }
+    kept += 1;
     const look = { folder: i < row.folder.length, hit: marked.has(i) };
     const last = runs[runs.length - 1];
     if (last && last.folder === look.folder && last.hit === look.hit) last.text += ch;

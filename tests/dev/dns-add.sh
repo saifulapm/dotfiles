@@ -55,13 +55,14 @@ wtype -k Escape
 check "Esc goes back to the list, DNS Shield still open" until_ok 1000 state_is '.add == null and .open'
 close_dns
 
-# Hostnames come from whatever a device sends the router: a newline, a bidi override, an escape sequence, none at all and 200 characters.
-jq -n --arg long "$(printf 'W%.0s' $(seq 1 200))" '[
+# Hostnames come from whatever a device sends the router: a newline, a bidi override, an escape sequence, none at all and 200 characters; so does a lease's address, here 300 characters.
+jq -n --arg long "$(printf 'W%.0s' $(seq 1 200))" --arg longip "$(printf '9%.0s' $(seq 1 300))" '[
   {mac: "02:00:00:00:00:51", ip: "192.168.0.151", hostname: "two\nlines"},
   {mac: "02:00:00:00:00:52", ip: "192.168.0.152", hostname: "evil‮gnp.exe"},
   {mac: "02:00:00:00:00:53", ip: "192.168.0.153", hostname: "esc\u001b[2Jape"},
   {mac: "02:00:00:00:00:54", ip: "192.168.0.154", hostname: ""},
-  {mac: "02:00:00:00:00:55", ip: "192.168.0.155", hostname: $long}]' >"$DOTS_DEV_DIR/dns-leases.json"
+  {mac: "02:00:00:00:00:55", ip: "192.168.0.155", hostname: $long},
+  {mac: "02:00:00:00:00:56", ip: $longip, hostname: "long-address"}]' >"$DOTS_DEV_DIR/dns-leases.json"
 open_dns
 idle
 wtype n
@@ -70,6 +71,7 @@ echo "     forged leases: $(dns_state | jq -c '[.add.leases[] | [.name, .lines, 
 check "no lease draws a newline, a bidi mark or an escape" state_is 'all(.add.leases[]; (.name | test("[\n‮\u001b]")) | not) and all(.add.leases[]; .lines == 1)'
 check "a lease with no hostname reads unnamed, the others one-lined" state_is '[.add.leases[0:4][].name] == ["two lines", "evilgnp.exe", "esc [2Jape", "unnamed"]'
 check "the 200-character hostname is elided" state_is '.add.leases[4].truncated == true'
+check "a 300-character address is elided inside its row ($(dns_state | jq -c '.add.leases[5] | {ipTruncated, ipLeft, left}'))" state_is '.add.leases[5] | .ipTruncated and .ipLeft > .left'
 # With the cursor on it, the pane at the right shows the long hostname too.
 wtype jjjj
 until_ok 1000 state_is '.add.cursor == "02:00:00:00:00:55"'

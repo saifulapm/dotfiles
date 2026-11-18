@@ -101,13 +101,11 @@ wtype t
 until_ok 3000 state_is '.state == "on" and (.rows | length) == 5'
 check "t turns it on again ($(fake_status)) and the rows come back" bash -c "[ '$(fake_status)' = Running ] && timeout 0.5 dots-call tailscale state | jq -e '.switchOn and (.rows | length) == 5' >/dev/null"
 
-# Without an operator, tailscaled refuses a non-root up or down, and the island says so instead of t doing nothing; a notice shows only at rest, so the earlier Sent toast has its 5 s first.
-island_rests() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e '.mode == "rest"' >/dev/null; }
-until_ok 8000 island_rests
+# Without an operator, tailscaled refuses a non-root up or down, and Tailscale says why at its foot instead of t doing nothing: the island draws Tailscale, not its notice, while Tailscale is open.
 touch "$ts_dir/denied"
 wtype t
-island_says() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e '.text | startswith("Tailscale not turned off · Access denied")' >/dev/null; }
-check "a refused t says why in the island ($(timeout 0.5 qs ipc call island state | jq -r .text))" until_ok 3000 island_says
+says_why() { state_is '.note | startswith("Tailscale not turned off · Access denied")'; }
+check "a refused t says why at Tailscale's foot ($(ts_state | jq -r .note))" until_ok 3000 says_why
 check "and Tailscale stays on" state_is '.state == "on"'
 rm "$ts_dir/denied"
 

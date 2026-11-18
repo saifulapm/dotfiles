@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Pass, Tailscale, Accounts, Goals and DNS Shield grow the island to their own width (board 8: 640 px, DNS 880 px), Esc gives it back, one key morphs straight to another, and Pass unloads 30 s after its close and opens again cold.
+# Pass, Tailscale, Accounts, Goals and DNS Shield grow the island to their own width (board 8: 640 px, DNS 880 px), a click on one stays in it, Esc gives it back, one key morphs straight to another, and Pass unloads 30 s after its close and opens again cold.
 {
 source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/pointer.bash"
 
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
@@ -30,6 +31,11 @@ for pair in pass:640 tailscale:640 accounts:640 goals:640 dns:880; do
   want=$((ow - 48 < w ? ow - 48 : w))
   open_tool "$s"
   check "the $s key sets surface to $s and the island $want px wide ($(island | jq -c '{surface, width}'))" island_is --arg s "$s" --argjson w "$want" '.surface == $s and .width == $w'
+  # A press on the tool's heading, inside the island but on no row, is a press on the tool, not one outside it.
+  point click $(((ow - want) / 2 + 30)) 26
+  sleep 0.3
+  check "a click on $s's heading keeps $s open ($(tool "$s" | jq -c '{open}'))" tool_is "$s" '.open'
+  until_ok 2000 tool_is "$s" '.keyboard and .settled'
   key Escape
   until_ok 3000 at_rest
   check "Esc closes $s and the island comes to rest ($(island | jq -c '{surface, animating}'))" tool_is "$s" '.open == false'

@@ -297,6 +297,7 @@ Item {
             newEntry: mode === "new" ? { path: newPath.text, tag: tagText.text, length: generated.length, lengthText: lengthText.text, focus: lengthBox.activeFocus ? "length" : "path" } : null,
             deleteLine: deleteLine.visible ? deleteLine.text : "",
             deleteColor: String(deleteLine.color),
+            note: toolNote.text,
             // The island's ink and fill and its danger tone, which the rows, Copy and the delete question draw in.
             on: String(on),
             fill: String(fill),
@@ -434,6 +435,15 @@ Item {
 
     Component.onCompleted: Root.State.loaded.push("pass")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "pass")
+
+    // One letter of a row's name, which is monospaced, so a long name is cut to the letters its row holds.
+    TextMetrics {
+        id: nameMetrics
+        font.family: pass.fonts.ui ?? ""
+        font.pixelSize: 13
+        font.weight: Font.Bold
+        text: "M"
+    }
 
     Root.Surface {
         id: card
@@ -616,7 +626,8 @@ Item {
                             required property var modelData
                             required property int index
                             readonly property bool isCurrent: index === pass.selected
-                            readonly property var runs: P.segments(modelData)
+                            // As many letters as the name's column holds, the last an ellipsis when the name is longer.
+                            readonly property var runs: P.segments(modelData, Math.max(1, Math.floor(nameColumn.width / Math.max(1, nameMetrics.advanceWidth))))
                             readonly property string drawnName: runs.map(r => r.text).join("")
                             function underlined() {
                                 const out = [];
@@ -650,6 +661,7 @@ Item {
                             }
 
                             Column {
+                                id: nameColumn
                                 anchors.left: parent.left
                                 anchors.leftMargin: 12
                                 anchors.right: rowEnd.left
@@ -1082,6 +1094,16 @@ Item {
                         onTapped: pass.save()
                     }
                 }
+            }
+
+            // A save's or a scan's word, which the island cannot show while Pass holds it.
+            Root.ToolNote {
+                id: toolNote
+                theme: pass.theme
+                x: 12
+                width: column.width - 24
+                color: pass.tones.muted
+                font.family: pass.fonts.ui ?? ""
             }
         }
     }

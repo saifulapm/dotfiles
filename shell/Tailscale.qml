@@ -131,6 +131,8 @@ Item {
         for (let i = 0; i < rowRepeater.count; i++)
             shownRows.push(rowRepeater.itemAt(i).drawn());
         return JSON.stringify({
+            // The latest notice, drawn at the tool's foot while the island holds the tool.
+            note: toolNote.text,
             loaded: true,
             open: shown,
             listed: listed,
@@ -230,6 +232,12 @@ Item {
                 return;
             event.accepted = true;
         }
+    }
+
+    // A press anywhere on the tool is on its card, so the surfaces' window never takes it for a click outside.
+    Item {
+        objectName: "card"
+        anchors.fill: parent
     }
 
     ColumnLayout {
@@ -489,6 +497,14 @@ Item {
                     font.pixelSize: 13
                 }
             }
+        }
+        // A refused up or down's word, which the island cannot show while Tailscale holds it.
+        Root.ToolNote {
+            id: toolNote
+            theme: panel.theme
+            Layout.fillWidth: true
+            color: panel.tones.muted
+            font.family: panel.fonts.ui ?? ""
         }
     }
 

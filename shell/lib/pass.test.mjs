@@ -73,6 +73,18 @@ test('a new password starts at 24 characters, from 8 to 128', () => {
   assert.deepEqual(LENGTH, { start: 24, min: 8, max: 128 });
 });
 
+test('a name longer than its row keeps the letters that fit and ends in an ellipsis, its runs intact', () => {
+  const row = passRows(parseEntries('web/github.com\t0\n'), 'gh')[0];
+  assert.deepEqual(segments(row, 8), [
+    { text: 'web/', folder: true, hit: false },
+    { text: 'g', folder: false, hit: true },
+    { text: 'it', folder: false, hit: false },
+    { text: '…', folder: false, hit: false },
+  ]);
+  assert.deepEqual(segments(row, 14), segments(row));
+  assert.deepEqual(segments(row, 99), segments(row));
+});
+
 test('+ and - step the length by one, held between 8 and 128', () => {
   assert.equal(stepLength(24, 1), 25);
   assert.equal(stepLength(24, -1), 23);

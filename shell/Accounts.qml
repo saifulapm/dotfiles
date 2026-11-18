@@ -158,6 +158,8 @@ Item {
         const limit = l => ({ name: l.name, figure: l.figure, reset: l.reset, warning: l.warning });
         const other = r => ({ label: r.label, figure: r.figure, note: r.note, warning: r.warning, error: r.error });
         return JSON.stringify({
+            // The latest notice, drawn at the tool's foot while the island holds the tool.
+            note: toolNote.text,
             loaded: true,
             open: shown,
             visible: panel.visible,
@@ -303,6 +305,12 @@ Item {
                 return;
             event.accepted = true;
         }
+    }
+
+    // A press anywhere on the tool is on its card, so the surfaces' window never takes it for a click outside.
+    Item {
+        objectName: "card"
+        anchors.fill: parent
     }
 
     ColumnLayout {
@@ -602,6 +610,14 @@ Item {
                 model: panel.tileItems
                 delegate: tileComponent
             }
+        }
+        // A switch of account or key's word, which the island cannot show while Accounts holds it.
+        Root.ToolNote {
+            id: toolNote
+            theme: panel.theme
+            Layout.fillWidth: true
+            color: panel.tones.muted
+            font.family: panel.fonts.ui ?? ""
         }
     }
 
