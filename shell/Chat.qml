@@ -49,6 +49,8 @@ Item {
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
     readonly property color tile: Qt.alpha(on, 0.07)
     readonly property color bubble: Qt.alpha(on, 0.12)
+    // The danger tone as a colour, so a check compares it with what the alert draws in.
+    readonly property color dangerTone: tones.danger
     // Code sits on a panel darker than the island's fill.
     readonly property color panel: Qt.darker(fill, 1.35)
     // The island reports this as its surface while the chat shows, and grows to this width for it (board 6).
@@ -217,6 +219,8 @@ Item {
     }
 
     function next() {
+        if (!streaming)
+            return;
         if (queue.length === 0) {
             messages = messages.concat(answered);
             ask();
@@ -243,12 +247,13 @@ Item {
         if (req.status === 200) {
             draw(cutter.end(replyText));
             const asked = calls.filter(c => c);
-            if (asked.length > 0) {
+            if (asked.length > 0 && error === "") {
                 xhr = null;
                 useTools(asked);
                 return;
             }
-            if (replyText !== "") {
+            // A reply that pxy's error cut off stays drawn but is not sent back, so r asks for the message again.
+            if (replyText !== "" && error === "") {
                 messages = messages.concat([{ role: "assistant", content: replyText }]);
                 replies = replies.concat([{ row: replyRow, text: replyText }]);
             }
@@ -256,6 +261,24 @@ Item {
             error = failure(req);
         }
         xhr = null;
+        streaming = false;
+    }
+
+    // The stop button ends the turn where it stands: the stream is cut off, what came stays drawn, and no tool call after it runs.
+    function stop() {
+        if (!streaming)
+            return;
+        const req = xhr;
+        xhr = null;
+        queue = [];
+        if (req) {
+            req.abort();
+            draw(cutter.end(replyText));
+            if (replyText !== "") {
+                messages = messages.concat([{ role: "assistant", content: replyText }]);
+                replies = replies.concat([{ row: replyRow, text: replyText }]);
+            }
+        }
         streaming = false;
     }
 
@@ -309,12 +332,10 @@ Item {
         return out;
     }
 
-    // Tab moves to the reply list on the last block; with no reply yet it stays in the field.
+    // Tab moves to the reply list on its last block, and stops there with nothing picked while there is no reply yet, so Tab cycles the same three stops every time.
     function focusReplies() {
         const found = blockRows();
-        if (!found.length)
-            return;
-        pick = found[found.length - 1];
+        pick = found.length ? found[found.length - 1] : -1;
         focusArea = "replies";
         replyKeys.forceActiveFocus();
     }
@@ -370,6 +391,8 @@ Item {
             focus: focusArea,
             pick: pick,
             drawn: drawn(),
+            failure: { drawn: failureLine.visible, retry: retryButton.visible, alert: String(alertGlyph.color) },
+            danger: String(dangerTone),
             openMs: openMs,
             opens: opens,
             settled: chat.settled,
@@ -659,6 +682,66 @@ Item {
                         }
                     }
 
+                    // pxy's own line under the message it failed, a red alert first, then Retry.
+                    Item {
+                        id: failureLine
+                        visible: chat.error !== "" && !chat.streaming
+                        width: messageColumn.width
+                        height: visible ? Math.max(failureText.implicitHeight, 26) : 0
+
+                        Text {
+                            id: alertGlyph
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: String.fromCodePoint(0xF0028)
+                            color: chat.tones.danger
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 16
+                        }
+
+                        Text {
+                            id: failureText
+                            anchors.left: alertGlyph.right
+                            anchors.leftMargin: 8
+                            anchors.right: retryButton.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            wrapMode: Text.Wrap
+                            maximumLineCount: 3
+                            elide: Text.ElideRight
+                            text: chat.error
+                            color: chat.on
+                            font.family: chat.fonts.ui ?? ""
+                            font.pixelSize: 13
+                        }
+
+                        Rectangle {
+                            id: retryButton
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: retryLabel.implicitWidth + 22
+                            height: 26
+                            radius: 13
+                            color: chat.tile
+
+                            Text {
+                                id: retryLabel
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: "Retry"
+                                color: chat.on
+                                font.family: chat.fonts.ui ?? ""
+                                font.pixelSize: 12
+                            }
+
+                            Root.Click {
+                                name: "chat-retry"
+                                onTapped: chat.retry()
+                            }
+                        }
+                    }
+
                     // While text streams in, an accent block marks where it arrives.
                     Rectangle {
                         visible: chat.streaming
@@ -744,6 +827,11 @@ Item {
                         color: chat.fill
                         font.family: "Symbols Nerd Font Mono"
                         font.pixelSize: 16
+                    }
+
+                    Root.Click {
+                        name: "chat-send"
+                        onTapped: chat.streaming ? chat.stop() : chat.send()
                     }
                 }
             }

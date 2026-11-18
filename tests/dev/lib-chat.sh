@@ -6,12 +6,25 @@ for _ in $(seq 100); do
   [ -s "$chat_fake/port" ] && break
   sleep 0.05
 done
-export DOTS_CHAT_URL="http://127.0.0.1:$(cat "$chat_fake/port")/v1/chat/completions"
+pxy_port=$(cat "$chat_fake/port")
+export DOTS_CHAT_URL="http://127.0.0.1:$pxy_port/v1/chat/completions"
 ln -s "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/bin/dev-fake-mem" "$chat_fake/mem"
 PATH=$chat_fake:$PATH
 # What the chat sent pxy, one request body a line, and each argv the fake mem ran.
 requests=$chat_fake/requests.jsonl
 mem_log=$chat_fake/mem.log
+# The fake pxy stops, so the chat meets a refused connection, and starts again on the same port.
+pxy_stop() {
+  kill -TERM "$pxy_pid" 2>/dev/null
+  until_ok 3000 pxy_gone
+}
+pxy_gone() { ! kill -0 "$pxy_pid" 2>/dev/null; }
+pxy_start() {
+  rm -f "$chat_fake/port"
+  "$(dirname "${BASH_SOURCE[0]}")/../../bin/dev-fake-pxy" "$chat_fake" "$pxy_port" >/dev/null 2>&1 9>&- &
+  pxy_pid=$!
+  until_ok 3000 test -s "$chat_fake/port"
+}
 chat_cleanup() {
   kill -TERM "$pxy_pid" 2>/dev/null
   rm -rf "$chat_fake"

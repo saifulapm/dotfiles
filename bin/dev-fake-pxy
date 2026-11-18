@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The chat's checks talk to this, never to pxy: `dev-fake-pxy <dir>` listens on a free local port, writes it to <dir>/port, logs each request's body as a line of <dir>/requests.jsonl, and answers by a word in the last user message (no word: the fish loop).
+// The chat's checks talk to this, never to pxy: `dev-fake-pxy <dir> [port]` listens on that local port or a free one, writes it to <dir>/port, logs each request's body as a line of <dir>/requests.jsonl, and answers by a word in the last user message (no word: the fish loop).
 import { appendFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 
@@ -93,7 +93,7 @@ const server = createServer((req, res) => {
     answer(req, res, body);
   });
 });
-server.listen(0, '127.0.0.1', () => {
+server.listen(Number(process.argv[3] ?? 0), '127.0.0.1', () => {
   writeFileSync(`${dir}/port.tmp`, String(server.address().port));
   renameSync(`${dir}/port.tmp`, `${dir}/port`);
 });
