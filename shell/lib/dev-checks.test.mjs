@@ -441,6 +441,7 @@ const stateSources = {
   polkit: [['Polkit.qml', 'target: "polkit"'], ['PolkitPrompt.qml']],
   pinentry: [['Pinentry.qml', 'target: "pinentry"'], ['PinentryPrompt.qml']],
   picker: [['Portal.qml', 'target: "picker"'], ['FilePicker.qml']],
+  pairing: [['Pairing.qml', 'target: "pairing"'], ['PairingPrompt.qml']],
 };
 
 // Blanks comments and string contents, so a brace or an apostrophe in either cannot shift the scan.

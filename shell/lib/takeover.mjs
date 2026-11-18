@@ -33,3 +33,7 @@ const NAMES = {
 
 // The chip a prompt's header draws for what it returns to.
 export const chipText = (name) => (name ? NAMES[name] ?? name : '');
+
+// A prompt that takes the keyboard mid-typing ignores Enter for its first half second, so a key meant for another window answers nothing (29PTQZ0V); a click still answers at once.
+export const ENTER_GUARD_MS = 500;
+export const enterReady = (shownAt, now) => shownAt > 0 && now - shownAt >= ENTER_GUARD_MS;

@@ -2,6 +2,11 @@
 # Enter on a new device in Control's Bluetooth tab pairs, trusts and connects it through bin/dots-bt-agent, each request answered in the island's pairing prompt; Esc, a timeout or a failed pair leave it new and say Pairing failed.
 {
 source "$(dirname "$0")/lib.sh"
+# A prompt ignores Enter for its first half second (29PTQZ0V), so each Enter waits that out.
+enter() {
+  sleep 0.5
+  wtype -k Return
+}
 
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
@@ -74,14 +79,14 @@ check "a scan lists Test Keyboard" detail_is "Test Keyboard" new
 
 # A code to confirm, answered from Control, which holds the keyboard.
 until_ok 3000 select_row "Test Keyboard"
-wtype -k Return
+enter
 until_ok 3000 asks "Test Keyboard" "check this code shows on the device"
 check "Enter on Test Keyboard asks to compare 123456 ($(pair | jq -c '{title, code: .code.text}'))" pair_is '.title == "Test Keyboard" and .code.text == "123456"'
 check "the prompt draws Reject and Pair over Control ($(pair | jq -c '{chip, buttons: [.buttons[].text]}'))" pair_is '.chip == "Control" and [.buttons[].text] == ["Reject", "Pair"]'
 # A person may take a while to compare the code: the answer still counts after D-Bus's 25 s default.
 sleep 27
 check "27 s on, the question still shows" asks "Test Keyboard" "check this code shows on the device"
-wtype -k Return
+enter
 until_ok 3000 prop_is "$keyboard" Connected true
 check "Enter pairs it (Paired true)" prop_is "$keyboard" Paired true
 check "trusts it (Trusted true)" prop_is "$keyboard" Trusted true
@@ -92,7 +97,7 @@ check "and the question is gone" no_question
 
 # Esc says no.
 until_ok 3000 select_row "Test Phone"
-wtype -k Return
+enter
 until_ok 3000 asks "Test Phone" "check this code shows on the device"
 check "Enter on Test Phone asks to compare 222222 ($(pair | jq -c .code.text))" pair_is '.title == "Test Phone" and .code.text == "222222"'
 wtype -k Escape
@@ -106,7 +111,7 @@ check "and its row reads new" detail_is "Test Phone" new
 # A passkey shown for typing on the device; the device types it.
 knob SetPairing osu "$mouse" display 654321
 until_ok 3000 select_row "Test Mouse"
-wtype -k Return
+enter
 until_ok 3000 asks "Test Mouse" "type this on the device, then Enter"
 check "a passkey to type draws 654321 for Test Mouse with Cancel alone ($(pair | jq -c '{code: .code.text, buttons: [.buttons[].text]}'))" pair_is '.code.text == "654321" and [.buttons[].text] == ["Cancel"]'
 knob Typed o "$mouse"
@@ -121,7 +126,7 @@ until_ok 3000 no_connect
 # A code typed wrong on the device fails the pair, and BlueZ sends no Cancel, so the shell drops the dead question itself.
 knob SetPairing osu "$phone" display 111111
 until_ok 3000 select_row "Test Phone"
-wtype -k Return
+enter
 until_ok 3000 asks "Test Phone" "type this on the device, then Enter"
 check "a passkey to type draws 111111 for Test Phone ($(pair | jq -c .code.text))" pair_is '.code.text == "111111"'
 knob Mistyped o "$phone"
@@ -132,13 +137,13 @@ check "and Control's keys move again" state_is '.typing | not'
 # A PIN typed in the island.
 knob SetPairing osu "$phone" pin 0
 until_ok 3000 select_row "Test Phone"
-wtype -k Return
+enter
 until_ok 3000 asks "Test Phone" "asks for a PIN"
 check "a PIN request draws a field for Test Phone ($(pair | jq -c .field))" pair_is '.field.h == 44 and .field.length == 0'
 wtype 0000
 until_ok 2000 pair_is '.field.length == 4'
 check "typing 0000 fills the prompt's field ($(pair | jq -c .field))" pair_is '.field.length == 4'
-wtype -k Return
+enter
 pin_sent() { knob Calls | grep -q "RequestPinCode $phone 0000"; }
 until_ok 3000 pin_sent
 check "Enter sends 0000 to BlueZ" pin_sent
@@ -151,7 +156,7 @@ answered() { grep -q "$1" "$DOTS_DEV_DIR/authorize"; }
 authorize
 until_ok 3000 asks "Test Speaker" "wants Audio"
 check "an untrusted Test Speaker asking for audio reads wants Audio" asks "Test Speaker" "wants Audio"
-wtype -k Return
+enter
 until_ok 3000 answered allowed
 check "Enter allows it" answered allowed
 authorize
@@ -170,7 +175,7 @@ until_ok 2000 dnd_on
 authorize
 until_ok 3000 asks "Test Speaker" "wants Audio"
 check "with Do Not Disturb on the prompt still shows, with no chip ($(pair | jq -c .chip))" eval 'asks "Test Speaker" "wants Audio" && pair_is ".chip == null"'
-wtype -k Return
+enter
 until_ok 3000 answered allowed
 check "with Control closed, Enter allows it" answered allowed
 timeout 0.5 qs ipc call notifs dnd false
@@ -181,7 +186,7 @@ wtype s
 until_ok 3000 state_is '.rows | index("00:00:00:00:00:07") != null'
 knob SetPairing osu "$nameless" confirm 333333
 until_ok 3000 select_row "00:00:00:00:00:07"
-wtype -k Return
+enter
 until_ok 3000 asks "00:00:00:00:00:07" "check this code shows on the device"
 check "the nameless device asks by its address ($(pair | jq -c '{title, code: .code.text}'))" pair_is '.title == "00:00:00:00:00:07" and .code.text == "333333"'
 until_ok 36000 toast_is "Pairing failed: 00:00:00:00:00:07"
@@ -194,7 +199,7 @@ check "the toast goes after its 1.5 s" gone_in_2s
 # A pair BlueZ fails says the same.
 knob SetPairing osu "$speaker" fail 0
 until_ok 3000 select_row "Test Speaker"
-wtype -k Return
+enter
 until_ok 3000 toast_is "Pairing failed: Test Speaker"
 check "a failed pair shows Pairing failed: Test Speaker" toast_is "Pairing failed: Test Speaker"
 until_ok 2000 detail_is "Test Speaker" new

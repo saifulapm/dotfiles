@@ -94,9 +94,22 @@ until_ok 3000 island_is '.mode == "notification"'
 check "once the launcher closes the notification shows ($(island | jq -c '{mode, text}'))" island_is '.mode == "notification"'
 until_ok 8000 rest
 
-# At rest: no chip, and the island goes back to the clock.
+# An Enter in the prompt's first half second answers nothing, so a key meant for another window cannot answer it (29PTQZ0V); one after it does.
+before=$(pk | jq .submits)
 fake Begin s t4 >/dev/null
+until_ok 3000 pk_is '.open and .keyboard'
+# The prompt has just taken the keys; this Enter is meant to come early.
+wtype -k Return # early on purpose
+sleep 0.2
+check "an Enter in the prompt's first half second hands nothing to the request ($(pk | jq -c '{submits, shownAt, open}'), now $(now_ms))" pk_is --argjson n "$before" '.open and .submits == $n'
 until_ok 3000 prompt_up
+sleep 0.5
+wtype -k Return
+until_ok 9000 pk_is --argjson n "$before" '.submits == $n + 1'
+check "one after it does ($(pk | jq -c '{submits}'), was $before)" pk_is --argjson n "$before" '.submits == $n + 1'
+until_ok 9000 pk_is '.open and .field == 0'
+
+# At rest: no chip, and the island goes back to the clock.
 check "a prompt over the resting island has no chip and no surface under it ($(pk | jq -c .chip), $(island | jq -c '{surface}'))" eval 'pk_is ".chip == null" && island_is ".surface == null"'
 wtype -k Escape
 until_ok 3000 rest

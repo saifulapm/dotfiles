@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { push, drop, holder, under, holds, chipText } from './takeover.mjs';
+import { push, drop, holder, under, holds, chipText, enterReady } from './takeover.mjs';
 
 test('a prompt over the launcher draws the prompt, keeps the launcher under it and returns to it', () => {
   const stack = push([], 'polkit');
@@ -56,4 +56,11 @@ test('the chip names the surface or prompt under it in plain words, and is empty
   assert.equal(chipText('pinentry'), 'GPG');
   assert.equal(chipText('picker'), 'Files');
   assert.equal(chipText(null), '');
+});
+
+test('a prompt ignores Enter for its first half second, so a key meant for another window answers nothing (29PTQZ0V)', () => {
+  assert.equal(enterReady(1000, 1000), false);
+  assert.equal(enterReady(1000, 1499), false);
+  assert.equal(enterReady(1000, 1500), true);
+  assert.equal(enterReady(0, 0), false);
 });

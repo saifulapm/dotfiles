@@ -1,5 +1,6 @@
 import QtQuick
 import "." as Root
+import "lib/takeover.mjs" as T
 import "lib/bt-pairing.mjs" as P
 
 // A Bluetooth pairing request as board 7's prompt, drawn inside the island over whatever it covers: a code to compare or to type on the device at 30 px, or a field for a PIN or passkey, then Reject and Pair, Deny and Allow, or Cancel alone.
@@ -24,8 +25,12 @@ Item {
     readonly property int wantWidth: 520
     implicitHeight: card.implicitHeight + 40
 
+    // When the prompt last showed; Enter does nothing for half a second after it, so a key meant for another window never pairs (29PTQZ0V).
+    property real shownAt: 0
+
     // The surfaces' window calls this for each request Pairing makes current, once it has taken the island over.
     function show() {
+        shownAt = Date.now();
         seen = Root.Pairing.current.request;
         shown = true;
         keys.forceActiveFocus();
@@ -81,8 +86,10 @@ Item {
     Item {
         id: keys
         Keys.onPressed: event => {
-            Root.Pairing.key(event);
             event.accepted = true;
+            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !T.enterReady(prompt.shownAt, Date.now()))
+                return;
+            Root.Pairing.key(event);
         }
     }
 

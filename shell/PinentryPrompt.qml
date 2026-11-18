@@ -1,5 +1,6 @@
 import QtQuick
 import "." as Root
+import "lib/takeover.mjs" as T
 import "lib/pinentry.mjs" as P
 
 // A gpg request as board 7's prompt, drawn inside the island over whatever it covers: a passphrase asks with Cancel and Unlock, a confirmation with Deny and Allow, and a wrong passphrase comes back with its error line.
@@ -22,7 +23,11 @@ Item {
     readonly property int wantWidth: 520
     implicitHeight: card.implicitHeight + 40
 
+    // When the prompt last showed; Enter does nothing for half a second after it (29PTQZ0V).
+    property real shownAt: 0
+
     function show(r) {
+        shownAt = Date.now();
         request = r;
         seen = r;
         card.input.text = "";
@@ -101,8 +106,10 @@ Item {
     // A confirmation has no field, so this takes its keys.
     Item {
         id: keys
-        Keys.onReturnPressed: prompt.submit()
-        Keys.onEnterPressed: prompt.submit()
+        Keys.onReturnPressed: if (T.enterReady(prompt.shownAt, Date.now()))
+            prompt.submit()
+        Keys.onEnterPressed: if (T.enterReady(prompt.shownAt, Date.now()))
+            prompt.submit()
         Keys.onEscapePressed: prompt.close()
     }
 
@@ -125,7 +132,8 @@ Item {
         primary: prompt.words.primary
         onQuietTapped: prompt.close()
         onPrimaryTapped: prompt.submit()
-        onEntered: prompt.submit()
+        onEntered: if (T.enterReady(prompt.shownAt, Date.now()))
+            prompt.submit()
         onEscaped: prompt.close()
     }
 }

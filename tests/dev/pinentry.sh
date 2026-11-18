@@ -2,6 +2,11 @@
 # gpg asks for its passphrase on the shell's prompt: a real agent in a scratch home runs bin/dots-pinentry, and pass show waits on the prompt.
 {
 source "$(dirname "$0")/lib.sh"
+# A prompt ignores Enter for its first half second (29PTQZ0V), so each Enter waits that out.
+enter() {
+  sleep 0.5
+  wtype -k Return
+}
 
 gnupg=$(mktemp -d) store=$(mktemp -d) out=$(mktemp -d)
 cleanup() {
@@ -46,14 +51,14 @@ check "the field is masked" state_is '.drawnField.secret'
 # A wrong passphrase comes back from gpg as a retry on the same pinentry: the prompt shows again with the error and an empty field.
 wtype 'wrong one'
 until_ok 2000 state_is '.field == 9'
-wtype -k Return
+enter
 until_ok 8000 state_is '.open and .error != ""'
 check "a wrong passphrase shows the prompt again with the board's error line ($(pin_state | jq -c .error))" state_is '.open and (.error | test("^Bad passphrase · try 2 of 3$"))'
 check "and its field is empty" state_is '.field == 0'
 
 wtype "$passphrase"
 until_ok 2000 state_is ".field == ${#passphrase}"
-wtype -k Return
+enter
 until_ok 8000 exited "$pid"
 rc=$(rc_of "$pid")
 check "the right passphrase, with % and non-ASCII in it, decrypts: pass show exits 0 (rc $rc)" test "$rc" = 0
@@ -93,7 +98,7 @@ b=$(ask second-request)
 until_ok 3000 state_is '.waiting == 1'
 check "a second request waits while the first shows" state_is '.open and .description == "first-request" and .waiting == 1'
 wtype one
-wtype -k Return
+enter
 until_ok 3000 state_is '.open and .description == "second-request" and .waiting == 0'
 check "answering the first shows the second" state_is '.open and .description == "second-request"'
 wtype -k Escape

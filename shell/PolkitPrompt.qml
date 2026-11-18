@@ -1,5 +1,6 @@
 import QtQuick
 import "." as Root
+import "lib/takeover.mjs" as T
 
 // A polkit request as board 7's prompt, drawn inside the island over whatever it covers: Cancel and Allow, the password field, and a red line after a wrong password.
 Item {
@@ -18,6 +19,8 @@ Item {
     property bool settled: false
     // A wrong password's line, until the next key.
     property string wrong: ""
+    // When the prompt last showed; Enter does nothing for half a second after it (29PTQZ0V).
+    property real shownAt: 0
     readonly property var asked: flow ? {
         message: flow.message,
         inputPrompt: flow.inputPrompt,
@@ -34,6 +37,7 @@ Item {
 
     function show(f) {
         flow = f;
+        shownAt = Date.now();
         wrong = "";
         card.input.text = "";
         shown = true;
@@ -85,6 +89,7 @@ Item {
             field: card.input.text.length,
             // How many answers this shell has handed a request, by Enter or by Allow.
             submits: submits,
+            shownAt: shownAt,
             title: d.title,
             detail: d.detail,
             chip: d.chip,
@@ -138,7 +143,8 @@ Item {
         primary: "Allow"
         onQuietTapped: prompt.close()
         onPrimaryTapped: prompt.submit()
-        onEntered: prompt.submit()
+        onEntered: if (T.enterReady(prompt.shownAt, Date.now()))
+            prompt.submit()
         onEscaped: prompt.close()
     }
 
