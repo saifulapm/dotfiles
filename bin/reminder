@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+// reminder add <when> <text>: sets a reminder in this machine's synced store, as the launcher's `r ` mode does, for an agent or a terminal. The store changes only through dots-sync-merge's swap, so a shell save in the same moment merges in rather than being lost.
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import * as R from '../shell/lib/reminders.mjs';
+import { machineId } from '../shell/lib/notes.mjs';
+
+const env = process.env;
+const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
+const fail = (msg, code = 1) => {
+  process.stderr.write(msg + '\n');
+  process.exit(code);
+};
+
+const machine = machineId(env.DOTS_MACHINE, read((env.XDG_CONFIG_HOME || env.HOME + '/.config') + '/chezmoi/chezmoi.toml'), read('/etc/hostname'));
+const path = join(env.XDG_DATA_HOME || env.HOME + '/.local/share', 'dots', 'reminders', machine + '.json');
+
+function store() {
+  if (!existsSync(path)) return R.emptyStore();
+  return R.parseStore(readFileSync(path, 'utf8')) ?? fail(R.brokenStore(machine));
+}
+
+// The changed records go in as another machine's file would, so the merge keeps whatever the shell saved meanwhile.
+function merge(records) {
+  const dir = mkdtempSync(join(tmpdir(), 'reminder-'));
+  try {
+    const file = join(dir, machine + '.json');
+    writeFileSync(file, JSON.stringify({ version: 1, reminders: records }));
+    const r = spawnSync(new URL('dots-sync-merge', import.meta.url).pathname, ['reminders', path, file], { encoding: 'utf8' });
+    if (r.status !== 0) fail(r.stderr.trim() || `dots-sync-merge exited ${r.status}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function add(when, words) {
+  const now = Date.now();
+  const parsed = R.parseReminder(`${when ?? ''} ${words.join(' ')}`, now);
+  if (!when || (!parsed && !/\S/.test(words.join(' ')))) fail(`Cannot set ${when ?? 'a reminder'}: it has no text`);
+  if (!parsed) fail(`Cannot set ${when}: give a time as 20m, 1h30m or 17:30`);
+  if (parsed.error) fail(parsed.error);
+  const before = store();
+  const r = R.setReminder(before, parsed, now);
+  if (r.error) fail(r.error);
+  merge(r.store.reminders.filter((x) => !before.reminders.includes(x)));
+  process.stdout.write(`${parsed.text} · ${parsed.when}\n`);
+}
+
+const [cmd, ...args] = process.argv.slice(2);
+if (cmd === 'add') add(args[0], args.slice(1));
+else fail('usage: reminder add <when> <text>', 2);
