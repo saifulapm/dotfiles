@@ -45,7 +45,7 @@ marks() { pk_state | jq -c '[.marked, [.rows[] | select(.marked) | .name], .foot
 
 ask several "$(request open "$dl" true)"
 shown
-check "an app that allows several files heads the card Open files ($(pk_state | jq -c .heading))" state_is '.heading | test("^open files"; "i")'
+check "an app that allows several files heads the picker $app wants to open files ($(pk_state | jq -c .heading))" state_is --arg h "$app wants to open files" '.heading == $h'
 mark
 check "ctrl+space on a folder marks nothing ($(marks))" until_ok 600 state_is '.rows[.selected].name == "screenshots/" and .marked == [] and .foot == ""'
 cursor_to IMG_2041.HEIC
@@ -84,17 +84,17 @@ shown
 cursor_to IMG_2041.HEIC
 mark
 check "without multiple, ctrl+space marks nothing ($(marks))" until_ok 600 state_is '.marked == [] and ([.rows[] | select(.marked)] | length) == 0 and .foot == ""'
-check "and the heading stays Open file ($(pk_state | jq -c .heading))" state_is '.heading | test("^open file( |$)"; "i")'
+check "and the button stays Open ($(pk_state | jq -c '[.buttons[].text]'))" state_is '[.buttons[].text] == ["Cancel", "Open"]'
 wtype -k Escape
 until_ok 3000 answered single
 
 ask folder "$(request folder "$pick")"
 shown
-echo "     folder: $(pk_state | jq -c '{heading, count, rows: [.rows[] | [.name, .size]], previewShown, foot, hint}')"
+echo "     folder: $(pk_state | jq -c '{heading, count, rows: [.rows[] | [.name, .size]], previewShown, foot, buttons: [.buttons[].text]}')"
 check "a folder request lists only the folders, no files" state_is '[.rows[].name] == ["Codes/", "music/"] and ([.rows[] | select(.dir | not)] | length) == 0 and (.previewShown | not)'
 wtype -k Return
 check "Enter enters the folder under the cursor, which lists only its folders ($(pk_state | jq -c '[.folder, [.rows[].name]]'))" until_ok 2000 state_is --arg f "$pick/Codes" '.folder == $f and .listed and [.rows[].name] == ["lareys/", "scratch/"]'
-check "the footer names the folder ctrl+Enter chooses ($(pk_state | jq -c .foot))" state_is '.foot | test("Codes")'
+check "the path ends on Codes beside Choose this folder ($(pk_state | jq -c '[.pills, [.buttons[].text]]'))" state_is '.pills[-1] == "Codes" and [.buttons[].text] == ["Cancel", "Choose this folder"]'
 wtype -M ctrl -k Return -m ctrl
 until_ok 3000 answered folder
 check "ctrl+Enter answers the folder the picker is in ($(cat "$out/folder" 2>/dev/null))" answer_is folder "$(chosen "$pick/Codes")"
@@ -123,15 +123,10 @@ for i in 1 2 3 4 5; do
   until_ok 3000 answered "relist-$i"
 done
 
-# Both cards' headings and the folder strip.
-ask heads-multi "$(request open "$dl" true)"
-shown
-check "several files head the card Open files · $app ($(pk_state | jq -c .heading))" state_is --arg h "Open files · $app" '.heading == $h'
-wtype -k Escape
-until_ok 3000 answered heads-multi
+# The folder request's heading.
 ask heads-folder "$(request folder "$pick")"
 shown
-check "a folder request heads the card Choose folder · $app and keys the folder strip ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "Choose folder · $app" '.heading == $h and .hint == "↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: name · esc"'
+check "a folder request heads the picker $app wants to choose a folder ($(pk_state | jq -c .heading))" state_is --arg h "$app wants to choose a folder" '.heading == $h'
 wtype -k Escape
 until_ok 3000 answered heads-folder
 

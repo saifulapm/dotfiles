@@ -37,10 +37,15 @@ export const answerLine = (response, paths) => JSON.stringify({ response: respon
 export const oneLine = (s) => line(str(s).replace(CONTROL, ' ').replace(MARK, ''));
 
 // The app by its desktop entry, found as the launcher finds a window's, else its id.
+const appEntry = (apps, id) => (id ? apps.find((e) => e.id.toLowerCase() === id.toLowerCase()) : null);
+
 export function appName(apps, id) {
-  const a = id ? apps.find((e) => e.id.toLowerCase() === id.toLowerCase()) : null;
+  const a = appEntry(apps, id);
   return a ? a.name : id;
 }
+
+// The icon the header's circle draws, from the same entry.
+export const appIcon = (apps, id) => appEntry(apps, id)?.icon ?? '';
 
 // The orders Files' , and the picker's ctrl+, cycle; both open on date, newest first. A folder's size says nothing, so a folders-only list skips size.
 const SORTS = ['modified', 'name', 'size'];
@@ -76,16 +81,28 @@ export function dateText(ms, now) {
   return d.getFullYear() !== new Date(now).getFullYear() ? `${day} ${d.getFullYear()}` : day;
 }
 
-export function headingText(app, mode, multiple) {
-  const head = mode === 'save' ? 'Save as' : mode === 'folder' ? 'Choose folder' : multiple ? 'Open files' : 'Open file';
-  return app ? `${head} · ${app}` : head;
+// Board 9's header: what the asking app wants, or the bare task when no app is named.
+export function headingText(app, mode) {
+  const [want, bare] = mode === 'save' ? ['save a file', 'Save a file'] : mode === 'folder' ? ['choose a folder', 'Choose a folder'] : ['open files', 'Open files'];
+  return app ? `${app} wants to ${want}` : bare;
 }
 
-// The keys spelt out as typed.
-export function pickerKeys(mode, multiple, sort = SORT_FIRST) {
-  const sorted = ['ctrl+,', `sort: ${SORT_WORDS[sort]}`];
-  const pairs = mode === 'save' ? [['↵', 'save'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], sorted, ['esc', '']] : mode === 'folder' ? [['↵', 'enter folder'], ['ctrl+↵', 'choose this folder'], sorted, ['esc', '']] : [['↵', 'open'], ['tab', 'places'], ['ctrl+l', 'path'], ['ctrl+h', 'hidden'], ['ctrl+space', 'select'], sorted, ['esc', '']];
-  return pairs.map(([k, w]) => ({ key: k, word: w }));
+// The footer's inverted button.
+export const primaryText = (mode, n) => (mode === 'save' ? 'Save' : mode === 'folder' ? 'Choose this folder' : n > 0 ? `Open ${n}` : 'Open');
+
+// The sort at the path's right: names A to Z, the newest and the largest first.
+export const sortText = (sort) => ({ modified: 'Date ↓', name: 'Name ↑', size: 'Size ↓' })[sort] ?? '';
+
+// The folder as pills, one per folder from ~ when it is under Home, else from /; each opens its folder.
+export function pathPills(folder, home) {
+  const under = folder === home || folder.indexOf(home + '/') === 0;
+  const pills = [under ? { label: '~', path: home } : { label: '/', path: '/' }];
+  let path = under ? home : '';
+  for (const part of folder.slice(under ? home.length : 0).split('/').filter(Boolean)) {
+    path += '/' + part;
+    pills.push({ label: part, path: path });
+  }
+  return pills;
 }
 
 // Why a name cannot be saved as it is, or "exists" when saving it replaces a file; checked against every entry, as a hidden file is replaced all the same.
@@ -97,11 +114,10 @@ export function saveProblem(name, entries) {
   return found ? (found.dir ? 'folder' : 'exists') : '';
 }
 
-// The line that takes the key strip's place: the replace question with its two keys, or why the name was refused.
+// The save footer's one line: the replace question beside Keep and Replace, or why the name was refused.
 export function saveNotice(tag, name) {
   const SAY = { exists: `${name} exists`, empty: 'type a name to save as', slash: 'a name cannot hold /', dots: `${name} is not a file name`, folder: `${name} is a folder` };
-  const keys = tag === 'exists' ? [['↵', 'replace'], ['esc', 'keep']] : [];
-  return { say: SAY[tag] || '', keys: keys.map(([k, w]) => ({ key: k, word: w })) };
+  return SAY[tag] || '';
 }
 
 const TYPED_DROP = klass(CONTROL_SET + BIDI_SET, 'g');
@@ -179,11 +195,8 @@ export function answersMarked(multiple, marked, row) {
   return multiple && !!row && !row.dir && marked.indexOf(row.name) >= 0;
 }
 
-// The line above the key strip: how many files ctrl+Enter opens, or the folder it chooses, which is a path and keeps its case.
-export function footText(mode, n, here) {
-  if (mode === 'folder') return `ctrl+↵ chooses ${here}, the folder you are in`;
-  return n === 0 ? '' : `${n} selected · ctrl+↵ open all`;
-}
+// The footer's count beside Cancel and Open N.
+export const footText = (mode, n) => (mode === 'open' && n > 0 ? `${n} selected` : '');
 
 // "~/Codes/la" is the folder ~/Codes to list and "la" begun in it; a path without / or ~ starts at the folder shown.
 export function splitPath(text, home, folder) {
@@ -215,14 +228,8 @@ export function countText(n, filterName, hidden, mode) {
   return parts.join(' · ');
 }
 
-// Beside the query: how many files are marked, or that a folder request lists folders only.
-export const chipText = (mode, marked) => (mode === 'folder' ? 'folders only' : marked > 0 ? `${marked} marked` : '');
-
 // Above the completions; the folder is a path, so it keeps its case.
 export const completionHead = (n, parent, tail) => `${counted(n, 'folder', 'folders')} in ${parent} ${n === 1 ? 'starts' : 'start'} with ${tail}`;
-
-// The path strip leads with tab and calls the way back the filter.
-export const pathKeys = () => [['tab', 'complete'], ['↵', 'go'], ['ctrl+l', 'filter'], ['esc', '']].map(([k, w]) => ({ key: k, word: w }));
 
 // Prints one JSON array of a folder's entries: names as they are spelt, dotfiles too, a folder with how many visible entries it holds, a file with its guessed mime type for the app's filters. A name that is not UTF-8 would stop the print, so it shows with U+FFFD and is marked undecodable; a dangling link lists as itself, so a save over it still asks.
 export const LIST_SCRIPT = [

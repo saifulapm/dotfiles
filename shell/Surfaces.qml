@@ -169,7 +169,7 @@ PanelWindow {
     }
 
     // The prompts that take the island over the surface in it and hand it back once answered, cancelled or hung up; each loads in the island's surface slot.
-    readonly property var takeovers: [polkit, pinentry, pairing]
+    readonly property var takeovers: [polkit, pinentry, pairing, picker]
     // Their names as they showed, oldest first, and the item each took the keyboard from.
     property var stack: []
     property var focusUnder: ({})
@@ -257,10 +257,10 @@ PanelWindow {
         pinentry.show(request);
     }
 
-    // The Portal service calls this with each file chooser request it shows.
+    // The Portal service calls this with each file chooser request it shows; it takes the island over whatever shows (7E95CSV2).
     function openPicker(request) {
         pickerLoader.active = true;
-        closeOthers(picker);
+        takeOver(picker);
         picker.show(request);
     }
 
@@ -729,19 +729,27 @@ PanelWindow {
         value: host.island?.surface === "goals" && !(host.island?.animating ?? true)
     }
 
+    // The file picker draws inside the island, on the island's fill, over the surface it covers (board 9).
     Loader {
         id: pickerLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.picker
         active: false
         sourceComponent: Root.FilePicker {
-            theme: panelTheme
+            theme: host.theme
             apps: host.apps
+            chip: host.chipFor(name)
+            settled: host.settledOn(name)
+            onShownChanged: if (!shown)
+                host.handBack(host.picker)
         }
     }
 
+    // Once the island has stopped drawing it, the picker unloads 30 s after its last request.
     Root.Tick {
         interval: 30000
-        running: !!host.picker && !host.picker.visible && !host.picker.busy
+        running: !!host.picker && !host.picker.visible && !host.picker.pending
         onTriggered: pickerLoader.active = false
     }
 

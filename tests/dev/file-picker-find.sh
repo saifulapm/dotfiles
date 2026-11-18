@@ -104,7 +104,7 @@ wtype -M ctrl l -m ctrl
 until_ok 2000 state_is '.pathMode'
 wtype "$codes/la"
 until_ok 3000 state_is '(.completions | length) == 3'
-echo "     path: $(pk_state | jq -c '{typed, prompt, match, completionHead, completions, hint, preview: .previewShown}')"
+echo "     path: $(pk_state | jq -c '{typed, prompt, match, completionHead, completions, preview: .previewShown}')"
 check "the completions are the folders starting with la, recent first" state_is '[.completions[].name | gsub("<[^>]*>"; "")] == ["lareys", "lareys-mobile", "laravel-demo"]'
 check "each with la underlined" state_is '.completions[0].name == "<u>la</u>reys"'
 check "the first holds the cursor and the preview hides" state_is '.choice == 0 and .previewShown == false'
@@ -169,7 +169,6 @@ wtype "$codes/la"
 until_ok 3000 state_is '(.completions | length) == 3'
 check "the path mode reads path, no match count, and how many folders start with la ($(pk_state | jq -c '[.prompt, .typed, .match, .completionHead, .count]'))" state_is --arg h "3 folders in $codes start with la" '.prompt == "path" and .match == "" and .completionHead == $h'
 check "the first completion reads lareys, real case" state_is '(.completions[0].name | gsub("<[^>]*>"; "")) == "lareys"'
-check "the keys lead with tab" state_is '.hint == "tab complete · ↵ go · ctrl+l filter · esc"'
 wtype -k Escape
 until_ok 2000 state_is '.pathMode == false'
 cancel words

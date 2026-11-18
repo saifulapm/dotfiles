@@ -50,7 +50,7 @@ check "before any request the picker is not loaded" state_is '.loaded == false'
 
 ask first "$(request "$dl")"
 shown
-echo "     picker: $(pk_state | jq -c '{mode, app, heading, folder, path, count, rows: [.rows[] | [.name, .size, .modified]], places, hint}')"
+echo "     picker: $(pk_state | jq -c '{mode, app, heading, folder, pills, count, rows: [.rows[] | [.name, .size, .modified]], places, buttons: [.buttons[].text]}')"
 check "a request opens the picker in open mode for $app, holding the keyboard" state_is --arg app "$app" '.mode == "open" and .app == $app and .keyboard'
 check "and the card has the keyboard" focus_is Exclusive
 check "the open is timed from the request line to the first frame ($(pk_state | jq -c '[.openMs, .opens]'))" state_is '.openMs > 0 and .opens == 1'
@@ -132,13 +132,13 @@ wtype -k Escape
 until_ok 3000 answered forged
 ask bare "$(request "$dl" '' '')"
 shown
-check "a request with no app reads just Open file ($(pk_state | jq -c .heading))" state_is '.heading == "Open file"'
+check "a request with no app reads just Open files ($(pk_state | jq -c .heading))" state_is '.heading == "Open files"'
 wtype -k Escape
 until_ok 3000 answered bare
 
 ask named "$(request "$dl")"
 shown
-check "the heading reads Open file · $app ($(pk_state | jq -c '[.heading, .hint]'))" state_is --arg h "Open file · $app" '.heading == $h'
+check "the heading reads $app wants to open files ($(pk_state | jq -c .heading))" state_is --arg h "$app wants to open files" '.heading == $h'
 check "IMG_2041.HEIC is drawn in its real case" state_is 'any(.rows[]; .name == "IMG_2041.HEIC")'
 wtype -k Escape
 until_ok 3000 answered named

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { answerLine, answersMarked, appName, chipText, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathKeys, pickerKeys, placeMatches, previewText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, splitPath, stampText, toggleMark } from './picker.mjs';
+import { answerLine, answersMarked, appIcon, appName, completionHead, completions, countText, dateText, footText, headingText, LIST_SCRIPT, markedPaths, matchText, nameText, oneLine, parseBookmarks, parseRequest, nextSort, pathPills, placeMatches, previewText, primaryText, saveNotice, saveProblem, shownRows, SIZE_SCRIPT, SORT_FIRST, sizeText, sortRows, sortText, splitPath, stampText, toggleMark } from './picker.mjs';
 
 test('a request line keeps every field the backend sends', () => {
   const r = parseRequest('{"mode":"open","multiple":false,"title":"Open File","app":"chromium-browser","folder":"/home/s/Downloads","name":"","filters":[{"name":"Images","globs":["*.png"],"mimes":[]}],"filter":0,"accept":""}');
@@ -71,35 +71,47 @@ test('a modified date pads the day, and names the year only when it is another',
   assert.equal(dateText(lastYear, now), '02 Feb 2025');
 });
 
-test('the heading names the app, and stands alone without one', () => {
-  assert.equal(headingText('Chromium'), 'Open file · Chromium');
-  assert.equal(headingText(''), 'Open file');
+test('the heading says what the app wants, and stands alone without one', () => {
+  assert.equal(headingText('Chromium', 'open'), 'Chromium wants to open files');
+  assert.equal(headingText('Chromium', 'open', true), 'Chromium wants to open files');
+  assert.equal(headingText('kak', 'save'), 'kak wants to save a file');
+  assert.equal(headingText('Chromium', 'folder'), 'Chromium wants to choose a folder');
+  assert.equal(headingText('', 'open'), 'Open files');
+  assert.equal(headingText('', 'save'), 'Save a file');
+  assert.equal(headingText('', 'folder'), 'Choose a folder');
 });
 
-test('a save request heads the card Save as', () => {
-  assert.equal(headingText('kak', 'save'), 'Save as · kak');
-  assert.equal(headingText('', 'save'), 'Save as');
+test('the inverted button opens the marked count, saves, or chooses the folder', () => {
+  assert.equal(primaryText('open', 0), 'Open');
+  assert.equal(primaryText('open', 3), 'Open 3');
+  assert.equal(primaryText('save', 0), 'Save');
+  assert.equal(primaryText('folder', 0), 'Choose this folder');
 });
 
-const strip = (keys) => keys.map((k) => (k.key + ' ' + k.word).trim()).join(' · ');
-
-test('the key strip spells each key out', () => {
-  assert.equal(strip(pickerKeys()), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
+test('the sort on the right of the path names the order and its direction', () => {
+  assert.equal(sortText('modified'), 'Date ↓');
+  assert.equal(sortText('name'), 'Name ↑');
+  assert.equal(sortText('size'), 'Size ↓');
 });
 
-test('a several-files strip selects with ctrl+space', () => {
-  assert.equal(strip(pickerKeys('open', true)), '↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: date · esc');
-});
-
-test('the heading chip counts the marked files, or says a folder request lists folders only', () => {
-  assert.equal(chipText('open', 3), '3 marked');
-  assert.equal(chipText('open', 0), '');
-  assert.equal(chipText('folder', 0), 'folders only');
-  assert.equal(chipText('save', 0), '');
-});
-
-test('the save strip saves and selects nothing', () => {
-  assert.equal(strip(pickerKeys('save')), '↵ save · tab places · ctrl+l path · ctrl+h hidden · ctrl+, sort: date · esc');
+test('the path is a pill per folder from ~, or from / outside Home', () => {
+  assert.deepEqual(pathPills('/home/s/Downloads/screenshots', '/home/s'), [
+    { label: '~', path: '/home/s' },
+    { label: 'Downloads', path: '/home/s/Downloads' },
+    { label: 'screenshots', path: '/home/s/Downloads/screenshots' },
+  ]);
+  assert.deepEqual(pathPills('/home/s', '/home/s'), [{ label: '~', path: '/home/s' }]);
+  assert.deepEqual(pathPills('/usr/share', '/home/s'), [
+    { label: '/', path: '/' },
+    { label: 'usr', path: '/usr' },
+    { label: 'share', path: '/usr/share' },
+  ]);
+  assert.deepEqual(pathPills('/', '/home/s'), [{ label: '/', path: '/' }]);
+  assert.deepEqual(pathPills('/home/sam', '/home/s'), [
+    { label: '/', path: '/' },
+    { label: 'home', path: '/home' },
+    { label: 'sam', path: '/home/sam' },
+  ]);
 });
 
 test('a name to save is refused when empty, a path, a dot name or a folder, and asked about when it exists', () => {
@@ -114,16 +126,12 @@ test('a name to save is refused when empty, a path, a dot name or a folder, and 
   assert.equal(saveProblem('drafts', entries), 'folder');
 });
 
-test('the save notice replaces the strip; the name keeps its case', () => {
-  const said = (tag, name) => {
-    const n = saveNotice(tag, name);
-    return [n.say].concat(n.keys.map((k) => (k.key + ' ' + k.word).trim())).join(' · ');
-  };
-  assert.equal(said('exists', 'Report.pdf'), 'Report.pdf exists · ↵ replace · esc keep');
-  assert.equal(said('empty', ''), 'type a name to save as');
-  assert.equal(said('slash', 'a/b'), 'a name cannot hold /');
-  assert.equal(said('dots', '..'), '.. is not a file name');
-  assert.equal(said('folder', 'drafts'), 'drafts is a folder');
+test('the save line asks about a name that exists or says why one is refused; the name keeps its case', () => {
+  assert.equal(saveNotice('exists', 'Report.pdf'), 'Report.pdf exists');
+  assert.equal(saveNotice('empty', ''), 'type a name to save as');
+  assert.equal(saveNotice('slash', 'a/b'), 'a name cannot hold /');
+  assert.equal(saveNotice('dots', '..'), '.. is not a file name');
+  assert.equal(saveNotice('folder', 'drafts'), 'drafts is a folder');
 });
 
 test('a typed name loses controls and bidi marks and keeps its spaces', () => {
@@ -143,6 +151,13 @@ test('an app id is named by its desktop entry, else by the id itself', () => {
   assert.equal(appName(apps, 'Chromium-Browser'), 'Chromium Web Browser');
   assert.equal(appName(apps, 'org.example.Unknown'), 'org.example.Unknown');
   assert.equal(appName(apps, ''), '');
+});
+
+test("the app's circle draws its desktop entry's icon, else none", () => {
+  const apps = [{ id: 'chromium', name: 'Chromium', icon: '/usr/share/icons/chromium.png' }];
+  assert.equal(appIcon(apps, 'Chromium'), '/usr/share/icons/chromium.png');
+  assert.equal(appIcon(apps, 'kak'), '');
+  assert.equal(appIcon(apps, ''), '');
 });
 
 test('GTK bookmarks become pins: the URI decoded, the label or else the folder name', () => {
@@ -193,15 +208,12 @@ test('by date the newest comes first and by size the largest, folders still on t
   assert.deepEqual(sortRows(rows, 'name').map((r) => r.name), ['Archive', 'Recent', 'mid.pdf', 'new.pdf', 'old.pdf']);
 });
 
-test('ctrl+, cycles date, name and size, a folders-only list skipping size, and the strip names the one in use', () => {
+test('ctrl+, cycles date, name and size, a folders-only list skipping size', () => {
   assert.equal(SORT_FIRST, 'modified');
   assert.equal(nextSort('modified'), 'name');
   assert.equal(nextSort('name'), 'size');
   assert.equal(nextSort('size'), 'modified');
   assert.equal(nextSort('name', true), 'modified');
-  const word = (k) => k.find((p) => p.key.indexOf(',') >= 0).word;
-  assert.equal(word(pickerKeys('open', false, 'size')), 'sort: size');
-  assert.equal(word(pickerKeys('save', false, 'name')), 'sort: name');
 });
 
 test('the rows shown follow the sort asked for', () => {
@@ -275,10 +287,6 @@ test('the completions heading says how many folders start with the tail', () => 
   assert.equal(completionHead(1, '~/Codes', 'la'), '1 folder in ~/Codes starts with la');
 });
 
-test('the path mode key strip leads with tab', () => {
-  assert.equal(strip(pathKeys()), 'tab complete · ↵ go · ctrl+l filter · esc');
-});
-
 test("the preview's meta lines are bare values, and the extension is a badge", () => {
   const heic = { name: 'IMG_2041.HEIC', dir: false, size: 2800000, mime: 'image/heic', mtime: new Date(2026, 9, 18, 14, 7).getTime() };
   assert.deepEqual(previewText(heic, 4032, 3024), { badge: 'HEIC', lines: ['4032 × 3024 px', '2.8 MB', '18 Oct 2026, 14:07'] });
@@ -290,16 +298,6 @@ test("the preview's meta lines are bare values, and the extension is a badge", (
 
 test('the full date has a comma before the time', () => {
   assert.equal(stampText(new Date(2026, 9, 14, 16, 41).getTime()), '14 Oct 2026, 16:41');
-});
-
-test('an app that allows several files heads the card Open files, and a folder request Choose folder', () => {
-  assert.equal(headingText('Chromium', 'open', true), 'Open files · Chromium');
-  assert.equal(headingText('Chromium', 'folder'), 'Choose folder · Chromium');
-  assert.equal(headingText('', 'folder'), 'Choose folder');
-});
-
-test('the folder strip enters with Enter and chooses with ctrl+Enter', () => {
-  assert.equal(strip(pickerKeys('folder')), '↵ enter folder · ctrl+↵ choose this folder · ctrl+, sort: date · esc');
 });
 
 test('a folder request lists only folders, dot folders when shown', () => {
@@ -334,10 +332,12 @@ test('Enter on a marked file in a multi-file picker answers every marked file', 
   assert.equal(answersMarked(true, ['a.png'], null), false);
 });
 
-test('the footer line: how many are marked, or the folder ctrl+Enter chooses', () => {
-  assert.equal(footText('open', 3, '~/Downloads'), '3 selected · ctrl+↵ open all');
-  assert.equal(footText('open', 0, '~/Downloads'), '');
-  assert.equal(footText('folder', 0, '~/Codes'), 'ctrl+↵ chooses ~/Codes, the folder you are in');
+test('the footer counts the marked files, and says nothing while none is', () => {
+  assert.equal(footText('open', 3), '3 selected');
+  assert.equal(footText('open', 1), '1 selected');
+  assert.equal(footText('open', 0), '');
+  assert.equal(footText('folder', 0), '');
+  assert.equal(footText('save', 0), '');
 });
 
 // Only the header bytes each format keeps its size in; the rest of a fixture is filler.

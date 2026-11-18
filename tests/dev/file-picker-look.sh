@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The picker as its board draws it: the preview's meta lines with the size read from the image's header, the heading chips, the folder and save path rows, the several-files key strip, and a heading that never pushes the query out of the card.
+# The picker as board 9 draws it: 44 px rows, the preview's meta lines with the size read from the image's header, the footer's count and Open N, folders in the accent and bold, the save path row, no key strip, and a heading that never pushes the query out of the picker.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -23,17 +23,6 @@ for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do truncate -s 2800000 "$loo
 
 pk_state() { timeout 0.5 dots-call picker state 2>/dev/null; }
 state_is() { pk_state | jq -e "$@" >/dev/null 2>&1; }
-# Exits 0 when the screen holds a pixel within $4 of $1 $2 $3.
-on_screen() {
-  grim -s 1 -t ppm - | node -e '
-    const [r, g, b, tol] = process.argv.slice(1).map(Number);
-    const buf = require("fs").readFileSync(0);
-    const head = buf.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/);
-    const px = buf.subarray(head[0].length);
-    for (let i = 0; i < head[1] * head[2] * 3; i += 3) if (Math.abs(px[i] - r) <= tol && Math.abs(px[i + 1] - g) <= tol && Math.abs(px[i + 2] - b) <= tol) process.exit(0);
-    process.exit(1);
-  ' "$@"
-}
 request() { jq -cn --arg mode "$1" --arg folder "$2" --argjson multiple "${3-false}" --arg app "${4-chromium-browser}" '{mode: $mode, multiple: $multiple, title: "", app: $app, folder: $folder, name: (if $mode == "save" then "report.pdf" else "" end), filters: [], filter: 0, accept: ""}'; }
 ask() {
   rm -f "$out/$1"
@@ -56,6 +45,24 @@ cursor_to() {
   return 1
 }
 mark() { wtype -M ctrl -k space -m ctrl; }
+# The colour on screen 3 px into row $1 at its middle, as "r g b".
+row_px() {
+  local b
+  b=$(timeout 0.5 qs ipc call shell box "picker-row:$1") && [ "$b" != null ] || return 1
+  grim -s 1 -g "$(jq -r '"\((.x + 3) | floor),\((.y + .h / 2) | floor) 1x1"' <<<"$b")" -t ppm - | tail -c 3 | od -An -tu1 | xargs
+}
+# The cursor row reads lighter on screen than a row off it, and the row off it is the island's fill ($1, as #rrggbb).
+cursor_lit() {
+  local on off fill
+  on=$(row_px "$2") && off=$(row_px "$3") || return 1
+  fill=$(printf '%d %d %d' "0x${1:1:2}" "0x${1:3:2}" "0x${1:5:2}")
+  echo "     cursor $on, off $off, fill $fill"
+  node -e '
+    const [on, off, fill] = process.argv.slice(1).map((s) => s.split(" ").map(Number));
+    const sum = (c) => c[0] + c[1] + c[2];
+    process.exit(sum(on) > sum(off) + 30 && off.every((v, i) => Math.abs(v - fill[i]) <= 4) ? 0 : 1);
+  ' "$on" "$off" "$fill"
+}
 preview_of() { pk_state | jq -c '{previewName, preview, previewBadge, previewLines}'; }
 # Every drawn box lies inside the card.
 inside='. as $s | [.boxes[] | select(. != null)] | all(.x >= 0 and .y >= 0 and .x + .width <= $s.cardSize[0] + 0.5 and .y + .height <= $s.cardSize[1] + 0.5)'
@@ -75,7 +82,10 @@ long=$(printf 'chrome-%0193d' 0)
 ask preview "$(request open "$look/shots")"
 shown
 cursor_to Photo.jpg
-check "the cursor row's accent veil reads on screen over the card's paper" on_screen 203 208 230 4
+check "a row is 44 px ($(pk_state | jq -c '.rows[.selected].h'))" state_is '.rows[.selected].h == 44'
+cur=$(pk_state | jq .selected)
+fill=$(pk_state | jq -r --argjson c "$cur" '.rows[(($c + 1) % (.rows | length))].behind')
+check "on screen the cursor row is filled lighter than a row off it, which is the island's fill" cursor_lit "$fill" "$cur" "$(((cur + 1) % $(pk_state | jq '.rows | length')))"
 check "a 640 x 480 JPEG draws 640 × 480 px ($(until_ok 3000 state_is '.previewDims != ""'; preview_of))" state_is '.previewDims == "640 × 480 px" and .previewName == "Photo.jpg"'
 cursor_to Report.pdf
 check "a PDF draws no dimensions line and no picture ($(until_ok 2000 state_is '.previewName == "Report.pdf"'; preview_of))" until_ok 2000 state_is '.previewName == "Report.pdf" and .preview == false and .previewDims == "" and .previewLines[0:1] == ["184 KB"] and (.previewLines | length) == 2'
@@ -92,22 +102,22 @@ wtype -k Escape
 until_ok 3000 answered preview
 ask multi "$(request open "$look/shots" true)"
 shown
-check "a several-files request keys the strip as typed ($(pk_state | jq -c .hint))" state_is '.hint == "↵ open · tab places · ctrl+l path · ctrl+h hidden · ctrl+space select · ctrl+, sort: name · esc"'
-check "and no chip while nothing is marked" state_is '.chip == ""'
+check "a several-files request draws no key strip, and Open with no count while nothing is marked ($(pk_state | jq -c '[.foot, [.buttons[].text]]'))" state_is '.foot == "" and [.buttons[].text] == ["Cancel", "Open"] and has("hint") == false'
 for n in IMG_2039.HEIC IMG_2040.HEIC IMG_2041.HEIC; do
   cursor_to "$n"
   mark
 done
-check "three marked files chip the heading 3 marked ($(pk_state | jq -c '[.chip, .marked]'))" until_ok 1000 state_is '.chip == "3 marked"'
+check "three marked files read 3 selected and Open 3 ($(pk_state | jq -c '[.foot, .marked, [.buttons[].text]]'))" until_ok 1000 state_is '.foot == "3 selected" and .buttons[1].text == "Open 3"'
 # IMG_2039 is marked and off the cursor, Photo.jpg is an unmarked file.
 check "a marked row off the cursor draws its name at contrast 4.5 or more ($(row_look IMG_2039.HEIC))" ratio_at_least 4.5 IMG_2039.HEIC
 check "a marked file draws ✓ and an unmarked one nothing ($(row_look IMG_2039.HEIC) $(row_look Photo.jpg))" state_is '(.rows[] | select(.name == "IMG_2039.HEIC") | .mark) == "✓" and (.rows[] | select(.name == "Photo.jpg") | .mark) == ""'
 cancel multi
 
-# A folder request: its chip, the path row's count and the Items head.
+# A folder request: the path row's count, and each folder's icon in the accent beside its name in bold.
 ask folder "$(request folder "$look/pick")"
 shown
-check "a folder request chips the heading folders only, counts 2 folders, heads Name ↑, Items, Modified ($(pk_state | jq -c '[.chip, .count, .heads]'))" state_is '.chip == "folders only" and .count == "2 folders · files hidden" and .heads == ["Name ↑", "Items", "Modified"]'
+check "a folder request counts 2 folders and sorts Name ↑ ($(pk_state | jq -c '[.count, .sortText]'))" state_is '.count == "2 folders · files hidden" and .sortText == "Name ↑"'
+check "a folder row draws its icon in the accent and its name bold ($(pk_state | jq -c '[.accent, (.rows[0] | [.icon, .bold])]'))" state_is '(.rows[0].icon | ascii_downcase) == (.accent | ascii_downcase) and .rows[0].bold'
 cancel folder
 
 # Save: the path row's count.

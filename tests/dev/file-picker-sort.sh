@@ -34,7 +34,7 @@ ask first "$(request open "$dir")"
 shown
 check "a request opens on date, newest first, folders on top ($(names))" \
   state_is '.sort == "modified" and [.rows[].name] == ["z-dir/", "y-dir/", "b-new.txt", "c-mid.txt", "a-old.txt"]'
-check "and the strip says so ($(pk_state | jq -c .hint))" state_is '.hint | contains("ctrl+, sort: date")'
+check "and the sort right of the path says so ($(pk_state | jq -c .sortText))" state_is '.sortText == "Date ↓"'
 wtype -k Down -k Down -k Down
 until_ok 1000 state_is '.rows[.selected].name == "c-mid.txt"'
 sort_key
@@ -70,10 +70,10 @@ until_ok 3000 answered folder
 
 ask arrow "$(request open "$dir")"
 shown
-check "the head arrows Modified while the rows sort by date ($(pk_state | jq -c .heads))" state_is '.heads == ["Name", "Size", "Modified ↓"]'
+check "the sort reads Date ↓ while the rows sort by date ($(pk_state | jq -c .sortText))" state_is '.sortText == "Date ↓"'
 sort_key
 until_ok 1000 state_is '.sort == "name"'
-check "and Name once they sort by name ($(pk_state | jq -c .heads))" state_is '.heads == ["Name ↑", "Size", "Modified"]'
+check "and Name ↑ once they sort by name ($(pk_state | jq -c .sortText))" state_is '.sortText == "Name ↑"'
 wtype -k Escape
 until_ok 3000 answered arrow
 

@@ -53,7 +53,7 @@ for i in 1 2 3 4 5; do
   shown
   check "run $i: a folder with a name that is not UTF-8 lists the rest ($(pk_state | jq -c '[.rows[].name]'))" state_is '[.rows[].name] == ["caf�.txt", "ok.txt", "report.pdf"]'
   wtype -k Return
-  check "run $i: and a save of report.pdf there asks ($(pk_state | jq -c '[.folder, .question, .hint]'))" until_ok 2000 state_is '.question'
+  check "run $i: and a save of report.pdf there asks ($(pk_state | jq -c '[.folder, .question, .line]'))" until_ok 2000 state_is '.question'
   check "run $i: and does not answer" unanswered "odd-$i"
   wtype -k Escape
   until_ok 2000 state_is '.question | not'

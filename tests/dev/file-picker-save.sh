@@ -36,7 +36,7 @@ erase() { local i; for i in $(seq 1 12); do wtype -k BackSpace; done; }
 
 ask save "$(request "$fresh")"
 shown
-echo "     save: $(pk_state | jq -c '{mode, heading, name, focus, question, hint, rows: [.rows[] | [.name, .tag]], selected}')"
+echo "     save: $(pk_state | jq -c '{mode, heading, name, focus, question, line, rows: [.rows[] | [.name, .tag]], selected}')"
 check "a save request opens in save mode with report.pdf in the name field" state_is '.mode == "save" and .name == "report.pdf" and .focus == "name"'
 wtype -k Return
 until_ok 3000 answered save
@@ -56,7 +56,7 @@ shown
 check "the file already there holds the cursor and reads exists ($(pk_state | jq -c '[.rows[.selected].name, .rows[.selected].tag]'))" state_is '.rows[.selected].name == "report.pdf" and (.rows[.selected].tag | test("exists"; "i"))'
 wtype -k Return
 until_ok 2000 state_is '.question'
-check "Enter on a name that exists asks first ($(pk_state | jq -c '[.question, .hint]'))" state_is '.question and (.hint | test("report.pdf exists"; "i"))'
+check "Enter on a name that exists asks first ($(pk_state | jq -c '[.question, .line]'))" state_is '.question and (.line | test("report.pdf exists"; "i"))'
 check "and does not answer" unanswered replace
 wtype -k Escape
 check "Esc keeps the file and returns to the name field" until_ok 2000 state_is '.open and (.question | not) and .focus == "name" and .name == "report.pdf"'
@@ -72,12 +72,12 @@ shown
 erase
 until_ok 2000 state_is '.name == ""'
 wtype -k Return
-check "an empty name does not answer ($(pk_state | jq -c .hint))" unanswered refuse
+check "an empty name does not answer ($(pk_state | jq -c .line))" unanswered refuse
 check "and says why" state_is '.open and .notice == "empty"'
 wtype "a/b.txt"
 until_ok 2000 state_is '.name == "a/b.txt"'
 wtype -k Return
-check "a name with / does not answer ($(pk_state | jq -c .hint))" unanswered refuse
+check "a name with / does not answer ($(pk_state | jq -c .line))" unanswered refuse
 check "and says why" state_is '.open and .notice == "slash"'
 wtype -k Escape
 until_ok 3000 answered refuse
@@ -100,10 +100,10 @@ done
 # The heading and the question; the file's name keeps its case.
 ask words "$(request "$docs")"
 shown
-check "the heading reads Save as · $app and the field report.pdf ($(pk_state | jq -c '[.heading, .name]'))" state_is --arg h "Save as · $app" '.heading == $h and .name == "report.pdf"'
+check "the heading reads $app wants to save a file and the field report.pdf ($(pk_state | jq -c '[.heading, .name]'))" state_is --arg h "$app wants to save a file" '.heading == $h and .name == "report.pdf"'
 wtype -k Return
 until_ok 2000 state_is '.question'
-check "the question reads report.pdf exists · ↵ replace · esc keep ($(pk_state | jq -c .hint))" state_is '.hint == "report.pdf exists · ↵ replace · esc keep"'
+check "the question reads report.pdf exists beside Keep and Replace ($(pk_state | jq -c '[.line, [.buttons[].text]]'))" state_is '.line == "report.pdf exists" and [.buttons[].text] == ["Keep", "Replace"]'
 wtype -k Escape
 until_ok 2000 state_is '.question | not'
 wtype -k Escape
