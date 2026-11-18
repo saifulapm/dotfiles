@@ -182,3 +182,22 @@ test("the service treats exit 69 and 75 as success", () => {
   const unit = readFileSync(resolve(import.meta.dirname, "../../home/dot_config/systemd/user/mail-sync.service"), "utf8");
   assert.match(unit, /^SuccessExitStatus=69 75$/m);
 });
+
+test("a file the push after a folder move renames is indexed under its new name", (t) => {
+  const r = mailRig(t);
+  r.deliver({});
+  const inbox = join(r.mail, "icloud/INBOX");
+  // A copy of mail-sync beside a fake folder sync, which it finds next to itself.
+  const dir = join(r.M, "sync-bin");
+  mkdirSync(dir);
+  const copy = join(dir, "mail-sync");
+  writeFileSync(copy, readFileSync(script), { mode: 0o755 });
+  fake(dir, "hey-folder-sync", `mv "${inbox}/new/0.eml" "${inbox}/cur/0.eml:2,"\necho "1 0"`);
+  fake(dir, "kak-mail", "exit 0");
+  // The second mbsync is the push, which uploads the moved file and adds its UID to the name.
+  const runs = join(r.M, "mbsync-runs");
+  fake(join(r.M, "bin"), "mbsync", `echo run >>"${runs}"\n[ "$(wc -l <"${runs}")" -eq 2 ] && mv "${inbox}/cur/0.eml:2," "${inbox}/cur/0.eml,U=7:2,"\nexit 0`);
+  const result = spawnSync(copy, ["--quiet"], { env: r.env, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(r.notmuch("search", "--output=files", "id:m0@x.test").trim(), `${inbox}/cur/0.eml,U=7:2,`);
+});

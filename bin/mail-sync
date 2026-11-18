@@ -91,6 +91,8 @@ if [ -x "$FOLDER_SYNC" ]; then
     if [ $((moved + created)) -gt 0 ]; then
         mbsync -c "$HOME/.mbsyncrc" icloud >>"$LOG" 2>&1 \
             || log "mbsync push after folder sync exited nonzero — retried next sync"
+        # The push adds each uploaded file's UID to its name, so notmuch must learn the names again or it opens files that are gone.
+        notmuch new --quiet >>"$LOG" 2>&1 || log "reindex after push failed"
     fi
 fi
 
