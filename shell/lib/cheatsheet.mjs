@@ -123,6 +123,8 @@ export const IN_SURFACES = [
   ['chat', '⇧ ↵', 'New Line'],
   ['chat', 'Tab', 'Go to the Replies, the History or Back'],
   ['chat', '⌃ N', 'New Chat'],
+  ['chat', '⌃ O', 'Attach a File'],
+  ['chat', '⌫', 'Remove the Last Attachment'],
   ['chat', 'Y', 'Copy the Block'],
   ['chat', '⇧ Y', 'Copy the Whole Reply'],
   ['chat', 'R', 'Retry a Failed Message'],

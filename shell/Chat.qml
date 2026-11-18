@@ -7,6 +7,7 @@ import "lib/island-tones.mjs" as T
 import "lib/chat.mjs" as C
 import "lib/chat-tools.mjs" as M
 import "lib/chat-history.mjs" as H
+import "lib/chat-files.mjs" as F
 
 // The AI chat inside the island, as board 6 draws it: Saiful's messages in a bubble, replies streamed from pxy as Markdown blocks, each closed block drawn once and kept.
 Item {
@@ -86,6 +87,12 @@ Item {
     property int historyPick: 0
     // Where each conversation is kept, one JSON file each.
     readonly property string store: (Quickshell.env("XDG_DATA_HOME") || Quickshell.env("HOME") + "/.local/share") + "/dots/chat"
+    // The files and images waiting above the field for the next message, each {name, size, kind} with its text or its data URL.
+    property var attachments: []
+    // The line that refused the last file over its limit, else empty.
+    property string refusal: ""
+    // Paths the picker chose that are still to be measured and read, one at a time.
+    property var toRead: []
 
     function open(t0) {
         openT0 = t0;
@@ -117,7 +124,12 @@ Item {
             conversation = Date.now();
             title = text.split("\n")[0].slice(0, 60);
         }
-        messages = messages.concat([{ role: "user", content: text }]);
+        const message = { role: "user", content: text };
+        if (attachments.length)
+            message.attachments = attachments;
+        attachments = [];
+        refusal = "";
+        messages = messages.concat([message]);
         rows.append({ kind: "user", bkind: "", lang: "", html: "", text: text });
         spent = 0;
         ask();
@@ -153,7 +165,101 @@ Item {
         req.open("POST", url);
         req.setRequestHeader("Authorization", "Bearer pxy-local");
         req.setRequestHeader("Content-Type", "application/json");
-        req.send(JSON.stringify({ model: alias, stream: true, messages: messages, tools: M.TOOLS }));
+        // Attachments go on the wire only inside their message's content, and only the turn whose message has an image asks the vision model.
+        const wire = messages.map(m => m.attachments ? { role: m.role, content: F.content(m.content, m.attachments) } : m);
+        const users = messages.filter(m => m.role === "user");
+        const asked = F.modelFor(alias, users.length ? users[users.length - 1].attachments : []);
+        req.send(JSON.stringify({ model: asked, stream: true, messages: wire, tools: M.TOOLS }));
+    }
+
+    function pickFiles() {
+        if (attachPicker.connected)
+            return;
+        refusal = "";
+        attachPicker.connected = true;
+    }
+
+    // Each picked file is measured first, so one over its limit is refused without being read.
+    function readNext() {
+        if (toRead.length === 0 || sizer.running || fileLoader.running)
+            return;
+        const path = toRead[0];
+        toRead = toRead.slice(1);
+        const name = path.split("/").pop();
+        sizer.job = { path: path, name: name, kind: F.isImage(name) ? "image" : "text" };
+        sizer.command = ["stat", "-c", "%s", "--", path];
+        sizer.running = true;
+    }
+
+    function measured(code) {
+        const job = sizer.job;
+        job.size = Number(sizeOut.text.trim());
+        const line = code === 0 ? F.check(job) : job.name + " could not be read";
+        if (line) {
+            refusal = line;
+            Qt.callLater(chat.readNext);
+            return;
+        }
+        fileLoader.job = job;
+        fileLoader.command = job.kind === "image" ? ["base64", "-w0", "--", job.path] : ["cat", "--", job.path];
+        fileLoader.running = true;
+    }
+
+    function loaded(code) {
+        const job = fileLoader.job;
+        if (code === 0) {
+            const a = { name: job.name, size: job.size, kind: job.kind };
+            if (job.kind === "image")
+                a.data = "data:" + mimeOf(job.name) + ";base64," + fileOut.text.trim();
+            else
+                a.text = fileOut.text;
+            attachments = attachments.concat([a]);
+        }
+        Qt.callLater(chat.readNext);
+    }
+
+    function mimeOf(name) {
+        const ext = name.split(".").pop().toLowerCase();
+        return "image/" + (ext === "jpg" ? "jpeg" : ext);
+    }
+
+    // Ctrl+V takes an image off the clipboard when it holds one, else the field pastes its text as before.
+    function paste() {
+        if (clipTypes.running || clipImage.running)
+            return;
+        refusal = "";
+        clipTypes.running = true;
+    }
+
+    function typesRead(code) {
+        const types = code === 0 ? clipTypesOut.text.split("\n").map(t => t.trim()) : [];
+        const type = types.indexOf("image/png") >= 0 ? "image/png" : types.find(t => t.startsWith("image/"));
+        if (!type) {
+            field.paste();
+            return;
+        }
+        clipImage.mime = type;
+        clipImage.command = ["sh", "-c", 'wl-paste -t "$1" | base64 -w0', "sh", type];
+        clipImage.running = true;
+    }
+
+    function imagePasted(code) {
+        const b64 = clipImageOut.text.trim();
+        if (code !== 0 || b64 === "")
+            return;
+        const size = Math.floor(b64.length * 3 / 4) - (b64.endsWith("==") ? 2 : b64.endsWith("=") ? 1 : 0);
+        const a = { name: "pasted." + clipImage.mime.split("/")[1], size: size, kind: "image" };
+        const line = F.check(a);
+        if (line) {
+            refusal = line;
+            return;
+        }
+        a.data = "data:" + clipImage.mime + ";base64," + b64;
+        attachments = attachments.concat([a]);
+    }
+
+    function removeAttachment(at) {
+        attachments = attachments.filter((a, i) => i !== at);
     }
 
     function read(req) {
@@ -483,6 +589,9 @@ Item {
             model: model,
             blocks: replyBlocks,
             tools: tools,
+            attachments: attachments.map(a => ({ name: a.name, size: a.size, kind: a.kind })),
+            pill: F.pillText(alias, attachments),
+            refusal: refusal,
             error: error,
             rows: rows.count,
             input: field.text,
@@ -637,6 +746,69 @@ Item {
         onExited: code => chat.answer(callId, M.cut(code === 0 ? memOut.text : memErr.text))
     }
 
+    // The shell's own file picker, asked over its socket as the island's attach asks it: one request line, one answer line.
+    Socket {
+        id: attachPicker
+        path: Quickshell.env("XDG_RUNTIME_DIR") + "/dots-picker-" + Quickshell.env("WAYLAND_DISPLAY") + ".sock"
+        onConnectedChanged: {
+            if (connected) {
+                write(JSON.stringify({ mode: "open", multiple: true, title: "Attach to the message", app: "", folder: Quickshell.env("HOME"), name: "", filters: [], filter: 0, accept: "" }) + "\n");
+                flush();
+            }
+        }
+        parser: SplitParser {
+            onRead: data => {
+                let r = null;
+                try {
+                    r = JSON.parse(data);
+                } catch (e) {}
+                if (r?.response === 0 && Array.isArray(r.paths)) {
+                    chat.toRead = chat.toRead.concat(r.paths);
+                    Qt.callLater(chat.readNext);
+                }
+                attachPicker.connected = false;
+            }
+        }
+    }
+
+    // Paths go to stat, cat and base64 as argv, and what a file holds comes back only on stdout.
+    Process {
+        id: sizer
+        property var job: null
+        stdout: StdioCollector {
+            id: sizeOut
+        }
+        onExited: code => chat.measured(code)
+    }
+
+    Process {
+        id: fileLoader
+        property var job: null
+        stdout: StdioCollector {
+            id: fileOut
+        }
+        onExited: code => chat.loaded(code)
+    }
+
+    Process {
+        id: clipTypes
+        command: ["wl-paste", "--list-types"]
+        stdout: StdioCollector {
+            id: clipTypesOut
+        }
+        onExited: code => chat.typesRead(code)
+    }
+
+    // The script is fixed and the type is its one argument, so the image's bytes only ever pass through the pipe.
+    Process {
+        id: clipImage
+        property string mime: ""
+        stdout: StdioCollector {
+            id: clipImageOut
+        }
+        onExited: code => chat.imagePasted(code)
+    }
+
     // The island draws the fill and plays the open; this is the content.
     Item {
         id: card
@@ -696,7 +868,7 @@ Item {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             textFormat: Text.PlainText
-                            text: chat.alias
+                            text: F.pillText(chat.alias, chat.attachments)
                             color: chat.on
                             font.family: chat.fonts.ui ?? ""
                             font.pixelSize: 12
@@ -925,6 +1097,79 @@ Item {
                 }
             }
 
+            // The attachments waiting for the next message, each with its remove button; an image shows a thumbnail.
+            Flow {
+                visible: chat.attachments.length > 0
+                width: column.width
+                spacing: 6
+
+                Repeater {
+                    model: chat.attachments
+
+                    Rectangle {
+                        required property var modelData
+                        required property int index
+                        width: chipLine.implicitWidth + 20
+                        height: 32
+                        radius: 16
+                        color: chat.tile
+
+                        Row {
+                            id: chipLine
+                            x: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 6
+
+                            Image {
+                                visible: parent.parent.modelData.kind === "image"
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 22
+                                height: 22
+                                source: visible ? parent.parent.modelData.data : ""
+                                sourceSize.width: 44
+                                sourceSize.height: 44
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+
+                            Text {
+                                visible: parent.parent.modelData.kind !== "image"
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF0219)
+                                color: chat.tones.muted
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 14
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: F.chipText(parent.parent.modelData)
+                                color: chat.on
+                                font.family: chat.fonts.ui ?? ""
+                                font.pixelSize: 12
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF0156)
+                                color: chat.tones.muted
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 14
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -4
+                                    onClicked: chat.removeAttachment(chipLine.parent.index)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // The paperclip, the field, and the round send button that turns into stop while a reply streams.
             Rectangle {
                 width: column.width
@@ -941,6 +1186,12 @@ Item {
                     color: chat.tones.muted
                     font.family: "Symbols Nerd Font Mono"
                     font.pixelSize: 18
+
+                    MouseArea {
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        onClicked: chat.pickFiles()
+                    }
                 }
 
                 TextEdit {
@@ -966,6 +1217,12 @@ Item {
                             chat.focusReplies();
                         else if (ctrl && event.key === Qt.Key_N)
                             chat.newChat();
+                        else if (ctrl && event.key === Qt.Key_O)
+                            chat.pickFiles();
+                        else if (ctrl && event.key === Qt.Key_V)
+                            chat.paste();
+                        else if (event.key === Qt.Key_Backspace && field.text === "" && chat.attachments.length)
+                            chat.removeAttachment(chat.attachments.length - 1);
                         else if (event.key === Qt.Key_Escape)
                             chat.close();
                         else
@@ -1006,6 +1263,17 @@ Item {
                         onTapped: chat.streaming ? chat.stop() : chat.send()
                     }
                 }
+            }
+
+            Text {
+                visible: chat.refusal !== ""
+                width: column.width
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                text: chat.refusal
+                color: chat.tones.danger
+                font.family: chat.fonts.ui ?? ""
+                font.pixelSize: 12
             }
         }
     }

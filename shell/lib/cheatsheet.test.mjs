@@ -167,6 +167,8 @@ const CODE = {
   '⇧ D': [/ShiftModifier/, /Key_D\b/],
   '⇧ Y': [/ShiftModifier/, /Key_Y\b/],
   '⌃ N': [/ControlModifier/, /Key_N\b/],
+  '⌃ O': [/ControlModifier/, /Key_O\b/],
+  '⌫': [/Key_Backspace\b/],
   '⇧ O': [/Key_O\b/, /"O"/],
   'w␣': [/'w '/],
   'v␣': [/'v '/],
@@ -230,7 +232,7 @@ test('none of the island\'s tools draws a key strip or a key hint', () => {
 
 test('IN SURFACES lists the chat\'s keys under Chat', () => {
   const keys = IN_SURFACES.filter((r) => r.surface === 'chat').map((r) => r.key);
-  assert.deepEqual(keys, ['↵', '⇧ ↵', 'Tab', '⌃ N', 'Y', '⇧ Y', 'R', 'M']);
+  assert.deepEqual(keys, ['↵', '⇧ ↵', 'Tab', '⌃ N', '⌃ O', '⌫', 'Y', '⇧ Y', 'R', 'M']);
 });
 
 test('IN SURFACES lists Control\'s - and = under Control', () => {
