@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { schemeTokens } from './colorscheme-file.mjs';
-import { parseStatus, offlineText, stateText, tailscaleKeys, toggleFailedText, tailscaleLook } from './tailscale.mjs';
+import { parseStatus, offlineText, stateText, toggleFailedText, rowLine } from './tailscale.mjs';
 
 const recorded = readFileSync(new URL('../../dev/tailscale-status.json', import.meta.url), 'utf8');
 // 2026-10-21 08:00 UTC: fedora was last seen 55 days before, the old Mac mini 42.
@@ -20,8 +19,8 @@ test('the recorded status gives this device and five machines, three online', ()
       ['iphone', '100.95.3.21', true, ''],
       ['mini', '100.72.40.9', true, ''],
       ['nuc', '100.88.14.3', true, ''],
-      ['saifuls-mac-mini', '', false, '42d'],
-      ['fedora', '', false, '55d'],
+      ['saifuls-mac-mini', '', false, '42 d'],
+      ['fedora', '', false, '55 d'],
     ],
   );
 });
@@ -42,9 +41,9 @@ test('a phone is marked, so Artboard can draw its row with a phone glyph', () =>
   assert.deepEqual(s.machines.map((m) => [m.name, m.phone]), [['iphone', true], ['mini', false], ['nuc', false], ['saifuls-mac-mini', false], ['fedora', false]]);
 });
 
-test('an offline age reads in days, hours or minutes, and a zero LastSeen reads as nothing', () => {
+test('an offline age reads as a number, a space and d, h or min, and a zero LastSeen reads as nothing', () => {
   const peer = (seen) => parseStatus(status({ Peer: { a: { DNSName: 'a.t.', TailscaleIPs: ['100.1.2.3'], Online: false, LastSeen: seen } } }), NOW).machines[0].age;
-  assert.deepEqual([peer('2026-10-21T05:00:00Z'), peer('2026-10-21T07:58:00Z'), peer('2026-10-21T07:59:50Z'), peer('0001-01-01T00:00:00Z'), peer(undefined)], ['3h', '2m', 'now', '', '']);
+  assert.deepEqual([peer('2026-10-21T05:00:00Z'), peer('2026-10-21T07:58:00Z'), peer('2026-10-21T07:59:50Z'), peer('0001-01-01T00:00:00Z'), peer(undefined)], ['3 h', '2 min', 'now', '', '']);
 });
 
 test('the backend state picks what the surface draws instead of an empty list', () => {
@@ -65,30 +64,9 @@ test('each state other than on reads one line, and an offline machine its own', 
   assert.equal(offlineText('fedora'), 'fedora is offline');
 });
 
-test('the key strip is the board\'s for on and off; a state with no toggle offers only esc', () => {
-  const plain = { keys: (k) => k };
-  assert.deepEqual(tailscaleKeys(plain, 'on'), [['↵', 'copy ip'], ['s', 'send files'], ['t', 'turn off'], ['esc', '']]);
-  assert.deepEqual(tailscaleKeys(plain, 'off'), [['t', 'turn on'], ['esc', '']]);
-  assert.deepEqual(tailscaleKeys(plain, 'down'), [['esc', '']]);
-});
-
-test('the badge is a #6C83FF dot on an ink chip when on, an outlined dot on a tile when off', () => {
-  const look = tailscaleLook(schemeTokens('artboard'));
-  assert.deepEqual(look.badge(true), { text: 'ON', color: '#FFFFFF', fill: '#15171B', radius: 8, dot: { size: 6, fill: '#6C83FF', line: 'transparent', radius: 3 } });
-  assert.deepEqual(look.badge(false), { text: 'OFF', color: '#57606A', fill: '#F2F3F6', radius: 8, dot: { size: 6, fill: 'transparent', line: '#8A909B', radius: 3 } });
-});
-
-test("a machine's state reads online with a green dot, or its age; its detail is its address or offline", () => {
-  const look = tailscaleLook(schemeTokens('artboard'));
+test("a row's line is its address when online, else offline with its age, as the board draws it", () => {
   const nuc = { name: 'nuc', ip: '100.88.14.3', online: true, age: '' };
-  const fedora = { name: 'fedora', ip: '', online: false, age: '55d' };
-  assert.deepEqual([look.status(nuc), look.status(fedora)], [{ word: 'online', dot: '#1E8E5A' }, { word: '55d', dot: 'transparent' }]);
-  assert.deepEqual([look.detail(nuc), look.detail(fedora)], ['100.88.14.3', 'offline']);
-  assert.equal(look.dotLine, '#8A909B');
-});
-
-test("ON's text is the surface it sits on in a dark scheme too, never white on light ink", () => {
-  assert.equal(tailscaleLook(schemeTokens('gruvbox-dark')).badge(true).color, '#282828');
+  assert.deepEqual([nuc, { name: 'ipad', ip: '', online: false, age: '2 h' }, { name: 'old', ip: '', online: false, age: '' }].map(rowLine), ['100.88.14.3', 'offline · 2 h', 'offline']);
 });
 
 test('a refused toggle reads its first line from tailscale, on one line', () => {

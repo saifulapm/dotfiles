@@ -1,5 +1,5 @@
 // Tailscale's rows from `tailscale status --json`: this device, the machines with online state, and the backend state the surface draws instead of an empty list.
-import { line, plainTones } from './voice.mjs';
+import { line } from './voice.mjs';
 import { CONTROL } from './clean.mjs';
 
 // A machine's name, address and the rest come from the tailnet, so a name is one line with no control characters.
@@ -14,9 +14,9 @@ function ageOf(seen, now) {
   if (!seen || Number.isNaN(at) || at <= 0) return '';
   const min = Math.floor((now - at) / 60000);
   if (min < 1) return 'now';
-  if (min < 60) return `${min}m`;
-  if (min < 1440) return `${Math.floor(min / 60)}h`;
-  return `${Math.floor(min / 1440)}d`;
+  if (min < 60) return `${min} min`;
+  if (min < 1440) return `${Math.floor(min / 60)} h`;
+  return `${Math.floor(min / 1440)} d`;
 }
 
 const STATES = { Running: 'on', Stopped: 'off', NeedsLogin: 'loggedOut', NeedsMachineAuth: 'loggedOut', Starting: 'starting', NoState: 'starting' };
@@ -50,20 +50,5 @@ export function toggleFailedText(wasOn, stderr) {
   return `Tailscale not turned ${wasOn ? 'off' : 'on'}` + (why ? ` · ${why}` : '');
 }
 
-export function tailscaleKeys(look, state) {
-  if (state === 'on') return look.keys([['↵', 'copy ip'], ['s', 'send files'], ['t', 'turn off'], ['esc', '']]);
-  if (state === 'off') return look.keys([['t', 'turn on'], ['esc', '']]);
-  return look.keys([['esc', '']]);
-}
-
-// How the surface's own parts read under a colorscheme: the ON or OFF badge, and a machine's state word, mark and detail. The badge dot, online dot, outline grey and badge chip come from the plain tones.
-export function tailscaleLook(tokens) {
-  const c = tokens.color;
-  const tones = plainTones(tokens);
-  return {
-    badge: (on) => ({ text: on ? 'ON' : 'OFF', color: on ? c.surface : c.muted, fill: on ? c.ink : tones.tile, radius: 8, dot: { size: 6, fill: on ? tones.bar : 'transparent', line: on ? 'transparent' : tones.outline, radius: 3 } }),
-    status: (row) => ({ word: row.online ? 'online' : row.age, dot: row.online ? tones.online : 'transparent' }),
-    dotLine: tones.outline,
-    detail: (row) => (row.online ? row.ip : 'offline'),
-  };
-}
+// A machine's second line: its address while online, else offline and how long ago it was seen.
+export const rowLine = (row) => (row.online ? row.ip : row.age ? `offline · ${row.age}` : 'offline');

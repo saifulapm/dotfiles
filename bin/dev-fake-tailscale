@@ -8,6 +8,8 @@ status=$dir/status.json
 changes=$dir/changes
 mkdir -p "$dir"
 touch "$changes"
+# Every call's arguments, one line each, so a check can see that nothing ran after a surface closed.
+echo "$*" >>"$dir/calls.log"
 # The recorded ages are against 2026-10-21T08:00Z, so each offline LastSeen moves by the same distance to now and stays 55d or 42d.
 if [ ! -e "$status" ]; then
   # The surface's first read and its watch start together, so each run writes a temp file of its own.

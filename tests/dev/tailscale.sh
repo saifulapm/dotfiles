@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Mod+T lists the tailnet: Enter copies an online machine's address, s sends it picked files, t turns Tailscale off and on, an offline machine only says so, and nothing watches tailscale once it closes.
+# Mod+T draws the tailnet in the island as board 8 does: a switch, this device as a tile, the machines with an ok dot when online and their age when not. Enter copies an online machine's address, s sends it picked files, the switch and t turn Tailscale off and on, an offline machine only says so, and tailscale runs nothing once the surface closes.
 {
 source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/pointer.bash"
 
 ts_dir=$DOTS_DEV_DIR/tailscale
 # The shell presses t on whatever tailscale its PATH finds, so the check ends before any key unless that is the fake.
@@ -31,29 +32,25 @@ fake_status() { jq -r .BackendState "$ts_dir/status.json"; }
 wake() { echo '{"State":"Running"}' >>"$ts_dir/changes"; }
 edit_status() { jq "$@" "$ts_dir/status.json" >"$ts_dir/status.tmp" && mv "$ts_dir/status.tmp" "$ts_dir/status.json" && wake; }
 watchers() { pgrep -f -- "$repo/dev/path/tailscale debug watch-ipn" >/dev/null; }
-# Pixels of geometry $1 within 12 of the hex colour $2.
-near() {
-  grim -s 1 -t ppm -g "$1" - | node -e '
-    const b = require("fs").readFileSync(0), hex = process.argv[1];
-    const [r, g, bl] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-    const head = b.toString("latin1").match(/^P6\s+(\d+)\s+(\d+)\s+(\d+)\s/), px = b.subarray(head[0].length);
-    let n = 0;
-    for (let i = 0; i < head[1] * head[2]; i++) if (Math.abs(px[i * 3] - r) <= 12 && Math.abs(px[i * 3 + 1] - g) <= 12 && Math.abs(px[i * 3 + 2] - bl) <= 12) n++;
-    console.log(n);
-  ' "$2"
-}
-badge_geo() { ts_state | jq -r '.badgeBox | "\(.x | floor),\(.y | floor) \(.w | ceil)x\(.h | ceil)"'; }
+calls() { wc -l <"$ts_dir/calls.log"; }
+# The island's own fill as it reports it, in the lower case Qt writes colours in.
+island_fill() { island | jq -r '.fill.color | ascii_downcase'; }
 
 check "before Mod+T the surface is not loaded" state_is '.loaded == false'
 check "and nothing watches tailscale" eval '! watchers'
 
 open_ts
-echo "     tailscale: $(ts_state | jq -c '{state, online, rows: [.rows[] | [.name, .ip, .status]], device, heading, badge, hint}')"
+echo "     tailscale: $(ts_state | jq -c '{state, online, switchOn, rows: [.rows[] | [.name, .line, .dot]], device, heading}')"
+check "Mod+T sets the island's surface to tailscale ($(island | jq -c .surface))" eval "island | jq -e '.surface == \"tailscale\"' >/dev/null"
 check "Mod+T opens the list from tailscale status: 5 rows, 3 online, on" state_is '.state == "on" and .online == 3 and (.rows | length) == 5'
+check "the switch is on while the tailnet is up" state_is '.switchOn and .heading == "Tailscale"'
 check "the rows are online by name, then offline most recently seen first" state_is '[.rows[].name] == ["iphone", "mini", "nuc", "saifuls-mac-mini", "fedora"]'
-check "online rows draw their address, offline ones none and their age in days" state_is '[.rows[].ip] == ["100.95.3.21", "100.72.40.9", "100.88.14.3", "", ""] and (.rows[4].status | test("^\\d+d$"))'
-check "this device is drawn: macbook, 100.101.7.12, taila27604.ts.net" state_is '.device == {name: "macbook", ip: "100.101.7.12", tailnet: "taila27604.ts.net"}'
-check "the key strip reads ↵ copy ip · s send files · t turn off · esc" state_is '.hint == "↵ copy ip · s send files · t turn off · esc"'
+check "online rows draw their address, offline ones offline and their age as 3 d" state_is '[.rows[].ip] == ["100.95.3.21", "100.72.40.9", "100.88.14.3", "", ""] and (.rows[4].line | test("^offline · [0-9]+ d$"))'
+check "this device draws as a tile: macbook, this device · 100.101.7.12" state_is '.device == {name: "macbook", line: "this device · 100.101.7.12", ip: "100.101.7.12"}'
+check "an online machine has a dot in the ok tone, an offline one a muted dot and line" state_is '(.ok | ascii_downcase) as $ok | (.muted | ascii_downcase) as $m | all(.rows[0:3][]; .dot == $ok) and all(.rows[3:][]; .dot != $ok and .ink == $m)'
+check "the selected row is lighter and its Send is inverted: the island's ink as fill, its fill as text" state_is '.rows[.selected].send == {text: "Send", fill: .ink, ink: .fill} and (.rows[.selected].fill | test("^#1f")) and ([.rows[] | select(.send != null)] | length) == 1'
+check "rows draw on the island's fill in the island's ink ($(island_fill))" state_is --arg f "$(island_fill)" '(.fill | ascii_downcase) == $f and .rows[0].ink == .ink and .ink != .fill'
+check "the legend and key strip are gone" state_is 'has("hint") | not'
 check "while open, the surface watches tailscale" watchers
 
 cursor_to nuc
@@ -95,15 +92,14 @@ check "and Sent 2 files to nuc lands in the notification centre" until_ok 8000 s
 check "the fake logged one file cp of both to 100.88.14.3: ($(cat "$ts_dir/cp.log" 2>/dev/null))" test "$(cat "$ts_dir/cp.log" 2>/dev/null)" = "file cp $DOTS_DEV_DIR/a.txt $DOTS_DEV_DIR/b.txt 100.88.14.3:"
 
 open_ts
-wtype t
+click_box tailscale-switch
 until_ok 3000 state_is '.state == "off"'
-check "t turns tailscale off ($(fake_status))" test "$(fake_status)" = Stopped
-check "and draws Tailscale is off with no rows ($(ts_state | jq -c '[.line, (.rows | length)]'))" state_is '.line == "Tailscale is off" and .rows == []'
-check "with the device block still drawn" state_is '.device.name == "macbook" and .device.ip == "100.101.7.12"'
-check "the badge reads OFF and the strip t turn on · esc ($(ts_state | jq -c '[.badge, .hint]'))" state_is '.badge == "OFF" and (.hint | ascii_downcase) == "t turn on · esc"'
+check "turning the switch off runs the fake's tailscale down ($(fake_status), last call: $(tail -n1 "$ts_dir/calls.log" | head -c 40))" bash -c "[ '$(fake_status)' = Stopped ] && grep -qx down '$ts_dir/calls.log'"
+check "and the list reads off: Tailscale is off, no rows, the switch off ($(ts_state | jq -c '[.line, (.rows | length)]'))" state_is '.line == "Tailscale is off" and .rows == [] and .switchOn == false'
+check "with the device tile still drawn" state_is '.device.name == "macbook" and .device.ip == "100.101.7.12"'
 wtype t
 until_ok 3000 state_is '.state == "on" and (.rows | length) == 5'
-check "t again turns it on ($(fake_status)) and the rows come back" bash -c "[ '$(fake_status)' = Running ] && timeout 0.5 dots-call tailscale state | jq -e '.badge == \"ON\" and (.rows | length) == 5' >/dev/null"
+check "t turns it on again ($(fake_status)) and the rows come back" bash -c "[ '$(fake_status)' = Running ] && timeout 0.5 dots-call tailscale state | jq -e '.switchOn and (.rows | length) == 5' >/dev/null"
 
 # Without an operator, tailscaled refuses a non-root up or down, and the island says so instead of t doing nothing; a notice shows only at rest, so the earlier Sent toast has its 5 s first.
 island_rests() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e '.mode == "rest"' >/dev/null; }
@@ -138,15 +134,27 @@ check "a 200-character name draws on one line, elided inside its row" state_is '
 edit_status 'del(.Peer["nodekey:06"], .Peer["nodekey:07"])'
 until_ok 3000 state_is '(.rows | length) == 5'
 
-check "the panel is drawn 640 px wide ($(ts_state | jq -c .cardBox.w))" state_is '.cardBox.w == 640'
-check "the heading reads Tailscale and the badge ON ($(ts_state | jq -c '[.heading, .badge]'))" state_is '.heading == "Tailscale" and .badge == "ON"'
-px=$(near "$(badge_geo)" "#6C83FF")
-check "the badge's dot draws #6C83FF ($px px, between 10 and 36)" test "$px" -ge 10 -a "$px" -le 36
+check "the surface is drawn 640 px wide ($(ts_state | jq -c .width))" state_is '.width == 640'
 
+before=$(calls)
 close_ts
+sleep 1
+check "1 s after Esc the fake tailscale's log gains no new line ($before lines)" test "$(calls)" = "$before"
 check "within 30 s of Esc no tailscale debug watch-ipn is left" until_ok 30000 eval '! watchers'
 until_ok 33000 state_is '.loaded == false'
 check "30 s after close shell status no longer lists tailscale as loaded" bash -c "timeout 0.5 qs ipc call shell status | jq -e 'all(.loaded[]; . != \"tailscale\")' >/dev/null"
+
+# Mod+Space opens the launcher, which closes Tailscale through the surfaces; a bus line then wakes nothing, and no tailscale runs.
+open_ts
+before=$(calls)
+niri msg action spawn -- dots-call launcher toggle
+until_ok 3000 state_is '.open == false'
+wake
+sleep 1
+check "1 s after Mod+Space morphs Tailscale away the fake tailscale's log gains no new line ($before lines)" test "$(calls)" = "$before"
+until_ok 3000 eval "island | jq -e '.surface == \"launcher\" and .animating == false' >/dev/null"
+niri msg action spawn -- dots-call launcher toggle
+until_ok 3000 eval "island | jq -e '.surface == null and .animating == false' >/dev/null"
 
 exit $((fails > 0))
 }

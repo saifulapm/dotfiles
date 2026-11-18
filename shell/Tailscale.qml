@@ -2,12 +2,12 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import QtQuick.Layouts
-import QtQuick.Shapes
 import "." as Root
-import "lib/voice.mjs" as L
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as IT
 import "lib/tailscale.mjs" as T
 
-// The tailnet as a list: this device, the machines with their online state, or one line when Tailscale is not on; tailscale runs only while it shows.
+// The tailnet drawn inside the island (board 8): a switch, this device as a tile, then the machines; or one line when Tailscale is not on. tailscale runs only while it shows.
 Item {
     id: panel
 
@@ -27,11 +27,12 @@ Item {
     readonly property bool busy: reader.running || toggler.running
 
     readonly property string sendBin: Quickshell.shellDir + "/bin/dots-taildrop-send"
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(theme.tokens)
-    readonly property var tones: L.plainTones(theme.tokens)
-    readonly property var marks: T.tailscaleLook(theme.tokens ?? { color: {} })
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and fill, and the tones lifted to read on it.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property color fill: S.surfaceStyle(tokens, "island").fill
+    readonly property var tones: tokens ? IT.islandTones(tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
     readonly property bool isOn: status.state === "on"
     readonly property var rows: isOn ? status.machines : []
     readonly property var current: rows[selected] ?? null
@@ -40,7 +41,7 @@ Item {
     readonly property int wantWidth: 640
     // True once the island has come to rest on Tailscale; the surfaces' window sets it.
     property bool settled: false
-    implicitHeight: card.height
+    implicitHeight: column.implicitHeight + 32
 
     function open(t0) {
         openT0 = t0;
@@ -49,9 +50,9 @@ Item {
         selected = 0;
         offlineNote = "";
         listed = false;
+        shown = true;
         read();
         watcher.running = true;
-        shown = true;
         keyTarget.forceActiveFocus();
     }
 
@@ -62,7 +63,10 @@ Item {
         refresh.stop();
     }
 
+    // A read that ends after the close, or a change that lands then, starts nothing.
     function read() {
+        if (!shown)
+            return;
         if (reader.running)
             stale = true;
         else
@@ -87,7 +91,7 @@ Item {
         copy();
     }
 
-    // The card closes on a copy, as Pass's does, and the island says what went on the clipboard.
+    // The surface closes on a copy, as Pass's does, and the island says what went on the clipboard.
     function copy() {
         if (!current)
             return;
@@ -100,7 +104,7 @@ Item {
         close();
     }
 
-    // dots-taildrop-send opens the chooser and outlives the card, so it starts detached after the close.
+    // dots-taildrop-send opens the file picker, another surface, and outlives this one, so Tailscale closes first and the send starts detached.
     function send() {
         if (!current)
             return;
@@ -126,31 +130,30 @@ Item {
         const shownRows = [];
         for (let i = 0; i < rowRepeater.count; i++)
             shownRows.push(rowRepeater.itemAt(i).drawn());
-        const keys = [];
-        for (let i = 0; i < keyRepeater.count; i++)
-            keys.push((keyRepeater.itemAt(i).keyLabel + " " + keyRepeater.itemAt(i).wordLabel).trim());
-        const a = badgeBox.mapToItem(null, 0, 0);
         return JSON.stringify({
             loaded: true,
             open: shown,
             listed: listed,
             state: status.state,
             online: status.online,
+            on: isOn,
+            switchOn: tsSwitch.on,
             rows: shownRows,
             selected: selected,
             offlineLine: offlineLine.visible ? offlineLine.text : "",
             line: stateLine.visible ? stateLine.text : "",
-            device: device.visible ? { name: deviceName.text, ip: deviceIp.text, tailnet: deviceTailnet.text } : null,
-            heading: pill.text,
-            badge: badgeText.text,
-            badgeBox: { x: a.x, y: a.y, w: badgeBox.width * card.scale, h: badgeBox.height * card.scale },
-            hint: keys.join(" · "),
+            device: device.visible ? { name: deviceName.text, line: deviceLine.text, ip: status.self.ip } : null,
+            heading: heading.text,
+            ink: String(on),
+            fill: String(fill),
+            ok: String(tones.ok),
+            muted: String(tones.muted),
             busy: busy,
             openMs: openMs,
             opens: opens,
             settled: panel.settled,
             drawing: panel.visible,
-            cardBox: card.drawnBox(),
+            width: panel.width,
             keyboard: panel.Window.active
         });
     }
@@ -207,7 +210,7 @@ Item {
     Component.onCompleted: Root.State.loaded.push("tailscale")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "tailscale")
 
-    // Holds the keyboard while the card shows, the list or its one line: j and k move, Enter copies, s sends, t turns Tailscale off or on.
+    // Holds the keyboard while Tailscale shows, the list or its one line: j and k move, Enter copies, s sends, t turns Tailscale off or on.
     Item {
         id: keyTarget
         Keys.onPressed: event => {
@@ -229,457 +232,281 @@ Item {
         }
     }
 
-    Root.Surface {
-        id: card
-        width: parent.width
-        height: column.implicitHeight
-        tokens: panel.theme.tokens
-        // The island draws the fill and plays the open.
-        bare: true
+    ColumnLayout {
+        id: column
+        x: 16
+        y: 16
+        width: parent.width - 32
+        spacing: 8
 
-        ColumnLayout {
-            id: column
-            width: parent.width
-            spacing: 0
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 36
+            spacing: 10
 
-            // The heading in the launcher's pill, and the ON or OFF badge across from it.
-            RowLayout {
+            Text {
+                id: heading
                 Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: 16
-                Layout.bottomMargin: 16
-                spacing: 12
-
-                Rectangle {
-                    implicitWidth: pill.implicitWidth + 18
-                    implicitHeight: pill.implicitHeight + 6
-                    radius: 8
-                    color: look.label.fill
-                    Text {
-                        id: pill
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: look.heading("tailscale", "")
-                        color: look.label.color
-                        font.family: fonts.ui
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-                }
-
-                Item {
-                    Layout.fillWidth: true
-                }
-
-                Rectangle {
-                    id: badgeBox
-                    readonly property var badge: marks.badge(isOn)
-                    implicitWidth: badgeRow.implicitWidth + 18
-                    implicitHeight: badgeRow.implicitHeight + 6
-                    radius: badge.radius
-                    color: badge.fill
-
-                    Row {
-                        id: badgeRow
-                        anchors.centerIn: parent
-                        spacing: 6
-
-                        Rectangle {
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: badgeBox.badge.dot.size
-                            height: width
-                            radius: badgeBox.badge.dot.radius
-                            color: badgeBox.badge.dot.fill
-                            border.width: badgeBox.badge.dot.line !== "transparent" ? 1.5 : 0
-                            border.color: badgeBox.badge.dot.line
-                        }
-                        Text {
-                            id: badgeText
-                            textFormat: Text.PlainText
-                            text: badgeBox.badge.text
-                            color: badgeBox.badge.color
-                            font.family: fonts.ui
-                            font.pixelSize: 11
-                            font.letterSpacing: 0
-                            font.weight: Font.Medium
-                        }
-                    }
-                }
+                textFormat: Text.PlainText
+                text: "Tailscale"
+                color: panel.on
+                font.family: fonts.ui ?? ""
+                font.pixelSize: 15
+                font.weight: Font.Bold
             }
 
-            Rule {}
-
-            // This device: its name, address and tailnet, kept while Tailscale is off.
-            Item {
-                id: device
-                visible: !!status.self
-                Layout.fillWidth: true
-                implicitHeight: deviceColumn.implicitHeight + 16
+            // A 38 x 22 switch, on while tailscaled runs the tailnet; a click does what t does.
+            Rectangle {
+                id: tsSwitch
+                property bool on: panel.isOn
+                implicitWidth: 38
+                implicitHeight: 22
+                radius: 11
+                color: on ? panel.on : Qt.alpha(panel.on, 0.16)
 
                 Rectangle {
-                    x: 18
-                    y: 12
-                    width: parent.width - 36
-                    height: deviceColumn.implicitHeight
-                    radius: 12
-                    color: tones.field ?? "transparent"
+                    x: tsSwitch.on ? parent.width - width - 3 : 3
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 16
+                    height: 16
+                    radius: 8
+                    color: tsSwitch.on ? panel.fill : panel.tones.muted
+                }
+                Root.Click {
+                    name: "tailscale-switch"
+                    onTapped: panel.toggle()
+                }
+            }
+        }
+
+        // This device, kept while Tailscale is off.
+        Rectangle {
+            id: device
+            visible: !!status.self
+            Layout.fillWidth: true
+            Layout.preferredHeight: 56
+            radius: 14
+            color: Qt.alpha(panel.on, 0.07)
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                spacing: 12
+
+                Circle {
+                    glyph: 0xF0379
                 }
 
                 ColumnLayout {
-                    id: deviceColumn
-                    x: 32
-                    y: 12
-                    width: parent.width - 2 * x
+                    Layout.fillWidth: true
                     spacing: 0
 
-                    RowLayout {
+                    Text {
+                        id: deviceName
                         Layout.fillWidth: true
-                        Layout.topMargin: 12
-                        Layout.bottomMargin: 12
+                        textFormat: Text.PlainText
+                        text: status.self ? status.self.name : ""
+                        elide: Text.ElideRight
+                        color: panel.on
+                        font.family: fonts.ui ?? ""
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        id: deviceLine
+                        textFormat: Text.PlainText
+                        text: status.self ? "this device · " + status.self.ip : ""
+                        color: panel.tones.muted
+                        font.family: fonts.ui ?? ""
+                        font.pixelSize: 12
+                    }
+                }
+            }
+        }
+
+        ColumnLayout {
+            visible: isOn
+            Layout.fillWidth: true
+            spacing: 4
+
+            Repeater {
+                id: rowRepeater
+                model: rows
+
+                Rectangle {
+                    id: rowItem
+                    required property var modelData
+                    required property int index
+                    readonly property bool isCurrent: index === panel.selected
+                    readonly property bool online: modelData.online
+                    readonly property color ink: online ? panel.on : panel.tones.muted
+                    // A click on the row does what Enter does on it.
+                    Root.Click {
+                        name: "tailscale-row:" + rowItem.index
+                        onTapped: panel.clickRow(rowItem.index)
+                    }
+                    // The row as drawn, for the state function: the address only where an online row draws one.
+                    function drawn() {
+                        const right = nameText.mapToItem(rowItem, nameText.width, 0).x;
+                        return {
+                            name: nameText.text,
+                            ip: online ? detailText.text : "",
+                            line: detailText.text,
+                            online: online,
+                            dot: String(dot.color),
+                            ink: String(nameText.color),
+                            fill: String(color),
+                            send: sendButton.visible ? { text: sendText.text, fill: String(sendButton.color), ink: String(sendText.color) } : null,
+                            lines: nameText.lineCount,
+                            elided: nameText.truncated,
+                            right: right,
+                            width: rowItem.width
+                        };
+                    }
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 48
+                    radius: 12
+                    color: isCurrent ? Qt.alpha(panel.on, 0.12) : "transparent"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 8
                         spacing: 12
 
-                        Tile {
-                            color: tones.card
-                            glyph: "laptop"
-                            ink: c.muted
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-
-                            Text {
-                                textFormat: Text.PlainText
-                                text: "This device"
-                                color: c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 11
-                            }
-                            Text {
-                                id: deviceName
-                                Layout.fillWidth: true
-                                textFormat: Text.PlainText
-                                text: look.title(status.self ? status.self.name : "")
-                                elide: Text.ElideRight
-                                color: c.ink
-                                font.family: fonts.ui
-                                font.pixelSize: 15
-                                font.weight: Font.Medium
-                                font.letterSpacing: 0
-                            }
-                        }
-
-                        ColumnLayout {
-                            spacing: 2
-
-                            Text {
-                                id: deviceIp
-                                Layout.alignment: Qt.AlignRight
-                                horizontalAlignment: Text.AlignRight
-                                textFormat: Text.PlainText
-                                text: status.self ? status.self.ip : ""
-                                color: c.ink
-                                font.family: fonts.ui
-                                font.pixelSize: 15
-                                font.weight: Font.Medium
-                            }
-                            // The tailnet under the address.
-                            Text {
-                                id: deviceTailnet
-                                Layout.alignment: Qt.AlignRight
-                                textFormat: Text.PlainText
-                                text: status.self ? status.self.tailnet : ""
-                                color: c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 12
-                            }
-                        }
-                    }
-                }
-            }
-
-            // The list's head.
-            RowLayout {
-                visible: isOn
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: 12
-
-                Text {
-                    Layout.fillWidth: true
-                    textFormat: Text.PlainText
-                    text: "Machines"
-                    color: look.small.color
-                    font.family: look.small.font
-                    font.pixelSize: look.small.size
-                    font.letterSpacing: look.small.spacing
-                }
-            }
-
-            Item {
-                visible: isOn
-                Layout.fillWidth: true
-                implicitHeight: list.implicitHeight + 16
-
-                Column {
-                    id: list
-                    y: 8
-                    x: 8
-                    width: parent.width - 2 * x
-
-                    Repeater {
-                        id: rowRepeater
-                        model: rows
-
                         Rectangle {
-                            id: rowItem
-                            required property var modelData
-                            required property int index
-                            readonly property bool isCurrent: index === panel.selected
-                            // A click on the row does what Enter does on it.
+                            id: dot
+                            implicitWidth: 8
+                            implicitHeight: 8
+                            radius: 4
+                            color: rowItem.online ? panel.tones.ok : Qt.alpha(panel.on, 0.16)
+                        }
+                        Text {
+                            id: nameText
+                            textFormat: Text.PlainText
+                            text: rowItem.modelData.name
+                            maximumLineCount: 1
+                            elide: Text.ElideRight
+                            // A long name keeps to half the row, so its address and the Send button stay in view.
+                            Layout.maximumWidth: rowItem.width / 2
+                            color: rowItem.ink
+                            font.family: fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                        }
+                        Text {
+                            id: detailText
+                            Layout.fillWidth: true
+                            textFormat: Text.PlainText
+                            text: T.rowLine(rowItem.modelData)
+                            elide: Text.ElideRight
+                            color: panel.tones.muted
+                            font.family: fonts.ui ?? ""
+                            font.pixelSize: 12
+                        }
+
+                        // The selected row's Send: inverted, the island's text as its fill.
+                        Rectangle {
+                            id: sendButton
+                            visible: rowItem.isCurrent
+                            implicitHeight: 32
+                            implicitWidth: sendRow.implicitWidth + 24
+                            radius: 10
+                            color: panel.on
+
+                            Row {
+                                id: sendRow
+                                anchors.centerIn: parent
+                                spacing: 6
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: String.fromCodePoint(0xF048A)
+                                    color: panel.fill
+                                    font.family: "Symbols Nerd Font Mono"
+                                    font.pixelSize: 12
+                                }
+                                Text {
+                                    id: sendText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: "Send"
+                                    color: panel.fill
+                                    font.family: fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                    font.weight: Font.Bold
+                                }
+                            }
                             Root.Click {
-                                name: "tailscale-row:" + rowItem.index
-                                onTapped: panel.clickRow(rowItem.index)
-                            }
-                            readonly property bool online: modelData.online
-                            readonly property var mark: marks.status(modelData)
-                            readonly property color textColor: isCurrent ? look.cursor.text : online ? c.ink : c.muted
-                            // The row as drawn, for the state function: the address only where an online row draws one.
-                            function drawn() {
-                                const right = nameText.mapToItem(rowItem, nameText.width, 0).x;
-                                return {
-                                    name: nameText.text,
-                                    ip: online ? detailText.text : "",
-                                    status: statusText.text,
-                                    lines: nameText.lineCount,
-                                    elided: nameText.truncated,
-                                    right: right,
-                                    width: rowItem.width
-                                };
-                            }
-                            width: list.width
-                            implicitHeight: row.implicitHeight + 16
-                            radius: look.cursor.radius
-                            color: isCurrent ? look.cursor.fill : "transparent"
-
-                            RowLayout {
-                                id: row
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: anchors.leftMargin
-                                spacing: 12
-
-                                Tile {
-                                    color: rowItem.isCurrent ? tones.card : look.tile.fill
-                                    glyph: rowItem.modelData.phone ? "phone" : "box"
-                                    ink: rowItem.isCurrent ? look.cursor.text : rowItem.online ? c.muted : marks.dotLine
-                                }
-
-                                ColumnLayout {
-                                    Layout.fillWidth: true
-                                    spacing: 0
-
-                                    Text {
-                                        id: nameText
-                                        Layout.fillWidth: true
-                                        textFormat: Text.PlainText
-                                        text: look.title(rowItem.modelData.name)
-                                        maximumLineCount: 1
-                                        elide: Text.ElideRight
-                                        color: rowItem.textColor
-                                        font.family: look.name.font
-                                        font.pixelSize: 15
-                                        font.weight: rowItem.isCurrent ? look.cursor.weight : !rowItem.online ? Font.Normal : look.name.weight
-                                        font.letterSpacing: 0
-                                    }
-                                    Text {
-                                        id: detailText
-                                        textFormat: Text.PlainText
-                                        text: marks.detail(rowItem.modelData)
-                                        color: c.muted
-                                        font.family: fonts.ui
-                                        font.pixelSize: 12
-                                    }
-                                }
-
-                                // The state dot and word.
-                                Row {
-                                    Layout.preferredWidth: implicitWidth
-                                    spacing: 6
-
-                                    Rectangle {
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 7
-                                        height: 7
-                                        radius: 3.5
-                                        color: rowItem.mark.dot
-                                        border.width: rowItem.online ? 0 : 1.5
-                                        border.color: marks.dotLine
-                                    }
-                                    Text {
-                                        id: statusText
-                                        textFormat: Text.PlainText
-                                        text: rowItem.mark.word
-                                        color: c.muted
-                                        font.family: fonts.ui
-                                        font.pixelSize: 11
-                                        font.letterSpacing: 0
-                                    }
-                                }
-
-                                Rectangle {
-                                    visible: rowItem.isCurrent
-                                    implicitWidth: 22
-                                    implicitHeight: 18
-                                    radius: 6
-                                    color: tones.card
-                                    Text {
-                                        anchors.centerIn: parent
-                                        textFormat: Text.PlainText
-                                        text: look.cursor.badge
-                                        color: look.cursor.text
-                                        font.family: fonts.ui
-                                        font.pixelSize: 11
-                                    }
-                                }
+                                name: "tailscale-send"
+                                onTapped: panel.send()
                             }
                         }
-                    }
-
-                    Text {
-                        id: offlineLine
-                        visible: panel.offlineNote !== ""
-                        width: list.width
-                        textFormat: Text.PlainText
-                        leftPadding: 20
-                        topPadding: 8
-                        bottomPadding: 3
-                        text: panel.offlineNote
-                        elide: Text.ElideRight
-                        color: c.danger
-                        font.family: look.small.font
-                        font.pixelSize: look.small.size + 1
-                        font.letterSpacing: look.small.spacing
                     }
                 }
             }
 
-            // Off, logged out, starting or tailscaled away: one line where the list goes, beside a power tile.
-            RowLayout {
-                visible: !isOn && listed
+            Text {
+                id: offlineLine
+                visible: panel.offlineNote !== ""
                 Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: 28
-                Layout.bottomMargin: 28
+                textFormat: Text.PlainText
+                leftPadding: 12
+                text: panel.offlineNote
+                elide: Text.ElideRight
+                color: panel.tones.danger
+                font.family: fonts.ui ?? ""
+                font.pixelSize: 12
+            }
+        }
+
+        // Off, logged out, starting or tailscaled away: one line where the list goes.
+        Rectangle {
+            visible: !isOn && listed
+            Layout.fillWidth: true
+            Layout.preferredHeight: 56
+            radius: 14
+            color: Qt.alpha(panel.on, 0.07)
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
                 spacing: 12
 
-                Tile {
-                    color: look.tile.fill
-                    glyph: "power"
-                    ink: c.muted
+                Circle {
+                    glyph: 0xF0425
                 }
                 Text {
                     id: stateLine
                     Layout.fillWidth: true
                     textFormat: Text.PlainText
                     text: T.stateText(status.state)
-                    color: c.muted
-                    font.family: fonts.ui
-                    font.pixelSize: 15
-                    font.letterSpacing: 0
-                }
-            }
-
-            Rule {}
-
-            // The key strip as Pass draws it, each pair as plain dim text.
-            Flow {
-                Layout.fillWidth: true
-                Layout.leftMargin: 14
-                Layout.rightMargin: Layout.leftMargin
-                Layout.topMargin: 10
-                Layout.bottomMargin: Layout.topMargin
-                spacing: 8
-
-                Repeater {
-                    id: keyRepeater
-                    model: T.tailscaleKeys(look, status.state)
-
-                    KeyPair {
-                        id: keyPair
-                        theme: panel.theme
-                        look: panel.look
-                    }
+                    color: panel.tones.muted
+                    font.family: fonts.ui ?? ""
+                    font.pixelSize: 13
                 }
             }
         }
     }
 
-    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
-    component Rule: Item {
-        Layout.fillWidth: true
-        implicitHeight: 1
-    }
+    // A 36 px circle in the 0.16 wash of the island's text, with a Nerd Font glyph in it.
+    component Circle: Rectangle {
+        property int glyph: 0
+        implicitWidth: 36
+        implicitHeight: 36
+        radius: 18
+        color: Qt.alpha(panel.on, 0.16)
 
-    // A 32 px tile with a line glyph: a laptop, a machine, a phone or the power mark.
-    component Tile: Rectangle {
-        id: tile
-        property string glyph: "box"
-        property color ink: "black"
-        implicitWidth: 32
-        implicitHeight: 32
-        radius: 9
-
-        Rectangle {
-            visible: tile.glyph === "laptop" || tile.glyph === "box" || tile.glyph === "phone"
+        Text {
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: tile.glyph === "laptop" ? -1.5 : 0
-            width: tile.glyph === "phone" ? 7 : tile.glyph === "laptop" ? 11 : 12
-            height: tile.glyph === "phone" ? 13 : tile.glyph === "laptop" ? 7.5 : 8
-            radius: tile.glyph === "box" ? 2 : 1.5
-            color: "transparent"
-            border.width: 1.5
-            border.color: tile.ink
-        }
-        Rectangle {
-            visible: tile.glyph !== "power"
-            x: tile.glyph === "laptop" ? 9 : tile.glyph === "phone" ? 15 : 13
-            y: tile.glyph === "laptop" ? 20.25 : tile.glyph === "phone" ? 19.75 : 15.25
-            width: tile.glyph === "laptop" ? 14 : 2
-            height: 1.5
-            radius: 0.75
-            color: tile.ink
-        }
-        Shape {
-            visible: tile.glyph === "power"
-            anchors.fill: parent
-            preferredRendererType: Shape.CurveRenderer
-            ShapePath {
-                strokeColor: tile.ink
-                strokeWidth: 1.5
-                fillColor: "transparent"
-                capStyle: ShapePath.RoundCap
-                startX: 16
-                startY: 9.8
-                PathLine {
-                    x: 16
-                    y: 15.2
-                }
-                PathMove {
-                    x: 12.6
-                    y: 11.9
-                }
-                PathArc {
-                    x: 19.4
-                    y: 11.9
-                    radiusX: 5.2
-                    radiusY: 5.2
-                    useLargeArc: true
-                }
-            }
+            textFormat: Text.PlainText
+            text: parent.glyph ? String.fromCodePoint(parent.glyph) : ""
+            color: panel.on
+            font.family: "Symbols Nerd Font Mono"
+            font.pixelSize: 17
         }
     }
 }
