@@ -73,7 +73,7 @@ done
 
 # A known network joined from its page inverts the Wi-Fi tile, which then names it.
 timeout 0.5 qs ipc call control section wifi
-until_ok 2000 control_is '.page == "wifi"'
+until_ok 2000 control_is '.page == "wifi" and .keyboard and .settled'
 until_ok 5000 control_is '.rows | index("Dots Home") != null'
 select_home() {
   local i

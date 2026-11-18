@@ -8,7 +8,7 @@ state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_period() { niri msg action spawn -- dots-call launcher mode emoji; }
 # Keys typed before niri moves the keyboard to the launcher go to the window behind, so the check waits for that window to lose focus.
-keyboard_taken() { state_is ".open and .mode == \"emoji\"" && ! foot_focused; }
+keyboard_taken() { state_is ".open and .mode == \"emoji\" and .keyboard and .settled" && ! foot_focused; }
 
 until_ok 5000 shell_status >/dev/null
 

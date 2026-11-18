@@ -6,6 +6,7 @@ source "$(dirname "$0")/lib.sh"
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
 control() { timeout 0.5 qs ipc call control state 2>/dev/null; }
+control_is() { control | jq -e "$@" >/dev/null 2>&1; }
 at_rest() { island_is '.surface == null and .animating == false'; }
 surfaces_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 
@@ -16,6 +17,7 @@ read -r ow _ < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.hei
 niri msg action spawn -- dots-call control toggle
 until_ok 3000 island_is '.surface == "control" and .animating == false and .morph.kind == "open"'
 until_ok 2000 surfaces_focus Exclusive
+until_ok 2000 control_is '.keyboard and .settled'
 clock=$(island | jq -c .morph.clock)
 target=$(control | jq -c .clock.box)
 echo "     $(jq length <<<"$clock") frames; first $(jq -c '.[0]' <<<"$clock"), last $(jq -c '.[-1]' <<<"$clock"); big clock $target"
@@ -46,6 +48,7 @@ dots-call control toggle >/dev/null
 until_ok 3000 island_is '.surface == "control" and .animating == false'
 clock=$(island | jq -c .morph.clock)
 check "a switch from the launcher into Control draws no glide ($(jq -c '[.[] | .[0]]' <<<"$clock"))" jq -e 'all(.[0] == 0)' <<<"$clock"
+until_ok 2000 control_is '.keyboard and .settled'
 wtype -k Escape
 until_ok 3000 at_rest
 exit "$fails"

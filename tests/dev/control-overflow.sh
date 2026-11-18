@@ -37,7 +37,7 @@ players+=($!)
 until_ok 3000 node_id application.name "$both" >/dev/null
 
 niri msg action spawn -- dots-call control section audio
-until_ok 3000 state_is '.open and .section == "audio" and .settled'
+until_ok 3000 state_is '.open and .section == "audio" and .keyboard and .settled'
 until_ok 3000 state_is --arg t "$long" '.rows | index($t) != null'
 until_ok 3000 state_is '.rows | index("Wide Player") != null'
 inside() { state_is '.cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w'; }

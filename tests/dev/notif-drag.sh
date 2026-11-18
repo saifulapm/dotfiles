@@ -7,7 +7,7 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 note_is() { island | jq -e "$1" >/dev/null; }
 centre() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 centre_is() { centre | jq -e "$1" >/dev/null; }
-open_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 3000 centre_is '.open and .settled and .cursorBox != null'; }
+open_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 3000 centre_is '.open and .settled and .keyboard and .cursorBox != null'; }
 close_centre() { niri msg action spawn -- dots-call notifs toggle; until_ok 2000 centre_is '.open == false and .drawing == false'; }
 # Pixels of geometry $1 within $5 of r g b; with_cursor=1 takes the pointer and its drag image too.
 near() {

@@ -10,7 +10,7 @@ open_launcher() {
   niri msg action spawn -- dots-call launcher toggle
   until_ok 3000 state_is '.open and .settled' || return 1
   # Keys typed before the launcher has the keyboard go to nothing.
-  until_ok 2000 bash -c "niri msg -j layers | jq -e 'any(.[]; .namespace == \"dots-surfaces\" and .keyboard_interactivity == \"Exclusive\")' >/dev/null"
+  until_ok 2000 state_is '.keyboard and .settled'
 }
 closed() { state_is '.open == false'; }
 

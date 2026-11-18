@@ -21,7 +21,7 @@ state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # Control opens on Route as Enter on its Sync tile opens it.
 open_route() {
   niri msg action spawn -- dots-call control section route
-  until_ok 3000 state_is '.open and .keyboard and .section == "route"'
+  until_ok 3000 state_is '.open and .keyboard and .settled and .section == "route"'
 }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
@@ -50,7 +50,7 @@ until_ok 2000 state_is '.open == false'
 mkdir -p "$remote"
 notes_run=$(jq '.notes.lastRun' "$XDG_STATE_HOME/dots/sync.json")
 niri msg action spawn -- dots-call launcher toggle
-until_ok 3000 launcher_is '.open and .query == "" and .keyboard'
+until_ok 3000 launcher_is '.open and .query == "" and .keyboard and .settled'
 wtype "> sync"
 until_ok 3000 launcher_is '.mode == "commands" and .results == ["sync"]'
 wtype -k Return

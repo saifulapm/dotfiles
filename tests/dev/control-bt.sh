@@ -38,7 +38,7 @@ open_bluetooth() {
   niri msg action spawn -- dots-call control section bluetooth
   until_ok 3000 section_is bluetooth
   until_ok 3000 control_focus
-  until_ok 3000 state_is '.keyboard'
+  until_ok 3000 state_is '.keyboard and .settled'
 }
 # What the page says in place of rows, which a caps voice draws upper case.
 empty_is() { state_is --arg h "$1" '(.empty | ascii_downcase) == $h'; }

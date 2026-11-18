@@ -16,6 +16,7 @@ open_launcher() {
   mod_space
   until_ok 3000 island_is '.surface == "launcher" and .animating == false'
   until_ok 2000 surfaces_focus Exclusive
+  until_ok 2000 launcher_is '.keyboard and .settled'
 }
 foot_open() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }
 
@@ -55,7 +56,7 @@ check "Esc returns the island to rest" at_rest
 # Typed 50 ms after the key, before the morph settles, every key lands in the field.
 mod_space
 sleep 0.05
-wtype foot
+wtype foot # early on purpose
 until_ok 2000 launcher_is '.query == "foot"'
 check "foot typed 50 ms after Mod+Space reads query foot ($(launcher | jq -c .query))" launcher_is '.query == "foot"'
 wtype -k Escape

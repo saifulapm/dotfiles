@@ -29,7 +29,7 @@ close_launcher
 for p in "clipboard Clipboard v" "emoji Emoji :" "colorschemes Colorschemes c"; do
   read -r mode name key <<<"$p"
   niri msg action spawn -- dots-call launcher mode "$mode"
-  until_ok 3000 state_is --arg n "$name" '.open and .chip.name == $n'
+  until_ok 3000 state_is --arg n "$name" '.open and .chip.name == $n and .keyboard and .settled'
   check "dots-call launcher mode $mode opens with the $name chip in the field ($(launcher | jq -c '{chip: .chip.name, query}'))" state_is --arg n "$name" --arg q "$key " '.chip.name == $n and .query == $q and .field.text == ""'
   close_launcher
 done

@@ -42,7 +42,7 @@ check "the notification still waits ($(island | jq -c .waiting))" island_is '.wa
 
 mod_space
 until_ok 3000 settled_on launcher
-until_ok 2000 launcher_is '.open and .query == ""'
+until_ok 2000 launcher_is '.open and .query == "" and .keyboard and .settled'
 check "Mod+Space on the open cheat sheet morphs back with an empty field" launcher_is '.open and .query == ""'
 wtype ab
 until_ok 2000 launcher_is '.query == "ab"'

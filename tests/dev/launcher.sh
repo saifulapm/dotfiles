@@ -8,7 +8,7 @@ state_is() { launcher_state | jq -e "$1" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_space() { niri msg action spawn -- dots-call launcher toggle; }
 launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-launcher_mapped() { state_is '.open and .settled' && launcher_focus Exclusive; }
+launcher_mapped() { state_is '.open and .settled and .keyboard' && launcher_focus Exclusive; }
 # Closed, the launcher stays mapped in the island but takes no keyboard and the island is back at rest.
 launcher_gone() { state_is '.open == false' && launcher_focus None && timeout 0.5 qs ipc call island state | jq -e '.surface == null' >/dev/null; }
 foot_open() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }

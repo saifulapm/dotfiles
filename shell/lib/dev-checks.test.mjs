@@ -621,3 +621,129 @@ test('every first-level jq field a tests/dev script reads off a mapped surface\'
   }
   assert.deepEqual(found, []);
 });
+
+// The surfaces whose state() emits both .keyboard and .settled; a surface without them, the island's among them, is out of the open-then-type rule.
+const keyed = 'launcher|control|notifs|goals|dns|accounts|tailscale|pass';
+
+// m104's notif-rules.sh typed once niri listed the centre's layer Exclusive, a moment before the centre took the keys, so its s cycles read wrong. Each wtype after a line that opens a keyed surface must come after reads of both .keyboard and .settled, on one line or two, following helper calls; returns the wtype lines that do not.
+export function typesBeforeKeys(text) {
+  const lines = text.split('\n').map((raw) => {
+    // Quoted text blanked to spaces, so positions still line up with the raw line, and a comment cut from both.
+    const blank = raw.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, (q) => q[0] + ' '.repeat(q.length - 2) + q[0]);
+    const hash = blank.search(/(^|\s)#/);
+    const end = hash < 0 ? raw.length : hash;
+    return { raw: raw.slice(0, end), code: blank.slice(0, end), full: raw };
+  });
+  // Each function's body as [line index, text from] pairs: a one-line function's body starts past its opening brace.
+  const bodies = new Map();
+  const inBody = new Set();
+  lines.forEach(({ code }, i) => {
+    const one = code.match(/^\s*(\w+)\(\)\s*\{(?=.*\}\s*$)/);
+    const many = code.match(/^(\s*)(\w+)\(\)\s*\{\s*$/);
+    if (one) {
+      bodies.set(one[1], [[i, one[0].length]]);
+      inBody.add(i);
+    } else if (many) {
+      const close = lines.findIndex((l, j) => j > i && l.code === `${many[1]}}`);
+      if (close < 0) return;
+      const body = [];
+      for (let j = i + 1; j < close; j++) body.push([j, 0]);
+      bodies.set(many[2], body);
+      for (let j = i; j <= close; j++) inBody.add(j);
+    }
+  });
+  // The island shows one surface at a time, so opening one the rule leaves out, the cheat sheet say, puts the keyed one away as a close does.
+  const surfaceCall = /(?:dots-call|qs ipc call)\s+(\w+)\s+(open|toggle|section|mode|close)\b/g;
+  const isKeyed = new RegExp(`^(?:${keyed})$`);
+  const calls = bodies.size ? new RegExp(`(?<![\\w$./-])(${[...bodies.keys()].join('|')})(?![\\w(-])`, 'g') : null;
+  const memo = new Map();
+  // A line's events in order, open, wait or type, with a helper call standing for its body's events.
+  const events = ([i, from], seen) => {
+    const raw = lines[i].raw.slice(from);
+    const code = lines[i].code.slice(from);
+    const found = [];
+    for (const m of code.matchAll(surfaceCall)) {
+      if (isKeyed.test(m[1])) found.push([m.index, m[2] === 'close' ? 'close' : 'open']);
+      else if (m[2] !== 'close') found.push([m.index, 'close']);
+    }
+    // niri's .keyboard_interactivity is not the surface's .keyboard.
+    for (const k of ['keyboard', 'settled']) for (const m of raw.matchAll(new RegExp(`\\.${k}(?!\\w)`, 'g'))) found.push([m.index, k]);
+    // A check of the keys typed before the surface settles marks its wtype, which then stands for the wait.
+    const early = /#\s*early on purpose\s*$/.test(lines[i].full);
+    for (const m of code.matchAll(/(?<![\w-])wtype\b/g)) found.push([m.index, early ? 'early' : 'type']);
+    for (const m of calls ? code.matchAll(calls) : []) {
+      // `dots-call notifs open` names a surface, not a helper that happens to share its name.
+      if (/(?:dots-call|qs ipc call)\s+$/.test(code.slice(0, m.index))) continue;
+      for (const e of body(m[1], seen)) found.push([m.index, e]);
+    }
+    return found.sort((a, b) => a[0] - b[0]).map((e) => e[1]);
+  };
+  const body = (name, seen) => {
+    if (seen.has(name)) return [];
+    if (!memo.has(name)) memo.set(name, bodies.get(name).flatMap((at) => events(at, new Set(seen).add(name))));
+    return memo.get(name);
+  };
+  const flagged = new Set();
+  const scan = (at, seen) => {
+    // The keys an open still waits on; a type while any is left is flagged.
+    let unread = new Set();
+    for (const a of at) {
+      for (const e of events(a, seen)) {
+        if (e === 'open') unread = new Set(['keyboard', 'settled']);
+        else if (e === 'close' || e === 'early') unread = new Set();
+        else if (e === 'type') unread.size && flagged.add(a[0] + 1);
+        else unread.delete(e);
+      }
+    }
+  };
+  scan(
+    lines.flatMap((_, i) => (inBody.has(i) ? [] : [[i, 0]])),
+    new Set(),
+  );
+  for (const [name, at] of bodies) scan(at, new Set([name]));
+  return [...flagged].sort((a, b) => a - b);
+}
+
+test('the open-then-type lint flags a wtype after an open that waited only on niri, and passes one that read .keyboard and .settled', () => {
+  const m104 = `notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+state_is() { notifs | jq -e "$@" >/dev/null; }
+focus_is() { niri msg -j layers | jq -e '.[] | .keyboard_interactivity == "Exclusive"' >/dev/null; }
+centre_open() { state_is '.open and .settled' && focus_is; }
+niri msg action spawn -- dots-call notifs open
+until_ok 3000 centre_open
+wtype s
+`;
+  assert.deepEqual(typesBeforeKeys(m104), [7]);
+  const fixed = m104.replace("'.open and .settled'", "'.open and .keyboard and .settled'");
+  assert.deepEqual(typesBeforeKeys(fixed), []);
+  assert.deepEqual(typesBeforeKeys(m104.replace("'.open and .settled'", "'.open and .keyboard'")), [7], 'the keyboard alone is not enough');
+  // A helper that opens and one that waits are followed through their calls, on one line or many.
+  const helpers = `open_acc() { niri msg action spawn -- dots-call accounts toggle; }
+ready() {
+  until_ok 3000 state_is '.open and .settled and .keyboard'
+}
+open_acc
+wtype -k r
+open_acc
+ready
+wtype -k r
+`;
+  assert.deepEqual(typesBeforeKeys(helpers), [6]);
+  // The island's own state has no .keyboard, so typing after opening it is out of the rule.
+  assert.deepEqual(typesBeforeKeys('niri msg action spawn -- dots-call island focus\nwtype -k d\n'), []);
+  // The cheat sheet, opened over the launcher, replaces it in the island, and the launcher's close puts it away.
+  assert.deepEqual(typesBeforeKeys('dots-call launcher toggle\ndots-call cheatsheet toggle\nwtype -k Escape\ndots-call launcher open\nqs ipc call launcher close\nwtype x\n'), []);
+  // A check of the early keys themselves marks the wtype that types them.
+  assert.deepEqual(typesBeforeKeys('dots-call launcher toggle\nwtype foot # early on purpose\nwtype -k Escape\n'), []);
+  assert.deepEqual(typesBeforeKeys('dots-call launcher toggle\nwtype foot # early\nwtype -k Escape\n'), [2, 3]);
+});
+
+test('every tests/dev script reads a keyed surface\'s .keyboard and .settled after opening it and before it types', () => {
+  // Rewritten by m105's surface tasks, which add the wait as they go.
+  const exempt = ['accounts.sh', 'dns-open.sh', 'goals.sh', 'pass.sh', 'rows-mouse.sh', 'surfaces.sh'];
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh') && !exempt.includes(f))) {
+    for (const n of typesBeforeKeys(readFileSync(dir + f, 'utf8'))) found.push(`${f}:${n}`);
+  }
+  assert.deepEqual(found, [], "wait with until_ok <ms> on a state read of '.keyboard and .settled'");
+});

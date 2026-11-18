@@ -31,7 +31,7 @@ open_bluetooth() {
   niri msg action spawn -- dots-call control section bluetooth
   until_ok 3000 section_is bluetooth
   until_ok 3000 control_focus
-  until_ok 3000 state_is '.keyboard'
+  until_ok 3000 state_is '.keyboard and .settled'
 }
 
 # Quickshell's BlueZ client talks to the system bus, which in the nested session is the nested session bus.

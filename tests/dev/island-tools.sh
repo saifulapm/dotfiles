@@ -40,6 +40,7 @@ open_tool pass
 niri msg action spawn -- dots-call tailscale toggle
 until_ok 3000 island_is '.surface == "tailscale" and .animating == false'
 check "Mod+T while Pass shows morphs the island to Tailscale and closes Pass ($(tool pass | jq -c '{open}'))" tool_is pass '.open == false'
+until_ok 2000 tool_is tailscale '.keyboard and .settled'
 key Escape
 until_ok 3000 at_rest
 

@@ -22,7 +22,7 @@ launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
 # The nested shell scans the temp data dir's entries, so the repo's entry goes there for the launcher to list.
 cp "$entry" "$DOTS_DEV_DIR/data/applications/dekho.desktop"
 niri msg action spawn -- dots-call launcher toggle
-until_ok 3000 launcher_is '.open and .query == ""'
+until_ok 3000 launcher_is '.open and .query == "" and .keyboard and .settled'
 wtype dekho
 until_ok 3000 launcher_is '.query == "dekho" and .results[0] == "Dekho"'
 check "the launcher lists Dekho from its desktop entry ($(launcher_state | jq -c '.results[0:2]'))" launcher_is '.results[0] == "Dekho"'

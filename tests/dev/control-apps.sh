@@ -65,7 +65,7 @@ until_ok 2000 volume_of "$player" "Volume: 0.40"
 
 # Control opens on Home; its Sound page is the section Audio.
 niri msg action spawn -- dots-call control section audio
-until_ok 3000 state_is '.open and .section == "audio" and .keyboard'
+until_ok 3000 state_is '.open and .section == "audio" and .keyboard and .settled'
 # Rows of a kind keep PipeWire's order, so each kind is read as a set.
 rows_are() { state_is --argjson a "$1" '(.rows[0:2] | sort) == ["Dots null sink","Dots second sink"] and (.rows[2:-1] | sort) == $a and .rows[-1] == "Dots null source"'; }
 until_ok 3000 rows_are '["Bare stream","Test Player"]'

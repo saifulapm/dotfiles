@@ -39,7 +39,7 @@ until_ok 3000 more_than $((n + 2))
 wl-copy 'just bench --only morph'
 until_ok 3000 more_than $((n + 3))
 niri msg action spawn -- dots-call launcher mode clipboard
-until_ok 3000 state_is '.open and .mode == "clipboard" and (.clips | length) == 4 and .settled'
+until_ok 3000 state_is '.open and .mode == "clipboard" and (.clips | length) == 4 and .keyboard and .settled'
 until_ok 3000 state_is '.clips[2].thumb'
 check "Mod+V draws the clips as 2 x 2 cards of 84 px, each with its age ($(launcher | jq -c '{columns, clips: [.clips[] | {height, age}]}'))" state_is '.columns == 2 and (.clips | length) == 4 and (.clips | all(.height == 84 and .age == "now"))'
 check "the image clip shows a thumbnail ($(launcher | jq -c '.clips[2] | {text, thumb}'))" state_is '.clips[2].thumb == true'

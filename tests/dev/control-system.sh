@@ -33,7 +33,7 @@ select_row() {
 # Opens Control on a page by name, as Enter on its tile and the power key do.
 page_to() {
   timeout 0.5 qs ipc call control section "$1"
-  until_ok 3000 section_is "$1" && until_ok 3000 state_is '.keyboard'
+  until_ok 3000 section_is "$1" && until_ok 3000 state_is '.keyboard and .settled'
 }
 
 until_ok 5000 shell_status >/dev/null
@@ -42,7 +42,7 @@ check "the shell runs the fake workflow" test -x "$DOTS_WORKFLOW"
 # The power key runs dots-call control section power (binds.kdl).
 niri msg action spawn -- dots-call control section power
 until_ok 3000 section_is power
-until_ok 3000 state_is '.keyboard'
+until_ok 3000 state_is '.keyboard and .settled'
 check "the power key opens Control on its Power page" section_is power
 check "Power lists the profile and the session actions" state_is '.rows as $r | ["Profile", "Lock", "Log out", "Reboot", "Power off"] | all(. as $t | $r | index($t))'
 check "its four square actions read Lock, Log out, Reboot and Power off ($(control_state | jq -c .power.actions))" state_is '.power.actions == ["Lock", "Log out", "Reboot", "Power off"]'

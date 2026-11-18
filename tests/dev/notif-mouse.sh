@@ -19,7 +19,7 @@ focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "do
 # niri runs no binds for wtype's virtual keyboard, so the check spawns Mod+A's command through niri.
 open_centre() {
   niri msg action spawn -- dots-call notifs toggle
-  until_ok 3000 centre_is '.open and .settled' || return 1
+  until_ok 3000 centre_is '.open and .settled and .keyboard' || return 1
   until_ok 2000 focus_is Exclusive
 }
 closed() { centre_is '.open == false'; }
