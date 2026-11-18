@@ -24,13 +24,17 @@ reminders. Do not write the store file yourself.
 
 Nothing else: no dates, no seconds, no words like "tomorrow". Change his
 words into one form: "in 5 minutes" is `5m`, "in an hour and a half" is
-`1h30m`, "at half five" in the evening is `17:30`. For a day after
-tomorrow, count the hours from now (`date` gives the clock) and show him
-the time the CLI prints.
+`1h30m`, "at half five" in the evening is `17:30`.
 
-`<text>` is every word after the time, so no quotes are needed. Keep his
-words, short: "remind me in 5 minutes to stretch" is
-`reminder add 5m stretch`.
+`17:30` rings at the next 17:30, so it rings today while 17:30 is still
+ahead. When he names tomorrow and that time is still ahead today, or he
+names a later day, count the hours from now instead (`date` gives the
+clock): at 10:00, "tomorrow at 17:30" is `31h30m`. The CLI prints the
+clock and how far off it is; check it says the day he meant.
+
+Put the text in single quotes, since bash would change `$50` or drop all
+after a `#`; write a `'` inside it as `'\''`. Keep his words, short:
+"remind me in 5 minutes to stretch" is `reminder add 5m 'stretch'`.
 
 It prints what it set, such as `tea · in 20m · 10:20`. Give Saiful that
 line. When it refuses (`Cannot set 0m: it is not in the future`, `At most

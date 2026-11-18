@@ -51,3 +51,23 @@ test('the skill asks Saiful before any reminder rm', () => {
   const text = readFileSync(skill, 'utf8');
   assert.ok(text.includes('Never run `reminder rm` until Saiful says yes to that reminder'));
 });
+
+test('the skill asks, then waits, and only then removes, in that order', () => {
+  const text = readFileSync(skill, 'utf8');
+  const steps = ['Run `reminder list`', 'Ask him', 'Then stop and wait for his answer.', 'After his yes, run `reminder rm <id>`'].map((x) => text.indexOf(x));
+  assert.ok(steps.every((at) => at >= 0), String(steps));
+  assert.deepEqual([...steps].sort((a, b) => a - b), steps);
+});
+
+// Unquoted, bash turns "pay Rubel $50" into "pay Rubel 0" and drops all after a #.
+test('the skill puts the text in single quotes', () => {
+  const text = readFileSync(skill, 'utf8');
+  assert.ok(text.includes("reminder add 5m 'stretch'"));
+  assert.ok(text.includes('Put the text in single quotes'));
+});
+
+// At 10:00, "tomorrow at 17:30" given as 17:30 would ring today.
+test('the skill counts hours for a named day the clock form would ring too soon', () => {
+  const text = readFileSync(skill, 'utf8');
+  assert.ok(text.includes('When he names tomorrow and that time is still ahead today'));
+});
