@@ -67,15 +67,19 @@ wtype "c "
 until_ok 3000 state_is '.count == 40'
 check "the current scheme's card has the check ($(launcher | jq -c '[.results, .checks] | transpose | map(select(.[1]))'))" state_is '[.results, .checks] | transpose | map(select(.[1])) | length <= 1'
 wtype -k Tab
-tallest=0
+# The island holds the launcher's whole content, its box plus 16 px above and below, and never grows past the output's less 48 px.
+tallest=0 cut=0
 for _ in $(seq 39); do
   wtype j
   h=$(island_h)
+  need=$(launcher | jq '.cardBox.h + 32 | ceil')
   ((h > tallest)) && tallest=$h
+  ((need > h)) && cut=$((cut + 1))
 done
 until_ok 2000 state_is '.top + .selected == 39'
 check "39 presses of j reach the 40th scheme card ($(launcher | jq -c '{top, selected, cursorName}'))" state_is '.top + .selected == 39 and .cursorName == .results[.selected]'
-check "and the island's height stays at or under the output's less 48 px ($tallest, cap $((oh - 48)))" test "$tallest" -le $((oh - 48))
+check "the island's height stays at or under the output's less 48 px ($tallest, cap $((oh - 48)))" test "$tallest" -le $((oh - 48))
+check "and the island never cuts the cards off ($cut of 39 steps cut)" test "$cut" -eq 0
 close_launcher
 
 open_launcher
