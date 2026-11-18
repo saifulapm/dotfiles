@@ -1,4 +1,4 @@
-// What bin/dots-pinentry and the shell's card say to each other: one request line, with gpg's Assuan text still percent-escaped, and the Assuan answer the stub hands gpg as it is.
+// What bin/dots-pinentry and the shell's prompt say to each other: one request line, with gpg's Assuan text still percent-escaped, and the Assuan answer the stub hands gpg as it is.
 import { line } from './voice.mjs';
 import { C0, DEL, klass } from './clean.mjs';
 
@@ -37,11 +37,9 @@ export function errorLine(text) {
   return m ? `Bad passphrase · try ${m[1]} of ${m[2]}` : line(text);
 }
 
-// The heading in the launcher's pill idiom and the key strip.
-export function cardText(look, kind) {
-  const name = kind === 'confirm' ? 'confirm' : 'passphrase';
-  return {
-    heading: look.heading(name, ''),
-    keys: look.keys(kind === 'confirm' ? [['↵', 'allow'], ['esc', 'deny']] : [['↵', 'unlock'], ['esc', 'cancel']]),
-  };
+// The words and buttons of board 7's prompt for a request: a passphrase asks, a confirmation allows or denies, and anything else only informs.
+export function cardWords(kind) {
+  if (kind === 'passphrase') return { title: 'Passphrase required', detail: 'GPG key', quiet: 'Cancel', primary: 'Unlock', field: true };
+  if (kind === 'confirm') return { title: 'Confirm', detail: 'GPG', quiet: 'Deny', primary: 'Allow', field: false };
+  return { title: 'GPG', detail: '', quiet: 'Cancel', primary: '', field: false };
 }

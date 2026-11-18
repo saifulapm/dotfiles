@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# gpg asks for its passphrase on the shell's card: a real agent in a scratch home runs bin/dots-pinentry, and pass show waits on the card.
+# gpg asks for its passphrase on the shell's prompt: a real agent in a scratch home runs bin/dots-pinentry, and pass show waits on the prompt.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -34,21 +34,21 @@ rc_of() {
   echo $?
 }
 
-check "before any request the card is not loaded" state_is '.loaded == false'
+check "before any request the prompt is not loaded" state_is '.loaded == false'
 
-# A cold agent asks: the card opens over the launcher's dim with gpg's description.
+# A cold agent asks: the prompt takes the island with gpg's description.
 show_bg first
 until_ok 8000 state_is '.open and .settled'
-check "pass show with a cold agent opens the card with gpg's description ($(pin_state | jq -c '.description[0:20]'))" state_is '.open and .kind == "passphrase" and (.description | startswith("Please enter the pas"))'
-check "the card holds the keyboard" focus_is Exclusive
-check "the field is masked" state_is '.masked'
+check "pass show with a cold agent opens the prompt with gpg's description ($(pin_state | jq -c '.description[0:20]'))" state_is '.open and .kind == "passphrase" and (.description | startswith("Please enter the pas"))'
+check "the prompt holds the keyboard" focus_is Exclusive
+check "the field is masked" state_is '.drawnField.secret'
 
-# A wrong passphrase comes back from gpg as a retry on the same pinentry: the card reopens with the error and an empty field.
+# A wrong passphrase comes back from gpg as a retry on the same pinentry: the prompt shows again with the error and an empty field.
 wtype 'wrong one'
 until_ok 2000 state_is '.field == 9'
 wtype -k Return
 until_ok 8000 state_is '.open and .error != ""'
-check "a wrong passphrase reopens the card with the board's error line ($(pin_state | jq -c .error))" state_is '.open and (.error | test("^Bad passphrase · try 2 of 3$"))'
+check "a wrong passphrase shows the prompt again with the board's error line ($(pin_state | jq -c .error))" state_is '.open and (.error | test("^Bad passphrase · try 2 of 3$"))'
 check "and its field is empty" state_is '.field == 0'
 
 wtype "$passphrase"
@@ -59,7 +59,7 @@ rc=$(rc_of "$pid")
 check "the right passphrase, with % and non-ASCII in it, decrypts: pass show exits 0 (rc $rc)" test "$rc" = 0
 check "and prints the password" grep -qxF "$password" "$out/first.out"
 until_ok 3000 state_is '.open | not'
-check "the card closes and gives the keyboard back" focus_is None
+check "the prompt closes and gives the keyboard back" focus_is None
 
 # Esc reaches gpg as a cancel, so the terminal gets gpg's error instead of hanging.
 gpgconf --kill gpg-agent
@@ -73,7 +73,7 @@ check "Esc makes pass show exit non-zero (rc $rc) with gpg's Operation cancelled
 unlogged() { ! journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null | grep -qF -e "$passphrase" -e 'wrong one'; }
 check "the shell's journal holds no typed passphrase" unlogged
 
-# While the screen is locked, the stub cancels before any card opens.
+# While the screen is locked, the stub cancels before any prompt opens.
 marker=$XDG_STATE_HOME/dots/locked
 date +%s >"$marker"
 gpgconf --kill gpg-agent
@@ -82,10 +82,10 @@ show_bg locked
 until_ok 4000 exited "$pid"
 rc=$(rc_of "$pid") ms=$(($(now_ms) - t0))
 check "with the lock marker down pass show exits non-zero in under 2 s (rc $rc, $ms ms)" bash -c "[ $rc != 0 ] && [ $ms -lt 2000 ]"
-check "and no card opened" state_is '.open | not'
+check "and no prompt opened" state_is '.open | not'
 : >"$marker"
 
-# Two requests at once: the second waits behind the first, and neither hangs. The prompt is not gpg's Passphrase:, so the only passphrase on the card is its heading.
+# Two requests at once: the second waits behind the first, and neither hangs. The prompt is not gpg's Passphrase:, so the prompt's own words do not match.
 ask() { printf 'SETDESC %s\nSETPROMPT Secret:\nGETPIN\nBYE\n' "$1" | "$repo/bin/dots-pinentry" >"$out/$1.assuan" 9>&- & echo $!; }
 a=$(ask first-request)
 until_ok 3000 state_is '.open and .description == "first-request"'
@@ -100,45 +100,26 @@ wtype -k Escape
 until_ok 3000 exited "$b"
 check "the first got its passphrase and the second its cancel" bash -c "grep -qx 'D one' '$out/first-request.assuan' && grep -qx 'ERR 83886179 Operation cancelled' '$out/second-request.assuan'"
 
-# gpg's error is the agent's text: one too long for the card is cut short inside it.
+# gpg's error is the agent's text: one too long for the prompt is cut short, and the prompt keeps its width.
 long=$(printf 'A%.0s' $(seq 200))
 printf 'SETDESC long error\nSETERROR %s\nGETPIN\nBYE\n' "$long" 9>&- | "$repo/bin/dots-pinentry" >/dev/null 9>&- &
 p=$!
 until_ok 3000 state_is '.open and .settled and .error != ""'
-check "a 200-character error is cut short inside the card ($(pin_state | jq -c '[.errorTruncated, .errorRight, (.cardBox.x + .cardBox.w)]'))" state_is '.errorTruncated and .errorRight <= .cardBox.x + .cardBox.w - 19'
+check "a 200-character error leaves the prompt 520 px wide ($(pin_state | jq -c '[.width, (.error | length)]'))" state_is '.width == 520 and (.error | length) == 200'
 wtype -k Escape
 until_ok 3000 exited "$p"
-until_ok 3000 state_is '.drawing == false'
+until_ok 3000 state_is '.open | not'
 
-# The card draws its heading and key strip, read off the screen.
-read -r ox oy < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y)"')
-box_of() { pin_state | jq -r --argjson ox "$ox" --argjson oy "$oy" --arg k "$1" '.[$k] | "\(.x + $ox - 4 | round),\(.y + $oy - 4 | round) \(.w + 8 | round)x\(.h + 8 | round)"'; }
-# tesseract reads the heading's pill negated.
-negated() {
-  node -e '
-    const b = require("fs").readFileSync(0);
-    const head = b.toString("latin1").match(/^P6\s+\d+\s+\d+\s+\d+\s/)[0].length;
-    for (let i = head; i < b.length; i++) b[i] = 255 - b[i];
-    process.stdout.write(b);
-  '
-}
-seen_text() {
-  grim -s 2 -g "$(box_of cardBox)" - | tesseract stdin - 2>/dev/null
-  grim -s 4 -t ppm -g "$(box_of headingBox)" - | negated | tesseract stdin - --psm 7 2>/dev/null
-}
-heading=Passphrase
-hint="↵ unlock  esc cancel"
+# The prompt draws board 7's words and buttons.
 p=$(ask "Unlock the key")
 until_ok 3000 state_is '.open and .settled'
-check "the heading reads $heading and the strip $hint ($(pin_state | jq -c '[.heading, .hint]'))" state_is ".heading == \"$heading\" and .hint == \"$hint\""
-text=$(seen_text | tr -s ' \n' ' ')
-check "the screen shows the heading (tesseract read: $text)" grep -qF "$heading" <<<"$text"
+check "the title reads Passphrase required with Cancel and an inverted Unlock ($(pin_state | jq -c '[.title, .detail, [.buttons[] | .text]]'))" state_is '.title == "Passphrase required" and ([.buttons[] | [.text, .inverted]] == [["Cancel", false], ["Unlock", true]])'
 wtype -k Escape
 until_ok 3000 exited "$p"
-until_ok 3000 state_is '.drawing == false'
+until_ok 3000 state_is '.open | not'
 
-# A closed card unloads 30 s after it stops drawing.
-check "the card is still loaded right after it closes" state_is '.loaded'
+# A closed prompt unloads 30 s after it closes.
+check "the prompt is still loaded right after it closes" state_is '.loaded'
 until_ok 33000 state_is '.loaded == false'
 check "and unloaded 30 s later" state_is '.loaded == false'
 

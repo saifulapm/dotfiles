@@ -1,10 +1,8 @@
 import QtQuick
-import QtQuick.Layouts
 import "." as Root
-import "lib/voice.mjs" as V
 import "lib/pinentry.mjs" as P
 
-// gpg's passphrase or confirmation card, shaped like the polkit prompt and drawn in the Surfaces window; it loads on the first request and unloads 30 s after it closes.
+// A gpg request as board 7's prompt, drawn inside the island over whatever it covers: a passphrase asks with Cancel and Unlock, a confirmation with Deny and Allow, and a wrong passphrase comes back with its error line.
 Item {
     id: prompt
 
@@ -12,245 +10,122 @@ Item {
     property bool shown: false
     // {kind, description, prompt, error, answer} from the Pinentry service, while a request shows.
     property var request: null
-    // The request as the card draws it, kept while its close still plays.
+    // The request as the prompt draws it, kept after it closes since the island still draws it on its way out.
     property var seen: null
-    readonly property bool confirm: seen?.kind === "confirm"
-
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: V.listLook(theme.tokens)
-    readonly property var words: P.cardText(look, seen?.kind ?? "passphrase")
-    readonly property Root.Motion motion: Root.Motion {
-        shown: prompt.shown
-        tokens: prompt.theme.tokens
-        onDrawingChanged: if (!drawing)
-            prompt.seen = null
-    }
+    // The surface this prompt returns to, as its chip's words; the surfaces' window sets it.
+    property string chip: ""
+    // True once the island has come to rest on the prompt; the surfaces' window sets it.
+    property bool settled: false
+    readonly property var words: P.cardWords(seen?.kind ?? "passphrase")
+    // The island reports this as its takeover while the prompt shows, and grows to this width for it (board 7).
+    readonly property string name: "pinentry"
+    readonly property int wantWidth: 520
+    implicitHeight: card.implicitHeight + 40
 
     function show(r) {
         request = r;
         seen = r;
-        input.text = "";
+        card.input.text = "";
         shown = true;
-        if (confirm)
-            confirmKeys.forceActiveFocus();
-        else
-            input.forceActiveFocus();
+        (words.field ? card.input : keys).forceActiveFocus();
     }
 
     function reply(text) {
         const r = request;
         request = null;
         shown = false;
-        input.text = "";
+        card.input.text = "";
         r?.answer(text);
     }
 
     function submit() {
-        if (request)
-            reply(confirm ? P.ALLOW : P.pinAnswer(input.text));
+        if (!request)
+            return;
+        if (seen.kind === "confirm")
+            reply(P.ALLOW);
+        else if (words.field)
+            reply(P.pinAnswer(card.input.text));
     }
 
-    // Esc, or another surface opening, answers the request so gpg never waits on a card nobody sees.
+    // Esc, Cancel or Deny answers the request so gpg never waits on a prompt nobody sees.
     function close() {
         if (request)
-            reply(confirm ? P.DENY : P.CANCEL);
+            reply(seen.kind === "confirm" ? P.DENY : P.CANCEL);
     }
 
     // gpg went away on its own, so there is nothing to answer.
     function dismiss() {
         request = null;
         shown = false;
-        input.text = "";
+        card.input.text = "";
     }
 
     function swapped() {
     }
 
-    function box(item) {
-        const a = item.mapToItem(null, 0, 0);
-        return { x: a.x, y: a.y, w: item.width, h: item.height };
-    }
-
     function state() {
-        const hint = [];
-        for (let i = 0; i < hintRepeater.count; i++)
-            hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
+        const d = card.drawn();
         return JSON.stringify({
             loaded: true,
             open: shown,
-            kind: seen?.kind ?? null,
-            heading: pill.text,
-            // The heading's pill as drawn, for a check that reads the screen.
-            headingBox: box(pill.parent),
-            hint: hint.join("  "),
-            description: descriptionText.text,
-            descriptionLines: descriptionText.lineCount,
-            error: errorText.visible ? errorText.text : "",
-            // The error line as drawn: cut short when it is longer than the card.
-            errorTruncated: errorText.truncated,
-            errorRight: errorText.mapToItem(null, errorText.contentWidth, 0).x,
-            field: input.text.length,
-            masked: input.echoMode === TextInput.Password,
-            motion: motion.curves?.kind ?? null,
-            settled: motion.settled,
+            settled: prompt.settled,
             drawing: prompt.visible,
-            cardBox: card.drawnBox()
+            keyboard: card.input.activeFocus || keys.activeFocus,
+            kind: seen?.kind ?? null,
+            description: seen?.description ?? "",
+            drawnDescription: d.request,
+            // The error line as drawn, "" when there is none.
+            error: d.error ? d.error.text : "",
+            // The field's length, never its text.
+            field: card.input.text.length,
+            title: d.title,
+            detail: d.detail,
+            chip: d.chip,
+            drawnField: d.field,
+            wrong: d.error,
+            danger: d.danger,
+            buttons: d.buttons,
+            width: prompt.width
         });
     }
 
     Component.onCompleted: Root.State.loaded.push("pinentry")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "pinentry")
-    visible: motion.drawing
 
-    Rectangle {
+    // A press anywhere on the prompt is on its card, so the surfaces' window never takes it for a click outside.
+    Item {
+        objectName: "card"
         anchors.fill: parent
-        color: card.wash
     }
 
-    Root.Surface {
+    // A confirmation has no field, so this takes its keys.
+    Item {
+        id: keys
+        Keys.onReturnPressed: prompt.submit()
+        Keys.onEnterPressed: prompt.submit()
+        Keys.onEscapePressed: prompt.close()
+    }
+
+    Root.Prompt {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: Math.round((parent.height - height) / 3)
-        width: 520
-        height: column.implicitHeight
-        tokens: prompt.theme.tokens
-        motion: prompt.motion
-
-        ColumnLayout {
-            id: column
-            width: parent.width
-            spacing: 0
-
-            // The heading in the launcher's pill.
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.margins: 20
-                Layout.bottomMargin: 10
-
-                Rectangle {
-                    implicitWidth: pill.implicitWidth + 18
-                    implicitHeight: pill.implicitHeight + 6
-                    radius: 8
-                    color: prompt.look.label.fill
-                    Text {
-                        id: pill
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: prompt.words.heading
-                        color: prompt.look.label.color
-                        font.family: prompt.fonts.ui
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-                }
-            }
-
-            // gpg's description keeps its own line breaks, up to three lines.
-            Text {
-                id: descriptionText
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.bottomMargin: prompt.confirm ? 16 : 0
-                wrapMode: Text.Wrap
-                maximumLineCount: 3
-                elide: Text.ElideRight
-                text: V.inOrder(prompt.seen?.description).trim()
-                color: prompt.c.ink
-                font.family: prompt.fonts.ui
-                font.pixelSize: 14
-                lineHeight: 1.2
-            }
-
-            Rectangle {
-                id: fieldBox
-                visible: !prompt.confirm
-                Layout.fillWidth: true
-                Layout.margins: 20
-                implicitHeight: 44
-                color: "transparent"
-                border.width: 1
-                border.color: prompt.c.ink
-
-                TextInput {
-                    id: input
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    verticalAlignment: TextInput.AlignVCenter
-                    echoMode: TextInput.Password
-                    color: prompt.c.ink
-                    font.family: prompt.fonts.ui
-                    font.pixelSize: 16
-                    clip: true
-                    Keys.onReturnPressed: prompt.submit()
-                    Keys.onEnterPressed: prompt.submit()
-                    Keys.onEscapePressed: prompt.close()
-                }
-
-                Text {
-                    textFormat: Text.PlainText
-                    visible: input.text === ""
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 12
-                    text: V.line(prompt.seen?.prompt).replace(/:$/, "") || "Passphrase"
-                    color: prompt.c.muted
-                    font.family: prompt.fonts.ui
-                    font.pixelSize: 16
-                }
-            }
-
-            // A confirmation has no field, so the card itself takes the keys.
-            Item {
-                id: confirmKeys
-                Keys.onReturnPressed: prompt.submit()
-                Keys.onEnterPressed: prompt.submit()
-                Keys.onEscapePressed: prompt.close()
-            }
-
-            Text {
-                id: errorText
-                visible: text !== ""
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.bottomMargin: 10
-                text: P.errorLine(prompt.seen?.error ?? "")
-                elide: Text.ElideRight
-                color: prompt.c.danger
-                font.family: prompt.look.small.font
-                font.pixelSize: prompt.look.small.size
-                font.letterSpacing: prompt.look.small.spacing
-            }
-
-            // The key strip as the launcher's legend draws it, each pair as plain dim text.
-            Row {
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.bottomMargin: 16
-                spacing: 8
-
-                Repeater {
-                    id: hintRepeater
-                    model: prompt.words.keys
-
-                    KeyPair {
-                        id: keyPair
-                        required property int index
-                        theme: prompt.theme
-                        look: prompt.look
-
-                        // The first chip is ↵ and the second esc, so a click on one does what its key does.
-                        Root.Click {
-                            name: "pinentry-key:" + keyPair.index
-                            onTapped: keyPair.index === 0 ? prompt.submit() : prompt.close()
-                        }
-                    }
-                }
-            }
-        }
+        x: 20
+        y: 20
+        width: parent.width - 40
+        theme: prompt.theme
+        clickName: "pinentry"
+        glyph: 0xF0306
+        title: prompt.words.title
+        detail: prompt.words.detail
+        chip: prompt.chip
+        request: prompt.seen?.description ?? ""
+        field: prompt.words.field
+        placeholder: "Passphrase"
+        error: P.errorLine(prompt.seen?.error ?? "")
+        quiet: prompt.words.quiet
+        primary: prompt.words.primary
+        onQuietTapped: prompt.close()
+        onPrimaryTapped: prompt.submit()
+        onEntered: prompt.submit()
+        onEscaped: prompt.close()
     }
 }

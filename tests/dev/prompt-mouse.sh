@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The polkit and pinentry prompts by mouse: a click on Allow or the ↵ chip answers as Enter does, and a click on Cancel or the esc chip cancels as Esc does.
+# The polkit and pinentry prompts by mouse: a click on Allow or Unlock answers as Enter does, and a click on Cancel cancels as Esc does.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -11,6 +11,8 @@ pk_is() { pk_state | jq -e "$1" >/dev/null 2>&1; }
 result_is() { [ "$(fake Result s "$1" 2>/dev/null)" = "s \"$2\"" ]; }
 pin_state() { timeout 0.5 dots-call pinentry state 2>/dev/null; }
 pin_is() { pin_state | jq -e "$1" >/dev/null 2>&1; }
+# An agent's shell carries PINENTRY_USER_DATA=curses, which sends the stub to pinentry-curses, so no prompt reaches the shell.
+unset PINENTRY_USER_DATA GPG_TTY
 out=$(mktemp -d)
 DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
 fake_pid=$!
@@ -38,25 +40,25 @@ until_ok 2000 pk_is '.open | not'
 check "and the prompt closes" pk_is '.open | not'
 
 printf 'SETDESC typed-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/typed.assuan" 9>&- &
-until_ok 3000 pin_is '.open and .description == "typed-request"'
+until_ok 3000 pin_is '.open and .description == "typed-request" and .settled and .keyboard'
 wtype one
-click_box pinentry-key:0
+click_box pinentry-primary
 until_ok 3000 grep -qx 'D one' "$out/typed.assuan"
-check "a click on pinentry's ↵ chip answers with what was typed" grep -qx 'D one' "$out/typed.assuan"
+check "a click on pinentry's Unlock answers with what was typed" grep -qx 'D one' "$out/typed.assuan"
 
 printf 'SETDESC confirm-request\nCONFIRM\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/confirm.assuan" 9>&- &
-until_ok 3000 pin_is '.open and .description == "confirm-request"'
-click_box pinentry-key:0
+until_ok 3000 pin_is '.open and .description == "confirm-request" and .settled'
+click_box pinentry-primary
 # Allowed, CONFIRM answers OK; denied, it answers ERR, and gpg reads OK closing connection only once the card has answered.
 allowed=$'OK Pleased to meet you\nOK\nOK\nOK closing connection'
 until_ok 3000 grep -q '^OK closing connection' "$out/confirm.assuan"
-check "a click on a confirm card's ↵ allow chip allows it ($(tr '\n' ' ' <"$out/confirm.assuan"))" test "$(cat "$out/confirm.assuan")" = "$allowed"
+check "a click on a confirm prompt's Allow allows it ($(tr '\n' ' ' <"$out/confirm.assuan"))" test "$(cat "$out/confirm.assuan")" = "$allowed"
 
 printf 'SETDESC cancel-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/cancel.assuan" 9>&- &
-until_ok 3000 pin_is '.open and .description == "cancel-request"'
-click_box pinentry-key:1
+until_ok 3000 pin_is '.open and .description == "cancel-request" and .settled'
+click_box pinentry-quiet
 until_ok 3000 grep -q '^ERR 83886179' "$out/cancel.assuan"
-check "a click on its esc chip cancels" grep -q '^ERR 83886179' "$out/cancel.assuan"
+check "a click on its Cancel cancels" grep -q '^ERR 83886179' "$out/cancel.assuan"
 
 exit "$fails"
 }

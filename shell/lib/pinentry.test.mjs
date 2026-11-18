@@ -1,8 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listLook } from './voice.mjs';
-import { schemeTokens } from './colorscheme-file.mjs';
-import { parseRequest, pinAnswer, CANCEL, ALLOW, DENY, errorLine, cardText } from './pinentry.mjs';
+import { parseRequest, pinAnswer, CANCEL, ALLOW, DENY, errorLine, cardWords } from './pinentry.mjs';
 
 test("a request line gives its kind and gpg's text, unescaped", () => {
   assert.deepEqual(parseRequest('passphrase\tPlease enter%0A"Saiful <s@x>"%0A100%25 yours\tPassphrase:\tBad Passphrase (try 2 of 3)'), {
@@ -50,8 +48,9 @@ test("gpg's bad-passphrase error reads as the board's line, and other errors pas
   assert.equal(errorLine(''), '');
 });
 
-test('the card names its heading and key strip, for a passphrase and for a confirmation', () => {
-  const t = (kind) => cardText(listLook(schemeTokens('artboard')), kind);
-  assert.deepEqual(t('passphrase'), { heading: 'Passphrase', keys: [{ key: '↵', word: 'unlock' }, { key: 'esc', word: 'cancel' }] });
-  assert.deepEqual(t('confirm'), { heading: 'Confirm', keys: [{ key: '↵', word: 'allow' }, { key: 'esc', word: 'deny' }] });
+// Board 7's buttons: a passphrase has Cancel and an inverted Unlock and a field; a confirmation Deny and Allow, no field; any other kind only informs, so Cancel alone.
+test('each kind of request names its title, detail, buttons and whether it has a field', () => {
+  assert.deepEqual(cardWords('passphrase'), { title: 'Passphrase required', detail: 'GPG key', quiet: 'Cancel', primary: 'Unlock', field: true });
+  assert.deepEqual(cardWords('confirm'), { title: 'Confirm', detail: 'GPG', quiet: 'Deny', primary: 'Allow', field: false });
+  assert.deepEqual(cardWords('message'), { title: 'GPG', detail: '', quiet: 'Cancel', primary: '', field: false });
 });

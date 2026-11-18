@@ -96,7 +96,6 @@ Item {
             return;
         hide();
         revealer.name = current.name;
-        revealer.wanted = true;
         revealer.command = [bin, "show", current.name];
         revealer.running = true;
     }
@@ -119,22 +118,13 @@ Item {
         mode = "list";
     }
 
-    // Esc while picking a QR's entry goes back to the list; otherwise it closes, and a reveal still waiting on gpg is dropped.
+    // Esc while picking a QR's entry goes back to the list; otherwise it closes.
     function leave() {
         if (mode === "qr") {
             back();
             return;
         }
-        revealer.wanted = false;
         close();
-    }
-
-    signal reopenWanted
-
-    // Back as it was, after the passphrase card took its place.
-    function reopen() {
-        shown = true;
-        results.forceActiveFocus();
     }
 
     function enter() {
@@ -259,11 +249,17 @@ Item {
         enter();
     }
 
-    // The card closes first, since gpg may ask for its passphrase on its own card; the island says how the copy went.
+    // The surfaces' window calls this when gpg's prompt takes the island over; a copy running then leaves Pass open under it.
+    function covered() {
+        if (runner.running)
+            runner.asked = true;
+    }
+
+    // Pass stays open while dots-pass runs, since gpg may ask for its passphrase on a prompt over it; the copy's end closes Pass unless gpg asked.
     function copy(kind) {
         if (!current || runner.running)
             return;
-        close();
+        runner.asked = false;
         runner.kind = kind;
         runner.command = [bin, kind, current.name];
         runner.running = true;
@@ -333,10 +329,16 @@ Item {
     Process {
         id: runner
         property string kind: ""
+        // True once a gpg prompt covered Pass while this copy ran.
+        property bool asked: false
         stderr: StdioCollector {
             id: runErr
         }
-        onExited: code => pass.theme.notice(code === 0 ? P.copiedText(kind) : P.failedText(runErr.text))
+        onExited: code => {
+            if (!asked)
+                pass.close();
+            pass.theme.notice(code === 0 ? P.copiedText(kind) : P.failedText(runErr.text));
+        }
     }
 
     Process {
@@ -345,15 +347,9 @@ Item {
         stdout: StdioCollector {
             id: revealOut
         }
-        // gpg's passphrase card closes Pass while it asks; once answered, Pass comes back showing the password, unless Esc closed it.
-        property bool wanted: false
+        // gpg's passphrase prompt covers Pass while it asks; once answered, the password shows on its row, unless Esc closed Pass.
         onExited: code => {
-            if (code !== 0 || !(pass.shown || wanted))
-                return;
-            wanted = false;
-            if (!pass.shown)
-                pass.reopenWanted();
-            if (!pass.shown)
+            if (code !== 0 || !pass.shown)
                 return;
             pass.revealName = name;
             pass.revealText = revealOut.text.replace(/\n$/, "");

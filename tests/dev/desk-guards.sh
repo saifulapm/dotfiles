@@ -56,7 +56,8 @@ until_ok 2000 focus_is "$(window_of ours)"
 "$screen" type x >/dev/null
 check "once it closes, the same screen type reaches the launched foot again" until_ok 2000 read_is ours ax
 
-# A pinentry card from bin/dots-pinentry, held open by a GETPIN on its stdin.
+# A pinentry prompt from bin/dots-pinentry, held open by a GETPIN on its stdin. An agent's shell carries PINENTRY_USER_DATA=curses, which sends the stub to pinentry-curses, so it is unset.
+unset PINENTRY_USER_DATA GPG_TTY
 mkfifo "$DOTS_DEV_DIR/pin.in"
 "$repo/bin/dots-pinentry" <"$DOTS_DEV_DIR/pin.in" >"$DOTS_DEV_DIR/pin.out" 9>&- &
 pin_pid=$!

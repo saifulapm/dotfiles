@@ -153,7 +153,7 @@ PanelWindow {
     }
 
     // The prompts that take the island over the surface in it and hand it back once answered, cancelled or hung up; each loads in the island's surface slot.
-    readonly property var takeovers: [polkit]
+    readonly property var takeovers: [polkit, pinentry]
     // Their names as they showed, oldest first, and the item each took the keyboard from.
     property var stack: []
     property var focusUnder: ({})
@@ -233,10 +233,11 @@ PanelWindow {
         closeOthers(dns);
     }
 
-    // The Pinentry service calls this with each gpg request it shows.
+    // The Pinentry service calls this with each gpg request it shows; the prompt takes the island over whatever shows, as polkit's does, and Pass stays open under it.
     function openPinentry(request) {
         pinentryLoader.active = true;
-        closeOthers(pinentry);
+        takeOver(pinentry);
+        pass?.covered();
         pinentry.show(request);
     }
 
@@ -578,19 +579,25 @@ PanelWindow {
         }
     }
 
-    // The newer surfaces load on their first open and never warm; each unloads once it has drawn nothing for 30 s.
+    // The gpg prompt draws inside the island like polkit's; it loads on its first request and unloads 30 s after it hands the island back.
     Loader {
         id: pinentryLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.pinentry
         active: false
         sourceComponent: Root.PinentryPrompt {
-            theme: panelTheme
+            theme: host.theme
+            chip: host.chipFor(name)
+            settled: host.settledOn(name)
+            onShownChanged: if (!shown)
+                host.handBack(host.pinentry)
         }
     }
 
     Root.Tick {
         interval: 30000
-        running: !!host.pinentry && !host.pinentry.visible
+        running: !!host.pinentry && !host.pinentry.shown
         onTriggered: pinentryLoader.active = false
     }
 
@@ -603,15 +610,6 @@ PanelWindow {
         active: false
         sourceComponent: Root.Pass {
             theme: host.theme
-        }
-    }
-
-    // Pass comes back only when nothing else has taken its place.
-    Connections {
-        target: host.pass
-        function onReopenWanted() {
-            if (!host.shown)
-                host.pass.reopen();
         }
     }
 
