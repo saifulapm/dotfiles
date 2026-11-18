@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# A surface's card, Goals', is the paper in a square 1 px accent edge with no shadow, and the island is a square ink box.
+# A surface's card, polkit's, is the paper in a square 1 px accent edge with no shadow, and the island is a square ink box.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
-goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
-goals_is() { goals_state | jq -e "$1" >/dev/null; }
+# pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent, as in polkit.sh.
+fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
+polkit_state() { timeout 0.5 qs ipc call polkit state 2>/dev/null; }
+polkit_is() { polkit_state | jq -e "$1" >/dev/null 2>&1; }
 surfaces_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
-goals_open() { goals_is ".open and .settled" && surfaces_focus Exclusive; }
-goals_closed() { goals_is ".open == false and .drawing == false" && surfaces_focus None; }
+polkit_open() { polkit_is ".open and .settled" && surfaces_focus Exclusive; }
+polkit_closed() { polkit_is ".open == false and .drawing == false" && surfaces_focus None; }
 
 read -r ox oy ow < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width)"')
 # The island's centre line.
@@ -36,16 +38,23 @@ span() {
 
 until_ok 5000 shell_status >/dev/null
 
-niri msg action spawn -- dots-call goals toggle
-until_ok 3000 goals_open
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
+fake_pid=$!
+cleanup() { kill "$fake_pid" 2>/dev/null; }
+until_ok 3000 fake Registered >/dev/null 2>&1
+# The agent registers as the shell starts, so the shell restarts once the authority is up.
+systemctl --user restart "$DOTS_DEV_UNIT"
+until_ok 5000 polkit_is .registered
+fake Begin s card >/dev/null
+until_ok 3000 polkit_open
 # The card's top-left corner and width as it reports them at rest, in screen pixels.
-read -r cx cy cw < <(goals_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cardBox | "\(.x + $ox | floor) \(.y + $oy | floor) \(.w | floor)"')
+read -r cx cy cw < <(polkit_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cardBox | "\(.x + $ox | floor) \(.y + $oy | floor) \(.w | floor)"')
 # The accent edge runs down the left side to the corner itself, so the corner is square; inside it the card is the paper, and 2 px outside it the wash shows no shadow.
 card() { edge "$cx" "$cy" && edge "$cx" $((cy + 40)) 1 10 && tol=6 near $((cx + 100)) $((cy + 3)) 228 230 234 && ! ink $((cx + cw + 2)) $((cy + 60)) && ! ink $((cx - 2)) $((cy + 40)); }
 until_ok 2000 card
 check "the card is the paper in a square 1 px accent edge, with no shadow past it ($cx $cy $cw)" card
 wtype -k Escape
-until_ok 2000 goals_closed
+until_ok 2000 polkit_closed
 
 # Its left edge is ink up at y 10 as well as on the middle row, so the corner is square, and 2 px left of it is paper.
 island() { local l r; read -r l r < <(span 21 23 27); ((l >= 2)) && ink $((mid - 200 + l)) $((oy + 10)) && ink $((mid - 200 + l + 5)) $((oy + 27)) && light $((mid - 200 + l - 2)) $((oy + 10)); }
