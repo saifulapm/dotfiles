@@ -91,8 +91,8 @@ dev_stop() {
   wait "$dev_pid" 2>/dev/null
   return 0
 }
-# A test that needs its own cleanup redefines this; the EXIT trap stays lib.sh's.
-cleanup() { :; }
+# A test that needs its own cleanup redefines this, and one a helper sourced before lib.sh defined stays; the EXIT trap stays lib.sh's.
+declare -F cleanup >/dev/null || cleanup() { :; }
 # A QML error can break what a surface draws while its state IPC still reads right, so every check reads the journal; a polish loop leaves a layout unlaid (m105's Accounts tiles collapsed the card after a refresh).
 qml_errors() {
   journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null |

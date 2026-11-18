@@ -967,3 +967,19 @@ test('dots-dev points the chat away from pxy, and no check or bench names port 4
     .map(([f]) => f);
   assert.deepEqual(named, []);
 });
+
+// m107's chat checks left eight fake pxy servers running when lib.sh stopped them early (the live session had locked), since lib-chat.sh starts its fake before lib.sh's trap.
+test('a chat check that lib.sh stops early leaves no fake pxy or its folder behind', () => {
+  const repo = new URL('../../', import.meta.url).pathname;
+  const r = spawnSync('bash', ['-c', `source ${repo}tests/dev/lib-chat.sh; echo "$chat_fake" >&2; source ${repo}tests/dev/lib.sh`], {
+    encoding: 'utf8',
+    timeout: 10000,
+    env: { ...process.env, WAYLAND_DISPLAY: '' },
+  });
+  const fake = r.stderr.split('\n')[0].trim();
+  assert.ok(fake.startsWith('/'), r.stderr);
+  for (let i = 0; i < 40 && existsSync(fake); i++) spawnSync('sleep', ['0.05']);
+  assert.ok(!existsSync(fake), `${fake} is still there`);
+  const left = spawnSync('pgrep', ['-a', 'node'], { encoding: 'utf8' }).stdout.split('\n').filter((l) => l.includes(fake));
+  assert.deepEqual(left, []);
+});

@@ -29,6 +29,9 @@ chat_cleanup() {
   kill -TERM "$pxy_pid" 2>/dev/null
   rm -rf "$chat_fake"
 }
+# lib.sh may stop before it sets its own EXIT trap (an empty WAYLAND_DISPLAY, a locked session, a busy machine), so this one cleans up until then, and lib.sh's trap runs cleanup after.
+trap chat_cleanup EXIT
+cleanup() { chat_cleanup; }
 
 chat() { timeout 0.5 qs ipc call chat state 2>/dev/null; }
 # Whether the requests the fake pxy logged, read as one array, pass a jq test.
