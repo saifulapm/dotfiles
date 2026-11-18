@@ -62,5 +62,17 @@ sleep 0.3
 check "Mod+Space then Mod+/ 100 ms later ends on the cheat sheet ($(island | jq -c '{surface, width}'))" island_is --argjson w "$sheet_w" '.surface == "cheatsheet" and .width == $w and .animating == false'
 wtype -k Escape
 until_ok 2000 at_rest
+
+# A notification still current under the open launcher, as a critical one stays, must not hide the switch from the morph.
+notify-send -u critical stays
+until_ok 3000 island_is '.mode == "notification"'
+mod_space
+until_ok 3000 settled_on launcher
+mod_slash
+until_ok 3000 settled_on cheatsheet
+check "with a notification current, Mod+/ still morphs from the launcher's box ($(island | jq -c '.morph | {kind, from}'))" island_is '.morph.kind == "open" and .morph.from[0] == 640'
+wtype -k Escape
+timeout 0.5 qs ipc call notifs clear
+until_ok 8000 at_rest
 exit "$fails"
 }

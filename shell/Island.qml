@@ -227,7 +227,7 @@ Item {
     readonly property real drawnWidth: box.width
     // The approved motion (38G8XV1J); none before the scheme loads, so the first frame draws at rest.
     readonly property var motion: theme.tokens ? H.hostMotion() : null
-    readonly property bool animating: morphing.running || [labelPart, livePart, leaseCardPart, sharingCardPart, mediaCardPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
+    readonly property bool animating: morphing.running || morphWaits > 0 || [labelPart, livePart, leaseCardPart, sharingCardPart, mediaCardPart, notePart, monthPart, askPart, surfacePart].some(p => p.busy) || surfaceBusy
     // The box morphs from where it is drawn to its target on one clock, so width and height land together.
     property real fromWidth: 0
     property real fromHeight: 0
@@ -264,13 +264,13 @@ Item {
     onTargetHeightChanged: Qt.callLater(morph)
 
     function morph() {
-        // An open surface's content is its name, so a switch from one surface to another morphs as well.
-        const content = part + ":" + (notification?.key ?? question?.id ?? (part === "surface" ? surface : ""));
+        // An open surface's content is its name, whatever notification or question stays current under it, so a switch from one surface to another morphs as well.
+        const content = part + ":" + (part === "surface" ? surface : notification?.key ?? question?.id ?? "");
         const fresh = morphedFor !== "" && content !== morphedFor;
         const switching = fresh && part === "surface" && morphedFor.startsWith("surface:");
         morphedFor = content;
-        // Width and height each call this; the second lands on the morph the first started.
-        if (!fresh && morphing.running) {
+        // Width and height each call this; the second lands on the morph the first started, or on one still waiting its two frames to start.
+        if (!fresh && (morphing.running || morphWaits > 0)) {
             toWidth = targetWidth;
             toHeight = targetHeight;
             return;
