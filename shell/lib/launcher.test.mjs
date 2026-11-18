@@ -279,3 +279,23 @@ test('a prefix mode has a chip of its glyph and name, and apps has none', () => 
   assert.equal(prefixOf('clipboard'), 'v ');
   assert.equal(prefixOf('apps'), '');
 });
+
+test('each command draws a Symbols Nerd Font glyph, and record draws in the danger tone', () => {
+  const rows = commandRows('', '/bin', 'nuc');
+  assert.deepEqual(
+    rows.map((r) => [r.title, r.nf.codePointAt(0).toString(16), !!r.danger]),
+    [
+      ['Annotate region', 'f03eb', false],
+      ['Annotate clipboard image', 'f02e9', false],
+      ['Copy text from region (OCR)', 'f113a', false],
+      ['Read QR code from region', 'f0432', false],
+      ['Pick colour', 'f020a', false],
+      ['lock', 'f033e', false],
+      ['theme', 'f03d8', false],
+      ['record', 'f044a', true],
+      ['sync', 'f04e6', false],
+      ['Remote: mini', 'f0379', false],
+      ['Remote: macbook', 'f0379', false],
+    ],
+  );
+});

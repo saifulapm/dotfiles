@@ -71,17 +71,17 @@ export function windowRows(windows, q) {
   );
 }
 
-// The capture rows come first, as the m24 boards list them; `key` is the global key a row also has, and `tool` the word Paper shows for it.
+// The capture rows come first, as the m24 boards list them; `key` is the global key a row also has, `tool` the word Paper shows for it, and `nf` the Symbols Nerd Font glyph the launcher draws for it.
 const COMMANDS = [
-  { title: 'Annotate region', detail: 'satty on a region of the screen', tool: 'satty', key: 'Mod+Shift+7', exec: ['dots-capture', 'annotate'] },
-  { title: 'Annotate clipboard image', detail: 'satty on the image in the clipboard', tool: 'satty', exec: ['dots-capture', 'annotate-clip'] },
-  { title: 'Copy text from region (OCR)', detail: 'tesseract eng+ben, text to the clipboard', tool: 'tesseract', key: 'Mod+Shift+6', exec: ['dots-capture', 'ocr'] },
-  { title: 'Read QR code from region', detail: 'zbarimg, copied as sensitive', tool: 'zbarimg', exec: ['dots-capture', 'qr'] },
-  { title: 'Pick colour', detail: 'hex to the clipboard', tool: 'niri', exec: ['dots-capture', 'colour'] },
-  { title: 'lock', detail: 'Lock the screen', exec: ['qs', 'ipc', 'call', 'lock', 'lock'] },
-  { title: 'theme', detail: 'Switch colorscheme', exec: ['dots-call', 'launcher', 'mode', 'colorschemes'] },
-  { title: 'record', detail: 'Start or stop recording', exec: ['qs', 'ipc', 'call', 'record', 'toggle'] },
-  { title: 'sync', detail: 'Sync dotfiles', exec: ['dots', 'sync'] },
+  { title: 'Annotate region', nf: 0xf03eb, detail: 'satty on a region of the screen', tool: 'satty', key: 'Mod+Shift+7', exec: ['dots-capture', 'annotate'] },
+  { title: 'Annotate clipboard image', nf: 0xf02e9, detail: 'satty on the image in the clipboard', tool: 'satty', exec: ['dots-capture', 'annotate-clip'] },
+  { title: 'Copy text from region (OCR)', nf: 0xf113a, detail: 'tesseract eng+ben, text to the clipboard', tool: 'tesseract', key: 'Mod+Shift+6', exec: ['dots-capture', 'ocr'] },
+  { title: 'Read QR code from region', nf: 0xf0432, detail: 'zbarimg, copied as sensitive', tool: 'zbarimg', exec: ['dots-capture', 'qr'] },
+  { title: 'Pick colour', nf: 0xf020a, detail: 'hex to the clipboard', tool: 'niri', exec: ['dots-capture', 'colour'] },
+  { title: 'lock', nf: 0xf033e, detail: 'Lock the screen', exec: ['qs', 'ipc', 'call', 'lock', 'lock'] },
+  { title: 'theme', nf: 0xf03d8, detail: 'Switch colorscheme', exec: ['dots-call', 'launcher', 'mode', 'colorschemes'] },
+  { title: 'record', nf: 0xf044a, danger: true, detail: 'Start or stop recording', exec: ['qs', 'ipc', 'call', 'record', 'toggle'] },
+  { title: 'sync', nf: 0xf04e6, detail: 'Sync dotfiles', exec: ['dots', 'sync'] },
 ];
 
 // The user manager's PATH lacks the repo's bin/, so a dots script runs from bin, the one beside the shell.
@@ -93,8 +93,8 @@ const REMOTES = { 'mac-mini-m2': 'mini', nuc: 'nuc', 'macbook-m2': 'macbook' };
 export function commandRows(q, bin, machine) {
   const remotes = Object.keys(REMOTES)
     .filter((id) => id !== machine)
-    .map((id) => ({ title: `Remote: ${REMOTES[id]}`, detail: `Show ${REMOTES[id]}'s screen`, exec: ['dots-vnc', REMOTES[id]] }));
-  const entries = COMMANDS.concat(remotes).map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, fromBin(c, bin)) }));
+    .map((id) => ({ title: `Remote: ${REMOTES[id]}`, detail: `Show ${REMOTES[id]}'s screen`, nf: 0xf0379, exec: ['dots-vnc', REMOTES[id]] }));
+  const entries = COMMANDS.concat(remotes).map((c) => ({ name: c.title, keywords: [], row: Object.assign({ glyph: '>' }, fromBin(c, bin), { nf: String.fromCodePoint(c.nf) }) }));
   return q.trim() ? rows(entries, q) : entries.map((e) => e.row);
 }
 

@@ -105,8 +105,8 @@ Item {
         }
         return [];
     }
-    // Clips draw as cards two to a row, four at a time, colorschemes three to a row, six at a time; every other mode as rows, eight at a time.
-    readonly property int columns: mode === "clipboard" ? 2 : mode === "colorschemes" ? 3 : 1
+    // Clips draw as cards two to a row, four at a time, colorschemes three to a row, six at a time, commands as rows in two columns; every other mode as rows, eight at a time.
+    readonly property int columns: mode === "clipboard" || mode === "commands" ? 2 : mode === "colorschemes" ? 3 : 1
     readonly property int pageSize: mode === "clipboard" ? 4 : mode === "colorschemes" ? 6 : 8
     readonly property var rows: found.slice(scrollTop, scrollTop + pageSize)
     readonly property var look: L.launcherLook(theme.tokens)
@@ -589,7 +589,7 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool current: index === launcher.selected
-                        readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : launcher.mode === "colorschemes" ? "scheme" : modelData.remind ? "tile" : "row"
+                        readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : launcher.mode === "colorschemes" ? "scheme" : launcher.mode === "commands" ? "command" : modelData.remind ? "tile" : "row"
                         readonly property var clipDrawn: kind === "clip" ? { text: clipText.text, age: clipAge.text, height: rowBox.height, textHeight: clipText.height, lines: clipText.lineCount, thumb: thumb.status === Image.Ready, swatch: swatch.visible ? String(swatch.color) : null } : null
                         readonly property var answerDrawn: kind === "answer" ? { text: answer.text, size: answer.font.pixelSize, bold: answer.font.bold, under: under.text } : null
                         readonly property string headText: modelData.head ? headLabel.text : ""
@@ -622,7 +622,7 @@ Item {
                             width: parent.width
                             height: kind === "answer" ? 80 : kind === "clip" ? 84 : kind === "scheme" ? 110 : kind === "tile" ? 56 : 48
                             radius: kind === "clip" || kind === "scheme" ? 14 : 12
-                            color: kind === "clip" || kind === "scheme" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
+                            color: kind === "clip" || kind === "scheme" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && (kind === "row" || kind === "command")) ? Qt.alpha(launcher.on, 0.07) : "transparent"
 
                             Root.Click {
                                 name: "launcher-row:" + index
@@ -808,7 +808,7 @@ Item {
                             }
 
                             RowLayout {
-                                visible: kind === "row" || kind === "tile"
+                                visible: kind === "row" || kind === "tile" || kind === "command"
                                 anchors.fill: parent
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
@@ -833,9 +833,9 @@ Item {
                                         anchors.centerIn: parent
                                         visible: !modelData.icon
                                         textFormat: Text.PlainText
-                                        text: kind === "tile" ? launcher.alarmGlyph : modelData.glyph || look.title(modelData.bare || modelData.title).charAt(0).toUpperCase()
-                                        color: launcher.on
-                                        font.family: kind === "tile" ? "Symbols Nerd Font Mono" : launcher.fonts.ui ?? ""
+                                        text: kind === "tile" ? launcher.alarmGlyph : kind === "command" ? modelData.nf : modelData.glyph || look.title(modelData.bare || modelData.title).charAt(0).toUpperCase()
+                                        color: modelData.danger ? launcher.tones.danger : launcher.on
+                                        font.family: kind === "tile" || kind === "command" ? "Symbols Nerd Font Mono" : launcher.fonts.ui ?? ""
                                         font.pixelSize: modelData.glyph ? 16 : 14
                                         font.weight: Font.Bold
                                     }
@@ -844,8 +844,9 @@ Item {
                                 Text {
                                     id: title
                                     textFormat: Text.PlainText
-                                    // The name keeps its own width, up to 60% of the row, and the note takes what is left.
-                                    Layout.preferredWidth: Math.min(implicitWidth, parent.width * 0.6)
+                                    // The name keeps its own width, up to 60% of the row, and the note takes what is left; a command's name, with no note, takes the row.
+                                    Layout.preferredWidth: kind === "command" ? -1 : Math.min(implicitWidth, parent.width * 0.6)
+                                    Layout.fillWidth: kind === "command"
                                     // The slot shows the row's glyph, so the title drops it.
                                     text: look.title(modelData.bare ? modelData.bare : modelData.title)
                                     elide: Text.ElideRight
@@ -855,8 +856,10 @@ Item {
                                     font.weight: Font.Bold
                                 }
 
+                                // A command draws its name alone, as two columns leave no room for a note.
                                 Text {
                                     id: note
+                                    visible: kind !== "command"
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
                                     text: look.rowDetail(modelData)

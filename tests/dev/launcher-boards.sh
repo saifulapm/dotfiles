@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Each launcher mode draws its board 3 form in the island: the calculator's 40 px answer, a reminder's one tile, the clipboard's 2 x 2 preview cards, the colorschemes' cards three to a row.
+# Each launcher mode draws its board 3 form in the island: the calculator's 40 px answer, a reminder's one tile, the clipboard's 2 x 2 preview cards, the colorschemes' cards three to a row, the commands in two columns.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -76,6 +76,14 @@ done
 until_ok 2000 state_is '.top + .selected == 39'
 check "39 presses of j reach the 40th scheme card ($(launcher | jq -c '{top, selected, cursorName}'))" state_is '.top + .selected == 39 and .cursorName == .results[.selected]'
 check "and the island's height stays at or under the output's less 48 px ($tallest, cap $((oh - 48)))" test "$tallest" -le $((oh - 48))
+close_launcher
+
+open_launcher
+wtype "> "
+until_ok 3000 state_is '.mode == "commands" and (.results | length) == 8'
+same_rows() { launcher | jq -e '(.cursorBox.w) as $w | .columns == 2 and (.rowHeights | all(. == 48))' >/dev/null; }
+check "> draws the commands as 48 px rows in two columns ($(launcher | jq -c '{columns, results}'))" same_rows
+check "each draws its own glyph in a circle, not a letter ($(launcher | jq -c .slots))" state_is '(.slots | all(test("^[A-Za-z>]") | not))'
 close_launcher
 exit "$fails"
 }
