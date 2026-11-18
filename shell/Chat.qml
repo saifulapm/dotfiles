@@ -5,6 +5,7 @@ import "." as Root
 import "lib/surface.mjs" as S
 import "lib/island-tones.mjs" as T
 import "lib/chat.mjs" as C
+import "lib/chat-tools.mjs" as M
 
 // The AI chat inside the island, as board 6 draws it: Saiful's messages in a bubble, replies streamed from pxy as Markdown blocks, each closed block drawn once and kept.
 Item {
@@ -63,6 +64,14 @@ Item {
     property var cutter: null
     // Where this reply's rows start in the list.
     property int replyRow: 0
+    // The tool calls this round streams, gathered by their index, and how many calls this turn has used of its 10.
+    property var calls: []
+    property int spent: 0
+    // The round's calls still to answer, one mem at a time, and the tool messages answered so far.
+    property var queue: []
+    property var answered: []
+    // The chips drawn in this conversation, as {name, arg}.
+    property var tools: []
 
     function open(t0) {
         openT0 = t0;
@@ -95,6 +104,7 @@ Item {
         }
         messages = messages.concat([{ role: "user", content: text }]);
         rows.append({ kind: "user", bkind: "", lang: "", html: "", text: text });
+        spent = 0;
         ask();
     }
 
@@ -105,6 +115,7 @@ Item {
         replyBlocks = 0;
         replyClosed = 0;
         replyRow = rows.count;
+        calls = [];
         reader = C.sse();
         cutter = C.blocks();
         streaming = true;
@@ -121,7 +132,7 @@ Item {
         req.open("POST", url);
         req.setRequestHeader("Authorization", "Bearer pxy-local");
         req.setRequestHeader("Content-Type", "application/json");
-        req.send(JSON.stringify({ model: alias, stream: true, messages: messages }));
+        req.send(JSON.stringify({ model: alias, stream: true, messages: messages, tools: M.TOOLS }));
     }
 
     function read(req) {
@@ -136,7 +147,10 @@ Item {
             }
             if (ev.model)
                 model = C.clean(ev.model);
-            added += ev.choices?.[0]?.delta?.content ?? "";
+            const delta = ev.choices?.[0]?.delta ?? {};
+            for (const piece of delta.tool_calls ?? [])
+                gather(piece);
+            added += delta.content ?? "";
         }
         if (added === "")
             return;
@@ -167,9 +181,73 @@ Item {
             rows.append(row);
     }
 
+    // A call's id and name come on its first piece and its arguments in pieces after, all under one index.
+    function gather(piece) {
+        const list = calls;
+        const call = list[piece.index] ?? { id: "", type: "function", function: { name: "", arguments: "" } };
+        if (piece.id)
+            call.id = piece.id;
+        if (piece.function?.name)
+            call.function.name = piece.function.name;
+        call.function.arguments += piece.function?.arguments ?? "";
+        list[piece.index] = call;
+        calls = list;
+    }
+
+    // A tool round: each call draws a chip, then runs or is refused, and the answers go back to pxy in one request.
+    function useTools(asked) {
+        messages = messages.concat([{ role: "assistant", content: replyText || null, tool_calls: asked }]);
+        for (const call of asked) {
+            const chip = M.chipFor(call.function.name, call.function.arguments);
+            rows.append({ kind: "tool", bkind: chip.name, lang: "", html: "", text: chip.arg });
+            tools = tools.concat([chip]);
+        }
+        const share = M.take(asked, spent);
+        spent += share.run.length;
+        const todo = [];
+        for (const call of share.run) {
+            const a = M.argvFor(call.function.name, call.function.arguments);
+            todo.push(a.argv ? { id: call.id, argv: a.argv } : { id: call.id, note: "not run: " + a.error });
+        }
+        for (const call of share.skipped)
+            todo.push({ id: call.id, note: "not run: this turn's " + M.CALLS_MAX + " tool calls are spent" });
+        queue = todo;
+        answered = [];
+        next();
+    }
+
+    function next() {
+        if (queue.length === 0) {
+            messages = messages.concat(answered);
+            ask();
+            return;
+        }
+        const job = queue[0];
+        queue = queue.slice(1);
+        if (!job.argv) {
+            answer(job.id, job.note);
+            return;
+        }
+        memRun.callId = job.id;
+        memRun.command = ["mem"].concat(job.argv);
+        memRun.running = true;
+    }
+
+    // The next call starts on a later turn of the event loop, so mem's Process is never restarted from inside its own exit.
+    function answer(id, content) {
+        answered = answered.concat([{ role: "tool", tool_call_id: id, content: content }]);
+        Qt.callLater(chat.next);
+    }
+
     function finish(req) {
         if (req.status === 200) {
             draw(cutter.end(replyText));
+            const asked = calls.filter(c => c);
+            if (asked.length > 0) {
+                xhr = null;
+                useTools(asked);
+                return;
+            }
             if (replyText !== "") {
                 messages = messages.concat([{ role: "assistant", content: replyText }]);
                 replies = replies.concat([{ row: replyRow, text: replyText }]);
@@ -200,6 +278,7 @@ Item {
         rows.clear();
         messages = [];
         replies = [];
+        tools = [];
         conversation = 0;
         title = "";
         error = "";
@@ -284,6 +363,7 @@ Item {
             alias: alias,
             model: model,
             blocks: replyBlocks,
+            tools: tools,
             error: error,
             rows: rows.count,
             input: field.text,
@@ -356,6 +436,19 @@ Item {
             }
             onExited: destroy()
         }
+    }
+
+    // mem runs as an argv with no shell, so a query is only ever one argument; a failed run answers with its stderr so the model sees why.
+    Process {
+        id: memRun
+        property string callId: ""
+        stdout: StdioCollector {
+            id: memOut
+        }
+        stderr: StdioCollector {
+            id: memErr
+        }
+        onExited: code => chat.answer(callId, M.cut(code === 0 ? memOut.text : memErr.text))
     }
 
     // The island draws the fill and plays the open; this is the content.
@@ -561,7 +654,7 @@ Item {
                                 readonly property string html: row.html
                                 readonly property string text: row.text
                                 width: parent.width
-                                sourceComponent: row.kind === "user" ? userRow : row.bkind === "code" ? codeRow : blockRow
+                                sourceComponent: row.kind === "user" ? userRow : row.kind === "tool" ? toolRow : row.bkind === "code" ? codeRow : blockRow
                             }
                         }
                     }
@@ -683,6 +776,63 @@ Item {
                     color: chat.on
                     font.family: chat.fonts.ui ?? ""
                     font.pixelSize: 13
+                }
+            }
+        }
+    }
+
+    // A mem call the model made: a database icon, the tool's name in bold and its argument muted, on a tile.
+    Component {
+        id: toolRow
+
+        Item {
+            readonly property string toolName: parent ? parent.bkind : ""
+            readonly property string toolArg: parent ? parent.text : ""
+            implicitHeight: 28
+
+            Rectangle {
+                width: Math.min(parent.width, chipRow.implicitWidth + 24)
+                height: 28
+                radius: 14
+                color: chat.tile
+
+                Row {
+                    id: chipRow
+                    x: 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+
+                    Text {
+                        id: chipIcon
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: String.fromCodePoint(0xF01BC)
+                        color: chat.tones.accent
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 14
+                    }
+
+                    Text {
+                        id: chipName
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: chipRow.parent.parent.toolName
+                        color: chat.on
+                        font.family: chat.fonts.ui ?? ""
+                        font.pixelSize: 12
+                        font.weight: Font.Bold
+                    }
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.min(implicitWidth, chipRow.parent.parent.width - 40 - chipIcon.width - chipName.width)
+                        textFormat: Text.PlainText
+                        elide: Text.ElideRight
+                        text: chipRow.parent.parent.toolArg
+                        color: chat.tones.muted
+                        font.family: chat.fonts.ui ?? ""
+                        font.pixelSize: 12
+                    }
                 }
             }
         }
