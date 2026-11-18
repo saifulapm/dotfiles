@@ -15,7 +15,6 @@ windows_n() { niri msg -j windows | jq length; }
 until_ok 5000 shell_status >/dev/null
 
 open_launcher
-check "the apps footer names the five prefixes" state_is '.legend | ascii_downcase | (contains("windows") and contains("clipboard") and contains("emoji") and contains("calc") and contains("commands"))'
 wtype "= 1440 * 1.25"
 until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
 check "= 1440 * 1.25 shows the single result 1800" state_is '.mode == "calculator" and .results == ["1800"]'
@@ -45,7 +44,6 @@ open_launcher
 wtype "> "
 until_ok 3000 state_is '.mode == "commands" and (.results | length) > 5'
 check "> lists the five capture rows first" state_is '.results[0:5] == ["Annotate region", "Annotate clipboard image", "Copy text from region (OCR)", "Read QR code from region", "Pick colour"]'
-check "annotate and OCR draw their global keys, the others none" state_is '(.keys[0] | IN("Mod+Shift+7", "MOD ⇧ 7", "[MOD ⇧ 7]")) and (.keys[2] | IN("Mod+Shift+6", "MOD ⇧ 6", "[MOD ⇧ 6]")) and .keys[1] == "" and .keys[3] == "" and .keys[4] == ""'
 close_launcher
 
 # The nested session's machine id is dev, none of the three, so every machine has a row.

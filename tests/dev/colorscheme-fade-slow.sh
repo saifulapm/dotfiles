@@ -9,13 +9,13 @@ unset TMUX
 rest_in() { shell_status | jq -e --arg t "$1" '.theme == $t and .transition == ""' >/dev/null; }
 until_ok 5000 rest_in catppuccin-mocha
 
-# The launcher open over the paper, both read from one 1 px line per grab, timed against the shell's start stamp.
+# The launcher open in the island over the paper, both read from one 1 px line per grab, timed against the shell's start stamp.
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 niri msg action spawn -- dots-call launcher toggle
 until_ok 3000 eval "launcher_state | jq -e '.open and .settled and .cardBox != null' >/dev/null"
 read -r cx cy < <(launcher_state | jq -r '.cardBox | "\(.x | floor) \(.y | floor)"')
-# The paper 3 px into a 16 px cell left of the card, clear of its dots and above the day's passage; the card 4 px inside its top-left corner.
-px=$(((cx - 40) / 16 * 16 + 3)) y=$((cy + 4))
+# The paper 3 px into a 16 px cell left of the island, clear of its dots and above the day's passage; the island's fill 8 px above the launcher's field.
+px=$(((cx - 40) / 16 * 16 + 3)) y=$((cy - 8))
 span=$((cx + 4 - px + 1))
 # Grabs go raw to files and are read after the switch, so each costs a grim and nothing more.
 shots=$(mktemp -d)
@@ -64,7 +64,8 @@ partway() {
 }
 check "a grab lands within 40 ms of 130 ms (x$slow) into the switch (${gap} ms off, ${#grabs[@]} grabs)" test "$gap" -le 40
 check "130 ms in, the paper is part way from #11111B to #F2E9E1 ($pr $pg $pb: $(partway '#11111B' '#F2E9E1' "$pr $pg $pb"))" eval "partway '#11111B' '#F2E9E1' '$pr $pg $pb' >/dev/null"
-check "130 ms in, the open launcher's fill is part way from #1E1E2E to #FAF4ED ($sr $sg $sb: $(partway '#1E1E2E' '#FAF4ED' "$sr $sg $sb"))" eval "partway '#1E1E2E' '#FAF4ED' '$sr $sg $sb' >/dev/null"
+# A dark scheme's island is its surface, a light one's its ink.
+check "130 ms in, the island's fill under the open launcher is part way from #1E1E2E to #575279 ($sr $sg $sb: $(partway '#1E1E2E' '#575279' "$sr $sg $sb"))" eval "partway '#1E1E2E' '#575279' '$sr $sg $sb' >/dev/null"
 
 exit $((fails > 0))
 }

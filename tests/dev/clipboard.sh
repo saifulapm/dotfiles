@@ -56,7 +56,6 @@ wl-copy third
 until_ok 3000 listed third
 mod_v
 until_ok 3000 state_is '.open and .mode == "clipboard" and .results[0] == "third"'
-check "the clipboard legend names Shift+Enter copy" state_is '.legend | test("⇧↵ copy"; "i")'
 wtype j
 until_ok 2000 state_is '.selected == 1'
 pick=$(launcher_state | jq -r '.results[1]')

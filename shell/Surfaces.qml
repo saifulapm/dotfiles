@@ -382,6 +382,14 @@ PanelWindow {
         value: host.islandLast?.busy ?? false
     }
 
+    // A check waits on this before it reads the launcher's pixels.
+    Binding {
+        when: !!host.launcher && !!host.island
+        target: host.launcher
+        property: "settled"
+        value: host.island?.surface === "launcher" && !(host.island?.animating ?? true)
+    }
+
     Connections {
         target: host.island
         function onSurfaceYielded() {

@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-# The launcher card is a white fill in a square 1 px line frame with no shadow, and the island is a square ink box.
+# A surface's card, the notification centre's, is the paper in a square 1 px accent edge with no shadow, and the island is a square ink box.
 {
 source "$(dirname "$0")/lib.sh"
 unset TMUX
 
-launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
-launcher_is() { launcher_state | jq -e "$1" >/dev/null; }
-launcher_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
-launcher_open() { launcher_is ".open and .settled" && launcher_focus Exclusive; }
-launcher_closed() { launcher_is ".open == false and .drawing == false" && launcher_focus None; }
+notifs_state() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
+notifs_is() { notifs_state | jq -e "$1" >/dev/null; }
+surfaces_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
+notifs_open() { notifs_is ".open and .settled" && surfaces_focus Exclusive; }
+notifs_closed() { notifs_is ".open == false and .drawing == false" && surfaces_focus None; }
 
 read -r ox oy ow < <(niri msg -j outputs | jq -r 'first(.[]).logical | "\(.x) \(.y) \(.width)"')
-# The launcher card's top-left corner, at x Math.round((width - 640) / 2) so an odd width rounds up, and the island's centre line.
-cx=$((ox + (ow - 640 + 1) / 2))
-cy=$((oy + 168))
+# The island's centre line.
 mid=$((ox + ow / 2))
 
 rgb() { grim -s 1 -t ppm -g "$1,$2 ${3:-1}x${4:-1}" - | mean_rgb; }
@@ -38,15 +36,16 @@ span() {
 
 until_ok 5000 shell_status >/dev/null
 
-niri msg action spawn -- dots-call launcher toggle
-until_ok 3000 launcher_open
-check "the launcher reports its card at rest, 640 px wide at y 168 ($(launcher_state | jq -c .cardBox))" launcher_is ".cardBox.x == $((cx - ox)) and .cardBox.y == 168 and .cardBox.w == 640"
+niri msg action spawn -- dots-call notifs toggle
+until_ok 3000 notifs_open
+# The card's top-left corner and width as it reports them at rest, in screen pixels.
+read -r cx cy cw < <(notifs_state | jq -r --argjson ox "$ox" --argjson oy "$oy" '.cardBox | "\(.x + $ox | floor) \(.y + $oy | floor) \(.w | floor)"')
 # The accent edge runs down the left side to the corner itself, so the corner is square; inside it the card is the paper, and 2 px outside it the wash shows no shadow.
-card() { edge "$cx" "$cy" && edge "$cx" $((cy + 40)) 1 10 && tol=6 near $((cx + 100)) $((cy + 3)) 228 230 234 && ! ink $((cx + 640 + 2)) $((cy + 60)) && ! ink $((cx - 2)) $((cy + 40)); }
+card() { edge "$cx" "$cy" && edge "$cx" $((cy + 40)) 1 10 && tol=6 near $((cx + 100)) $((cy + 3)) 228 230 234 && ! ink $((cx + cw + 2)) $((cy + 60)) && ! ink $((cx - 2)) $((cy + 40)); }
 until_ok 2000 card
-check "the card is the paper in a square 1 px accent edge, with no shadow past it" card
+check "the card is the paper in a square 1 px accent edge, with no shadow past it ($cx $cy $cw)" card
 wtype -k Escape
-until_ok 2000 launcher_closed
+until_ok 2000 notifs_closed
 
 # Its left edge is ink up at y 10 as well as on the middle row, so the corner is square, and 2 px left of it is paper.
 island() { local l r; read -r l r < <(span 21 23 27); ((l >= 2)) && ink $((mid - 200 + l)) $((oy + 10)) && ink $((mid - 200 + l + 5)) $((oy + 27)) && light $((mid - 200 + l - 2)) $((oy + 10)); }

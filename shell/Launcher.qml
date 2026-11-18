@@ -23,6 +23,8 @@ Item {
     readonly property int wantWidth: 640
     readonly property bool busy: false
     property bool shown: false
+    // True once the island has come to rest on the launcher; the surfaces' window sets it.
+    property bool settled: false
     readonly property string query: input.text
     // selected counts from scrollTop, the first of the eight rows drawn out of every row found.
     property int selected: 0
@@ -202,6 +204,7 @@ Item {
         const box = cur ? cur.box : null;
         const p = box ? box.mapToItem(null, 0, 0) : null;
         const f = field.mapToItem(null, 0, 0);
+        const k = column.mapToItem(null, 0, 0);
         return JSON.stringify({
             open: shown,
             mode: mode,
@@ -217,7 +220,13 @@ Item {
             openMs: openMs,
             opens: opens,
             drawing: shown,
+            settled: settled,
+            cardBox: { x: k.x, y: k.y, w: column.width, h: column.height },
             count: found.length,
+            // Each row's icon, as its image source, its glyph, or the letter drawn in its circle.
+            slots: rows.map((r, i) => rowRepeater.itemAt(i)?.slot ?? null),
+            cursorElided: cur ? cur.nameText.truncated : null,
+            cursorDetailWidth: cur ? cur.detailWidth : null,
             cursorName: cur ? cur.nameText.text : null,
             cursorFill: box ? String(box.color) : null,
             cursorBox: box ? { x: p.x, y: p.y, w: box.width, h: box.height } : null,
@@ -466,6 +475,8 @@ Item {
                         readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
                         readonly property Item box: rowBox
                         readonly property Item nameText: title
+                        readonly property real detailWidth: note.width
+                        readonly property string slot: modelData.icon || letter.text
                         width: list.width
 
                         Text {
@@ -515,6 +526,7 @@ Item {
                                         asynchronous: true
                                     }
                                     Text {
+                                        id: letter
                                         anchors.centerIn: parent
                                         visible: !modelData.icon
                                         textFormat: Text.PlainText
@@ -541,6 +553,7 @@ Item {
                                 }
 
                                 Text {
+                                    id: note
                                     textFormat: Text.PlainText
                                     Layout.fillWidth: true
                                     text: look.rowDetail(modelData)

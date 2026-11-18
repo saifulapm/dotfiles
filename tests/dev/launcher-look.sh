@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The launcher looks like its board: icon tiles, a rounded tinted cursor row, a mode pill and prefix chips.
+# The launcher looks like board 3 on the island's fill: flat rows, a 32 px icon or a letter in a circle, a rounded fill on the selected row only, a long name elided beside its note.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -23,8 +23,6 @@ cursor_geo() {
   launcher_state | jq -r --argjson dx "$1" --argjson dy "$2" --argjson w "$3" --argjson h "$4" \
     '.cursorBox | "\((if $dx < 0 then .x + .w + $dx else .x + $dx end) | floor),\((if $dy < 0 then .y + .h + $dy else .y + $dy end) | floor) \($w)x\($h)"'
 }
-# An 8 px square in the query's empty right half, where only the card's fill shows.
-fill_geo() { launcher_state | jq -r '.cardBox | "\(.x + 300 | floor),\(.y + 22 | floor) 8x8"'; }
 
 # An app whose icon no theme has, written after the shell's scan, so the scan must pick it up.
 mkdir -p "$DOTS_DEV_DIR/data/applications"
@@ -37,59 +35,36 @@ until_ok 5000 shell_status >/dev/null
 open_launcher
 wtype fo
 until_ok 3000 state_is '.query == "fo" and .results[0] == "Foot" and .cursorBox != null'
-check "the cursor row's fill is the accent's veil #243249ce ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#243249ce"'
-tint=$(near "$(cursor_geo -70 4 8 8)" 203 208 230 4)
-check "inside the cursor row reads the veil over the card's paper ($tint of 64 px)" test "$tint" -eq 64
-corner=$(near "$(cursor_geo 0 0 2 2)" 228 230 234 4)
-check "the cursor row's corner reads the card's paper, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
+check "the selected row's fill is the island's text at 7% ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#12e4e6ea"'
+# The island is Artboard's ink #15171B, so the row's fill over it reads about 36 38 42.
+tint=$(near "$(cursor_geo -70 4 8 8)" 36 38 42 4)
+check "inside the selected row reads its fill over the island's ink ($tint of 64 px)" test "$tint" -eq 64
+corner=$(near "$(cursor_geo 0 0 2 2)" 21 23 27 4)
+check "the selected row's corner reads the island's ink, so it is rounded ($corner of 4 px)" test "$corner" -ge 3
 check "Foot's row draws its icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
-# foot's icon is a dark terminal, so its tile holds dark pixels that the tint never has.
-dark=$(near "$(cursor_geo 12 12 32 32)" 30 30 30 40)
-check "Foot's 32 px icon shows in its slot ($dark dark px)" test "$dark" -gt 100
-check "the mode pill reads Apps and the footer shows five prefix chips" state_is '.label == "Apps" and .legendKeys == 5 and .legendLines == 1'
+# foot's icon is a light page with a dark prompt, so its slot holds light pixels the ink never has.
+lit=$(near "$(cursor_geo 10 8 32 32)" 230 230 220 40)
+check "Foot's 32 px icon shows in its slot ($lit light px)" test "$lit" -gt 20
 close_launcher
 
 open_launcher
 wtype "zz iconless"
 until_ok 5000 state_is '.results[0] == "Zz Iconless" and .cursorBox != null'
-check "an entry whose icon is missing gets the fallback tile ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "tile"'
-# The tile sits in the lit row, so its ink veil lies over the accent's veil over the card.
-tile=$(near "$(cursor_geo 20 20 16 16)" 192 197 218 4)
-check "the fallback tile is the ink's veil over the lit row ($tile of 256 px)" test "$tile" -gt 240
+check "an entry whose icon is missing draws its first letter in a circle ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "Z"'
 close_launcher
 
 open_launcher
 wtype "zz long"
 until_ok 3000 state_is '(.results[0] // "") | startswith("Zz Long")'
-check "a 200-character name elides above its detail ($(launcher_state | jq -c '[.cursorElided, .cursorDetailWidth]'))" state_is '.cursorElided and .cursorDetailWidth > 40'
-close_launcher
-
-for m in "w " "v " ": " "= " "> "; do
-  open_launcher
-  wtype -- "$m"
-  until_ok 2000 state_is ".query == \"$m\""
-  check "the legend fits one line in mode '$m'" state_is '.legendLines == 1'
-  close_launcher
-done
-
-# Every mode draws its rows in the same look.
-niri msg action spawn -- dots-call launcher mode clipboard
-until_ok 3000 state_is '.open and .mode == "clipboard"'
-check "Mod+V shows the mode pill reading Clipboard ($(launcher_state | jq -c .label))" state_is '.label == "Clipboard"'
+check "a 200-character name elides and leaves its note room ($(launcher_state | jq -c '[.cursorElided, .cursorDetailWidth]'))" state_is '.cursorElided and .cursorDetailWidth > 40'
 close_launcher
 
 open_launcher
 wtype ": fire"
 until_ok 3000 state_is '.results[0] == "🔥 fire" and .cursorBox != null'
-check ": fire shows 🔥 in the first row's icon slot ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "🔥"'
-flame=$(near "$(cursor_geo 12 12 32 32)" 245 130 40 60)
+check ": fire shows 🔥 as the first row's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] == "🔥"'
+flame=$(near "$(cursor_geo 10 8 32 32)" 245 130 40 60)
 check "the flame's colours show in the slot ($flame px)" test "$flame" -gt 20
-close_launcher
-
-open_launcher
-wtype "= 1440*1.25"
-until_ok 3000 state_is '.mode == "calculator" and .results == ["1800"]'
-check "= 1440*1.25 shows 1800 as the first row" state_is '.results[0] == "1800" and .label == "Calculator"'
 close_launcher
 
 niri msg action spawn -- foot -c /dev/null
@@ -100,26 +75,14 @@ until_ok 3000 state_is '.mode == "windows" and (.results | length) >= 1'
 check "a foot window's row draws foot's icon ($(launcher_state | jq -c '.slots[0]'))" state_is '.slots[0] | test("^image://icon/foot")'
 close_launcher
 
-# The card restyles at once: a switch while open keeps the query and the keyboard and fills the card in the new surface.
+# The launcher restyles at once: a switch while open keeps the query and the keyboard, and the row's fill takes the new island's text.
 open_launcher
 wtype fo
 until_ok 3000 state_is '.query == "fo"'
 "$repo/bin/dots" colorscheme catppuccin-mocha >/dev/null
 until_ok 3000 eval 'shell_status | jq -e ".theme == \"catppuccin-mocha\" and .transition == \"\"" >/dev/null'
 check "a switch while open keeps the query and the keyboard" state_is '.open and .query == "fo" and .keyboard'
-fill=$(near "$(fill_geo)" 17 17 27 4)
-check "the card is filled with Mocha's paper #11111B ($fill of 64 px)" test "$fill" -eq 64
-close_launcher
-
-# A dark scheme's lit row is its own tint, mixed from its surface and accent, never Artboard's light #EEF1FF (m80 walk 0JG8TBA8).
-open_launcher
-wtype fo
-until_ok 3000 state_is '.query == "fo" and .cursorBox != null'
-check "mocha: the cursor row's fill is its accent's veil #2489B4FA ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#2489b4fa"'
-tint=$(near "$(cursor_geo -70 4 8 8)" 34 40 58 4)
-check "mocha: inside the cursor row reads its veil over the paper on screen ($tint of 64 px)" test "$tint" -eq 64
-light=$(near "$(cursor_geo 0 0 400 20)" 238 241 255 6)
-check "mocha: no pixel of the cursor row is Artboard's #EEF1FF ($light px)" test "$light" -eq 0
+check "mocha: the selected row's fill is Mocha's text at 7% ($(launcher_state | jq -c .cursorFill))" state_is '.cursorFill == "#12cdd6f4"'
 close_launcher
 
 exit $((fails > 0))
