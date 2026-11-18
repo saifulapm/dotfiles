@@ -437,6 +437,10 @@ const stateSources = {
   accounts: [['shell.qml', 'target: "accounts"'], ['Accounts.qml']],
   dns: [['shell.qml', 'target: "dns"'], ['Dns.qml']],
   goals: [['shell.qml', 'target: "goals"'], ['Goals.qml']],
+  // Each takeover's Ipc target merges the prompt's state() with what its agent adds (registered, active, waiting).
+  polkit: [['Polkit.qml', 'target: "polkit"'], ['PolkitPrompt.qml']],
+  pinentry: [['Pinentry.qml', 'target: "pinentry"'], ['PinentryPrompt.qml']],
+  picker: [['Portal.qml', 'target: "picker"'], ['FilePicker.qml']],
 };
 
 // Blanks comments and string contents, so a brace or an apostrophe in either cannot shift the scan.
@@ -749,4 +753,141 @@ test('every tests/dev script reads a keyed surface\'s .keyboard and .settled aft
     for (const n of typesBeforeKeys(readFileSync(dir + f, 'utf8'))) found.push(`${f}:${n}`);
   }
   assert.deepEqual(found, [], "wait with until_ok <ms> on a state read of '.keyboard and .settled'");
+});
+
+// QML with its comments blanked, as `code`, and with string contents blanked too, as `shape`, both the length of the text so a position in one is the position in the other.
+function qmlScan(text) {
+  let code = '';
+  let shape = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '/' && (text[i + 1] === '/' || text[i + 1] === '*')) {
+      const e = text[i + 1] === '/' ? text.indexOf('\n', i) : text.indexOf('*/', i + 2) + 2;
+      const end = e <= i + 1 ? text.length : e;
+      const gap = text.slice(i, end).replace(/[^\n]/g, ' ');
+      code += gap;
+      shape += gap;
+      i = end - 1;
+    } else if (c === '"' || c === "'") {
+      let j = i + 1;
+      while (j < text.length && text[j] !== c && text[j] !== '\n') j += text[j] === '\\' ? 2 : 1;
+      code += text.slice(i, j + 1);
+      shape += c + ' '.repeat(Math.max(0, j - i - 1)) + c;
+      i = j;
+    } else {
+      code += c;
+      shape += c;
+    }
+  }
+  return { code, shape };
+}
+
+// Whether a QML file calls theme.notice(, whoever's theme it is.
+const callsNotice = (text) => /\btheme\.notice\(/.test(qmlScan(text).shape);
+
+// A file that calls theme.notice( must draw the notice: a Root.ToolNote, or a handler for the signal (function onNotice) that puts its text somewhere drawn.
+export function noticeUndrawn(text) {
+  const { code } = qmlScan(text);
+  return callsNotice(text) && !/\bRoot\.ToolNote\b/.test(code) && !/\bfunction onNotice\(/.test(code);
+}
+
+// Whether the file names an item objectName: "card" that fills its parent (anchors.fill: parent, or width: parent.width with a height of its own), or is the root itself, which the island sizes to fit.
+export function hasFillingCard(text) {
+  const { code, shape } = qmlScan(text);
+  const root = shape.indexOf('{');
+  for (const m of code.matchAll(/\bobjectName:\s*"card"/g)) {
+    let open = -1;
+    for (let i = m.index, depth = 0; i >= 0; i--) {
+      if (shape[i] === '}') depth++;
+      else if (shape[i] === '{' && depth-- === 0) {
+        open = i;
+        break;
+      }
+    }
+    if (open < 0) continue;
+    if (open === root) return true;
+    // The card's own properties: what sits at its brace depth, not in a child's block.
+    let own = '';
+    for (let i = open + 1, depth = 0; i < shape.length && depth >= 0; i++) {
+      if (shape[i] === '{') depth++;
+      else if (shape[i] === '}') depth--;
+      else if (depth === 0) own += code[i];
+    }
+    if (/\banchors\.fill:\s*parent\b|\bwidth:\s*parent\.width\b/.test(own)) return true;
+  }
+  return false;
+}
+
+// The name and file of each surface in Surfaces.qml's islandSurfaces and takeovers lists, the file read off the Loader the name's property points at; takeovers may be absent.
+export function surfaceFiles(text) {
+  const found = [];
+  for (const list of ['islandSurfaces', 'takeovers']) {
+    const names = text.match(new RegExp(`readonly property var ${list}: \\[([^\\]]*)\\]`));
+    for (const name of names?.[1].split(',').map((n) => n.trim()).filter(Boolean) ?? []) {
+      const loader = text.match(new RegExp(`readonly property var ${name}: (\\w+)\\.item`))?.[1];
+      const at = loader ? text.indexOf(`id: ${loader}\n`) : -1;
+      const file = at < 0 ? null : text.slice(at).match(/sourceComponent:\s*Root\.(\w+)/)?.[1];
+      assert.ok(file, `${list} names ${name}, which no Loader's sourceComponent gives a file`);
+      found.push([name, `${file}.qml`]);
+    }
+  }
+  return found;
+}
+
+// m105's Pass, Tailscale and Accounts called theme.notice() while open and nothing drew it, because the island draws the surface, not the notice. A surface that calls it carries a ToolNote, or handles the signal itself.
+test('the notice lint flags a surface that calls theme.notice and draws nothing, and passes one with a ToolNote or an onNotice handler', () => {
+  const bare = 'Item {\n  Process { onExited: panel.theme.notice("done") }\n}\n';
+  assert.equal(noticeUndrawn(bare), true);
+  assert.equal(noticeUndrawn(bare.replace('Item {', 'Item {\n  Root.ToolNote { theme: panel.theme }')), false);
+  assert.equal(noticeUndrawn(bare.replace('Item {', 'Item {\n  Connections { target: panel.theme\n function onNotice(text) { line.text = text } }')), false);
+  // A comment or a string that names the call is not a call, and a file that never calls it has nothing to draw.
+  assert.equal(noticeUndrawn('Item {\n  // calls theme.notice(text) later\n  Text { text: "theme.notice(x)" }\n}\n'), false);
+  assert.equal(noticeUndrawn('Item {\n  Root.ToolNote { theme: panel.theme }\n}\n'), false);
+});
+
+// Root.Surface used to carry objectName "card"; three tools lost it in the move and any press off a row closed them.
+test('the card lint wants an item named card that fills its parent, or the root itself', () => {
+  assert.equal(hasFillingCard('Item {\n  Item {\n    objectName: "card"\n    anchors.fill: parent\n  }\n}\n'), true);
+  assert.equal(hasFillingCard('Item {\n  Item {\n    id: card\n    objectName: "card"\n    width: parent.width\n    height: column.implicitHeight + 32\n  }\n}\n'), true);
+  assert.equal(hasFillingCard('Item {\n  objectName: "card"\n  Text {}\n}\n'), true);
+  assert.equal(hasFillingCard('Item {\n  Text {}\n}\n'), false);
+  assert.equal(hasFillingCard('Item {\n  Item {\n    objectName: "card"\n    x: 16\n    width: 40\n  }\n}\n'), false);
+  // The fill belongs to the card's own item, not to a child inside it, and a comment is no card.
+  assert.equal(hasFillingCard('Item {\n  Item {\n    objectName: "card"\n    Item { anchors.fill: parent }\n  }\n}\n'), false);
+  assert.equal(hasFillingCard('Item {\n  // objectName: "card"\n  Item { anchors.fill: parent }\n}\n'), false);
+});
+
+test('surfaceFiles maps the names in islandSurfaces and takeovers to their Loaders\' files, and takes a tree without takeovers', () => {
+  const qml = `
+    readonly property var pass: passLoader.item
+    readonly property var picker: pickerLoader.item
+    readonly property var islandSurfaces: [pass]
+    Loader {
+        id: passLoader
+        sourceComponent: Root.Pass {
+        }
+    }
+    Loader {
+        id: pickerLoader
+        sourceComponent: Root.FilePicker {
+        }
+    }
+`;
+  assert.deepEqual(surfaceFiles(qml), [['pass', 'Pass.qml']]);
+  assert.deepEqual(surfaceFiles(qml.replace('[pass]', '[pass]\n    readonly property var takeovers: [picker]')), [['pass', 'Pass.qml'], ['picker', 'FilePicker.qml']]);
+});
+
+// The files of the surfaces the island or a takeover draws, read from Surfaces.qml, as [name, file, text].
+const drawnSurfaces = () => {
+  const found = surfaceFiles(readFileSync(new URL('../Surfaces.qml', import.meta.url), 'utf8'));
+  assert.ok(found.length >= 10, `${found.length} surfaces mapped`);
+  return found.map(([name, file]) => [`${name} (${file})`, readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')]);
+};
+
+test('every island surface and takeover that calls theme.notice draws it', () => {
+  assert.deepEqual(drawnSurfaces().filter(([, text]) => noticeUndrawn(text)).map(([n]) => n), [], 'add Root.ToolNote { theme: ... } at the tool\'s foot');
+});
+
+test('every island surface and takeover that calls theme.notice names a card that fills it', () => {
+  assert.deepEqual(drawnSurfaces().filter(([, text]) => callsNotice(text) && !hasFillingCard(text)).map(([n]) => n), [], 'name an item objectName: "card" with anchors.fill: parent');
 });
