@@ -130,6 +130,19 @@ export async function identity(m, from) {
   if (r.code !== 0) throw new Error('age-keygen: ' + r.stderr);
 }
 
+// Gives m the iCloud mail entry the reminders push reads, as a pass that prints it and the .gpg file pass would decrypt, and points the push at the fake iCloud.
+export function icloudEntry(m, fake, name = 'me') {
+  const store = join(m.env.HOME, '.password-store/email/icloud');
+  mkdirSync(store, { recursive: true });
+  writeFileSync(join(store, name + '.gpg'), '');
+  const dir = join(m.env.HOME, 'pass-bin');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'pass'), `#!/bin/sh\n[ "$1 $2" = "show email/icloud/${name}" ] || exit 1\nprintf 'app-pass-1\\ntype: icloud\\nuser: me@x.test\\nimap: imap.mail.me.com\\n'\n`);
+  chmodSync(join(dir, 'pass'), 0o755);
+  m.env.PATH = dir + delimiter + m.env.PATH;
+  m.env.DOTS_CALDAV_URL = fake.url;
+}
+
 // The one place a sync test starts a process: as machine m, in its scratch env.
 const start = (m, cmd, args) => spawn(cmd, args, { env: checked(m.env) });
 

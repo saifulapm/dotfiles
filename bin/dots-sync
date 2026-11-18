@@ -69,8 +69,17 @@ sync_goals() {
   store_unit goals
 }
 
+# The Dropbox part goes first and stands whatever iCloud answers; a failed push exits 5, so the shell still reads the round as pulled.
 sync_reminders() {
-  store_unit reminders
+  local code=0 out
+  store_unit reminders || code=$?
+  ((code == 0 || code == 5)) || return "$code"
+  mkdir -p "$state/sync"
+  if ! out=$("$here/dots-sync-icloud" "$data/reminders/$machine.json" "$state/sync/reminders-icloud.json" 2>&1); then
+    ((code)) || err=$(tail -n 1 <<<"$out")
+    return 5
+  fi
+  return "$code"
 }
 
 # Playlists and Saved only: History and the download index live under the state dir, which no unit reads.

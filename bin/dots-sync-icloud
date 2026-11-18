@@ -1,0 +1,122 @@
+#!/usr/bin/env node
+// dots-sync-icloud <store> <state>: the reminders unit's last step, after the Dropbox part. Each pending reminder goes to the "Dots reminders" iCloud calendar as an event the iPhone rings, named by its id, so two machines write one event. Exits 0 when done or skipped, 1 with the reason on stderr.
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import * as R from '../shell/lib/reminders.mjs';
+import { eventIcs } from '../shell/lib/reminder-event.mjs';
+
+const CALENDAR = 'Dots reminders';
+// The shell's overdue round is cut at 30 s and the Dropbox part goes first, so iCloud gets 15 s in all.
+const deadline = Date.now() + 15000;
+const [storePath, statePath] = process.argv.slice(2);
+
+const fail = (msg) => {
+  process.stderr.write(`reminders: ${msg}\n`);
+  process.exit(1);
+};
+
+// The iCloud mail account's app-specific password, which also opens its calendars; its entry is named after the mail address, which stays out of this repo.
+const passDir = join(process.env.PASSWORD_STORE_DIR || join(process.env.HOME, '.password-store'), 'email/icloud');
+const entries = existsSync(passDir) ? readdirSync(passDir).filter((f) => f.endsWith('.gpg')) : [];
+// A machine without the entry does not push, and that is not a failure.
+if (entries.length === 0) process.exit(0);
+if (entries.length > 1) fail(`the pass store holds ${entries.length} entries in email/icloud, so the iPhone push does not know which to use`);
+
+const text = existsSync(storePath) ? readFileSync(storePath, 'utf8') : null;
+const store = text === null ? R.emptyStore() : R.parseStore(text);
+// The merge already failed the unit on a broken store.
+if (!store) process.exit(0);
+// Each event sent: the reminder id and a hash of the bytes iCloud holds.
+let sent = {};
+try {
+  sent = JSON.parse(readFileSync(statePath, 'utf8'));
+} catch {}
+
+const hash = (s) => createHash('sha256').update(s).digest('hex');
+const puts = R.pendingList(store)
+  .map((r) => ({ id: r.id, ics: eventIcs(r) }))
+  .filter((e) => sent[e.id] !== hash(e.ics));
+if (puts.length === 0) process.exit(0);
+
+function credentials() {
+  let out;
+  try {
+    out = execFileSync('pass', ['show', 'email/icloud/' + entries[0].slice(0, -4)], { encoding: 'utf8', timeout: 10000, stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch {
+    fail('could not decrypt the iCloud entry from pass');
+  }
+  const lines = out.split('\n');
+  const user = lines.find((l) => l.startsWith('user: '));
+  if (!lines[0] || !user) fail('the iCloud entry in pass has no password on its first line or no user: line');
+  return 'Basic ' + Buffer.from(user.slice(6).trim() + ':' + lines[0]).toString('base64');
+}
+const auth = credentials();
+
+// One request with what is left of the 15 s; an error names the method and iCloud's status, never a header.
+async function call(method, url, body, headers = {}) {
+  const left = deadline - Date.now();
+  if (left <= 0) fail('iCloud took over 15 s, so the rest waits for the next round');
+  let res;
+  try {
+    res = await fetch(url, { method, body, redirect: 'manual', headers: Object.assign({ Authorization: auth }, headers), signal: AbortSignal.timeout(left) });
+  } catch (e) {
+    fail(`iCloud did not answer ${method}: ${e.name === 'TimeoutError' ? 'timed out' : e.cause?.code || e.message}`);
+  }
+  return res;
+}
+
+const unxml = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+const responses = (xml) => [...xml.matchAll(/<(?:\w+:)?response\b[^>]*>([\s\S]*?)<\/(?:\w+:)?response>/g)].map((m) => m[1]);
+// The text of the first <name> element's <href>, or of <name> itself, under any prefix.
+const element = (xml, name) => {
+  const m = new RegExp(`<(?:\\w+:)?${name}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${name}>`).exec(xml);
+  return m ? unxml(m[1].trim()) : null;
+};
+const href = (xml, name) => {
+  const inner = new RegExp(`<(?:\\w+:)?${name}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${name}>`).exec(xml);
+  return inner ? element(inner[1], 'href') : null;
+};
+
+async function propfind(url, depth, props) {
+  const res = await call('PROPFIND', url, `<?xml version="1.0" encoding="UTF-8"?><d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>${props}</d:prop></d:propfind>`, {
+    Depth: depth,
+    'Content-Type': 'application/xml; charset=utf-8',
+  });
+  if (res.status !== 207) fail(`iCloud answered ${res.status} ${res.statusText} to PROPFIND`);
+  return res.text();
+}
+
+// The principal, then its calendar home on a partition host, then the one calendar with the display name.
+async function calendar() {
+  const front = process.env.DOTS_CALDAV_URL || 'https://caldav.icloud.com/';
+  const principal = href(await propfind(front, '0', '<d:current-user-principal/>'), 'current-user-principal');
+  if (!principal) fail('iCloud named no principal');
+  const principalUrl = new URL(principal, front).href;
+  const home = href(await propfind(principalUrl, '0', '<c:calendar-home-set/>'), 'calendar-home-set');
+  if (!home) fail('iCloud named no calendar home');
+  const homeUrl = new URL(home, principalUrl).href;
+  const found = responses(await propfind(homeUrl, '1', '<d:displayname/><d:resourcetype/>')).filter((r) => element(r, 'displayname') === CALENDAR);
+  if (found.length === 0) fail(`iCloud has no calendar named ${CALENDAR}`);
+  if (found.length > 1) fail(`iCloud has ${found.length} calendars named ${CALENDAR}`);
+  return new URL(element(found[0], 'href'), homeUrl).href;
+}
+
+function save() {
+  const tmp = `${statePath}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(sent));
+  renameSync(tmp, statePath);
+}
+
+const cal = await calendar();
+const eventUrl = (id) => new URL(encodeURIComponent(id) + '.ics', cal).href;
+for (const e of puts) {
+  const res = await call('PUT', eventUrl(e.id), e.ics, { 'Content-Type': 'text/calendar; charset=utf-8' });
+  if (!res.ok) {
+    save();
+    fail(`iCloud answered ${res.status} ${res.statusText} to PUT`);
+  }
+  sent[e.id] = hash(e.ics);
+}
+save();
