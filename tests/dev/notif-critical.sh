@@ -17,7 +17,7 @@ mod_i_d() {
 }
 dnd() { timeout 0.5 qs ipc call notifs dnd "$1" >/dev/null; }
 mod_a() { niri msg action spawn -- dots-call notifs toggle; }
-centre_open() { notifs | jq -e .open >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
+centre_open() { notifs | jq -e '.open and .keyboard and .settled' >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
 
 notify-send -u critical -a Test "Disk full"
 until_ok 2000 shows "Disk full"

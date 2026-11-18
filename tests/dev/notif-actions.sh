@@ -88,7 +88,7 @@ centre_is() { notifs | jq -e "$@" >/dev/null; }
 centre_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
 open_centre() {
   niri msg action spawn -- dots-call notifs open
-  until_ok 3000 centre_is .open
+  until_ok 3000 centre_is '.open and .keyboard and .settled'
   until_ok 2000 centre_focus Exclusive
 }
 close_centre() {

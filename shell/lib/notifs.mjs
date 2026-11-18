@@ -15,8 +15,8 @@ export function setAside(waiting, leaving, arriving, rules = {}) {
 // A hold paused under the pointer or Mod+I gets back what it had left, but never less than 1.5 s to read it once let go; one paused as its Tick was due has 0 or less left. 0 is until dismissed.
 export const resumeMs = (entry, left, rule) => (holdMs(entry, rule) > 0 ? Math.max(left, 1500) : 0);
 
-// Whether an entry takes the island, given its app's rule: a muted app's never do, criticals included; under Do Not Disturb only criticals and apps let through do.
-export const shows = (entry, rule, dnd) => !rule?.muted && (!dnd || entry.critical || rule?.dnd === true);
+// Whether an entry takes the island, given its app's rule: a muted app's do not, but a critical still does; under Do Not Disturb only criticals and unmuted apps let through do.
+export const shows = (entry, rule, dnd) => entry.critical || (!rule?.muted && (!dnd || rule?.dnd === true));
 
 // Rules key on the exact app name, which a sender may make __proto__ or constructor, so a name is only ever an own key.
 export const ruleOf = (rules, app) => (Object.prototype.hasOwnProperty.call(rules, app) ? rules[app] : undefined);

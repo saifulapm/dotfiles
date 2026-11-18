@@ -185,10 +185,13 @@ test('a hold paused as it ran out still resumes, and one until dismissed never d
   assert.equal(resumeMs(Object.assign(entry(1), { timeout: 0 }), 0), 0);
 });
 
-test('a muted app goes to the history only, its criticals too, and Do Not Disturb still lets criticals through', () => {
+test('a muted app goes to the history only, but its criticals still show, under Do Not Disturb too', () => {
   const muted = { muted: true };
   assert.equal(shows(entry(1), muted, false), false);
-  assert.equal(shows(critical(1), muted, false), false);
+  assert.equal(shows(critical(1), muted, false), true);
+  assert.equal(shows(critical(1), muted, true), true);
+  assert.equal(shows(entry(1), muted, true), false);
+  assert.equal(shows(entry(1), { muted: true, dnd: true }, true), false);
   assert.equal(shows(entry(1), undefined, false), true);
   assert.equal(shows(entry(1), undefined, true), false);
   assert.equal(shows(critical(1), undefined, true), true);

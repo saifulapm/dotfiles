@@ -10,7 +10,7 @@ island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e --arg m "
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 mod_a() { niri msg action spawn -- dots-call notifs toggle; }
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-centre_open() { state_is .open && focus_is Exclusive; }
+centre_open() { state_is '.open and .keyboard and .settled' && focus_is Exclusive; }
 centre_closed() { state_is '.open == false' && focus_is None; }
 
 notify-send -a mail "mail 1"

@@ -14,7 +14,8 @@ listed() { state_is --arg s "$1" 'any(.summaries[]; . == $s)'; }
 had_head() { jq -e --arg t "$1" 'any(.heads[]; .text | ascii_downcase == $t)' <<<"$seen" >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns the bind's command through niri.
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == $k)' >/dev/null; }
-centre_open() { state_is .open && focus_is Exclusive; }
+# The island's centre holds the keys once it is settled and its window active; niri lists the layer Exclusive a moment before.
+centre_open() { state_is '.open and .keyboard and .settled' && focus_is Exclusive; }
 centre_closed() { state_is '.open == false' && focus_is None; }
 # Opening the centre selects its first row, the newest app's, and the key acts on that app; seen keeps the centre as it then drew.
 seen=
@@ -44,7 +45,13 @@ notify-send -a T x
 check "a muted T's notification keeps the island at rest" sent_rests x
 check "Mod+A lists it" listed x
 notify-send -u critical -a T y
-check "a muted T's critical keeps the island at rest, and Mod+A lists it" sent_rests y
+check "a muted T's critical still shows" until_ok 2000 shows y
+check "and Mod+A lists it" listed y
+# It stays until dismissed, so Mod+I, d puts it away.
+niri msg action spawn -- dots-call island focus
+sleep 0.3
+wtype -k d
+until_ok 2000 mode_is rest
 
 notify-send -t 1 -a slack s1
 until_ok 2000 listed s1
@@ -127,7 +134,7 @@ key_on_newest -k m
 long_head() { jq -e '. as $s | any(.heads[]; (.app | startswith("long")) and .elided and .badge == "Muted" and .badgeRight <= $s.cardRight)' <<<"$seen" >/dev/null; }
 check "a long app name elides and its Muted badge is drawn whole ($(jq -c '[.heads[] | {app: .app[-12:], elided, badge, badgeRight}] + [{cardRight}]' <<<"$seen"))" long_head
 
-# Criticals set aside come back newest first; a muted app's is passed over, not left blocking the older one.
+# Criticals set aside come back newest first, a muted app's too, since a critical shows whatever the app's rule.
 notify-send -u critical -a D d2
 until_ok 2000 shows d2
 notify-send -u critical -a C c1
@@ -136,7 +143,15 @@ notify-send -a N n1
 until_ok 2000 shows n1
 key_on_newest -k j -k m
 check "j, m on the C row mutes C ($(notifs | jq -c .rules.C))" state_is '.rules.C.muted'
-check "as N leaves, D's critical comes back past the muted C's" until_ok 7000 shows d2
+check "as N leaves, the muted C's critical still comes back first" until_ok 7000 shows c1
+niri msg action spawn -- dots-call island focus
+sleep 0.3
+wtype -k d
+check "then, put away, D's critical comes back" until_ok 3000 shows d2
+niri msg action spawn -- dots-call island focus
+sleep 0.3
+wtype -k d
+until_ok 2000 mode_is rest
 
 # Any sender can name itself after a member every object inherits.
 notify-send -t 1 -a __proto__ p1
