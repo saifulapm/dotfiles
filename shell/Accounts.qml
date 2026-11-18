@@ -633,8 +633,8 @@ Item {
                 };
             }
 
-            // Two tiles to a row of the grid they sit in.
-            width: (parent.width - 8) / 2
+            // Two tiles to a row, sized from the card's column: the grid's own width comes from its tiles, so sizing them from it loops its polish and leaves the card unlaid.
+            width: (column.width - 8) / 2
             height: 64
             radius: 14
             color: Qt.alpha(panel.on, selected ? 0.12 : 0.07)

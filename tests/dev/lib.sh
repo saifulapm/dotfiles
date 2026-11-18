@@ -90,10 +90,10 @@ dev_stop() {
 }
 # A test that needs its own cleanup redefines this; the EXIT trap stays lib.sh's.
 cleanup() { :; }
-# A QML error can break what a surface draws while its state IPC still reads right, so every check reads the journal.
+# A QML error can break what a surface draws while its state IPC still reads right, so every check reads the journal; a polish loop leaves a layout unlaid (m105's Accounts tiles collapsed the card after a refresh).
 qml_errors() {
   journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat 2>/dev/null |
-    grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert|unavailable|Invalid property assignment|Cannot anchor'
+    grep -E 'TypeError|ReferenceError|SyntaxError|Failed to load configuration|is not a type|Cannot assign|Cannot read propert|unavailable|Invalid property assignment|Cannot anchor|polish\(\) loop'
 }
 dev_exit() {
   local rc=$? errs= changed=
