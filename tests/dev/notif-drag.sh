@@ -168,6 +168,34 @@ n=$(drop_count)
 drag_to_target "$(centre | jq -c '[.notes[] | select(.file)][0].file')"
 check "the centre tile's chip drops file://$heic on the window under the centre ($(drops -1))" test "$(drop_count)" -gt "$n" -a "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
 check "and the centre is still open after the drop" centre_is '.open'
+
+# While the chip drags, the surfaces' window takes input on the island alone, so the drop reaches the window under it; after the drop it takes the whole output again.
+press_and_hold() {
+  local x y
+  x=$(jq -r '(.x + .w / 2) | floor' <<<"$1")
+  y=$(jq -r '(.y + .h / 2) | floor' <<<"$1")
+  point press "$x" "$y"
+  point move "$((x + 30))" "$((y + 30))" 10
+  point move "$tx" "$ty" 30
+  point sleep 300
+}
+check "at rest in the centre the window takes the whole output ($(centre | jq -c .input))" centre_is '.input == "output"'
+n=$(drop_count)
+press_and_hold "$(centre | jq -c '[.notes[] | select(.file)][0].file')"
+check "mid-drag the window takes input on the island alone ($(centre | jq -c .input))" centre_is '.input == "island"'
+point release
+until_ok 3000 drops_more "$n"
+check "after the drop it takes the whole output again ($(centre | jq -c .input))" until_ok 2000 centre_is '.input == "output"'
+
+# Esc during the drag drops nothing, and the centre stays open with the whole output again.
+n=$(drop_count)
+press_and_hold "$(centre | jq -c '[.notes[] | select(.file)][0].file')"
+wtype -k Escape
+point sleep 300
+point release
+sleep 1
+check "Esc during the drag drops nothing ($(drop_count) drops, $n before)" test "$(drop_count)" -eq "$n"
+check "and the centre stays open ($(centre | jq -c '{open, input}'))" centre_is '.open and .input == "output"'
 close_centre
 
 # A click on an action chip runs that action, and the card's own click, the default action, does not run as well. Only a resident notification is still there to take both, and notify-send prints only the first, so a resident one is sent and the bus is read.
@@ -194,6 +222,24 @@ check "a file notification with actions draws its chips ($(island | jq -c .note.
 drag_to_target "$(island | jq -c .note.chipBox)"
 check "and its file chip drops file://$heic ($(drops -1))" test "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
 kill "$sender"
+
+# Onto a foot: the file's path arrives typed there, as foot types a dropped file.
+kill "$target" 2>/dev/null
+typed=$DOTS_DEV_DIR/foot-typed
+niri msg action spawn -- foot -c /dev/null -a dropfoot sh -c "stty raw -echo; exec cat >$typed"
+foot_up() { niri msg -j windows | jq -e 'any(.[]; .app_id == "dropfoot")' >/dev/null; }
+until_ok 5000 foot_up
+niri msg action maximize-column
+send_files "$heic"
+toast_for "Taildrop · 1 file"
+open_centre
+box=$(centre | jq -c '[.notes[] | select(.file)][0].file')
+press_and_hold "$box"
+point release
+typed_path() { grep -qF "$heic" "$typed" 2>/dev/null; }
+until_ok 3000 typed_path
+check "the centre's chip dropped on a foot types $heic there ($(cat "$typed" 2>/dev/null))" typed_path
+close_centre
 
 exit $((fails > 0))
 }

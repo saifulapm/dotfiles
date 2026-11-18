@@ -231,6 +231,9 @@ PanelWindow {
     // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover; at rest only the island takes clicks, and after Mod+I the whole output does, so a click outside gives the keyboard back (SMB51G7B).
     mask: shown && !(notifications?.dragging ?? false) ? null : island?.wantsKeys && !island.noteDragging ? null : island?.visible ? islandInput : noInput
 
+    // Where the window takes input, for checks: the whole output, the island alone, or nowhere.
+    readonly property string inputKind: mask === null ? "output" : mask === islandInput ? "island" : "none"
+
     Region {
         id: noInput
     }
