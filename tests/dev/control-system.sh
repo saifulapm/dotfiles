@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Control's Power asks for y before a reboot, Display steps a fake backlight, and Route flips a fake workflow route and Do Not Disturb.
+# Control's Power page asks again before a reboot, red as Reboot?, and runs it only on a second Enter; Display steps a fake backlight, and Route flips a fake workflow route and draws a failed sync unit in red on one line.
 {
 fake=$(mktemp -d)
 fake_log=$fake/argv
@@ -30,35 +30,33 @@ select_row() {
   done
   return 1
 }
-# One Tab at a time, each waiting for the section to move, so a late press never overshoots.
-section_not() { ! section_is "$1"; }
-tab_to() {
-  local n s
-  until_ok 3000 state_is '.keyboard' || return 1
-  for n in 1 2 3 4 5 6; do
-    section_is "$1" && return 0
-    s=$(control_state | jq -r .section)
-    wtype -k Tab
-    until_ok 2000 section_not "$s" || return 1
-  done
-  section_is "$1"
+# Opens Control on a page by name, as Enter on its tile and the power key do.
+page_to() {
+  timeout 0.5 qs ipc call control section "$1"
+  until_ok 3000 section_is "$1" && until_ok 3000 state_is '.keyboard'
 }
 
 until_ok 5000 shell_status >/dev/null
 check "the shell runs the fake workflow" test -x "$DOTS_WORKFLOW"
 
-mod_c
-until_ok 3000 section_is audio
-tab_to power
-check "Tab reaches power" section_is power
+# The power key runs dots-call control section power (binds.kdl).
+niri msg action spawn -- dots-call control section power
+until_ok 3000 section_is power
+until_ok 3000 state_is '.keyboard'
+check "the power key opens Control on its Power page" section_is power
 check "Power lists the profile and the session actions" state_is '.rows as $r | ["Profile", "Lock", "Log out", "Reboot", "Power off"] | all(. as $t | $r | index($t))'
+check "its four square actions read Lock, Log out, Reboot and Power off ($(control_state | jq -c .power.actions))" state_is '.power.actions == ["Lock", "Log out", "Reboot", "Power off"]'
+# Never a second Enter on Reboot here: the nested shell's systemctl is dev/path's stand-in, and it must stay unasked.
+asked_power() { [ -s "$DOTS_DEV_DIR/systemctl-power" ]; }
 select_row Reboot
 wtype -k Return
 until_ok 2000 state_is '.confirming == "reboot"'
-check "Enter on Reboot asks for y and runs nothing" state_is '.confirming == "reboot"'
-wtype n
+check "Enter on Reboot asks again and runs nothing" state_is '.confirming == "reboot"'
+check "the button turns red and reads Reboot? ($(control_state | jq -c .power.actions))" state_is '.power.actions[2] == "Reboot?"'
+wtype -k Escape
 until_ok 2000 state_is '.confirming == ""'
-check "any other key cancels the confirm" state_is '.confirming == ""'
+check "Esc puts it back and stays on Power" state_is '.confirming == "" and .section == "power" and .power.actions[2] == "Reboot"'
+check "nothing asked systemctl to reboot" bash -c "! [ -s '$DOTS_DEV_DIR/systemctl-power' ]"
 
 # The charge limit goes through dev/path's fake UPower, which starts on at 80; only a machine with a threshold has the row.
 if compgen -G '/sys/class/power_supply/*/charge_control_end_threshold' >/dev/null; then
@@ -83,6 +81,7 @@ check "Stay awake starts off" state_is '.awakeUntil == 0'
 wtype -k Return
 until_ok 2000 awake_in 30
 check "Enter holds it for 30 min" awake_in 30
+check "and its 30 min segment is lit ($(control_state | jq -c .power.awake))" state_is '.power.awake == "30 min"'
 check "and the idle steps hold off as long" bash -c "timeout 0.5 qs ipc call idle state | jq -e --argjson u $(control_state | jq .awakeUntil) '.awakeUntil == \$u'"
 wtype l
 until_ok 2000 awake_in 60
@@ -93,7 +92,7 @@ wtype -k Return
 until_ok 2000 state_is '.awakeUntil == 0'
 check "past 2 h it turns off" state_is '.awakeUntil == 0'
 
-tab_to display
+page_to display
 until_ok 2000 state_is '.rows | index("fake-bl")'
 check "Display lists the fake backlight" state_is '.rows | index("fake-bl")'
 until_ok 2000 state_is '.rows | index("FAKE-B")'
@@ -104,7 +103,7 @@ stepped() { grep -qx -- '-m -d fake-bl set 5%+' "$fake_log" 2>/dev/null; }
 until_ok 2000 stepped
 check "l steps it by 5%+ through brightnessctl" stepped
 
-tab_to route
+page_to route
 until_ok 2000 state_is '.route == "device"'
 check "Route reads device from workflow route" state_is '.route == "device"'
 select_row "Questions ring on"
@@ -114,14 +113,14 @@ check "Enter switches the route to phone" bash -c "state() { timeout 0.5 qs ipc 
 wtype -k Return
 until_ok 2000 state_is '.route == "device"'
 check "Enter again switches it back to device" state_is '.route == "device"'
-select_row "Do Not Disturb"
-wtype -k Return
-dnd() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e ".dnd == $1" >/dev/null; }
-until_ok 2000 dnd true
-check "Enter on Do Not Disturb turns it on" dnd true
-wtype -k Return
-until_ok 2000 dnd false
-check "and Enter again turns it off" dnd false
+
+# A unit that failed draws its error in the danger tone on one line, cut with an ellipsis, however long the error.
+long=$(printf 'mail: %.0s' {1..2}; printf 'x%.0s' {1..190})
+jq -n --arg e "$long" '{mail: {ok: false, lastRun: 1, lastOk: null, error: $e}, notes: {ok: true, lastRun: 1, lastOk: 1}}' >"$XDG_STATE_HOME/dots/sync.json"
+until_ok 3000 state_is '.rows | index("mail") != null'
+check "Route lists each sync unit as a row ($(control_state | jq -c .rows))" state_is '.rows == ["Questions ring on", "mail", "notes"]'
+check "the failed unit's row draws in the danger tone ($(control_state | jq -c .tones))" state_is '.tones[1] == "danger" and .tones[2] == ""'
+check "its error is cut on one line with an ellipsis ($(control_state | jq -c '.detailsDrawn[1]'))" state_is '(.detailsDrawn[1] | endswith("…")) and .detailLines[1] == 1'
 wtype -k Escape
 
 exit $((fails > 0))

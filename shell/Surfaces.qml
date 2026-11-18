@@ -392,7 +392,10 @@ PanelWindow {
 
     Connections {
         target: host.island
+        // A pairing request asked from Control's Bluetooth page is answered there, so Control stays.
         function onSurfaceYielded() {
+            if (host.islandSurface === host.control && host.control.page === "bluetooth")
+                return;
             host.islandSurface?.close();
         }
     }

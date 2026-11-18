@@ -9,9 +9,10 @@ section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 detail_is() { state_is --arg t "$1" --arg d "$2" '.details[.rows | index($t)] == $d'; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
-asks() { island_is --arg t "$1" '.mode == "question" and .text == $t'; }
-toast_is() { island_is --arg t "$1" '.mode == "toast" and .text == $t'; }
-no_question() { ! island_is '.mode == "question"'; }
+# A request asked from Control's Bluetooth page shows there, Control holding the island; one asked with Control closed shows in the island.
+asks() { island_is --arg t "$1" '.mode == "question" and .text == $t' || timeout 0.5 qs ipc call control state 2>/dev/null | jq -e --arg t "$1" '.open and .pairing.text == $t' >/dev/null 2>&1; }
+toast_is() { island_is --arg t "$1" '.mode == "toast" and .text == $t' || timeout 0.5 qs ipc call control state 2>/dev/null | jq -e --arg t "$1" '.open and .pairing.text == $t' >/dev/null 2>&1; }
+no_question() { ! island_is '.mode == "question"' && ! timeout 0.5 qs ipc call control state 2>/dev/null | jq -e '.pairing.buttons | length > 0' >/dev/null 2>&1; }
 # Presses j until the row titled $1 is selected.
 select_row() {
   local i n
@@ -73,7 +74,7 @@ until_ok 3000 select_row "Test Keyboard"
 wtype -k Return
 until_ok 3000 asks "Pair Test Keyboard? 123456"
 check "Enter on Test Keyboard asks Pair Test Keyboard? 123456 ($(island | jq -c '{mode, text}'))" asks "Pair Test Keyboard? 123456"
-check "the island names its keys, ↵ yes and esc no" island_is '.pairing.keys == ["↵ yes", "esc no"]'
+check "the Bluetooth page draws a button for each answer, Yes and No ($(control_state | jq -c .pairing))" state_is '.pairing.buttons == ["Yes", "No"]'
 # A person may take a while to compare the code: the answer still counts after D-Bus's 25 s default.
 sleep 27
 check "27 s on, the question still shows" asks "Pair Test Keyboard? 123456"
@@ -132,8 +133,8 @@ wtype -k Return
 until_ok 3000 asks "PIN for Test Phone"
 check "a PIN request reads PIN for Test Phone" asks "PIN for Test Phone"
 wtype 0000
-until_ok 2000 island_is '.pairing.pin == "0000"'
-check "typing 0000 shows it in the island" island_is '.pairing.pin == "0000"'
+until_ok 2000 state_is '.pairing.pin == "0000"'
+check "typing 0000 shows it on the Bluetooth page" state_is '.pairing.pin == "0000"'
 wtype -k Return
 pin_sent() { knob Calls | grep -q "RequestPinCode $phone 0000"; }
 until_ok 3000 pin_sent

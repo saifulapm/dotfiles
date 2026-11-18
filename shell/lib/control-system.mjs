@@ -92,13 +92,25 @@ export const syncFailing = (units) => Object.keys(units).some((k) => units[k].ok
 // Control's detail text has no width of its own, so a long error is cut to 60 characters on screen.
 const cut = (s) => (s.length > 60 ? s.slice(0, 59) + '…' : s);
 
+// Route's rows below Questions ring on: every sync unit with when it last went through, a failed one with its error in the danger tone; none yet reads as one row.
 export function syncRows(units) {
   const names = Object.keys(units);
   if (names.length === 0) return [{ title: 'Sync', detail: 'no rounds yet' }];
-  const failing = names.filter((k) => units[k].ok === false);
-  if (failing.length === 0) {
-    const times = names.map((k) => units[k].lastOk).filter((t) => t !== null);
-    return [{ title: 'Sync', detail: times.length ? 'ok · ' + clockText(new Date(Math.max.apply(null, times))) : 'ok' }];
-  }
-  return [{ title: 'Sync', detail: failing.length + ' failing' }].concat(failing.map((k) => ({ title: k, detail: cut(units[k].error) })));
+  return names.map((k) =>
+    units[k].ok === false
+      ? { title: k, detail: cut(units[k].error), tone: 'danger' }
+      : { title: k, detail: units[k].lastOk !== null ? 'ok · ' + clockText(new Date(units[k].lastOk)) : 'ok' },
+  );
+}
+
+// The battery's line on the Power page: its state and time to empty or to full, as board 4 words it.
+export function batteryLine(state, toEmpty, toFull) {
+  const time = (s) => {
+    if (!(s > 0)) return '';
+    const m = Math.round(s / 60);
+    return Math.floor(m / 60) > 0 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`;
+  };
+  if (state === 'charging') return ['Charging', time(toFull) && time(toFull) + ' to full'].filter((x) => x).join(' · ');
+  if (state === 'discharging') return ['Discharging', time(toEmpty) && time(toEmpty) + ' left'].filter((x) => x).join(' · ');
+  return state === 'fully charged' ? 'Full' : state ? state[0].toUpperCase() + state.slice(1) : '';
 }

@@ -7,14 +7,14 @@ import "lib/control-system.mjs" as Lib
 import "lib/idle.mjs" as Idle
 import "lib/voice.mjs" as V
 
-// Control's Power section: battery, profile, charge limit where the hardware has one, stay awake, then the session actions, each but Lock waiting for y.
+// Control's Power section: battery, profile, charge limit where the hardware has one, stay awake, then the session actions, each but Lock waiting for a second Enter; Control draws its page.
 Item {
     id: power
 
     required property var theme
     property int selected: 0
     readonly property var look: V.listLook(theme.tokens)
-    // The action waiting for its y, or "".
+    // The action waiting for its second Enter, or "".
     property string confirming: ""
     // The battery's charge limit while it is on, 0 while off, -1 where the hardware has none.
     property int chargeLimit: -1
@@ -45,19 +45,37 @@ Item {
             }]).concat(Lib.ACTIONS.map(a => ({
                 id: a.id,
                 title: a.title,
-                detail: a.id === confirming ? "y to confirm" : ""
+                detail: a.id === confirming ? a.title + "?" : ""
             })))
     readonly property var rows: items
 
+    // An action ran: Control closes, so a lock never leaves it open behind the lock screen.
+    signal ran
+
     function run(id) {
         confirming = "";
+        ran();
         Quickshell.execDetached(Lib.actionCommand(id));
+    }
+
+    // Esc, or a click outside, puts a confirming button back; true when there was one.
+    function cancel() {
+        if (confirming === "")
+            return false;
+        confirming = "";
+        return true;
+    }
+
+    // Steps Stay awake straight to minutes (0 is off), as a click on its segment does.
+    function setAwake(minutes) {
+        Root.State.awakeUntil = Idle.awakeEnd(Date.now(), minutes);
     }
 
     function key(event) {
         const item = items[selected];
+        // Only a second Enter runs the action; any other key puts the button back.
         if (confirming !== "") {
-            if (event.key === Qt.Key_Y)
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 run(confirming);
             else
                 confirming = "";
@@ -106,7 +124,6 @@ Item {
 
     onSelectedChanged: confirming = ""
     onVisibleChanged: confirming = ""
-    implicitHeight: hint.implicitHeight
 
     // Read when Control first opens, and again after each turn on or off; a turn that fails prints nothing, so the row keeps what it showed.
     Process {
@@ -119,16 +136,5 @@ Item {
                     power.chargeLimit = Lib.chargeLimit(text);
             }
         }
-    }
-
-    Text {
-        id: hint
-        textFormat: Text.PlainText
-        leftPadding: 20
-        text: power.look.tabText(power.confirming !== "" ? (Lib.ACTIONS.find(a => a.id === power.confirming).title + "? y confirms · any other key cancels") : "↵ act · h/l profile")
-        color: power.confirming !== "" ? power.theme.color.danger : power.look.small.color
-        font.family: power.look.small.font
-        font.pixelSize: power.look.small.size
-        font.letterSpacing: power.look.small.spacing
     }
 }

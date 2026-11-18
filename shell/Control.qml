@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Services.UPower
 import QtQuick
 import "." as Root
 import "lib/control.mjs" as Lib
@@ -39,6 +40,20 @@ Item {
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+
+    // A pair that failed, said on the Bluetooth page, where the island's own toast cannot show while Control holds it; cleared by the next request or leaving the page.
+    property string pairNote: ""
+    Connections {
+        target: Root.Pairing
+        function onFailed(device) {
+            control.pairNote = "Pairing failed: " + device;
+        }
+        function onCurrentChanged() {
+            if (Root.Pairing.current)
+                control.pairNote = "";
+        }
+    }
+    onPageChanged: pairNote = ""
 
     // Enter on Record screen and on Calendar hand off to the Recorder and to the island's calendar card.
     signal recordWanted
@@ -118,7 +133,7 @@ Item {
     function stepBack() {
         if (page !== "" && section.typing && section.closeLine)
             section.closeLine();
-        else
+        else if (!(page !== "" && section.cancel && section.cancel()))
             close();
     }
 
@@ -181,6 +196,16 @@ Item {
         section.key({ key: Qt.Key_Return, modifiers: 0, text: "" });
     }
 
+    // A click on a part of the Power page selects it and hands Power the Enter its key() handles.
+    function runPower(id) {
+        const i = power.items.findIndex(it => it.id === id);
+        if (i < 0)
+            return;
+        if (power.selected !== i)
+            power.selected = i;
+        power.key({ key: Qt.Key_Return, modifiers: 0, text: "" });
+    }
+
     // A wheel turn over a slider row selects it and takes one h or l step its key() handles for each whole notch.
     function turnRow(index, angle) {
         if (!section.levels || section.typing)
@@ -215,7 +240,12 @@ Item {
             details: rows.map(r => r.detail),
             // The caption over each row that starts a group, as the Sound page draws OUTPUT, PLAYING and INPUT.
             caps: rows.map(r => r.cap ?? ""),
+            tones: rows.map(r => r.tone ?? ""),
+            detailLines: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).detailLines),
             scanning: scanRow.visible,
+            pairing: pairCard.visible ? { text: pairText.text, pin: Root.Pairing.pin, buttons: Array.from({ length: pairButtons.count }, (_, i) => pairButtons.itemAt(i).word) } : null,
+            // The Power page as drawn: the profile and Stay awake segments lit, and each action's label.
+            power: page === "power" ? { profile: profileSegments.drawnCurrent, awake: awakeSegments.drawnCurrent, actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawnText) } : null,
             // A page's field or a pairing question takes every key.
             typing: page !== "" && !!section.typing,
             detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
@@ -245,8 +275,11 @@ Item {
             event.accepted = true;
             return;
         }
-        if (k === Qt.Key_Escape)
+        // Esc puts a confirming button back before it leaves the page.
+        if (k === Qt.Key_Escape && !(page !== "" && section.cancel && section.cancel()))
             back();
+        else if (k === Qt.Key_Escape)
+            return;
         else if (page !== "") {
             if (k === Qt.Key_J || k === Qt.Key_Down)
                 move(1);
@@ -295,6 +328,7 @@ Item {
         }
         Root.ControlPower {
             id: power
+            onRan: control.close()
             visible: control.page === "power"
             probe: control.opened
             theme: control.theme
@@ -644,6 +678,80 @@ Item {
             }
         }
 
+        // A pairing request on the Bluetooth page: what it asks, the code typed so far, and a button for each answer; a failed pair says so here.
+        Rectangle {
+            id: pairCard
+            readonly property var q: control.page === "bluetooth" ? Root.Pairing.question : null
+            visible: !!q || (control.page === "bluetooth" && control.pairNote !== "")
+            width: parent.width
+            height: pairColumn.implicitHeight + 24
+            radius: 12
+            color: Qt.alpha(control.on, 0.1)
+
+            Column {
+                id: pairColumn
+                x: 12
+                y: 12
+                width: parent.width - 24
+                spacing: 8
+
+                Text {
+                    id: pairText
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 3
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    text: pairCard.q ? pairCard.q.text : control.pairNote
+                    color: pairCard.q ? control.on : control.tones.danger
+                    font.family: control.fonts.ui ?? ""
+                    font.pixelSize: 13
+                    font.weight: Font.Bold
+                }
+                Text {
+                    visible: !!pairCard.q && ["pin", "passkey"].indexOf(pairCard.q.pairing) >= 0
+                    textFormat: Text.PlainText
+                    text: Root.Pairing.pin || "Type the code"
+                    color: Root.Pairing.pin ? control.on : control.tones.muted
+                    font.family: control.fonts.mono ?? ""
+                    font.pixelSize: 15
+                }
+                Row {
+                    visible: !!pairCard.q
+                    spacing: 8
+
+                    Repeater {
+                        id: pairButtons
+                        model: pairCard.q ? pairCard.q.keys : []
+
+                        Rectangle {
+                            required property var modelData
+                            readonly property bool yes: modelData[0] === "↵"
+                            readonly property string word: modelData[1].charAt(0).toUpperCase() + modelData[1].slice(1)
+                            width: pairWord.implicitWidth + 28
+                            height: 34
+                            radius: 10
+                            color: yes ? control.on : Qt.alpha(control.on, 0.07)
+                            Text {
+                                id: pairWord
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: parent.word
+                                color: parent.yes ? control.fill : control.on
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: parent.yes ? Font.Bold : Font.Normal
+                            }
+                            Root.Click {
+                                name: "control-pair:" + parent.modelData[1]
+                                onTapped: Root.Pairing.key({ key: parent.yes ? Qt.Key_Return : Qt.Key_Escape, modifiers: 0, text: "" })
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // A page with no rows says why, as Bluetooth turned off does.
         Text {
             visible: control.rows.length === 0 && text !== ""
@@ -659,7 +767,8 @@ Item {
 
         Repeater {
             id: rowRepeater
-            model: control.rows
+            // Power draws its own page below.
+            model: control.page === "power" ? [] : control.rows
 
             // A row, under its caption when it starts a group: OUTPUT, PLAYING or INPUT.
             Item {
@@ -675,6 +784,7 @@ Item {
                 readonly property alias color: rowFill.color
                 readonly property alias box: rowFill
                 readonly property var fieldLook: rowFill.look
+                readonly property int detailLines: level ? 1 : detail.lineCount
                 width: pageColumn.width
                 height: rowFill.height + (cap ? 24 : 0)
 
@@ -897,6 +1007,183 @@ Item {
             }
         }
 
+        // Power, as board 4 draws it: the battery beside the charge limit, the profile and Stay awake as segments, then four square actions; the selected part is a shade lighter.
+        Column {
+            id: powerView
+            visible: control.page === "power"
+            width: parent.width
+            spacing: 8
+            readonly property string at: power.items[power.selected]?.id ?? ""
+
+            Row {
+                visible: power.hasBattery || power.chargeLimit >= 0
+                width: parent.width
+                spacing: 8
+
+                Rectangle {
+                    visible: power.hasBattery
+                    width: power.chargeLimit >= 0 ? (parent.width - 8) * 2 / 3 : parent.width
+                    height: 60
+                    radius: 14
+                    color: Qt.alpha(control.on, powerView.at === "battery" ? 0.1 : 0.05)
+
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 12
+                        spacing: 10
+
+                        Rectangle {
+                            width: 36
+                            height: 36
+                            radius: 18
+                            color: Qt.alpha(control.on, 0.1)
+                            Text {
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF0082)
+                                color: control.on
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 18
+                            }
+                        }
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            Text {
+                                textFormat: Text.PlainText
+                                text: power.hasBattery ? Math.round(power.battery.percentage * 100) + "%" : ""
+                                color: control.on
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+                            Text {
+                                textFormat: Text.PlainText
+                                text: power.hasBattery ? Sys.batteryLine(UPowerDeviceState.toString(power.battery.state).toLowerCase(), power.battery.timeToEmpty, power.battery.timeToFull) : ""
+                                color: control.tones.muted
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 11
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    visible: power.chargeLimit >= 0
+                    width: power.hasBattery ? (parent.width - 8) / 3 : parent.width
+                    height: 60
+                    radius: 14
+                    color: Qt.alpha(control.on, powerView.at === "limit" ? 0.1 : 0.05)
+
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 12
+                        Text {
+                            textFormat: Text.PlainText
+                            text: "Charge limit"
+                            color: control.on
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            text: power.chargeLimit > 0 ? power.chargeLimit + "%" : "Off"
+                            color: control.tones.muted
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 11
+                        }
+                    }
+                    Switch {
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        anchors.rightMargin: 12
+                        on: power.chargeLimit > 0
+                    }
+                    Root.Click {
+                        name: "control-power:limit"
+                        onTapped: control.runPower("limit")
+                    }
+                }
+            }
+
+            // The profile, one segment per profile, the current one inverted.
+            Segments {
+                id: profileSegments
+                selected: powerView.at === "profile"
+                options: power.profiles.map(p => ({ id: String(p), label: ({ [PowerProfile.PowerSaver]: "Power saver", [PowerProfile.Balanced]: "Balanced", [PowerProfile.Performance]: "Performance" })[p] }))
+                current: String(PowerProfiles.profile)
+                onPicked: id => {
+                    power.selected = power.items.findIndex(i => i.id === "profile");
+                    PowerProfiles.profile = Number(id);
+                }
+            }
+
+            // Stay awake: off or one of its steps, the one that holds it inverted.
+            Segments {
+                id: awakeSegments
+                selected: powerView.at === "awake"
+                label: "Stay awake"
+                glyph: 0xF0176
+                options: [{ id: "0", label: "Off" }, { id: "30", label: "30 min" }, { id: "60", label: "1 h" }, { id: "120", label: "2 h" }]
+                current: String(Idle.awakeStep(control.now.getTime(), Root.State.awakeUntil))
+                onPicked: id => {
+                    power.selected = power.items.findIndex(i => i.id === "awake");
+                    power.setAwake(Number(id));
+                }
+            }
+
+            // Lock, Log out, Reboot and Power off: a press asks again, red as "Reboot?", and only a second Enter or click runs it.
+            Row {
+                width: parent.width
+                spacing: 8
+
+                Repeater {
+                    id: actionRepeater
+                    model: Sys.ACTIONS
+
+                    Rectangle {
+                        id: action
+                        required property var modelData
+                        readonly property bool asking: power.confirming === modelData.id
+                        readonly property string drawnText: actionText.text
+                        width: (parent.width - 24) / 4
+                        height: 96
+                        radius: 14
+                        color: asking ? Qt.alpha(control.tones.danger, 0.16) : Qt.alpha(control.on, powerView.at === modelData.id ? 0.1 : 0.05)
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 10
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(({ lock: 0xF033E, logout: 0xF0343, reboot: 0xF0709, poweroff: 0xF0425 })[action.modelData.id])
+                                color: action.asking || action.modelData.id === "poweroff" ? control.tones.danger : control.on
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 24
+                            }
+                            Text {
+                                id: actionText
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                textFormat: Text.PlainText
+                                text: action.asking ? action.modelData.title + "?" : action.modelData.title
+                                color: action.asking ? control.tones.danger : control.tones.muted
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 12
+                                font.weight: action.asking ? Font.Bold : Font.Normal
+                            }
+                        }
+
+                        Root.Click {
+                            name: "control-power:" + action.modelData.id
+                            onTapped: control.runPower(action.modelData.id)
+                        }
+                    }
+                }
+            }
+        }
+
         // While Bluetooth scans, a row says so under the devices.
         Rectangle {
             id: scanRow
@@ -954,6 +1241,76 @@ Item {
                 font.pixelSize: parent.height <= 18 ? 11 : 13
             }
         }
+    }
+
+    // A segmented control: an optional glyph and label, then one segment per option, the current one inverted.
+    component Segments: Rectangle {
+        id: seg
+        property var options: []
+        property string current: ""
+        property bool selected: false
+        property string label: ""
+        property int glyph: 0
+        signal picked(string id)
+        readonly property real labelWidth: label ? 120 : 0
+        width: parent.width
+        height: 44
+        radius: 14
+        color: Qt.alpha(control.on, selected ? 0.1 : 0.05)
+
+        Row {
+            visible: seg.label !== ""
+            anchors.verticalCenter: parent.verticalCenter
+            x: 12
+            spacing: 8
+            Text {
+                textFormat: Text.PlainText
+                text: seg.glyph ? String.fromCodePoint(seg.glyph) : ""
+                color: control.on
+                font.family: "Symbols Nerd Font Mono"
+                font.pixelSize: 15
+            }
+            Text {
+                textFormat: Text.PlainText
+                text: seg.label
+                color: control.on
+                font.family: control.fonts.ui ?? ""
+                font.pixelSize: 13
+            }
+        }
+
+        Row {
+            x: 4 + seg.labelWidth
+            y: 4
+            spacing: 4
+            Repeater {
+                model: seg.options
+                Rectangle {
+                    required property var modelData
+                    readonly property bool on: modelData.id === seg.current
+                    width: (seg.width - 8 - seg.labelWidth - 4 * (seg.options.length - 1)) / seg.options.length
+                    height: 36
+                    radius: 10
+                    color: on ? control.on : "transparent"
+                    Text {
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: parent.modelData.label
+                        color: parent.on ? control.fill : control.tones.muted
+                        font.family: control.fonts.ui ?? ""
+                        font.pixelSize: 13
+                        font.weight: parent.on ? Font.Bold : Font.Normal
+                    }
+                    Root.Click {
+                        name: "control-seg:" + parent.modelData.label
+                        onTapped: seg.picked(parent.modelData.id)
+                    }
+                }
+            }
+        }
+
+        // Read by state(): which segment shows as current.
+        readonly property string drawnCurrent: (options.find(o => o.id === current) ?? {}).label ?? ""
     }
 
     // A 38 x 22 switch: the knob at the right and filled while on.

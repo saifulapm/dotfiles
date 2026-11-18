@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncFailing, syncRows, chargeLimit, chargeCommand } from './control-system.mjs';
+import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncFailing, syncRows, batteryLine, chargeLimit, chargeCommand } from './control-system.mjs';
 
 test('brightnessctl -m -l lines become backlights with their percent', () => {
   const text = 'apple-panel-bl,backlight,36,7%,509\n228600000.dsi.0,backlight,0,0%,255\n';
@@ -46,12 +46,15 @@ test('sync.json parses to its units, and a missing or broken file to none', () =
   assert.deepEqual(parseSync('[1]'), {});
 });
 
-test('Route names the sync state and each failing unit with its error', () => {
+test('Route lists every sync unit, a failing one with its error in the danger tone', () => {
   const at = (h, m) => new Date(2026, 9, 19, h, m).getTime();
   assert.deepEqual(syncRows({}), [{ title: 'Sync', detail: 'no rounds yet' }]);
   const good = { notes: { ok: true, lastRun: at(9, 5), lastOk: at(9, 5), error: null }, goals: { ok: true, lastRun: at(14, 2), lastOk: at(14, 2), error: null } };
   assert.equal(syncFailing(good), false);
-  assert.deepEqual(syncRows(good), [{ title: 'Sync', detail: 'ok · 14:02' }]);
+  assert.deepEqual(syncRows(good), [
+    { title: 'notes', detail: 'ok · 09:05' },
+    { title: 'goals', detail: 'ok · 14:02' },
+  ]);
   const bad = {
     notes: { ok: false, lastRun: at(14, 3), lastOk: at(9, 5), error: 'directory not found' },
     goals: { ok: true, lastRun: at(14, 3), lastOk: at(14, 3), error: null },
@@ -59,10 +62,17 @@ test('Route names the sync state and each failing unit with its error', () => {
   };
   assert.equal(syncFailing(bad), true);
   assert.deepEqual(syncRows(bad), [
-    { title: 'Sync', detail: '2 failing' },
-    { title: 'notes', detail: 'directory not found' },
-    { title: 'fish', detail: 'Failed to copy: ' + 'x'.repeat(43) + '…' },
+    { title: 'notes', detail: 'directory not found', tone: 'danger' },
+    { title: 'goals', detail: 'ok · 14:03' },
+    { title: 'fish', detail: 'Failed to copy: ' + 'x'.repeat(43) + '…', tone: 'danger' },
   ]);
+});
+
+test("the Power page's battery line names its state and time left or to full", () => {
+  assert.equal(batteryLine('discharging', 9600, 0), 'Discharging · 2 h 40 min left');
+  assert.equal(batteryLine('charging', 0, 2400), 'Charging · 40 min to full');
+  assert.equal(batteryLine('discharging', 0, 0), 'Discharging');
+  assert.equal(batteryLine('fully charged', 0, 0), 'Full');
 });
 
 test('a forged sync.json reads as units Route can draw, never a TypeError', () => {
@@ -73,8 +83,8 @@ test('a forged sync.json reads as units Route can draw, never a TypeError', () =
     '<b>x</b>': { ok: true, lastRun: null, lastOk: null, error: null },
   });
   assert.equal(syncFailing(units), true);
-  assert.deepEqual(syncRows(units).map((r) => r.detail), ['2 failing', 'no error recorded', 'no error recorded']);
-  assert.deepEqual(syncRows(parseSync('{"notes":{"ok":true,"lastOk":"x"}}')), [{ title: 'Sync', detail: 'ok' }]);
+  assert.deepEqual(syncRows(units).map((r) => r.detail), ['no error recorded', 'no error recorded', 'ok']);
+  assert.deepEqual(syncRows(parseSync('{"notes":{"ok":true,"lastOk":"x"}}')), [{ title: 'notes', detail: 'ok' }]);
 });
 
 test("UPower's three properties become the limit while on, 0 while off, -1 where there is none", () => {

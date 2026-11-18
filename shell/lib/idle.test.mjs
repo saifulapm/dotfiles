@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIMES, startTimes, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeWord, awakeDetail } from './idle.mjs';
+import { TIMES, startTimes, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeWord, awakeDetail, awakeStep } from './idle.mjs';
 
 test('the idle steps dim at 4 min, lock at 5 and turn monitors off at 6', () => {
   assert.deepEqual(TIMES, [240, 300, 360]);
@@ -54,4 +54,13 @@ test('the margin reads awake and the end, Control until and the end, or off', ()
   assert.equal(awakeWord(0), '');
   assert.equal(awakeDetail(until), 'until 14:05');
   assert.equal(awakeDetail(0), 'off');
+});
+
+test('the Power page lights the Stay awake step that still holds', () => {
+  const now = 1_000_000;
+  assert.equal(awakeStep(now, 0), 0);
+  assert.equal(awakeStep(now, now + 30 * 60000), 30);
+  assert.equal(awakeStep(now, now + 59.5 * 60000), 60);
+  assert.equal(awakeStep(now, now + 10 * 60000), 30);
+  assert.equal(awakeStep(now, now + 120 * 60000), 120);
 });

@@ -5,8 +5,6 @@ source "$(dirname "$0")/lib.sh"
 unset TMUX
 
 surface_is() { timeout 0.5 qs ipc call "$1" state 2>/dev/null | jq -e "$2" >/dev/null; }
-# A first open draws its first frame near the start of its motion, not halfway through.
-from_start() { surface_is "$1" '(.firstFrame | type) == "number" and .firstFrame > 0 and .firstFrame <= 0.3'; }
 springs='.motion == "spring" and (.settleMs | type) == "number" and .settleMs >= 340 and .settleMs <= 400'
 
 # Opens surface $1 and checks it settles on the spring, then closes it.
@@ -15,14 +13,13 @@ settles() {
   niri msg action spawn -- dots-call "$s" open >/dev/null
   until_ok 3000 surface_is "$s" .settled
   check "the $s settles as a spring in 340 to 400 ms ($(timeout 0.5 qs ipc call "$s" state | jq -c '[.motion, .settleMs, .firstFrame]'))" surface_is "$s" "$springs"
-  case $s in control) check "the $s draws its first frame near the start of its open" from_start "$s" ;; esac
   timeout 0.5 qs ipc call "$s" close >/dev/null
   until_ok 2000 surface_is "$s" '.drawing == false'
 }
 
 until_ok 5000 shell_status >/dev/null
-# The launcher and the cheat sheet grow from the island on its own motion, which island-motion.sh times.
-for s in notifs goals control; do settles "$s"; done
+# The launcher, the cheat sheet and Control grow from the island on its own motion, which island-motion.sh times.
+for s in notifs goals; do settles "$s"; done
 
 # The recorder's picker opens and closes on its one toggle.
 niri msg action spawn -- dots-call record toggle >/dev/null

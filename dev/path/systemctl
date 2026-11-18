@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Stands in for systemctl in a nested session, so Control's Reboot or Power off logs what it asked and never takes the machine down; anything else goes to the next systemctl on PATH.
+case " $* " in
+*" reboot "* | *" poweroff "* | *" halt "* | *" suspend "* | *" hibernate "* | *" kexec "*)
+  echo "$*" >>"${DOTS_DEV_DIR:?}/systemctl-power"
+  exit 0
+  ;;
+esac
+self=$(cd "$(dirname "$0")" && pwd -P)
+PATH=$(tr : '\n' <<<"$PATH" | while read -r d; do [ "$(cd "$d" 2>/dev/null && pwd -P)" = "$self" ] || printf '%s:' "$d"; done)
+exec systemctl "$@"

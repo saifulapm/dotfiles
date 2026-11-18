@@ -2,7 +2,6 @@ import Quickshell
 import Quickshell.Io
 import QtQuick
 import "lib/control-system.mjs" as Lib
-import "lib/voice.mjs" as V
 
 // Control's Display section: the built-in panel by brightnessctl, external screens by ddcutil.
 Item {
@@ -11,17 +10,23 @@ Item {
     required property var theme
     property int selected: 0
     readonly property bool levels: true
-    readonly property var look: V.listLook(theme.tokens)
     property var panels: []
     // Read once, when Control first opens, not when the warm-up makes it.
     property bool probe: true
     property var externals: []
+    // A slider row per screen, as the Sound page draws them; an external screen's level is not read back over DDC, which takes seconds, so its slider stays empty.
     readonly property var rows: panels.map(p => ({
                 title: p.device,
-                detail: p.percent + "%"
+                detail: p.percent + "%",
+                glyph: String.fromCodePoint(0xF0322),
+                level: p.percent / 100,
+                value: p.percent + "%"
             })).concat(externals.map(e => ({
                 title: e.name,
-                detail: "external"
+                detail: "external",
+                glyph: String.fromCodePoint(0xF0379),
+                level: 0,
+                value: ""
             })))
 
     // Only a step like 5%+ reaches either tool, as argv.
@@ -44,7 +49,6 @@ Item {
         return { panels: panels };
     }
 
-    implicitHeight: hint.implicitHeight
 
     Process {
         running: display.probe
@@ -73,16 +77,5 @@ Item {
                     display.panels = display.panels.map(p => p.device === set.device ? set : p);
             }
         }
-    }
-
-    Text {
-        id: hint
-        textFormat: Text.PlainText
-        leftPadding: 20
-        text: display.look.tabText("h/l brightness")
-        color: display.look.small.color
-        font.family: display.look.small.font
-        font.pixelSize: display.look.small.size
-        font.letterSpacing: display.look.small.spacing
     }
 }

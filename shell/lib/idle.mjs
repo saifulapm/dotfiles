@@ -28,6 +28,13 @@ export function nextAwake(now, until) {
   return awakeEnd(now, next ?? 0);
 }
 
+// The step a Stay awake that ends at until stands on now: 0 when off, else the shortest step that still holds it, as the Power page lights it.
+export function awakeStep(now, until) {
+  const left = until > now ? (until - now) / 60000 : 0;
+  if (left <= 0) return 0;
+  return AWAKE_STEPS.find((m) => m >= Math.floor(left)) ?? AWAKE_STEPS[AWAKE_STEPS.length - 1];
+}
+
 // The margin's word and Control's detail; until is ms since the epoch.
 export const awakeWord = (until) => (until > 0 ? `awake ${clockText(new Date(until))}` : '');
 export const awakeDetail = (until) => (until > 0 ? `until ${clockText(new Date(until))}` : 'off');
