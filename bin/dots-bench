@@ -189,6 +189,22 @@ for i in 1 2 3; do
 done
 open_max=$(middle "${open_maxes[@]}") close_max=$(middle "${close_maxes[@]}")
 echo "     morph open: longest gaps ${open_maxes[*]}, p95 ${open_p95}; close: longest gaps ${close_maxes[*]}, p95 ${close_p95}"
+# The island's morph from the launcher straight into the cheat sheet, three times warm, read as the open and close are.
+switch_maxes=() switch_p95=0
+for i in 1 2 3; do
+  dots-call launcher toggle >/dev/null || die "launcher toggle failed"
+  until_ok 3000 island_is '.surface == "launcher" and .animating == false' || die "the island never settled on the launcher"
+  dots-call cheatsheet toggle >/dev/null || die "cheatsheet toggle failed"
+  until_ok 3000 island_is '.surface == "cheatsheet" and .animating == false and .morph.from[0] != 176' || die "the island never settled on the cheat sheet from the launcher"
+  read -r mx p95 < <(morph_stats)
+  [ -n "$mx" ] || die "the island recorded no frames for its switch"
+  switch_maxes+=("$mx") switch_p95=$(worse "$switch_p95" "$p95")
+  wtype -k Escape
+  until_ok 3000 island_is '.surface == null and .animating == false' || die "the island never settled back at rest"
+  until_ok 3000 host_focus None || die "the cheat sheet never gave the keyboard back"
+done
+switch_morph_max=$(middle "${switch_maxes[@]}")
+echo "     morph switch: longest gaps ${switch_maxes[*]}, p95 ${switch_p95}"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 # GPU buffers are shmem, which RSS misses, so the unit's cgroup anon+shmem is read at the same moment.
@@ -275,6 +291,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95"
 exit
 }

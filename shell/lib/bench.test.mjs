@@ -4,10 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, limits, frameStats, morphIntervals, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 } };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 }, morphSwitch: { max: 17, p95: 8 } };
 const rest = ['180224', '0', '180', '131072', '0', '220', '141072', '0'];
 const head = ['130', '152576', '38', '4', '1', '0.03', '120', '157000', '236544', '35', '9', '3', '11', '310'];
-const morph = ['14', '9', '15', '10'];
+const morph = ['14', '9', '15', '10', '17', '8'];
 const args = [...head, ...rest];
 
 test('the limits are the budget or the baseline plus its spread, whichever holds a row tighter', () => {
@@ -52,6 +52,7 @@ test('every measure within its limit reads ok and passes', () => {
     'deen closed   0 left  = 0 left   ok',
     'morph open    14/9 ms ≤ 36/12 ms ok',
     'morph close   15/10 ms ≤ 36/12 ms ok',
+    'morph switch  17/8 ms ≤ 20/12 ms ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -282,12 +283,12 @@ test('a morph that was not timed reads none and is OVER', () => {
   assert.equal(r.lines[21], 'morph open    none');
 });
 
-test('the CLI reads the morph rows from its last four arguments and counts a missing pair as OVER', () => {
+test('the CLI reads the morph rows from its last six arguments and counts a missing pair as OVER', () => {
   const out = execFileSync('node', [cli, ...args, ...morph], { encoding: 'utf8' });
   assert.match(out, /morph open {4}14\/9 ms +≤ 36\/12 ms +ok/);
   assert.match(out, /morph close {3}15\/10 ms +≤ 36\/12 ms +ok/);
   assert.throws(
-    () => execFileSync('node', [cli, ...args, '14', '9', '37', '10'], { stdio: 'pipe' }),
+    () => execFileSync('node', [cli, ...args, '14', '9', '37', '10', '17', '8'], { stdio: 'pipe' }),
     (e) => e.status === 1 && /morph close {3}37\/10 ms +≤ 36\/12 ms +OVER/.test(e.stdout.toString()),
   );
   assert.throws(
@@ -305,4 +306,18 @@ test('frame intervals are the gaps between a morph\'s frames, the wait for its f
 test('the frames CLI prints a morph\'s longest interval and the p95 of its frames\' work from island state\'s frames', () => {
   const frames = JSON.stringify([[4, 0, 0, 0, 0, 3], [12, 0, 0, 0, 0, 2], [20, 0, 0, 0, 0, 9], [37, 0, 0, 0, 0, 4], [45, 0, 0, 0, 0, 1]]);
   assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 9');
+});
+
+// The plan holds a switch from one surface to another to 20 ms at its longest and 12 ms at p95: the window's keyboard does not change, so no frame of its own lands in the morph.
+test('a morph switch with a longest interval of 21 ms or a p95 of 13 ms is OVER, 20 and 12 ok', () => {
+  assert.equal(report({ ...good, morphSwitch: { max: 20, p95: 12 } }, BUDGETS).over, false);
+  const long = report({ ...good, morphSwitch: { max: 21, p95: 8 } }, BUDGETS);
+  assert.equal(long.over, true);
+  assert.equal(long.lines[23], 'morph switch  21/8 ms ≤ 20/12 ms OVER');
+  assert.equal(report({ ...good, morphSwitch: { max: 14, p95: 13 } }, BUDGETS).over, true);
+  assert.equal(report({ ...good, morphSwitch: null }, BUDGETS).lines[23], 'morph switch  none');
+  assert.throws(
+    () => execFileSync('node', [cli, ...args, '14', '9', '15', '10'], { stdio: 'pipe' }),
+    (e) => e.status === 1 && /morph switch +none/.test(e.stdout.toString()),
+  );
 });
