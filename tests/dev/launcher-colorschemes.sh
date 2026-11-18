@@ -20,13 +20,13 @@ check "c without its space stays an app search" state_is '.mode == "apps"'
 wtype " "
 until_ok 3000 state_is '.mode == "colorschemes" and .count > 0'
 check "c and a space list all $schemes colorschemes ($(launcher_state | jq .count))" state_is ".mode == \"colorschemes\" and .count == $schemes and .count == 40"
-check "eight rows show, Artboard first" state_is '(.results | length) == 8 and .results[0] == "Artboard"'
+check "six cards show, Artboard first" state_is '(.results | length) == 6 and .results[0] == "Artboard"'
 check "under artboard the artboard row carries the mark and no other row does" state_is '.marks[0] == true and ([.marks[] | select(.)] | length) == 1'
 artboard_strip='["#e4e6ea","#ffffff","#3d5afe","#cf222e","#1a7f37","#9a6700","#8250df"]'
 check "the artboard row draws paper, surface, accent and ANSI 1, 2, 3 and 5" state_is ".strips[0] == $artboard_strip"
 for _ in $(seq 1 10); do wtype -M ctrl -k j -m ctrl; done
 until_ok 2000 state_is '.top + .selected == 10'
-check "ten moves down scroll the list: the tenth row below the first is lit and drawn ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 3 and .selected == 7 and (.results | length) == 8 and .cursorName == .results[7]'
+check "ten moves down page the cards: the tenth card after the first is lit and drawn ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 5 and .selected == 5 and (.results | length) == 6 and .cursorName == .results[5]'
 for _ in $(seq 1 10); do wtype -M ctrl -k k -m ctrl; done
 until_ok 2000 state_is '.top + .selected == 0'
 check "ten moves up bring Artboard back to the top" state_is '.top == 0 and .selected == 0 and .cursorName == "Artboard"'
@@ -54,7 +54,10 @@ until_ok 3000 eval "shell_status | jq -e '.theme == \"catppuccin-mocha\" and .tr
 niri msg action spawn -- dots-call launcher mode colorschemes
 until_ok 3000 state_is '.open and .keyboard and .settled'
 check "Mod+Shift+T opens the launcher with c and a space typed" state_is '.query == "c " and .mode == "colorschemes" and .count == 40'
-check "the mark moves to Catppuccin Mocha" state_is '[.results, .marks] | transpose | map(select(.[1])) == [["Catppuccin Mocha", true]]'
+# Six cards show at a time, so the Catppuccin ones are typed up to see the mark.
+wtype catppuccin
+until_ok 3000 state_is '.query == "c catppuccin"'
+check "the mark moves to Catppuccin Mocha, drawn as its card's check" state_is '[.results, .marks, .checks] | transpose | map(select(.[1])) == [["Catppuccin Mocha", true, true]]'
 close_launcher
 
 # The Themes surface is gone: no IPC target answers to it and the shell never loads it.

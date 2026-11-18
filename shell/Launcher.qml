@@ -48,6 +48,8 @@ Item {
     readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue" })
     // The search field's glyph, a magnifier from Symbols Nerd Font.
     readonly property string searchGlyph: String.fromCodePoint(0xF0349)
+    // The current colorscheme's check.
+    readonly property string checkGlyph: String.fromCodePoint(0xF012C)
     // A reminder tile's alarm clock.
     readonly property string alarmGlyph: String.fromCodePoint(0xF0020)
     // {id, name, genericName, keywords, icon, entry} per desktop entry, from the shell's scan.
@@ -103,9 +105,9 @@ Item {
         }
         return [];
     }
-    // Clips draw as cards two to a row, four at a time; every other mode as rows, eight at a time.
-    readonly property int columns: mode === "clipboard" ? 2 : 1
-    readonly property int pageSize: mode === "clipboard" ? 4 : 8
+    // Clips draw as cards two to a row, four at a time, colorschemes three to a row, six at a time; every other mode as rows, eight at a time.
+    readonly property int columns: mode === "clipboard" ? 2 : mode === "colorschemes" ? 3 : 1
+    readonly property int pageSize: mode === "clipboard" ? 4 : mode === "colorschemes" ? 6 : 8
     readonly property var rows: found.slice(scrollTop, scrollTop + pageSize)
     readonly property var look: L.launcherLook(theme.tokens)
     implicitHeight: column.implicitHeight + 32
@@ -246,6 +248,8 @@ Item {
             selected: selected,
             top: scrollTop,
             marks: rows.map(r => !!r.current),
+            // Each scheme card's check as drawn.
+            checks: rows.map((r, i) => rowRepeater.itemAt(i)?.checked ?? null),
             strips: rows.map((r, i) => rowRepeater.itemAt(i)?.stripColors ?? null),
             openMs: openMs,
             opens: opens,
@@ -585,14 +589,15 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool current: index === launcher.selected
-                        readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : modelData.remind ? "tile" : "row"
+                        readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : launcher.mode === "colorschemes" ? "scheme" : modelData.remind ? "tile" : "row"
                         readonly property var clipDrawn: kind === "clip" ? { text: clipText.text, age: clipAge.text, height: rowBox.height, textHeight: clipText.height, lines: clipText.lineCount, thumb: thumb.status === Image.Ready, swatch: swatch.visible ? String(swatch.color) : null } : null
                         readonly property var answerDrawn: kind === "answer" ? { text: answer.text, size: answer.font.pixelSize, bold: answer.font.bold, under: under.text } : null
                         readonly property string headText: modelData.head ? headLabel.text : ""
                         // A colorscheme row's strip as drawn, for the state.
-                        readonly property var stripColors: modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
+                        readonly property var stripColors: kind === "scheme" ? [String(paperBox.color), String(surfaceBox.color)].concat(dots.children.filter(d => d.width > 0).map(d => String(d.color))) : modelData.swatches ? strip.children.filter(s => s.width > 0).map(s => String(s.color)) : null
+                        readonly property bool checked: kind === "scheme" && checkMark.visible
                         readonly property Item box: rowBox
-                        readonly property Item nameText: title
+                        readonly property Item nameText: kind === "scheme" ? schemeName : title
                         readonly property real detailWidth: note.width
                         readonly property string noteText: note.text
                         readonly property string slot: modelData.icon || letter.text
@@ -615,9 +620,9 @@ Item {
                         Rectangle {
                             id: rowBox
                             width: parent.width
-                            height: kind === "answer" ? 80 : kind === "clip" ? 84 : kind === "tile" ? 56 : 48
-                            radius: kind === "clip" ? 14 : 12
-                            color: kind === "clip" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
+                            height: kind === "answer" ? 80 : kind === "clip" ? 84 : kind === "scheme" ? 110 : kind === "tile" ? 56 : 48
+                            radius: kind === "clip" || kind === "scheme" ? 14 : 12
+                            color: kind === "clip" || kind === "scheme" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
 
                             Root.Click {
                                 name: "launcher-row:" + index
@@ -693,6 +698,79 @@ Item {
                                         color: launcher.tones.muted
                                         font.family: launcher.fonts.ui ?? ""
                                         font.pixelSize: 11
+                                    }
+                                }
+                            }
+
+                            // A colorscheme's card: its paper holding its surface and five dots, the accent and ANSI 1, 2, 3 and 5, then its name, checked when it is the current one.
+                            Column {
+                                visible: kind === "scheme"
+                                x: 8
+                                y: 8
+                                width: parent.width - 16
+                                spacing: 8
+
+                                Rectangle {
+                                    id: paperBox
+                                    width: parent.width
+                                    height: 58
+                                    radius: 8
+                                    color: modelData.swatches?.[0] ?? "transparent"
+
+                                    Rectangle {
+                                        id: surfaceBox
+                                        x: 10
+                                        y: 10
+                                        width: 70
+                                        height: 38
+                                        radius: 4
+                                        color: modelData.swatches?.[1] ?? "transparent"
+                                    }
+
+                                    Row {
+                                        id: dots
+                                        x: 90
+                                        y: 12
+                                        spacing: 4
+                                        Repeater {
+                                            model: kind === "scheme" ? (modelData.swatches ?? []).slice(2) : []
+                                            Rectangle {
+                                                required property string modelData
+                                                width: 10
+                                                height: 10
+                                                radius: 5
+                                                color: modelData
+                                            }
+                                        }
+                                    }
+                                }
+
+                                RowLayout {
+                                    width: parent.width
+                                    spacing: 6
+
+                                    Text {
+                                        id: schemeName
+                                        Layout.fillWidth: true
+                                        leftPadding: 4
+                                        elide: Text.ElideRight
+                                        textFormat: Text.PlainText
+                                        text: kind === "scheme" ? look.title(modelData.title) : ""
+                                        color: launcher.on
+                                        font.family: launcher.fonts.ui ?? ""
+                                        font.pixelSize: 12
+                                        font.weight: Font.Bold
+                                    }
+
+                                    Text {
+                                        id: checkMark
+                                        visible: !!modelData.current
+                                        rightPadding: 4
+                                        textFormat: Text.PlainText
+                                        text: launcher.checkGlyph
+                                        color: launcher.tones.accent
+                                        font.family: "Symbols Nerd Font Mono"
+                                        font.pixelSize: 13
                                     }
                                 }
                             }
