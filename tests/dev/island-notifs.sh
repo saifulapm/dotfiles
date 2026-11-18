@@ -65,5 +65,21 @@ check "Clear all empties the list and draws Nothing new" notifs_is '.count == 0 
 wtype -k Escape
 until_ok 3000 at_rest
 check "Esc closes the centre and gives the keyboard back" surfaces_focus None
+
+# Mod+Shift+A clears and Mod+D toggles Do Not Disturb without opening anything; the check spawns each bind's command through niri.
+notify-send -t 1 -a Mail "Four"
+until_ok 2000 notifs_is '.count == 1'
+until_ok 3000 island_is '.mode == "rest"'
+niri msg action spawn -- dots-call notifs clear
+until_ok 2000 notifs_is '.count == 0'
+sleep 0.3
+check "Mod+Shift+A clears the list and the island's surface stays null ($(island | jq -c '{surface}'))" island_is '.surface == null'
+niri msg action spawn -- dots-call notifs toggleDnd
+until_ok 2000 notifs_is '.dnd == true'
+sleep 0.3
+check "Mod+D turns Do Not Disturb on and the surface stays null ($(island | jq -c '{surface}'))" island_is '.surface == null'
+niri msg action spawn -- dots-call notifs toggleDnd
+until_ok 2000 notifs_is '.dnd == false'
+check "and Mod+D again turns it off, still with no surface" island_is '.surface == null'
 exit "$fails"
 }
