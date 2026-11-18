@@ -343,6 +343,37 @@ ShellRoot {
     }
 
     Root.Ipc {
+        target: "chat"
+
+        // t0 is taken before the load, so the first open after an unload is timed cold.
+        function open(): void {
+            const t0 = Date.now();
+            surfacesLoader.active = true;
+            surfacesLoader.item.openChat(t0);
+        }
+
+        function close(): void {
+            surfacesLoader.item?.chat?.close();
+        }
+
+        function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
+            if (surfacesLoader.item?.chat?.shown)
+                close();
+            else
+                open();
+        }
+
+        function state(): string {
+            if (surfacesLoader.item?.chat)
+                return surfacesLoader.item.chat.state();
+            return JSON.stringify({ loaded: false, open: false, streaming: false, conversation: null, alias: "chat", model: "", blocks: 0, error: "", openMs: null, opens: 0 });
+        }
+    }
+
+    Root.Ipc {
         target: "tailscale"
 
         function open(): void {

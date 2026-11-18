@@ -48,8 +48,9 @@ PanelWindow {
     readonly property var dns: dnsLoader.item
     readonly property var picker: pickerLoader.item
     readonly property var pairing: pairingLoader.item
+    readonly property var chat: chatLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, notifications, cheatsheet, control, recorder, polkit, pairing, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
+    readonly property var all: [launcher, notifications, cheatsheet, control, recorder, polkit, pairing, goalsView, pinentry, pass, tailscale, accounts, dns, picker, chat]
     readonly property bool shown: all.some(s => s?.shown ?? false)
     // While niri's overview is open the shell holds the keyboard, so no key reaches the window behind it.
     readonly property bool overview: niri?.overview ?? false
@@ -227,6 +228,14 @@ PanelWindow {
         accountsLoader.active = true;
         accounts.open(t0);
         closeOthers(accounts);
+    }
+
+    function openChat(t0) {
+        if (host.takeoverItem)
+            return;
+        chatLoader.active = true;
+        chat.open(t0);
+        closeOthers(chat);
     }
 
     function openDns(t0) {
@@ -434,7 +443,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder, pass, tailscale, accounts, dns, goalsView]
+    readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder, pass, tailscale, accounts, dns, goalsView, chat]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last thing the island drew, a surface or a prompt, keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null
@@ -680,7 +689,32 @@ PanelWindow {
         onTriggered: dnsLoader.active = false
     }
 
+    // The chat loads on its first open and unloads 30 s after its close, once no reply streams.
+    Loader {
+        id: chatLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
+        anchors.fill: parent
+        visible: host.islandLast === host.chat
+        active: false
+        sourceComponent: Root.Chat {
+            theme: host.theme
+        }
+    }
+
+    Root.Tick {
+        interval: 30000
+        running: !!host.chat && !host.chat.shown && !host.chat.busy
+        onTriggered: chatLoader.active = false
+    }
+
     // A check waits on these before it reads a tool's pixels.
+    Binding {
+        when: !!host.chat && !!host.island
+        target: host.chat
+        property: "settled"
+        value: host.island?.surface === "chat" && !(host.island?.animating ?? true)
+    }
+
     Binding {
         when: !!host.pass && !!host.island
         target: host.pass

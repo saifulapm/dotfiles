@@ -38,7 +38,7 @@ test('an event whose data is not JSON is skipped, and the stream reads on', () =
 });
 
 test('ESC, C1 controls and bidi marks are dropped; tabs and newlines stay', () => {
-  assert.equal(clean('a\x1b[31mred‮b⁦c‏d\x9be\tf\ng\r'), 'a[31mredbcde\tf\ng');
+  assert.equal(clean('a\x1b[31mred\u202Eb\u2066c\u200Fd\x9be\tf\ng\r'), 'a[31mredbcde\tf\ng');
 });
 
 // Each closed block is rendered once and frozen; only the open block is rendered again as chunks land.

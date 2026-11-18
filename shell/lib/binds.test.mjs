@@ -31,6 +31,10 @@ test('Mod+P toggles Pass', () => {
   assert.match(binds, spawns('Mod+P', ['dots-call', 'pass', 'toggle']));
 });
 
+test('Mod+Shift+Space toggles the AI chat', () => {
+  assert.match(binds, spawns('Mod+Shift+Space', ['dots-call', 'chat', 'toggle']));
+});
+
 test('Mod+T toggles Tailscale', () => {
   assert.match(binds, spawns('Mod+T', ['dots-call', 'tailscale', 'toggle']));
 });

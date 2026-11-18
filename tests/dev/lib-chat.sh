@@ -1,0 +1,33 @@
+# Sourced by the chat checks before lib.sh: starts bin/dev-fake-pxy and puts bin/dev-fake-mem first on PATH as mem, so the chat reaches neither pxy nor the real mem.
+chat_fake=$(mktemp -d)
+"$(dirname "${BASH_SOURCE[0]}")/../../bin/dev-fake-pxy" "$chat_fake" >/dev/null 2>&1 9>&- &
+pxy_pid=$!
+for _ in $(seq 100); do
+  [ -s "$chat_fake/port" ] && break
+  sleep 0.05
+done
+export DOTS_CHAT_URL="http://127.0.0.1:$(cat "$chat_fake/port")/v1/chat/completions"
+ln -s "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/bin/dev-fake-mem" "$chat_fake/mem"
+PATH=$chat_fake:$PATH
+# What the chat sent pxy, one request body a line, and each argv the fake mem ran.
+requests=$chat_fake/requests.jsonl
+mem_log=$chat_fake/mem.log
+chat_cleanup() {
+  kill -TERM "$pxy_pid" 2>/dev/null
+  rm -rf "$chat_fake"
+}
+
+chat() { timeout 0.5 qs ipc call chat state 2>/dev/null; }
+chat_is() { chat | jq -e "$@" >/dev/null 2>&1; }
+island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
+island_is() { island | jq -e "$@" >/dev/null 2>&1; }
+# What Mod+Shift+Space spawns (binds.test.mjs pins the key; wtype's keys never reach the nested niri's binds), then wait until the chat holds the keyboard and the island has come to rest on it, so the next key reaches the field.
+open_chat() {
+  niri msg action spawn -- dots-call chat toggle
+  until_ok 3000 chat_is '.open and .keyboard and .settled'
+}
+# Types a message and sends it with Enter.
+say() {
+  wtype -- "$1"
+  wtype -k Return
+}

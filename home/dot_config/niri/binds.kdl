@@ -9,6 +9,7 @@ binds {
     Mod+Semicolon repeat=false hotkey-overlay-title="Click a Target" { spawn "wl-kbptr" "-o" "modes=floating,click" "-o" "mode_floating.source=detect"; }
     Mod+Shift+Semicolon repeat=false hotkey-overlay-title="Click by Grid" { spawn "wl-kbptr" "-o" "modes=tile,bisect"; }
     Mod+Space hotkey-overlay-title="Launcher" { spawn "dots-call" "launcher" "toggle"; }
+    Mod+Shift+Space hotkey-overlay-title="AI Chat" { spawn "dots-call" "chat" "toggle"; }
     Mod+V hotkey-overlay-title="Clipboard" { spawn "dots-call" "launcher" "mode" "clipboard"; }
     Mod+Period hotkey-overlay-title="Emoji" { spawn "dots-call" "launcher" "mode" "emoji"; }
     Mod+C hotkey-overlay-title="Control" { spawn "dots-call" "control" "toggle"; }

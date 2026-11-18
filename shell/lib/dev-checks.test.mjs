@@ -437,6 +437,7 @@ const stateSources = {
   accounts: [['shell.qml', 'target: "accounts"'], ['Accounts.qml']],
   dns: [['shell.qml', 'target: "dns"'], ['Dns.qml']],
   goals: [['shell.qml', 'target: "goals"'], ['Goals.qml']],
+  chat: [['shell.qml', 'target: "chat"'], ['Chat.qml']],
   // Each takeover's Ipc target merges the prompt's state() with what its agent adds (registered, active, waiting).
   polkit: [['Polkit.qml', 'target: "polkit"'], ['PolkitPrompt.qml']],
   pinentry: [['Pinentry.qml', 'target: "pinentry"'], ['PinentryPrompt.qml']],
@@ -633,7 +634,7 @@ test('every first-level jq field a tests/dev script reads off a mapped surface\'
 });
 
 // The surfaces whose state() emits both .keyboard and .settled; a surface without them, the island's among them, is out of the open-then-type rule.
-const keyed = 'launcher|control|notifs|goals|dns|accounts|tailscale|pass';
+const keyed = 'launcher|control|notifs|goals|dns|accounts|tailscale|pass|chat';
 
 // m104's notif-rules.sh typed once niri listed the centre's layer Exclusive, a moment before the centre took the keys, so its s cycles read wrong. Each wtype after a line that opens a keyed surface must come after reads of both .keyboard and .settled, on one line or two, following helper calls; returns the wtype lines that do not.
 export function typesBeforeKeys(text) {

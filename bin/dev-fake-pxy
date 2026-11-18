@@ -16,7 +16,7 @@ const call = (name, args, i = 0) => ({ index: i, id: `call_${i + 1}`, type: 'fun
 
 // What each word asks of the fake: a reply, tool calls for the first round, an HTTP error, an error in the stream, or a stall.
 const SCENARIOS = [
-  ['hostile', { reply: `Red \x1b[31mtext‮evil.\n\n${'x'.repeat(1 << 20)}\n\nend.`, chunk: 65536, every: 5 }],
+  ['hostile', { reply: `Red \x1b[31mtext\u202Eevil.\n\n${'x'.repeat(1 << 20)}\n\nend.`, chunk: 65536, every: 5 }],
   ['stall', { reply: 'Thinking about it', stall: 60000 }],
   ['401', { status: 401, error: 'fake pxy: invalid API key' }],
   ['stream error', { reply: 'Part', streamError: 'fake pxy: upstream overloaded' }],
@@ -26,7 +26,7 @@ const SCENARIOS = [
   ['pwn', { tools: [call('mem_search', { query: 'x; touch PWNED' })], reply: 'Nothing found.' }],
   ['big result', { tools: [call('mem_search', { query: 'big' })], reply: 'That was long.' }],
   ['eleven', { tools: Array.from({ length: 11 }, (_, i) => call('mem_search', { query: `q${i + 1}` }, i)), reply: 'Eleven asked.' }],
-  ['slow', { reply: FISH, chunk: 2, every: 60 }],
+  ['slow', { reply: FISH, chunk: 2, every: 150 }],
 ];
 
 function scenario(messages) {
@@ -60,7 +60,7 @@ async function answer(req, res, body) {
   const size = s.chunk ?? 6;
   for (let at = 0; at < s.reply.length && !closed; at += size) {
     send({ content: s.reply.slice(at, at + size) });
-    await sleep(s.every ?? 20);
+    await sleep(s.every ?? 60);
   }
   if (s.stall) await sleep(s.stall);
   if (closed) return;

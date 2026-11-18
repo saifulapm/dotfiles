@@ -21,8 +21,8 @@ function textBlocks(src) {
   return blocks;
 }
 
-// The island's question draws Q.linkify's html, which escapes the text before it adds links (questions.test.mjs), so that Text alone may be StyledText.
-const STYLED = ['Island.qml:askText'];
+// The island's question draws Q.linkify's html, which escapes the text before it adds links (questions.test.mjs), and a chat reply's block draws chat.mjs's render, which escapes the reply before it adds bold and code (chat.test.mjs); those Texts alone may be StyledText.
+const STYLED = ['Island.qml:askText', 'Chat.qml:styledBlock'];
 
 test('every Text in the shell sets textFormat: Text.PlainText, but the escaped question links', () => {
   const found = [];
