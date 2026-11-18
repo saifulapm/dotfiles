@@ -31,7 +31,7 @@ function scratch() {
   return { root, env, sock: join(root, 'run', 'dots-pinentry-wayland-test.sock'), marker: join(root, 'state', 'dots', 'locked') };
 }
 
-// The shell's side: each request line is handed to answer(), whose lines go back; null keeps the connection open unanswered.
+// The shell's side: each request line is handed to answer(), whose lines go back on the same connection, which the stub keeps for its whole run; no lines hang up, and null leaves the request unanswered.
 async function shell(sock, answer) {
   const requests = [];
   const sockets = [];
@@ -47,7 +47,8 @@ async function shell(sock, answer) {
         buf = buf.slice(i + 1);
         requests.push(line);
         const reply = answer(line, requests.length);
-        if (reply !== null) s.end(reply.map((l) => l + '\n').join(''));
+        if (reply?.length) s.write(reply.map((l) => l + '\n').join(''));
+        else if (reply) s.end();
       }
     });
     s.on('close', () => closed.push(Date.now()));
