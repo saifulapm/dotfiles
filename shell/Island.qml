@@ -648,6 +648,7 @@ Item {
             // The first button's text and fill, which board 2 inverts.
             actionInk: actionRepeater.count ? [actionRepeater.itemAt(0).drawn.ink, actionRepeater.itemAt(0).drawn.fill] : null,
             dragging: noteDragging,
+            opacity: notePart.opacity,
             frame: [box.style.frame.width, String(box.style.frame.color)],
             faceUrl: noteFace.url
         };
@@ -899,7 +900,8 @@ Item {
     // What waits behind an open surface: the notifications Notifs holds, each question that arrived, and one media change (7E95CSV2).
     property var questionsWaiting: []
     property bool mediaWaiting: false
-    readonly property int waiting: Wait.count(notifs.queue) + questionsWaiting.length + (mediaWaiting ? 1 : 0)
+    // A question answered elsewhere while it waited drops out of the count; questions show one at a time, so they count as one.
+    readonly property int waiting: Wait.count(notifs.queue) + (question && questionsWaiting.indexOf(question.id) >= 0 ? 1 : 0) + (mediaWaiting ? 1 : 0)
     onSurfaceChanged: if (!surface) {
         questionsWaiting = [];
         mediaWaiting = false;

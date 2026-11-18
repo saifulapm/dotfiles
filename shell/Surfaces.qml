@@ -229,7 +229,7 @@ PanelWindow {
     }
     color: "transparent"
     // A drag out of the notification centre must reach the window under it, which this full-output layer would otherwise cover; at rest only the island takes clicks, and after Mod+I the whole output does, so a click outside gives the keyboard back (SMB51G7B).
-    mask: shown && !(notifications?.dragging ?? false) ? null : island?.wantsKeys ? null : island?.visible ? islandInput : noInput
+    mask: shown && !(notifications?.dragging ?? false) ? null : island?.wantsKeys && !island.noteDragging ? null : island?.visible ? islandInput : noInput
 
     Region {
         id: noInput
@@ -263,15 +263,20 @@ PanelWindow {
     // Under every surface, so it takes only the presses nothing drawn above it takes: one outside the shown card closes that surface as Escape does, and focus goes back to the window that had it.
     MouseArea {
         anchors.fill: parent
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         onPressed: mouse => {
             const s = host.all.find(s => s?.shown);
-            // After Mod+I a press outside the island gives the keyboard back and goes no further; one on it is the island's.
+            // After Mod+I a press of any button outside the island gives the keyboard back and goes no further; one on it is the island's.
             if (!s && host.island?.wantsKeys) {
                 const box = host.island.maskItem;
                 if (box.contains(mapToItem(box, mouse.x, mouse.y)))
                     mouse.accepted = false;
                 else
                     host.island.release();
+                return;
+            }
+            if (mouse.button !== Qt.LeftButton) {
+                mouse.accepted = false;
                 return;
             }
             // A surface in the island is drawn inside it, so the press is read in the surface's own coordinates.
@@ -282,6 +287,12 @@ PanelWindow {
                 s.stepBack();
             else
                 s.close();
+        }
+        // A wheel turned outside the island after Mod+I gives the keyboard back too.
+        onWheel: wheel => {
+            if (!host.all.some(s => s?.shown) && host.island?.wantsKeys)
+                host.island.release();
+            wheel.accepted = false;
         }
     }
 

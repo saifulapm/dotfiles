@@ -95,7 +95,8 @@ Scope {
     function show(e) {
         if (!N.shows(e, N.ruleOf(rules, e.app), dnd))
             return;
-        if (held || (queue.length && current?.key !== e.key)) {
+        // A replace of the one showing updates it in place, held or not, so it never waits as a second copy.
+        if (current?.key !== e.key && (held || queue.length)) {
             const at = Date.now();
             queue = W.arrive(queue, { kind: "notification", key: e.key, at, expires: W.expiry(at, N.holdMs(e, N.ruleOf(rules, e.app))), entry: e });
             return;
@@ -156,7 +157,10 @@ Scope {
     function release() {
         if (held)
             return false;
-        const r = W.take(queue, Date.now());
+        // Do Not Disturb or a mute set while it waited still keeps it off the island.
+        let r = W.take(queue, Date.now());
+        while (r.next && !N.shows(r.next.entry, N.ruleOf(rules, r.next.entry.app), dnd))
+            r = W.take(r.rest, Date.now());
         queue = r.rest;
         if (!r.next)
             return false;

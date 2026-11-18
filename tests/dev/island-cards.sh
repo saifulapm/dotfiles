@@ -52,5 +52,13 @@ for _ in 1 2 3 4 5 6; do widths+=("$(island | jq .width)"); sleep 0.05; done
 settled '.note.summary == "burst 3"'
 check "three notifications in $burst_ms ms swap in place: the card's width stays 440 px (${widths[*]})" test "$(printf '%s\n' "${widths[@]}" | sort -u)" = 440
 check "and it ends on the third, drawn at 440 px" island_is '.note.summary == "burst 3" and .drawn == 440'
+# A steady burst over an open card swaps in place: replayed on each key, the card's fade held it near 0 (8e5a51eb).
+mid=""
+for n in 1 2 3 4 5 6 7 8 9 10; do
+  notify-send "steady $n"
+  [ "$n" = 7 ] && mid=$(island | jq .note.opacity)
+  sleep 0.08
+done
+check "ten notifications 100 ms apart keep the card drawn: its opacity at the seventh is $mid" node -e 'process.exit(Number(process.argv[1]) > 0.9 ? 0 : 1)' "$mid"
 exit "$fails"
 }
