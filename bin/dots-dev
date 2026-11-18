@@ -17,8 +17,8 @@ dconf_name=${dconf_name//[^[:alnum:]_]/_}
 export TMUX_TMPDIR=$D/tmux DCONF_PROFILE=$D/dconf-profile
 # Nor the live coding agents' theme files.
 export DOTS_AGENT_HOME=$D/agents
-# A fixed machine id names the notes store dev.json, whatever the live chezmoi config says.
-export DOTS_MACHINE=dev
+# A fixed machine id names the notes store dev.json, whatever the live chezmoi config says; a walk of two machines names each.
+export DOTS_MACHINE=${DOTS_DEV_MACHINE:-dev}
 # Nor the live hub's questions or the live PipeWire.
 export DOTS_HUB_QUESTIONS=$D/hub-questions.json PIPEWIRE_RUNTIME_DIR=$D/pw
 # The nested shell never dims or locks itself, since a walk or a long check pauses its input for minutes; idle.sh and presence.sh set DOTS_DEV_IDLE=on for the real steps.
@@ -104,8 +104,10 @@ trap 'exit 143' TERM
 
 mkdir -p "$XDG_STATE_HOME/dots" "$XDG_DATA_HOME/applications" "$TMUX_TMPDIR" "$PIPEWIRE_RUNTIME_DIR"
 printf 'user-db:%s\n' "$dconf_name" >"$DCONF_PROFILE"
-mkdir -p "$D/remote"
-printf '[Dropbox]\ntype = alias\nremote = %s\n' "$D/remote" >"$RCLONE_CONFIG"
+# Two sessions handed one folder share a scratch Dropbox, as two machines would.
+remote=${DOTS_DEV_REMOTE:-$D/remote}
+mkdir -p "$remote"
+printf '[Dropbox]\ntype = alias\nremote = %s\n' "$remote" >"$RCLONE_CONFIG"
 mkdir -p "$DOTS_PAM_DIR"
 printf 'auth required pam_exec.so expose_authtok quiet %s\naccount required pam_permit.so\n' "$repo/dev/pam-test-password" >"$DOTS_PAM_DIR/dots-lock"
 # Fonts are read, never written, so the user's own stay visible to the nested shell.
