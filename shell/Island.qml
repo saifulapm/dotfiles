@@ -35,8 +35,8 @@ Item {
     required property var media
     // A theme switch's failure, shown in place of the clock for 5 s.
     property string notice: ""
-    // What the island may show; each is null while it has nothing to show. A Bluetooth pairing request asks ahead of an agent's question, since it times out.
-    readonly property var question: Root.Pairing.question ?? questions.current
+    // What the island may show; each is null while it has nothing to show.
+    readonly property var question: questions.current
     // The month the calendar shows, {year, month}, while Mod+I has it open.
     property var calendar: null
     readonly property var grid: heldCalendar ? I.monthGrid(heldCalendar.year, heldCalendar.month, clockLook.grid.weekStart) : null
@@ -163,11 +163,8 @@ Item {
     readonly property string mode: H.modeOf(holder, slots)
     // The slots as they last were, so an arrival while a surface is open can be told from a state already live.
     property var slotsSeen: ({})
-    signal surfaceYielded
     onSlotsChanged: {
-        if (holder && H.surfaceYields(slotsSeen, slots))
-            surfaceYielded();
-        if (holder && slots.question && !slots.question.pairing && slots.question.id !== slotsSeen.question?.id && questionsWaiting.indexOf(slots.question.id) < 0)
+        if (holder && slots.question && slots.question.id !== slotsSeen.question?.id && questionsWaiting.indexOf(slots.question.id) < 0)
             questionsWaiting = questionsWaiting.concat([slots.question.id]);
         if (holder && slots.playing && I.trackText(slots.playing) !== I.trackText(slotsSeen.playing ?? {}))
             mediaWaiting = true;
@@ -687,17 +684,6 @@ Item {
         };
     }
 
-    // A pairing request's kind, what has been typed and its keys as drawn, or null.
-    function pairingState() {
-        if (mode !== "question" || !question.pairing)
-            return null;
-        return {
-            kind: question.pairing,
-            pin: pinText.text,
-            keys: question.keys.map(k => k.join(" "))
-        };
-    }
-
     // Mod+I gives the island the keyboard to act on what it shows; anything but a question gives it back.
     property bool focused: false
     property bool replying: false
@@ -705,7 +691,7 @@ Item {
     property bool attaching: false
     // Why the last attach found nothing, such as no image on the clipboard; the next key clears it.
     property string askNote: ""
-    readonly property var askLinks: Q.linkify(Q.unbidi(heldQuestion?.pairing ? "" : heldQuestion?.text ?? ""))
+    readonly property var askLinks: Q.linkify(Q.unbidi(heldQuestion?.text ?? ""))
     readonly property var askFiles: heldQuestion ? questions.attached[heldQuestion.id] ?? [] : []
     readonly property string askFailed: heldQuestion ? questions.failed[heldQuestion.id] ?? "" : ""
     // Where a screenshot or a pasted image is kept until mem has handed it to the hub.
@@ -751,7 +737,7 @@ Item {
 
     // The question card as drawn, for `island state`.
     function askState() {
-        if (mode !== "question" || question.pairing)
+        if (mode !== "question")
             return null;
         return {
             expanded: focused,
@@ -833,7 +819,7 @@ Item {
     // A click on an option answers with it as its number key does, and Reply opens the reply line as r does; neither while the reply line or the file picker has the question.
     function clickOption(index) {
         const q = question;
-        if (!q || q.pairing || !focused || replying || attaching)
+        if (!q || !focused || replying || attaching)
             return;
         askNote = "";
         if (index === Math.min(q.options.length, 9)) {
@@ -959,7 +945,7 @@ Item {
     Binding {
         target: island.notifs
         property: "held"
-        value: !!island.holder || island.overFullscreen || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
+        value: !!island.holder || island.overFullscreen || (!!island.question && island.notifs.queue.length > 0)
     }
     // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
     readonly property bool wantsKeys: focused && !attaching && visible
@@ -2129,7 +2115,7 @@ Item {
                 // A dropped file attaches to the answer, open or closed.
                 DropArea {
                     anchors.fill: parent
-                    enabled: island.part === "question" && !island.question?.pairing
+                    enabled: island.part === "question"
                     keys: ["text/uri-list"]
                     onDropped: drop => {
                         const paths = drop.urls.map(u => decodeURIComponent(String(u).replace(/^file:\/\//, ""))).filter(p => p.startsWith("/"));
@@ -2172,14 +2158,14 @@ Item {
                             font: island.theme.tokens?.type.mono ?? ""
                         }
 
-                        // Two lines until Mod+I opens the card, then all of it; a pairing request is plain text, a question's web addresses are links.
+                        // Two lines until Mod+I opens the card, then all of it; a question's web addresses are links.
                         Text {
                             id: askText
                             width: parent.width
-                            text: island.heldQuestion?.pairing ? island.heldQuestion.text : island.askLinks.html
-                            textFormat: island.heldQuestion?.pairing ? Text.PlainText : Text.StyledText
+                            text: island.askLinks.html
+                            textFormat: Text.StyledText
                             wrapMode: Text.Wrap
-                            maximumLineCount: island.heldQuestion?.pairing ? 6 : island.focused ? 10000 : 2
+                            maximumLineCount: island.focused ? 10000 : 2
                             elide: Text.ElideRight
                             lineHeight: 1.3
                             color: box.style.text
@@ -2195,7 +2181,7 @@ Item {
 
                         Text {
                             id: askSummary
-                            visible: !island.heldQuestion?.pairing && !island.focused
+                            visible: !island.focused
                             width: parent.width
                             textFormat: Text.PlainText
                             elide: Text.ElideRight
@@ -2208,7 +2194,7 @@ Item {
                         // Every option in full as a button, one to a row, the first inverted and the rest quiet; Reply… is the last.
                         Column {
                             id: askOptions
-                            visible: !island.heldQuestion?.pairing && island.focused && !island.replying
+                            visible: island.focused && !island.replying
                             width: parent.width
                             spacing: 6
 
@@ -2250,40 +2236,6 @@ Item {
                             }
                         }
 
-                        // A pairing request names the keys that answer it in place of options.
-                        Flow {
-                            width: parent.width
-                            spacing: 8
-                            visible: !!island.heldQuestion?.pairing
-
-                            Repeater {
-                                model: island.heldQuestion?.pairing ? island.heldQuestion.keys.map(k => k.join(" ")) : []
-
-                                Rectangle {
-                                    required property string modelData
-                                    required property int index
-                                    width: Math.min(chip.implicitWidth + 24, ask.width)
-                                    height: chip.implicitHeight + 12
-                                    radius: 8
-                                    color: index === 0 ? box.style.text : "transparent"
-                                    border.width: index === 0 ? 0 : 1
-                                    border.color: Qt.alpha(box.style.text, 0.35)
-
-                                    Text {
-                                        id: chip
-                                        textFormat: Text.PlainText
-                                        anchors.centerIn: parent
-                                        width: Math.min(implicitWidth, parent.width - 24)
-                                        elide: Text.ElideRight
-                                        text: parent.modelData
-                                        color: parent.index === 0 ? box.style.fill : box.style.text
-                                        font.family: island.theme.tokens?.type.ui ?? ""
-                                        font.pixelSize: 13
-                                    }
-                                }
-                            }
-                        }
-
                         // What goes with the answer, and why the last answer or attach did not go through.
                         Text {
                             visible: island.askFiles.length > 0
@@ -2307,29 +2259,6 @@ Item {
                             font.pixelSize: 11
                         }
 
-                        // The PIN or passkey as typed, for a request that asks one.
-                        Rectangle {
-                            visible: ["pin", "passkey"].indexOf(island.heldQuestion?.pairing) >= 0
-                            width: parent.width
-                            height: 32
-                            radius: 8
-                            color: "transparent"
-                            border.width: 1
-                            border.color: Qt.alpha(box.style.text, 0.5)
-
-                            Text {
-                                id: pinText
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                verticalAlignment: Text.AlignVCenter
-                                textFormat: Text.PlainText
-                                text: Root.Pairing.pin
-                                color: box.style.text
-                                font.family: island.theme.tokens?.type.mono ?? ""
-                                font.pixelSize: 13
-                            }
-                        }
 
                         Rectangle {
                             visible: island.replying
@@ -2488,10 +2417,6 @@ Item {
                 const q = island.question;
                 if (!q)
                     return;
-                if (q.pairing) {
-                    Root.Pairing.key(event);
-                    return;
-                }
                 island.askNote = "";
                 if (event.key === Qt.Key_Escape) {
                     island.questions.putAway(q.id);

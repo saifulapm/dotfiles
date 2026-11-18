@@ -1,4 +1,4 @@
-// Pure pieces of a Bluetooth pairing request from bin/dots-bt-agent, which the island asks as a question, kept here so node can test them.
+// Pure pieces of a Bluetooth pairing request from bin/dots-bt-agent, which the island asks as board 7's prompt, kept here so node can test them.
 import { line } from './voice.mjs';
 import { CONTROL, BIDI } from './clean.mjs';
 
@@ -67,31 +67,20 @@ export function serviceName(uuid) {
   return `service ${u}`;
 }
 
-export function promptText(r) {
+// Board 7's prompt for a request: the Bluetooth glyph, or a keyboard's for a code typed on the device, the device as its title, a muted detail, the code it draws or a field, and its quiet and primary buttons.
+export function promptOf(r) {
+  const card = (o) => Object.assign({ glyph: 0xf00af, title: r.device, detail: '', code: '', field: false, placeholder: '', quiet: 'Reject', primary: 'Pair' }, o);
   switch (r.kind) {
     case 'confirm':
-      return r.code ? `Pair ${r.device}? ${r.code}` : `Pair ${r.device}?`;
+      return card({ detail: r.code ? 'check this code shows on the device' : 'wants to pair', code: r.code });
     case 'display':
-      return `Type ${r.code} on ${r.device}`;
+      return card({ glyph: 0xf030c, detail: 'type this on the device, then Enter', code: r.code, quiet: 'Cancel', primary: '' });
     case 'pin':
-      return `PIN for ${r.device}`;
+      return card({ detail: 'asks for a PIN', field: true, placeholder: 'PIN' });
     case 'passkey':
-      return `Passkey for ${r.device}`;
+      return card({ detail: 'asks for a passkey', field: true, placeholder: 'Passkey' });
     default:
-      return `${r.device} wants ${serviceName(r.service)}`;
-  }
-}
-
-export function keyText(kind) {
-  switch (kind) {
-    case 'confirm':
-      return [['↵', 'yes'], ['esc', 'no']];
-    case 'display':
-      return [['esc', 'cancel']];
-    case 'authorize':
-      return [['↵', 'allow'], ['esc', 'deny']];
-    default:
-      return [['↵', 'send'], ['esc', 'cancel']];
+      return card({ detail: `wants ${serviceName(r.service)}`, quiet: 'Deny', primary: 'Allow' });
   }
 }
 

@@ -73,8 +73,9 @@ until_ok 8000 at_rest
 open_sheet
 { printf '%s\n' '{"kind":"confirm","device":"Keys","address":"AA:BB:CC:DD:EE:FF","code":"123456","service":""}'; sleep 6; } 9>&- | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-bt-$WAYLAND_DISPLAY.sock" >/dev/null 2>&1 9>&- &
 pair=$!
-until_ok 2000 island_is '.surface == null and .mode == "question"'
-check "a pairing request takes the island from the sheet with its card ($(island | jq -c '{surface, mode}'))" island_is '.surface == null and .mode == "question" and .pairing != null'
+until_ok 2000 island_is '.surface == "cheatsheet" and .takeover == "pairing"'
+check "a pairing request takes the island over the sheet, which stays under it ($(island | jq -c '{surface, takeover}'))" island_is '.surface == "cheatsheet" and .takeover == "pairing"'
+check "and its chip reads Keys ($(timeout 0.5 qs ipc call pairing state | jq -c .chip))" eval 'timeout 0.5 qs ipc call pairing state | jq -e ".chip == \"Keys\"" >/dev/null'
 kill "$pair" 2>/dev/null
 exit "$fails"
 }

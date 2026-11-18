@@ -59,8 +59,9 @@ PanelWindow {
     readonly property var accounts: accountsLoader.item
     readonly property var dns: dnsLoader.item
     readonly property var picker: pickerLoader.item
+    readonly property var pairing: pairingLoader.item
     // Every surface that takes the keyboard while it shows; a recording carries on with its picker closed.
-    readonly property var all: [launcher, notifications, cheatsheet, control, recorder, polkit, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
+    readonly property var all: [launcher, notifications, cheatsheet, control, recorder, polkit, pairing, goalsView, pinentry, pass, tailscale, accounts, dns, picker]
     readonly property bool shown: all.some(s => s?.shown ?? false)
     // While niri's overview is open the shell holds the keyboard, so no key reaches the window behind it.
     readonly property bool overview: niri?.overview ?? false
@@ -152,8 +153,23 @@ PanelWindow {
         polkit.show(flow);
     }
 
+    // Pairing shows bin/dots-bt-agent's requests one at a time; each takes the island over whatever shows, Control's Bluetooth page included.
+    function openPairing() {
+        pairingLoader.active = true;
+        takeOver(pairing);
+        pairing.show();
+    }
+
+    Connections {
+        target: Root.Pairing
+        function onCurrentChanged() {
+            if (Root.Pairing.current)
+                host.openPairing();
+        }
+    }
+
     // The prompts that take the island over the surface in it and hand it back once answered, cancelled or hung up; each loads in the island's surface slot.
-    readonly property var takeovers: [polkit, pinentry]
+    readonly property var takeovers: [polkit, pinentry, pairing]
     // Their names as they showed, oldest first, and the item each took the keyboard from.
     property var stack: []
     property var focusUnder: ({})
@@ -481,16 +497,6 @@ PanelWindow {
         value: host.island?.surface === "launcher" && !(host.island?.animating ?? true)
     }
 
-    Connections {
-        target: host.island
-        // A pairing request asked from Control's Bluetooth page is answered there, so Control stays.
-        function onSurfaceYielded() {
-            if (host.islandSurface === host.control && host.control.page === "bluetooth")
-                return;
-            host.islandSurface?.close();
-        }
-    }
-
     // Control draws inside the island, on the island's fill, so it reads the scheme's own tokens.
     Loader {
         id: controlLoader
@@ -576,6 +582,22 @@ PanelWindow {
             settled: host.settledOn(name)
             onShownChanged: if (!shown)
                 host.handBack(host.polkit)
+        }
+    }
+
+    // The pairing prompt draws inside the island the same way, over the surface it covers (board 7).
+    Loader {
+        id: pairingLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
+        anchors.fill: parent
+        visible: host.islandLast === host.pairing
+        active: false
+        sourceComponent: Root.PairingPrompt {
+            theme: host.theme
+            chip: host.chipFor(name)
+            settled: host.settledOn(name)
+            onShownChanged: if (!shown)
+                host.handBack(host.pairing)
         }
     }
 

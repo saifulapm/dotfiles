@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLine, deviceName, keyText, parseRequest, promptText, serviceName, typed } from './bt-pairing.mjs';
+import { readFileSync } from 'node:fs';
+import { answerLine, deviceName, parseRequest, promptOf, serviceName, typed } from './bt-pairing.mjs';
 
 const req = (r) => JSON.stringify(r);
 
@@ -42,17 +43,76 @@ test('a request whose fields BlueZ would never send is refused, not drawn', () =
 test('a long device name is cut to 40 characters, so the code always shows', () => {
   const r = parseRequest(req({ kind: 'confirm', device: 'A'.repeat(248), address: 'AA', code: '123456' }));
   assert.equal(r.device, 'A'.repeat(39) + '…');
-  assert.equal(promptText(r), `Pair ${'A'.repeat(39)}…? 123456`);
+  assert.equal(promptOf(r).title, `${'A'.repeat(39)}…`);
 });
 
-test('each request kind asks in its own words', () => {
-  const p = (r) => promptText(parseRequest(req(r)));
-  assert.equal(p({ kind: 'confirm', device: 'Test Keyboard', code: '123456' }), 'Pair Test Keyboard? 123456');
-  assert.equal(p({ kind: 'confirm', device: 'Test Keyboard', code: '' }), 'Pair Test Keyboard?');
-  assert.equal(p({ kind: 'display', device: 'Magic Keyboard', code: '654321' }), 'Type 654321 on Magic Keyboard');
-  assert.equal(p({ kind: 'pin', device: 'Old Mouse' }), 'PIN for Old Mouse');
-  assert.equal(p({ kind: 'passkey', device: 'Old Mouse' }), 'Passkey for Old Mouse');
-  assert.equal(p({ kind: 'authorize', device: 'Test Phone', service: '0000110d-0000-1000-8000-00805f9b34fb' }), 'Test Phone wants Audio');
+test('each request kind draws as its own board 7 prompt: glyph, device, detail, a code or a field, and its buttons', () => {
+  const p = (r) => promptOf(parseRequest(req(r)));
+  assert.deepEqual(p({ kind: 'confirm', device: 'Test Keyboard', code: '123456' }), {
+    glyph: 0xf00af,
+    title: 'Test Keyboard',
+    detail: 'check this code shows on the device',
+    code: '123456',
+    field: false,
+    placeholder: '',
+    quiet: 'Reject',
+    primary: 'Pair',
+  });
+  assert.deepEqual(p({ kind: 'confirm', device: 'Test Keyboard', code: '' }), {
+    glyph: 0xf00af,
+    title: 'Test Keyboard',
+    detail: 'wants to pair',
+    code: '',
+    field: false,
+    placeholder: '',
+    quiet: 'Reject',
+    primary: 'Pair',
+  });
+  assert.deepEqual(p({ kind: 'display', device: 'Magic Keyboard', code: '654321' }), {
+    glyph: 0xf030c,
+    title: 'Magic Keyboard',
+    detail: 'type this on the device, then Enter',
+    code: '654321',
+    field: false,
+    placeholder: '',
+    quiet: 'Cancel',
+    primary: '',
+  });
+  assert.deepEqual(p({ kind: 'pin', device: 'Old Mouse' }), {
+    glyph: 0xf00af,
+    title: 'Old Mouse',
+    detail: 'asks for a PIN',
+    code: '',
+    field: true,
+    placeholder: 'PIN',
+    quiet: 'Reject',
+    primary: 'Pair',
+  });
+  assert.deepEqual(p({ kind: 'passkey', device: 'Old Mouse' }), {
+    glyph: 0xf00af,
+    title: 'Old Mouse',
+    detail: 'asks for a passkey',
+    code: '',
+    field: true,
+    placeholder: 'Passkey',
+    quiet: 'Reject',
+    primary: 'Pair',
+  });
+  assert.deepEqual(p({ kind: 'authorize', device: 'Test Phone', service: '0000110d-0000-1000-8000-00805f9b34fb' }), {
+    glyph: 0xf00af,
+    title: 'Test Phone',
+    detail: 'wants Audio',
+    code: '',
+    field: false,
+    placeholder: '',
+    quiet: 'Deny',
+    primary: 'Allow',
+  });
+});
+
+test('bin/dots-bt-agent rejects an unanswered request after 60 s unless DOTS_BT_AGENT_TIMEOUT_S says otherwise', () => {
+  const agent = readFileSync(new URL('../../bin/dots-bt-agent', import.meta.url), 'utf8');
+  assert.match(agent, /os\.environ\.get\("DOTS_BT_AGENT_TIMEOUT_S", "60"\)/);
 });
 
 test('a service is named by its UUID, and an unknown one by its short or full UUID', () => {
@@ -61,14 +121,6 @@ test('a service is named by its UUID, and an unknown one by its short or full UU
   assert.equal(serviceName('00001234-0000-1000-8000-00805f9b34fb'), 'service 0x1234');
   assert.equal(serviceName('6e400001-b5a3-f393-e0a9-e50e24dcca9e'), 'service 6e400001-b5a3-f393-e0a9-e50e24dcca9e');
   assert.equal(serviceName('a\nb'), 'service ab');
-});
-
-test('each kind names the keys that answer it', () => {
-  assert.deepEqual(keyText('confirm'), [['↵', 'yes'], ['esc', 'no']]);
-  assert.deepEqual(keyText('display'), [['esc', 'cancel']]);
-  assert.deepEqual(keyText('pin'), [['↵', 'send'], ['esc', 'cancel']]);
-  assert.deepEqual(keyText('passkey'), [['↵', 'send'], ['esc', 'cancel']]);
-  assert.deepEqual(keyText('authorize'), [['↵', 'allow'], ['esc', 'deny']]);
 });
 
 test('a PIN takes up to 16 printable characters, a passkey up to 6 digits', () => {

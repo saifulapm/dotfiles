@@ -254,10 +254,10 @@ Item {
             tones: rows.map(r => r.tone ?? ""),
             detailLines: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).detailLines),
             scanning: scanRow.visible,
-            pairing: pairCard.visible ? { text: pairText.text, pin: Root.Pairing.pin, buttons: Array.from({ length: pairButtons.count }, (_, i) => pairButtons.itemAt(i).word) } : null,
+            pairNote: pairCard.visible ? pairText.text : null,
             // The Power page as drawn: the profile and Stay awake segments lit, and each action's label.
             power: page === "power" && powerLoader.item ? powerLoader.item.drawn : null,
-            // A page's field or a pairing question takes every key.
+            // A page's field takes every key.
             typing: page !== "" && !!section.typing,
             detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
             // The open password field as drawn, in the asking network's row.
@@ -724,77 +724,29 @@ Item {
             }
         }
 
-        // A pairing request on the Bluetooth page: what it asks, the code typed so far, and a button for each answer; a failed pair says so here.
+        // A failed pair says so on the Bluetooth page; the request itself draws as the island's pairing prompt over Control.
         Rectangle {
             id: pairCard
-            readonly property var q: control.page === "bluetooth" ? Root.Pairing.question : null
-            visible: !!q || (control.page === "bluetooth" && control.pairNote !== "")
+            visible: control.page === "bluetooth" && control.pairNote !== ""
             width: parent.width
-            height: pairColumn.implicitHeight + 24
+            height: pairText.implicitHeight + 24
             radius: 12
             color: Qt.alpha(control.on, 0.1)
 
-            Column {
-                id: pairColumn
+            Text {
+                id: pairText
                 x: 12
                 y: 12
                 width: parent.width - 24
-                spacing: 8
-
-                Text {
-                    id: pairText
-                    width: parent.width
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 3
-                    elide: Text.ElideRight
-                    textFormat: Text.PlainText
-                    text: pairCard.q ? pairCard.q.text : control.pairNote
-                    color: pairCard.q ? control.on : control.tones.danger
-                    font.family: control.fonts.ui ?? ""
-                    font.pixelSize: 13
-                    font.weight: Font.Bold
-                }
-                Text {
-                    visible: !!pairCard.q && ["pin", "passkey"].indexOf(pairCard.q.pairing) >= 0
-                    textFormat: Text.PlainText
-                    text: Root.Pairing.pin || "Type the code"
-                    color: Root.Pairing.pin ? control.on : control.tones.muted
-                    font.family: control.fonts.mono ?? ""
-                    font.pixelSize: 15
-                }
-                Row {
-                    visible: !!pairCard.q
-                    spacing: 8
-
-                    Repeater {
-                        id: pairButtons
-                        model: pairCard.q ? pairCard.q.keys : []
-
-                        Rectangle {
-                            required property var modelData
-                            readonly property bool yes: modelData[0] === "↵"
-                            readonly property string word: modelData[1].charAt(0).toUpperCase() + modelData[1].slice(1)
-                            width: pairWord.implicitWidth + 28
-                            height: 34
-                            radius: 10
-                            color: yes ? control.on : Qt.alpha(control.on, 0.07)
-                            Text {
-                                id: pairWord
-                                anchors.centerIn: parent
-                                textFormat: Text.PlainText
-                                text: parent.word
-                                color: parent.yes ? control.fill : control.on
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 13
-                                font.weight: parent.yes ? Font.Bold : Font.Normal
-                            }
-                            Root.Click {
-                                name: "control-pair:" + parent.modelData[1]
-                                onTapped: Root.Pairing.key({ key: parent.yes ? Qt.Key_Return : Qt.Key_Escape, modifiers: 0, text: "" })
-                            }
-                        }
-                    }
-                }
+                wrapMode: Text.Wrap
+                maximumLineCount: 3
+                elide: Text.ElideRight
+                textFormat: Text.PlainText
+                text: control.pairNote
+                color: control.tones.danger
+                font.family: control.fonts.ui ?? ""
+                font.pixelSize: 13
+                font.weight: Font.Bold
             }
         }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Enter on a new device in Control's Bluetooth tab pairs, trusts and connects it through bin/dots-bt-agent, each request answered in the island; Esc, a timeout or a failed pair leave it new and say Pairing failed.
+# Enter on a new device in Control's Bluetooth tab pairs, trusts and connects it through bin/dots-bt-agent, each request answered in the island's pairing prompt; Esc, a timeout or a failed pair leave it new and say Pairing failed.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -9,10 +9,13 @@ section_is() { state_is --arg s "$1" '.open and .section == $s'; }
 detail_is() { state_is --arg t "$1" --arg d "$2" '.details[.rows | index($t)] == $d'; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
-# A request asked from Control's Bluetooth page shows there, Control holding the island; one asked with Control closed shows in the island.
-asks() { island_is --arg t "$1" '.mode == "question" and .text == $t' || timeout 0.5 qs ipc call control state 2>/dev/null | jq -e --arg t "$1" '.open and .pairing.text == $t' >/dev/null 2>&1; }
-toast_is() { island_is --arg t "$1" '.mode == "toast" and .text == $t' || timeout 0.5 qs ipc call control state 2>/dev/null | jq -e --arg t "$1" '.open and .pairing.text == $t' >/dev/null 2>&1; }
-no_question() { ! island_is '.mode == "question"' && ! timeout 0.5 qs ipc call control state 2>/dev/null | jq -e '.pairing.buttons | length > 0' >/dev/null 2>&1; }
+pair() { timeout 0.5 qs ipc call pairing state 2>/dev/null; }
+pair_is() { pair | jq -e "$@" >/dev/null 2>&1; }
+# A request takes the island over as the pairing prompt, whatever shows; it reads the device as its title and a detail, and holds the keyboard.
+asks() { island_is '.takeover == "pairing"' && pair_is --arg t "$1" --arg d "$2" '.open and .settled and .keyboard and .title == $t and .detail == $d'; }
+# A failed pair is the island's toast, or a line on Control's Bluetooth page while Control holds the island.
+toast_is() { island_is --arg t "$1" '.mode == "toast" and .text == $t' || timeout 0.5 qs ipc call control state 2>/dev/null | jq -e --arg t "$1" '.open and .pairNote == $t' >/dev/null 2>&1; }
+no_question() { ! island_is '.takeover == "pairing"' && ! pair_is '.open'; }
 # Presses j until the row titled $1 is selected.
 select_row() {
   local i n
@@ -72,12 +75,12 @@ check "a scan lists Test Keyboard" detail_is "Test Keyboard" new
 # A code to confirm, answered from Control, which holds the keyboard.
 until_ok 3000 select_row "Test Keyboard"
 wtype -k Return
-until_ok 3000 asks "Pair Test Keyboard? 123456"
-check "Enter on Test Keyboard asks Pair Test Keyboard? 123456 ($(island | jq -c '{mode, text}'))" asks "Pair Test Keyboard? 123456"
-check "the Bluetooth page draws a button for each answer, Yes and No ($(control_state | jq -c .pairing))" state_is '.pairing.buttons == ["Yes", "No"]'
+until_ok 3000 asks "Test Keyboard" "check this code shows on the device"
+check "Enter on Test Keyboard asks to compare 123456 ($(pair | jq -c '{title, code: .code.text}'))" pair_is '.title == "Test Keyboard" and .code.text == "123456"'
+check "the prompt draws Reject and Pair over Control ($(pair | jq -c '{chip, buttons: [.buttons[].text]}'))" pair_is '.chip == "Control" and [.buttons[].text] == ["Reject", "Pair"]'
 # A person may take a while to compare the code: the answer still counts after D-Bus's 25 s default.
 sleep 27
-check "27 s on, the question still shows" asks "Pair Test Keyboard? 123456"
+check "27 s on, the question still shows" asks "Test Keyboard" "check this code shows on the device"
 wtype -k Return
 until_ok 3000 prop_is "$keyboard" Connected true
 check "Enter pairs it (Paired true)" prop_is "$keyboard" Paired true
@@ -90,8 +93,8 @@ check "and the question is gone" no_question
 # Esc says no.
 until_ok 3000 select_row "Test Phone"
 wtype -k Return
-until_ok 3000 asks "Pair Test Phone? 222222"
-check "Enter on Test Phone asks Pair Test Phone? 222222" asks "Pair Test Phone? 222222"
+until_ok 3000 asks "Test Phone" "check this code shows on the device"
+check "Enter on Test Phone asks to compare 222222 ($(pair | jq -c .code.text))" pair_is '.title == "Test Phone" and .code.text == "222222"'
 wtype -k Escape
 until_ok 3000 no_question
 check "Esc puts the question away" no_question
@@ -104,8 +107,8 @@ check "and its row reads new" detail_is "Test Phone" new
 knob SetPairing osu "$mouse" display 654321
 until_ok 3000 select_row "Test Mouse"
 wtype -k Return
-until_ok 3000 asks "Type 654321 on Test Mouse"
-check "a passkey to type reads Type 654321 on Test Mouse" asks "Type 654321 on Test Mouse"
+until_ok 3000 asks "Test Mouse" "type this on the device, then Enter"
+check "a passkey to type draws 654321 for Test Mouse with Cancel alone ($(pair | jq -c '{code: .code.text, buttons: [.buttons[].text]}'))" pair_is '.code.text == "654321" and [.buttons[].text] == ["Cancel"]'
 knob Typed o "$mouse"
 until_ok 3000 prop_is "$mouse" Connected true
 check "typed on the device, Test Mouse pairs and connects" prop_is "$mouse" Connected true
@@ -119,8 +122,8 @@ until_ok 3000 no_connect
 knob SetPairing osu "$phone" display 111111
 until_ok 3000 select_row "Test Phone"
 wtype -k Return
-until_ok 3000 asks "Type 111111 on Test Phone"
-check "a passkey to type reads Type 111111 on Test Phone" asks "Type 111111 on Test Phone"
+until_ok 3000 asks "Test Phone" "type this on the device, then Enter"
+check "a passkey to type draws 111111 for Test Phone ($(pair | jq -c .code.text))" pair_is '.code.text == "111111"'
 knob Mistyped o "$phone"
 until_ok 3000 toast_is "Pairing failed: Test Phone"
 check "typed wrong on the device, the question goes and the island shows Pairing failed: Test Phone ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: Test Phone"
@@ -130,11 +133,11 @@ check "and Control's keys move again" state_is '.typing | not'
 knob SetPairing osu "$phone" pin 0
 until_ok 3000 select_row "Test Phone"
 wtype -k Return
-until_ok 3000 asks "PIN for Test Phone"
-check "a PIN request reads PIN for Test Phone" asks "PIN for Test Phone"
+until_ok 3000 asks "Test Phone" "asks for a PIN"
+check "a PIN request draws a field for Test Phone ($(pair | jq -c .field))" pair_is '.field.h == 44 and .field.length == 0'
 wtype 0000
-until_ok 2000 state_is '.pairing.pin == "0000"'
-check "typing 0000 shows it on the Bluetooth page" state_is '.pairing.pin == "0000"'
+until_ok 2000 pair_is '.field.length == 4'
+check "typing 0000 fills the prompt's field ($(pair | jq -c .field))" pair_is '.field.length == 4'
 wtype -k Return
 pin_sent() { knob Calls | grep -q "RequestPinCode $phone 0000"; }
 until_ok 3000 pin_sent
@@ -146,31 +149,30 @@ check "and Test Phone pairs" prop_is "$phone" Paired true
 authorize() { knob Authorize os "$speaker" 0000110d-0000-1000-8000-00805f9b34fb >"$DOTS_DEV_DIR/authorize" 2>&1 9>&- & }
 answered() { grep -q "$1" "$DOTS_DEV_DIR/authorize"; }
 authorize
-until_ok 3000 asks "Test Speaker wants Audio"
-check "an untrusted Test Speaker asking for audio reads Test Speaker wants Audio" asks "Test Speaker wants Audio"
+until_ok 3000 asks "Test Speaker" "wants Audio"
+check "an untrusted Test Speaker asking for audio reads wants Audio" asks "Test Speaker" "wants Audio"
 wtype -k Return
 until_ok 3000 answered allowed
 check "Enter allows it" answered allowed
 authorize
-until_ok 3000 asks "Test Speaker wants Audio"
+until_ok 3000 asks "Test Speaker" "wants Audio"
 wtype -k Escape
 until_ok 3000 answered org.bluez.Error.Rejected
 check "Esc denies it" answered org.bluez.Error.Rejected
 
-# Do Not Disturb never hides a pairing question, and with Control closed Mod+I answers it.
-wtype -k Escape
+# Do Not Disturb never hides a pairing request, and with Control closed the prompt takes the keyboard itself.
+until_ok 3000 no_question
+timeout 0.5 qs ipc call control close
 until_ok 3000 state_is '.open == false'
 timeout 0.5 qs ipc call notifs dnd true
 dnd_on() { timeout 0.5 qs ipc call notifs state 2>/dev/null | jq -e '.dnd == true' >/dev/null; }
 until_ok 2000 dnd_on
 authorize
-until_ok 3000 asks "Test Speaker wants Audio"
-check "with Do Not Disturb on the question still shows" asks "Test Speaker wants Audio"
-timeout 0.5 qs ipc call island focus
-until_ok 2000 island_is '.focused'
+until_ok 3000 asks "Test Speaker" "wants Audio"
+check "with Do Not Disturb on the prompt still shows, with no chip ($(pair | jq -c .chip))" eval 'asks "Test Speaker" "wants Audio" && pair_is ".chip == null"'
 wtype -k Return
 until_ok 3000 answered allowed
-check "with Control closed, Mod+I then Enter allows it" answered allowed
+check "with Control closed, Enter allows it" answered allowed
 timeout 0.5 qs ipc call notifs dnd false
 
 # Left unanswered, the agent gives up and the island says the pair failed.
@@ -180,8 +182,8 @@ until_ok 3000 state_is '.rows | index("00:00:00:00:00:07") != null'
 knob SetPairing osu "$nameless" confirm 333333
 until_ok 3000 select_row "00:00:00:00:00:07"
 wtype -k Return
-until_ok 3000 asks "Pair 00:00:00:00:00:07? 333333"
-check "the nameless device asks by its address" asks "Pair 00:00:00:00:00:07? 333333"
+until_ok 3000 asks "00:00:00:00:00:07" "check this code shows on the device"
+check "the nameless device asks by its address ($(pair | jq -c '{title, code: .code.text}'))" pair_is '.title == "00:00:00:00:00:07" and .code.text == "333333"'
 until_ok 36000 toast_is "Pairing failed: 00:00:00:00:00:07"
 check "left 32 s, the island shows Pairing failed: 00:00:00:00:00:07 ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: 00:00:00:00:00:07"
 check "and the device stays unpaired" prop_is "$nameless" Paired false

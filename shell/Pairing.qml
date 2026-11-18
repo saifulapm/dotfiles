@@ -2,9 +2,10 @@ pragma Singleton
 import Quickshell
 import Quickshell.Io
 import QtQuick
+import "." as Root
 import "lib/bt-pairing.mjs" as P
 
-// bin/dots-bt-agent's other end: each connection is one BlueZ request, held open until the island answers it or the agent hangs up; a request that comes while one shows waits its turn. Control's Enter on a new device runs its pair, trust and connect here, so the steps outlive Control closing.
+// bin/dots-bt-agent's other end: each connection is one BlueZ request, held open until its prompt in the island answers it or the agent hangs up; a request that comes while one shows waits its turn. Control's Enter on a new device runs its pair, trust and connect here, so the steps outlive Control closing.
 Singleton {
     id: pairing
 
@@ -14,16 +15,8 @@ Singleton {
     // What has been typed for a PIN or passkey request.
     property string pin: ""
     property int serial: 0
-    // The request as the island's question slot shows it: no options, the keys that answer it, and the kind.
-    readonly property var question: current ? {
-        "id": current.id,
-        project: "Bluetooth",
-        machine: "",
-        text: P.promptText(current.request),
-        options: [],
-        pairing: current.request.kind,
-        keys: P.keyText(current.request.kind)
-    } : null
+    // The prompt that draws the current request, once the surfaces' window has loaded it.
+    property var prompt: null
     // The device Control asked to pair, until its pair ends.
     property var device: null
 
@@ -110,6 +103,15 @@ Singleton {
             console.warn("pairing: Pair on " + d.address + " failed: " + pairErr.text.trim());
             pairing.dropFor(d.address);
             pairing.failed(P.deviceName(d.deviceName, d.address));
+        }
+    }
+
+    Root.Ipc {
+        target: "pairing"
+
+        function state(): string {
+            const shown = pairing.prompt ? JSON.parse(pairing.prompt.state()) : { open: false };
+            return JSON.stringify(Object.assign(shown, { waiting: pairing.waiting.length }));
         }
     }
 

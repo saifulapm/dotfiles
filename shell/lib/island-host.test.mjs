@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { springCurve, ease } from './island.mjs';
-import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, surfaceYields, modeOf, shownNotification } from './island-host.mjs';
+import { hostMotion, rowFade, bottomRadius, REST, CONCAVE, modeOf, shownNotification } from './island-host.mjs';
 
 test('the island opens and switches on springCurve(260, 0.7, 30), 362 ms where the old open took 611', () => {
   const m = hostMotion();
@@ -66,25 +66,6 @@ test('the bottom radius follows the same progress as the box, from 14 to 20 and 
 });
 
 const note = { key: 'n1', summary: 'hi' };
-
-// 7E95CSV2: from m101 what arrives while a surface is open waits behind the dot; until m106 only a pairing request still closes the surface (PCGX7JPJ).
-test('a notification, a question, the OSD or a toast arriving while a surface is open leaves it open', () => {
-  assert.equal(surfaceYields({}, { notification: note }), false);
-  assert.equal(surfaceYields({}, { osd: { kind: 'volume', value: 40 } }), false);
-  assert.equal(surfaceYields({}, { toast: 'Copied' }), false);
-  assert.equal(surfaceYields({}, { question: { id: 'Q1' } }), false);
-  assert.equal(surfaceYields({ notification: note }, { notification: { key: 'n2', summary: 'again' } }), false);
-});
-
-test('a pairing request arriving, or a new one, closes the surface', () => {
-  assert.equal(surfaceYields({}, { question: { id: 'pair-1', pairing: 'pin' } }), true);
-  assert.equal(surfaceYields({ question: { id: 'Q1' } }, { question: { id: 'pair-1', pairing: 'confirm' } }), true);
-  assert.equal(surfaceYields({ question: { id: 'pair-1', pairing: 'pin' } }, { question: { id: 'pair-1', pairing: 'pin' } }), false);
-});
-
-test('a state going away keeps the surface open', () => {
-  assert.equal(surfaceYields({ notification: note, osd: { kind: 'volume', value: 40 } }, {}), false);
-});
 
 test('an open surface outranks every slot, a question and a lease card among them; with none open the slots rank as before', () => {
   const all = { question: { id: 'Q1', text: 'q', options: [] }, leaseCard: true, notification: note, osd: { kind: 'volume', value: 40 } };

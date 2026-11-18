@@ -35,9 +35,3 @@ export const modeOf = (surface, slots) => (surface ? 'surface' : pick(slots));
 
 // The notification the island may show: none while a screen is shared, so a share never shows one (61SHXHG7); it still goes to the centre's history.
 export const shownNotification = (current, sharing) => (sharing ? null : current);
-
-// What arrives while a surface is open waits behind the dot (7E95CSV2); until m106 a pairing request, which arrives in the question slot, still closes the surface (PCGX7JPJ).
-export function surfaceYields(before, after) {
-  const now = after.question;
-  return !!now?.pairing && now.id !== before.question?.id;
-}
