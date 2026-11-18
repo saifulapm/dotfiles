@@ -409,6 +409,9 @@ PanelWindow {
             notifs: host.notifs
             sync: host.sync
             clock: host.island ? host.island.clock : null
+            onRecordWanted: host.toggleRecorder()
+            // The calendar opens from the resting island, so it waits for Control's close to reach it.
+            onCalendarWanted: Qt.callLater(() => host.island?.openCalendar())
         }
     }
 

@@ -6,6 +6,7 @@ import "lib/control-home.mjs" as Home
 import "lib/control-system.mjs" as Sys
 import "lib/surface.mjs" as S
 import "lib/island-tones.mjs" as T
+import "lib/idle.mjs" as Idle
 
 // Control drawn inside the island on its fill (board 4): Home's clock and tiles, and a page per section behind its tile. A section is an Item with: required property var theme; property int selected; readonly property var rows ([{title, detail}]); optional readonly property bool levels (true when every row has a volume or brightness that h/l steps); function key(event): bool for keys other than j/k, Up/Down and Esc, or for every key while its optional typing is true; function state(): object.
 Item {
@@ -38,6 +39,10 @@ Item {
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
     property real openT0: -1
+
+    // Enter on Record screen and on Calendar hand off to the Recorder and to the island's calendar card.
+    signal recordWanted
+    signal calendarWanted
 
     readonly property var tokens: theme.tokens
     readonly property var fonts: tokens ? tokens.type : ({})
@@ -125,11 +130,44 @@ Item {
         section.selected = Math.max(0, Math.min(rows.length - 1, section.selected + by));
     }
 
-    // Enter on a tile opens its page; the rest act in place.
+    // Enter on a tile opens its page; the switches flip, Lock locks, and Record screen and Calendar close Control for what they open.
     function act(id) {
         cursor = id;
-        if (Home.PAGES[id])
+        if (Home.PAGES[id]) {
             page = Home.PAGES[id];
+        } else if (id === "dnd") {
+            notifs.setDnd(!notifs.dnd);
+        } else if (id === "awake") {
+            // The switch turns Stay awake off, or on for its first step, 30 minutes; Power's page holds the longer steps.
+            Root.State.awakeUntil = Root.State.awakeUntil > Date.now() ? 0 : Idle.nextAwake(Date.now(), 0);
+        } else if (id === "lock") {
+            close();
+            Quickshell.execDetached(Sys.actionCommand("lock"));
+        } else if (id === "record") {
+            close();
+            recordWanted();
+        } else if (id === "calendar") {
+            close();
+            calendarWanted();
+        }
+    }
+
+    // - and = on Sound step the default output 5%, and on Brightness the built-in panel one step; dir is -1 or 1.
+    function step(id, dir) {
+        if (id === "sound" && sink?.audio)
+            sink.audio.volume = Lib.stepVolume(sink.audio.volume, dir);
+        else if (id === "brightness" && display.panels.length) {
+            display.selected = 0;
+            display.key({ key: dir > 0 ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
+        }
+    }
+
+    // A wheel turn over a slider steps it once per whole notch; wheelRest holds a touchpad's part of one.
+    function turn(id, angle) {
+        const t = Lib.wheelSteps(wheelRest, angle);
+        wheelRest = t.rest;
+        for (let i = 0; i < Math.abs(t.steps); i++)
+            step(id, t.steps > 0 ? 1 : -1);
     }
 
     // A click on a page's row selects it and hands its section the Enter its key() handles; an open password line takes only keys.
@@ -203,6 +241,8 @@ Item {
                 cursor = Home.move(cursor, dx, dy);
             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                 act(cursor);
+            else if (k === Qt.Key_Equal || k === Qt.Key_Minus)
+                step(cursor, k === Qt.Key_Equal ? 1 : -1);
             else
                 return;
         }
@@ -334,9 +374,17 @@ Item {
                 // The focused tile is a shade above the rest, as the launcher's selected card is; an inverted one dims a little instead.
                 color: t.on ? Qt.alpha(control.on, focused ? 0.8 : 1) : Qt.alpha(control.on, focused ? 0.1 : 0.05)
 
+                // Under the click area, which takes no wheel; only the sliders take a turn.
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    enabled: tile.at.id === "sound" || tile.at.id === "brightness"
+                    onWheel: event => control.turn(tile.at.id, event.angleDelta.y)
+                }
+
                 Root.Click {
-                    name: "control-tile:" + tile.t.id
-                    onTapped: control.act(tile.t.id)
+                    name: "control-tile:" + tile.at.id
+                    onTapped: control.act(tile.at.id)
                 }
 
                 // Wi-Fi, Bluetooth, Record screen, Battery and Sync: a round icon beside the name and a line under it.

@@ -772,6 +772,19 @@ Item {
         };
     }
 
+    // Control's Calendar opens the calendar card whatever one-line state shows, a toast's included, since the card outranks them; only a question keeps the island.
+    function openCalendar() {
+        if (cardOpen || mode === "question")
+            return;
+        calendar = {
+            year: clock.now.getFullYear(),
+            month: clock.now.getMonth()
+        };
+        zones.need();
+        focused = true;
+        keys.forceActiveFocus();
+    }
+
     function focusIsland() {
         if (cardOpen)
             return;
