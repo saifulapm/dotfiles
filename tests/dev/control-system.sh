@@ -47,8 +47,15 @@ check "the power key opens Control on its Power page" section_is power
 check "Power lists the profile and the session actions" state_is '.rows as $r | ["Profile", "Lock", "Log out", "Reboot", "Power off"] | all(. as $t | $r | index($t))'
 check "its four square actions read Lock, Log out, Reboot and Power off ($(control_state | jq -c .power.actions))" state_is '.power.actions == ["Lock", "Log out", "Reboot", "Power off"]'
 # Never a second Enter on Reboot here: the nested shell's systemctl is dev/path's stand-in, and it must stay unasked.
-asked_power() { [ -s "$DOTS_DEV_DIR/systemctl-power" ]; }
 select_row Reboot
+# A held Enter repeats; only its first press counts, so it shows Reboot? and never confirms it.
+wtype -P Return
+sleep 1.2
+wtype -p Return
+until_ok 2000 state_is '.confirming == "reboot"'
+check "a held Enter on Reboot asks once and runs nothing" bash -c "timeout 0.5 qs ipc call control state | jq -e '.confirming == \"reboot\"' >/dev/null && ! [ -s '$DOTS_DEV_DIR/systemctl-power' ]"
+wtype -k Escape
+until_ok 2000 state_is '.confirming == ""'
 wtype -k Return
 until_ok 2000 state_is '.confirming == "reboot"'
 check "Enter on Reboot asks again and runs nothing" state_is '.confirming == "reboot"'
@@ -102,6 +109,11 @@ wtype l
 stepped() { grep -qx -- '-m -d fake-bl set 5%+' "$fake_log" 2>/dev/null; }
 until_ok 2000 stepped
 check "l steps it by 5%+ through brightnessctl" stepped
+select_row FAKE-A
+wtype =
+ddc_stepped() { grep -qx -- '-d 1 setvcp 10 + 5' "$DOTS_DEV_DIR/ddcutil-set" 2>/dev/null; }
+until_ok 2000 ddc_stepped
+check "= on the external FAKE-A raises it one step through ddcutil ($(tail -1 "$DOTS_DEV_DIR/ddcutil-set" 2>/dev/null))" ddc_stepped
 
 page_to route
 until_ok 2000 state_is '.route == "device"'

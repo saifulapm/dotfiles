@@ -287,7 +287,8 @@ Item {
         const content = part + ":" + (part === "surface" ? surface : notification?.key ?? question?.id ?? "");
         const fresh = morphedFor !== "" && content !== morphedFor;
         const switching = fresh && part === "surface" && morphedFor.startsWith("surface:");
-        const glide = fresh && part === "surface" && surface === "control" && modeBefore === "rest" && !!clockTarget;
+        // Only an open from the resting clock glides; a switch from another surface has no clock to move.
+        const glide = fresh && !switching && part === "surface" && surface === "control" && modeBefore === "rest" && !!clockTarget;
         morphedFor = content;
         // A new morph that is not the glide ends any glide still drawn; the second of the width's and height's calls keeps it.
         if (fresh && !glide)

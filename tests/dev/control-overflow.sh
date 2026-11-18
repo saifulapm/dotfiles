@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A Control row wider than the panel, as the NUC's HDMI card draws: the detail sits under the name, each elides in a line of its own, and neither runs past the row.
+# A Sound page row whose name is wider than its place, as the NUC's HDMI card draws: the name elides in its 150 px and nothing runs past the row.
 {
 export DOTS_DEV_WIREPLUMBER=1
 source "$(dirname "$0")/lib.sh"
@@ -36,30 +36,24 @@ pw-play --target dots-long -P "{ application.name = \"$both\" node.name = both-p
 players+=($!)
 until_ok 3000 node_id application.name "$both" >/dev/null
 
-niri msg action spawn -- dots-call control toggle
+niri msg action spawn -- dots-call control section audio
 until_ok 3000 state_is '.open and .section == "audio" and .settled'
 until_ok 3000 state_is --arg t "$long" '.rows | index($t) != null'
 until_ok 3000 state_is '.rows | index("Wide Player") != null'
+inside() { state_is '.cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w'; }
 
-# The app row's detail is the long sink's description: it elides inside the row and the short name stays whole.
+# A short name stays whole.
 until_ok 3000 select_row "Wide Player"
-until_ok 1000 state_is '.cursorDetail.truncated'
-check "a long detail elides ($(control_state | jq -c '.cursorDetail.truncated'))" state_is '.cursorDetail.truncated'
-check "a long detail ends inside its row ($(control_state | jq -c '[.cursorDetail.x + .cursorDetail.w, .cursorBox.x + .cursorBox.w]'))" \
-  state_is '.cursorDetail.x + .cursorDetail.w <= .cursorBox.x + .cursorBox.w'
-check "the name above a long detail stays whole ($(control_state | jq -c '[.cursorName.w, .cursorName.truncated]'))" \
-  state_is '.cursorName.w > 0 and (.cursorName.truncated | not)'
+check "a short name stays whole ($(control_state | jq -c '[.cursorName.w, .cursorName.truncated]'))" state_is '.cursorName.w > 0 and (.cursorName.truncated | not)'
 
-# The long sink's own row: its name has a line of its own and elides.
+# The long sink's own row: its name elides inside the row.
 until_ok 3000 select_row "$long"
 check "a long name elides ($(control_state | jq -c '.cursorName.truncated'))" state_is '.cursorName.truncated'
-check "a long name ends inside its row" state_is '.cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w'
-check "the detail under a long name stays whole ($(control_state | jq -c '.cursorDetail.truncated'))" state_is '.cursorDetail.truncated | not'
-check "the detail under a long name ends inside its row" state_is '.cursorDetail.x + .cursorDetail.w <= .cursorBox.x + .cursorBox.w'
+check "a long name ends inside its row" inside
 
-# A long name above a long detail: each has a line of its own.
+# A playing app's long name does the same.
 until_ok 3000 select_row "$both"
-check "neither runs past the row" state_is '.cursorDetail.x + .cursorDetail.w <= .cursorBox.x + .cursorBox.w and .cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w'
+check "a long app name elides and ends inside its row ($(control_state | jq -c '.cursorName'))" bash -c "timeout 0.5 qs ipc call control state | jq -e '.cursorName.truncated and .cursorName.x + .cursorName.w <= .cursorBox.x + .cursorBox.w' >/dev/null"
 
 timeout 0.5 qs ipc call control close
 until_ok 2000 state_is '.open == false and .drawing == false'

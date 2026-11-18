@@ -64,11 +64,11 @@ export function move(id, dx, dy) {
   return row.reduce((best, t) => (Math.abs(centre(t) - centre(at)) < Math.abs(centre(best) - centre(at)) ? t : best)).id;
 }
 
-// What each tile reads, from the plain state Control gathers: { wifi: {name, signal} | null, wifiOn, bt: {name, battery} | null, btOn, sink: {name, volume, muted} | null, panel: percent | null, recordingMs, battery: {percent, state, profile, left} | null, units, dnd, awakeUntil, now }.
+// What each tile reads, from the plain state Control gathers: { wifi: {name, signal} | null, wifiOn, bt: {name, battery} | null, btOn, sink: {name, volume, muted} | null, panel: percent | null, recording, recordingMs, battery: {percent, state, profile, left} | null, units, dnd, awakeUntil, now }.
 export function tiles(s) {
   const failing = Object.keys(s.units ?? {}).filter((k) => s.units[k].ok === false);
   const btDetail = s.bt ? s.bt.name + (s.bt.battery !== null && s.bt.battery !== undefined ? ' · ' + s.bt.battery + '%' : '') : s.btOn ? 'On' : 'Off';
-  const sec = Math.floor((s.recordingMs ?? 0) / 1000);
+  const sec = Math.max(0, Math.floor((s.recordingMs ?? 0) / 1000));
   const pad = (n) => String(n).padStart(2, '0');
   const b = s.battery;
   const t = (id, label, detail, on, extra) => Object.assign({ id, title: TITLES[id], label, detail, on }, extra ?? {});
@@ -77,7 +77,7 @@ export function tiles(s) {
     t('bluetooth', 'Bluetooth', btDetail, !!s.bt),
     t('sound', 'Sound', s.sink ? s.sink.name : 'No output', false, { level: s.sink && !s.sink.muted ? s.sink.volume : 0 }),
     t('brightness', 'Brightness', s.panel === null || s.panel === undefined ? '' : s.panel + '%', false, { level: s.panel === null || s.panel === undefined ? 0 : s.panel / 100 }),
-    t('record', 'Record screen', pad(Math.floor(sec / 60)) + ':' + pad(sec % 60), s.recordingMs > 0),
+    t('record', 'Record screen', pad(Math.floor(sec / 60)) + ':' + pad(sec % 60), !!s.recording),
     t('battery', b ? b.percent + '%' : 'Battery', b ? [b.profile, b.left].filter((x) => x).join(' · ') : 'No battery', false),
     t('sync', 'Sync', failing.length ? failing.length + ' failing' : Object.keys(s.units ?? {}).length ? 'ok' : 'no rounds yet', false, { danger: failing.length > 0 }),
     t('dnd', 'Do Not Disturb', '', !!s.dnd),

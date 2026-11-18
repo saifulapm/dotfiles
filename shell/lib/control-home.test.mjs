@@ -63,8 +63,11 @@ test('a failing sync unit makes the Sync tile danger, and Power is always danger
   assert.equal(t.find((x) => x.id === 'power').danger, true);
 });
 
-test('a recording counts on the Record screen tile', () => {
-  const r = tiles({ ...base, recordingMs: 61500 }).find((x) => x.id === 'record');
+test('a recording counts on the Record screen tile, inverted from its first second', () => {
+  const just = tiles({ ...base, recording: true, recordingMs: -20000 }).find((x) => x.id === 'record');
+  assert.equal(just.on, true);
+  assert.equal(just.detail, '00:00');
+  const r = tiles({ ...base, recording: true, recordingMs: 61500 }).find((x) => x.id === 'record');
   assert.equal(r.on, true);
   assert.equal(r.detail, '01:01');
 });

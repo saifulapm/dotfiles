@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stands in for ddcutil in a nested session, so Control never probes the live I2C buses.
-[ "${1:-}" = detect ] || exit 0
+# A brightness step is logged, so a check can see which screen it went to.
+[ "${1:-}" = detect ] || { [ -z "${DOTS_DEV_DIR:-}" ] || echo "$*" >>"$DOTS_DEV_DIR/ddcutil-set"; exit 0; }
 cat <<'OUT'
 Display 1
    I2C bus:  /dev/i2c-4

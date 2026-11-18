@@ -82,13 +82,23 @@ Item {
         btOn: bluetooth.on,
         sink: sink?.audio ? { name: sink.description || sink.name, volume: sink.audio.volume, muted: sink.audio.muted } : null,
         panel: display.panels.length ? display.panels[0].percent : null,
-        recordingMs: Root.State.recordingSince > 0 ? now.getTime() - Root.State.recordingSince : 0,
+        recording: Root.State.recordingSince > 0,
+        recordingMs: Root.State.recordingSince > 0 ? recordNow - Root.State.recordingSince : 0,
         battery: power.hasBattery ? { percent: Math.round(power.battery.percentage * 100), profile: power.profileName, left: Home.leftText(power.battery.timeToEmpty) } : null,
         units: control.sync ? control.sync.units : {},
         dnd: control.notifs.dnd,
         awakeUntil: Root.State.awakeUntil,
         now: now.getTime()
     })
+
+    // Record screen counts the seconds of a running recording while Control shows; the clock's minute tick is too coarse.
+    property real recordNow: Date.now()
+    Root.Tick {
+        interval: 1000
+        repeat: true
+        running: control.shown && Root.State.recordingSince > 0
+        onTriggered: control.recordNow = Date.now()
+    }
 
     implicitHeight: (page === "" ? Home.height() : pageColumn.implicitHeight) + 32
 
@@ -97,6 +107,7 @@ Item {
         openMs = null;
         opens += 1;
         opened = true;
+        recordNow = Date.now();
         page = "";
         cursor = "wifi";
         shown = true;
@@ -245,7 +256,7 @@ Item {
             scanning: scanRow.visible,
             pairing: pairCard.visible ? { text: pairText.text, pin: Root.Pairing.pin, buttons: Array.from({ length: pairButtons.count }, (_, i) => pairButtons.itemAt(i).word) } : null,
             // The Power page as drawn: the profile and Stay awake segments lit, and each action's label.
-            power: page === "power" ? { profile: profileSegments.drawnCurrent, awake: awakeSegments.drawnCurrent, actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawnText) } : null,
+            power: page === "power" && powerLoader.item ? powerLoader.item.drawn : null,
             // A page's field or a pairing question takes every key.
             typing: page !== "" && !!section.typing,
             detailsDrawn: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).drawnDetail),
@@ -254,6 +265,7 @@ Item {
             rowHeights: Array.from({ length: rowRepeater.count }, (_, i) => rowRepeater.itemAt(i).height),
             cursorFill: cur ? String(cur.color) : null,
             cursorBox: cur ? box(cur.box) : null,
+            cursorName: cur ? Object.assign(box(cur.nameItem), { truncated: cur.nameItem.truncated }) : null,
             clock: { text: bigClock.text, px: bigClock.font.pixelSize, box: box(bigClock) },
             date: dateText.text,
             openMs: openMs,
@@ -269,6 +281,11 @@ Item {
 
     Keys.onPressed: event => {
         const k = event.key;
+        // A held Enter acts once: its repeats never confirm Reboot, Log out or Power off, nor flip a switch back.
+        if (event.isAutoRepeat && (k === Qt.Key_Return || k === Qt.Key_Enter)) {
+            event.accepted = true;
+            return;
+        }
         // A section's open password line takes every key first, so j, k and - type and Esc closes only the line.
         if (page !== "" && section.typing) {
             section.key(event);
@@ -450,67 +467,104 @@ Item {
                 }
 
                 // Wi-Fi, Bluetooth, Record screen, Battery and Sync: a round icon beside the name and a line under it.
-                Row {
-                    visible: ["wifi", "bluetooth", "record", "battery", "sync"].indexOf(tile.t.id) >= 0
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 12
-                    spacing: 10
-
-                    Rectangle {
-                        width: 36
-                        height: 36
-                        radius: 18
-                        // Inverted, the circle is the island's fill again, as board 4 draws Wi-Fi.
-                        color: tile.t.on ? control.fill : Qt.alpha(control.on, 0.1)
-                        Text {
-                            anchors.centerIn: parent
-                            textFormat: Text.PlainText
-                            text: String.fromCodePoint(({ wifi: 0xF0928, bluetooth: 0xF00AF, record: 0xF044A, battery: 0xF0082, sync: 0xF04E6 })[tile.t.id] ?? 0xF0928)
-                            color: tile.t.id === "record" || tile.t.danger ? control.tones.danger : control.on
-                            font.family: "Symbols Nerd Font Mono"
-                            font.pixelSize: 18
-                        }
-                    }
-
-                    Column {
+                Component {
+                    id: iconLayout
+                    Row {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: tile.width - 12 - 36 - 10 - 12
-
-                        Text {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            textFormat: Text.PlainText
-                            text: tile.t.label
-                            color: tile.ink
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
+                        x: 12
+                        spacing: 10
+                        Rectangle {
+                            width: 36
+                            height: 36
+                            radius: 18
+                            // Inverted, the circle is the island's fill again, as board 4 draws Wi-Fi.
+                            color: tile.t.on ? control.fill : Qt.alpha(control.on, 0.1)
+                            Text {
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(({ wifi: 0xF0928, bluetooth: 0xF00AF, record: 0xF044A, battery: 0xF0082, sync: 0xF04E6 })[tile.t.id] ?? 0xF0928)
+                                color: tile.t.id === "record" || tile.t.danger ? control.tones.danger : control.on
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 18
+                            }
                         }
-                        Text {
-                            width: parent.width
-                            elide: Text.ElideRight
-                            textFormat: Text.PlainText
-                            text: tile.t.detail
-                            color: tile.t.danger ? control.tones.danger : tile.sub
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 11
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: tile.width - 12 - 36 - 10 - 12
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                textFormat: Text.PlainText
+                                text: tile.t.label
+                                color: tile.ink
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+                                textFormat: Text.PlainText
+                                text: tile.t.detail
+                                color: tile.t.danger ? control.tones.danger : tile.sub
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 11
+                            }
                         }
                     }
                 }
 
                 // Sound: its name and output over a pill slider.
-                Column {
-                    visible: tile.t.id === "sound"
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 12
-                    width: tile.width - 24
-                    spacing: 7
+                Component {
+                    id: soundLayout
+                    Column {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 12
+                        width: tile.width - 24
+                        spacing: 7
+                        Item {
+                            width: parent.width
+                            height: soundName.implicitHeight
+                            Text {
+                                id: soundName
+                                textFormat: Text.PlainText
+                                text: tile.t.label
+                                color: tile.ink
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+                            Text {
+                                anchors.right: parent.right
+                                anchors.baseline: soundName.baseline
+                                width: Math.min(implicitWidth, parent.width - soundName.implicitWidth - 8)
+                                elide: Text.ElideRight
+                                textFormat: Text.PlainText
+                                text: tile.t.detail
+                                color: tile.sub
+                                font.family: control.fonts.ui ?? ""
+                                font.pixelSize: 11
+                            }
+                        }
+                        Pill {
+                            width: parent.width
+                            height: 18
+                            level: tile.t.level ?? 0
+                            glyph: 0xF057E
+                        }
+                    }
+                }
 
-                    Item {
-                        width: parent.width
-                        height: soundName.implicitHeight
+                // Brightness: its name, a pill slider and the percent.
+                Component {
+                    id: brightnessLayout
+                    Row {
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: 14
+                        spacing: 12
                         Text {
-                            id: soundName
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 92
                             textFormat: Text.PlainText
                             text: tile.t.label
                             color: tile.ink
@@ -518,104 +572,76 @@ Item {
                             font.pixelSize: 13
                             font.weight: Font.Bold
                         }
+                        Pill {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: tile.width - 28 - 92 - 38 - 24
+                            height: 22
+                            level: tile.t.level ?? 0
+                            glyph: 0xF05A8
+                        }
                         Text {
-                            anchors.right: parent.right
-                            anchors.baseline: soundName.baseline
-                            width: Math.min(implicitWidth, parent.width - soundName.implicitWidth - 8)
-                            elide: Text.ElideRight
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 38
+                            horizontalAlignment: Text.AlignRight
                             textFormat: Text.PlainText
                             text: tile.t.detail
-                            color: tile.sub
+                            color: control.tones.muted
                             font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 11
+                            font.pixelSize: 13
                         }
-                    }
-
-                    Pill {
-                        width: parent.width
-                        height: 18
-                        level: tile.t.level ?? 0
-                        glyph: 0xF057E
-                    }
-                }
-
-                // Brightness: its name, a pill slider and the percent.
-                Row {
-                    visible: tile.t.id === "brightness"
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 14
-                    spacing: 12
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 92
-                        textFormat: Text.PlainText
-                        text: tile.t.label
-                        color: tile.ink
-                        font.family: control.fonts.ui ?? ""
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                    }
-                    Pill {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: tile.width - 28 - 92 - 38 - 24
-                        height: 22
-                        level: tile.t.level ?? 0
-                        glyph: 0xF05A8
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 38
-                        horizontalAlignment: Text.AlignRight
-                        textFormat: Text.PlainText
-                        text: tile.t.detail
-                        color: control.tones.muted
-                        font.family: control.fonts.ui ?? ""
-                        font.pixelSize: 13
                     }
                 }
 
                 // Do Not Disturb and Stay awake: a glyph, the name and a switch.
-                Row {
-                    visible: tile.t.id === "dnd" || tile.t.id === "awake"
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 12
-                    spacing: 10
-
-                    Text {
+                Component {
+                    id: switchLayout
+                    Row {
                         anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        text: String.fromCodePoint(tile.t.id === "dnd" ? 0xF0F65 : 0xF0176)
-                        color: tile.t.on ? tile.ink : control.tones.muted
-                        font.family: "Symbols Nerd Font Mono"
-                        font.pixelSize: 16
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: tile.width - 12 - 16 - 10 - 10 - 38 - 12
-                        elide: Text.ElideRight
-                        textFormat: Text.PlainText
-                        text: tile.t.label
-                        color: tile.ink
-                        font.family: control.fonts.ui ?? ""
-                        font.pixelSize: 13
-                    }
-                    Switch {
-                        anchors.verticalCenter: parent.verticalCenter
-                        on: tile.t.on
-                        inverted: tile.t.on
+                        x: 12
+                        spacing: 10
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: String.fromCodePoint(tile.t.id === "dnd" ? 0xF0F65 : 0xF0176)
+                            color: tile.t.on ? tile.ink : control.tones.muted
+                            font.family: "Symbols Nerd Font Mono"
+                            font.pixelSize: 16
+                        }
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: tile.width - 12 - 16 - 10 - 10 - 38 - 12
+                            elide: Text.ElideRight
+                            textFormat: Text.PlainText
+                            text: tile.t.label
+                            color: tile.ink
+                            font.family: control.fonts.ui ?? ""
+                            font.pixelSize: 13
+                        }
+                        Switch {
+                            anchors.verticalCenter: parent.verticalCenter
+                            on: tile.t.on
+                            inverted: tile.t.on
+                        }
                     }
                 }
 
                 // Lock and Power: a square button with its glyph, Power in the danger tone.
-                Text {
-                    visible: tile.t.id === "lock" || tile.t.id === "power"
-                    anchors.centerIn: parent
-                    textFormat: Text.PlainText
-                    text: String.fromCodePoint(tile.t.id === "lock" ? 0xF033E : 0xF0425)
-                    color: tile.t.danger ? control.tones.danger : control.on
-                    font.family: "Symbols Nerd Font Mono"
-                    font.pixelSize: 17
+                Component {
+                    id: buttonLayout
+                    Text {
+                        anchors.centerIn: parent
+                        textFormat: Text.PlainText
+                        text: String.fromCodePoint(tile.t.id === "lock" ? 0xF033E : 0xF0425)
+                        color: tile.t.danger ? control.tones.danger : control.on
+                        font.family: "Symbols Nerd Font Mono"
+                        font.pixelSize: 17
+                    }
+                }
+
+                // Each tile builds only its own layout: five layouts in every tile cost about 4 MB of idle RSS.
+                Loader {
+                    anchors.fill: parent
+                    sourceComponent: ["wifi", "bluetooth", "record", "battery", "sync"].indexOf(tile.at.id) >= 0 ? iconLayout : tile.at.id === "sound" ? soundLayout : tile.at.id === "brightness" ? brightnessLayout : tile.at.id === "dnd" || tile.at.id === "awake" ? switchLayout : buttonLayout
                 }
             }
         }
@@ -785,6 +811,7 @@ Item {
                 readonly property alias box: rowFill
                 readonly property var fieldLook: rowFill.look
                 readonly property int detailLines: level ? 1 : detail.lineCount
+                readonly property Item nameItem: level ? levelName : title
                 width: pageColumn.width
                 height: rowFill.height + (cap ? 24 : 0)
 
@@ -846,6 +873,7 @@ Item {
                             }
                         }
                         Text {
+                            id: levelName
                             anchors.verticalCenter: parent.verticalCenter
                             width: 150
                             elide: Text.ElideRight
@@ -1007,177 +1035,190 @@ Item {
             }
         }
 
-        // Power, as board 4 draws it: the battery beside the charge limit, the profile and Stay awake as segments, then four square actions; the selected part is a shade lighter.
-        Column {
-            id: powerView
-            visible: control.page === "power"
+        // Power, as board 4 draws it: the battery beside the charge limit, the profile and Stay awake as segments, then four square actions, the selected part a shade lighter; it loads only while its page shows.
+        Loader {
+            id: powerLoader
+            active: control.page === "power"
+            visible: active
             width: parent.width
-            spacing: 8
-            readonly property string at: power.items[power.selected]?.id ?? ""
-
-            Row {
-                visible: power.hasBattery || power.chargeLimit >= 0
-                width: parent.width
-                spacing: 8
-
-                Rectangle {
-                    visible: power.hasBattery
-                    width: power.chargeLimit >= 0 ? (parent.width - 8) * 2 / 3 : parent.width
-                    height: 60
-                    radius: 14
-                    color: Qt.alpha(control.on, powerView.at === "battery" ? 0.1 : 0.05)
+            sourceComponent: Component {
+                Column {
+                    id: powerView
+                    // Read by state(): the segments lit and each action's label, as drawn.
+                    readonly property var drawn: ({
+                            profile: profileSegments.drawnCurrent,
+                            awake: awakeSegments.drawnCurrent,
+                            actions: Array.from({ length: actionRepeater.count }, (_, i) => actionRepeater.itemAt(i).drawnText)
+                        })
+                    width: parent.width
+                    spacing: 8
+                    readonly property string at: power.items[power.selected]?.id ?? ""
 
                     Row {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 12
-                        spacing: 10
+                        visible: power.hasBattery || power.chargeLimit >= 0
+                        width: parent.width
+                        spacing: 8
 
                         Rectangle {
-                            width: 36
-                            height: 36
-                            radius: 18
-                            color: Qt.alpha(control.on, 0.1)
-                            Text {
-                                anchors.centerIn: parent
-                                textFormat: Text.PlainText
-                                text: String.fromCodePoint(0xF0082)
-                                color: control.on
-                                font.family: "Symbols Nerd Font Mono"
-                                font.pixelSize: 18
+                            visible: power.hasBattery
+                            width: power.chargeLimit >= 0 ? (parent.width - 8) * 2 / 3 : parent.width
+                            height: 60
+                            radius: 14
+                            color: Qt.alpha(control.on, powerView.at === "battery" ? 0.1 : 0.05)
+
+                            Row {
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: 12
+                                spacing: 10
+
+                                Rectangle {
+                                    width: 36
+                                    height: 36
+                                    radius: 18
+                                    color: Qt.alpha(control.on, 0.1)
+                                    Text {
+                                        anchors.centerIn: parent
+                                        textFormat: Text.PlainText
+                                        text: String.fromCodePoint(0xF0082)
+                                        color: control.on
+                                        font.family: "Symbols Nerd Font Mono"
+                                        font.pixelSize: 18
+                                    }
+                                }
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: power.hasBattery ? Math.round(power.battery.percentage * 100) + "%" : ""
+                                        color: control.on
+                                        font.family: control.fonts.ui ?? ""
+                                        font.pixelSize: 13
+                                        font.weight: Font.Bold
+                                    }
+                                    Text {
+                                        textFormat: Text.PlainText
+                                        text: power.hasBattery ? Sys.batteryLine(UPowerDeviceState.toString(power.battery.state).toLowerCase(), power.battery.timeToEmpty, power.battery.timeToFull) : ""
+                                        color: control.tones.muted
+                                        font.family: control.fonts.ui ?? ""
+                                        font.pixelSize: 11
+                                    }
+                                }
                             }
                         }
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-                            Text {
-                                textFormat: Text.PlainText
-                                text: power.hasBattery ? Math.round(power.battery.percentage * 100) + "%" : ""
-                                color: control.on
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 13
-                                font.weight: Font.Bold
+
+                        Rectangle {
+                            visible: power.chargeLimit >= 0
+                            width: power.hasBattery ? (parent.width - 8) / 3 : parent.width
+                            height: 60
+                            radius: 14
+                            color: Qt.alpha(control.on, powerView.at === "limit" ? 0.1 : 0.05)
+
+                            Column {
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: 12
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: "Charge limit"
+                                    color: control.on
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                    font.weight: Font.Bold
+                                }
+                                Text {
+                                    textFormat: Text.PlainText
+                                    text: power.chargeLimit > 0 ? power.chargeLimit + "%" : "Off"
+                                    color: control.tones.muted
+                                    font.family: control.fonts.ui ?? ""
+                                    font.pixelSize: 11
+                                }
                             }
-                            Text {
-                                textFormat: Text.PlainText
-                                text: power.hasBattery ? Sys.batteryLine(UPowerDeviceState.toString(power.battery.state).toLowerCase(), power.battery.timeToEmpty, power.battery.timeToFull) : ""
-                                color: control.tones.muted
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 11
+                            Switch {
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                on: power.chargeLimit > 0
+                            }
+                            Root.Click {
+                                name: "control-power:limit"
+                                onTapped: control.runPower("limit")
                             }
                         }
                     }
-                }
 
-                Rectangle {
-                    visible: power.chargeLimit >= 0
-                    width: power.hasBattery ? (parent.width - 8) / 3 : parent.width
-                    height: 60
-                    radius: 14
-                    color: Qt.alpha(control.on, powerView.at === "limit" ? 0.1 : 0.05)
-
-                    Column {
-                        anchors.verticalCenter: parent.verticalCenter
-                        x: 12
-                        Text {
-                            textFormat: Text.PlainText
-                            text: "Charge limit"
-                            color: control.on
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-                        Text {
-                            textFormat: Text.PlainText
-                            text: power.chargeLimit > 0 ? power.chargeLimit + "%" : "Off"
-                            color: control.tones.muted
-                            font.family: control.fonts.ui ?? ""
-                            font.pixelSize: 11
+                    // The profile, one segment per profile, the current one inverted.
+                    Segments {
+                        id: profileSegments
+                        selected: powerView.at === "profile"
+                        options: power.profiles.map(p => ({ id: String(p), label: ({ [PowerProfile.PowerSaver]: "Power saver", [PowerProfile.Balanced]: "Balanced", [PowerProfile.Performance]: "Performance" })[p] }))
+                        current: String(PowerProfiles.profile)
+                        onPicked: id => {
+                            power.selected = power.items.findIndex(i => i.id === "profile");
+                            PowerProfiles.profile = Number(id);
                         }
                     }
-                    Switch {
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.right: parent.right
-                        anchors.rightMargin: 12
-                        on: power.chargeLimit > 0
+
+                    // Stay awake: off or one of its steps, the one that holds it inverted.
+                    Segments {
+                        id: awakeSegments
+                        selected: powerView.at === "awake"
+                        label: "Stay awake"
+                        glyph: 0xF0176
+                        options: [{ id: "0", label: "Off" }, { id: "30", label: "30 min" }, { id: "60", label: "1 h" }, { id: "120", label: "2 h" }]
+                        current: String(Idle.awakeStep(control.now.getTime(), Root.State.awakeUntil))
+                        onPicked: id => {
+                            power.selected = power.items.findIndex(i => i.id === "awake");
+                            power.setAwake(Number(id));
+                        }
                     }
-                    Root.Click {
-                        name: "control-power:limit"
-                        onTapped: control.runPower("limit")
-                    }
-                }
-            }
 
-            // The profile, one segment per profile, the current one inverted.
-            Segments {
-                id: profileSegments
-                selected: powerView.at === "profile"
-                options: power.profiles.map(p => ({ id: String(p), label: ({ [PowerProfile.PowerSaver]: "Power saver", [PowerProfile.Balanced]: "Balanced", [PowerProfile.Performance]: "Performance" })[p] }))
-                current: String(PowerProfiles.profile)
-                onPicked: id => {
-                    power.selected = power.items.findIndex(i => i.id === "profile");
-                    PowerProfiles.profile = Number(id);
-                }
-            }
+                    // Lock, Log out, Reboot and Power off: a press asks again, red as "Reboot?", and only a second Enter or click runs it.
+                    Row {
+                        width: parent.width
+                        spacing: 8
 
-            // Stay awake: off or one of its steps, the one that holds it inverted.
-            Segments {
-                id: awakeSegments
-                selected: powerView.at === "awake"
-                label: "Stay awake"
-                glyph: 0xF0176
-                options: [{ id: "0", label: "Off" }, { id: "30", label: "30 min" }, { id: "60", label: "1 h" }, { id: "120", label: "2 h" }]
-                current: String(Idle.awakeStep(control.now.getTime(), Root.State.awakeUntil))
-                onPicked: id => {
-                    power.selected = power.items.findIndex(i => i.id === "awake");
-                    power.setAwake(Number(id));
-                }
-            }
+                        Repeater {
+                            id: actionRepeater
+                            model: Sys.ACTIONS
 
-            // Lock, Log out, Reboot and Power off: a press asks again, red as "Reboot?", and only a second Enter or click runs it.
-            Row {
-                width: parent.width
-                spacing: 8
+                            Rectangle {
+                                id: action
+                                required property var modelData
+                                readonly property bool asking: power.confirming === modelData.id
+                                readonly property string drawnText: actionText.text
+                                width: (parent.width - 24) / 4
+                                height: 96
+                                radius: 14
+                                color: asking ? Qt.alpha(control.tones.danger, 0.16) : Qt.alpha(control.on, powerView.at === modelData.id ? 0.1 : 0.05)
 
-                Repeater {
-                    id: actionRepeater
-                    model: Sys.ACTIONS
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: 10
 
-                    Rectangle {
-                        id: action
-                        required property var modelData
-                        readonly property bool asking: power.confirming === modelData.id
-                        readonly property string drawnText: actionText.text
-                        width: (parent.width - 24) / 4
-                        height: 96
-                        radius: 14
-                        color: asking ? Qt.alpha(control.tones.danger, 0.16) : Qt.alpha(control.on, powerView.at === modelData.id ? 0.1 : 0.05)
+                                    Text {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        textFormat: Text.PlainText
+                                        text: String.fromCodePoint(({ lock: 0xF033E, logout: 0xF0343, reboot: 0xF0709, poweroff: 0xF0425 })[action.modelData.id])
+                                        color: action.asking || action.modelData.id === "poweroff" ? control.tones.danger : control.on
+                                        font.family: "Symbols Nerd Font Mono"
+                                        font.pixelSize: 24
+                                    }
+                                    Text {
+                                        id: actionText
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        textFormat: Text.PlainText
+                                        text: action.asking ? action.modelData.title + "?" : action.modelData.title
+                                        color: action.asking ? control.tones.danger : control.tones.muted
+                                        font.family: control.fonts.ui ?? ""
+                                        font.pixelSize: 12
+                                        font.weight: action.asking ? Font.Bold : Font.Normal
+                                    }
+                                }
 
-                        Column {
-                            anchors.centerIn: parent
-                            spacing: 10
-
-                            Text {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                textFormat: Text.PlainText
-                                text: String.fromCodePoint(({ lock: 0xF033E, logout: 0xF0343, reboot: 0xF0709, poweroff: 0xF0425 })[action.modelData.id])
-                                color: action.asking || action.modelData.id === "poweroff" ? control.tones.danger : control.on
-                                font.family: "Symbols Nerd Font Mono"
-                                font.pixelSize: 24
+                                Root.Click {
+                                    name: "control-power:" + action.modelData.id
+                                    onTapped: control.runPower(action.modelData.id)
+                                }
                             }
-                            Text {
-                                id: actionText
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                textFormat: Text.PlainText
-                                text: action.asking ? action.modelData.title + "?" : action.modelData.title
-                                color: action.asking ? control.tones.danger : control.tones.muted
-                                font.family: control.fonts.ui ?? ""
-                                font.pixelSize: 12
-                                font.weight: action.asking ? Font.Bold : Font.Normal
-                            }
-                        }
-
-                        Root.Click {
-                            name: "control-power:" + action.modelData.id
-                            onTapped: control.runPower(action.modelData.id)
                         }
                     }
                 }

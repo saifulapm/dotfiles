@@ -18,17 +18,10 @@ marked() { margins | jq -e '.right.sync == "sync !" and (.right.text | startswit
 unmarked() { margins | jq -e '.right.sync == "" and (.right.text | startswith("sync") | not)' >/dev/null 2>&1; }
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
-# Control opens on Audio, and one Shift+Tab steps back to Route; a key sent before the keyboard arrives is lost, so it repeats while Control is still on Audio.
+# Control opens on Route as Enter on its Sync tile opens it.
 open_route() {
-  niri msg action spawn -- dots-call control toggle
-  until_ok 3000 state_is '.open and .keyboard' || return 1
-  local n
-  for n in 1 2 3; do
-    state_is '.section == "route"' && return 0
-    wtype -M shift -k Tab -m shift
-    until_ok 1000 state_is '.section == "route"' && return 0
-  done
-  return 1
+  niri msg action spawn -- dots-call control section route
+  until_ok 3000 state_is '.open and .keyboard and .section == "route"'
 }
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher_state | jq -e "$1" >/dev/null 2>&1; }
@@ -38,7 +31,7 @@ until_ok 5000 shell_status >/dev/null
 open_route
 until_ok 2000 state_is '.section == "route"'
 echo "     route: $(control_state | jq -c '{rows, details, sync}')"
-check "with no sync.json Route's Sync row reads no rounds yet" state_is '.rows[2] == "Sync" and .details[2] == "no rounds yet" and .sync == {}'
+check "with no sync.json Route's Sync row reads no rounds yet" state_is '.rows[1] == "Sync" and .details[1] == "no rounds yet" and .sync == {}'
 check "with no sync.json the margin has no sync !" unmarked
 
 rm -rf "$remote"
@@ -46,10 +39,10 @@ rm -rf "$remote"
 until_ok 3000 marked
 echo "     margins: $(margins | jq -c .right)"
 check "a round with the remote gone starts the margin with sync !" marked
-failing_rows() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync", "notes", "goals", "fish", "ssh"] and .details[2] == "4 failing" and (.details[3:] | all(endswith("directory not found"))) and ([.sync[].error] | all(endswith("directory not found")))'; }
+failing_rows() { state_is '.rows[0] == "Questions ring on" and (["notes", "goals", "fish", "ssh"] - .rows | length == 0) and ([range(1; .rows | length) as $i | select(.tones[$i] == "danger") | .details[$i]] | length >= 4 and all(endswith("directory not found"))) and ([.sync[].error] | all(endswith("directory not found")))'; }
 until_ok 2000 failing_rows
 echo "     route: $(control_state | jq -c '{rows, details, sync}')"
-check "Route lists each unit with its error" failing_rows
+check "Route lists each unit, a failed one with its error in the danger tone" failing_rows
 wtype -k Escape
 until_ok 2000 state_is '.open == false'
 
@@ -69,10 +62,10 @@ until_ok 30000 ran_again
 check "the launcher's sync row ran a round without bin/ on the shell's PATH" ran_again
 
 open_route
-ok_row() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync"] and (.details[2] | test("^ok · [0-9]{2}:[0-9]{2}$"))'; }
+ok_row() { state_is '.rows[0] == "Questions ring on" and (.rows | length) > 1 and (.details[1:] | all(test("^ok · [0-9]{2}:[0-9]{2}$")))'; }
 until_ok 2000 ok_row
 echo "     route: $(control_state | jq -c '{rows, details}')"
-check "Route's Sync row reads ok · HH:MM" ok_row
+check "each unit's row on Route reads ok · HH:MM" ok_row
 wtype -k Escape
 
 status=$(shell_status)
@@ -84,7 +77,7 @@ check "shell status .sync holds the units after a round" status_units
 printf '{"goals":' >"$remote/dots-sync/goals/other.json"
 "$repo/bin/dots" sync >/dev/null 2>&1
 open_route
-broken_row() { state_is '.rows == ["Questions ring on", "Do Not Disturb", "Sync", "goals"] and .details[2] == "1 failing" and .sync.goals.error == "goals: skipped other.json, which does not parse" and .sync.notes.ok'; }
+broken_row() { state_is '(.rows | index("goals")) as $g | $g != null and .tones[$g] == "danger" and .details[$g] == "goals: skipped other.json, which does not parse" and .sync.goals.error == "goals: skipped other.json, which does not parse" and .sync.notes.ok'; }
 until_ok 2000 broken_row
 echo "     route: $(control_state | jq -c '{rows, details}')"
 check "Route lists the goals unit with the file that does not parse" broken_row

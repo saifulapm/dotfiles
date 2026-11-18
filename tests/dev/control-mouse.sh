@@ -20,7 +20,8 @@ until_ok 5000 shell_status >/dev/null
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.40
 wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
-niri msg action spawn -- dots-call control toggle
+# The Sound page, as Enter on its tile opens it.
+niri msg action spawn -- dots-call control section audio
 until_ok 3000 state_is '.open and .settled and .section == "audio" and .keyboard'
 until_ok 3000 state_is '.rows | index("Dots second sink") != null'
 
@@ -38,22 +39,12 @@ until_ok 2000 configured_sink
 check "a click on the second sink's row makes it the configured default, as Enter does" configured_sink
 check "and selects that row ($(control_state | jq -c '{selected}'))" state_is --argjson i "$second" '.selected == $i'
 
-click_box control-tab:route
-until_ok 2000 section_is route
-check "a click on the Route tab opens Route" section_is route
-until_ok 2000 state_is '.rows | index("Do Not Disturb") != null'
-before=$(timeout 0.5 qs ipc call notifs state | jq .dnd)
-after=$([ "$before" = true ] && echo false || echo true)
-dndrow=$(row_of "Do Not Disturb")
-click_box "control-row:$dndrow"
-until_ok 2000 dnd_is "$after"
-check "a click on the Do Not Disturb row flips it as Enter does ($before to $after)" dnd_is "$after"
-click_box "control-row:$dndrow"
-until_ok 2000 dnd_is "$before"
-check "and a second click flips it back" dnd_is "$before"
-
-click_box control-tab:audio
+click_box control-back
+until_ok 2000 section_is home
+check "a click on the back circle returns to Home with Sound focused" state_is '.section == "home" and .cursor == "sound"'
+click_box control-tile:sound
 until_ok 2000 section_is audio
+check "a click on the Sound tile opens its page again" section_is audio
 until_ok 2000 state_is '.keyboard'
 for n in 1 2 3 4 5 6 7 8; do wtype k; done
 until_ok 2000 state_is '.selected == 0'

@@ -45,6 +45,7 @@ open_control
 check "Mod+C sets surface to control and the island $want px wide ($(island | jq -c '{surface, width}'))" island_is --argjson w "$want" '.surface == "control" and .width == $w'
 titles='["Wi-Fi","Bluetooth","Sound","Brightness","Record screen","Battery","Sync","Do Not Disturb","Stay awake","Lock","Power"]'
 check "control state lists the tiles in board order ($(control | jq -c '[.tiles[].title]'))" control_is --argjson t "$titles" '[.tiles[].title] == $t'
+check "Home is the clock and the tiles with no legend row: the island is 340 px tall ($(island | jq .height))" island_is '.height == 340'
 check "it opens on Home with Wi-Fi focused ($(control | jq -c '{page, cursor}'))" control_is '.page == "home" and .cursor == "wifi"'
 check "the big clock is 34 px and reads the time ($(control | jq -c .clock))" control_is '.clock.px == 34 and (.clock.text | test("^[0-9]{2}:[0-9]{2}$"))'
 check "Do Not Disturb is off and its switch with it ($(tile "Do Not Disturb"))" tile_is "Do Not Disturb" '.on == false'

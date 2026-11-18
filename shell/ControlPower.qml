@@ -75,6 +75,8 @@ Item {
         const item = items[selected];
         // Only a second Enter runs the action; any other key puts the button back.
         if (confirming !== "") {
+            if (event.isAutoRepeat)
+                return true;
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 run(confirming);
             else

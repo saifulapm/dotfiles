@@ -53,14 +53,16 @@ check "a click on the foot closes Control" control_is '.open == false'
 until_ok 2000 foot_focused
 check "and focuses that foot ($(focused))" foot_focused
 
-# A click on the island while a card is open is a click outside that card: it closes it, and the island opens nothing; the launcher draws inside the island, so it is Control's card here.
+# A click on the island while a card is open is a click outside that card: it closes it, and the island opens nothing; the launcher and Control draw inside the island, so it is Goals' card here.
 island_is() { timeout 0.5 qs ipc call island state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
-niri msg action spawn -- dots-call control toggle
-until_ok 3000 control_is '.open and .settled'
+goals_is() { timeout 0.5 qs ipc call goals state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
+timeout 0.5 qs ipc call goals open >/dev/null
+until_ok 3000 goals_is '.open'
+until_ok 2000 layer_keys Exclusive
 read -r ix iy < <(timeout 0.5 qs ipc call island box island | jq -r '"\((.x + .w / 2) | floor) \((.y + .h / 2) | floor)"')
 point click "$ix" "$iy"
-until_ok 2000 control_is '.open == false'
-check "a click on the island closes open Control as a click outside" control_is '.open == false'
+until_ok 2000 goals_is '.open == false'
+check "a click on the island closes open Goals as a click outside" goals_is '.open == false'
 check "and the island opens no calendar ($(timeout 0.5 qs ipc call island state | jq -c '{mode, focused}'))" island_is '.mode == "rest" and .focused == false'
 until_ok 2000 layer_keys None
 

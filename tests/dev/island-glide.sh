@@ -41,6 +41,11 @@ echo "     launcher: label opacity per frame $(jq -c '[.[] | .[4]]' <<<"$clock")
 check "opening the launcher draws no glide" jq -e 'all(.[0] == 0)' <<<"$clock"
 fades() { jq -e '[.[] | .[4]] as $o | ($o | any(. > 0 and . < 1)) and $o[-1] == 0' <<<"$clock"; }
 check "and fades the resting clock out" fades
+# From the launcher straight into Control there is no resting clock to move.
+dots-call control toggle >/dev/null
+until_ok 3000 island_is '.surface == "control" and .animating == false'
+clock=$(island | jq -c .morph.clock)
+check "a switch from the launcher into Control draws no glide ($(jq -c '[.[] | .[0]]' <<<"$clock"))" jq -e 'all(.[0] == 0)' <<<"$clock"
 wtype -k Escape
 until_ok 3000 at_rest
 exit "$fails"
