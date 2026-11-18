@@ -457,7 +457,8 @@ PanelWindow {
         parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
         visible: host.islandLast === host.recorder
-        active: !!host.recorder
+        // Made only while the bar is the island's, so it costs nothing at rest.
+        active: !!host.recorder && host.islandLast === host.recorder
         sourceComponent: Root.RecorderBar {
             recorder: host.recorder
             theme: host.theme
