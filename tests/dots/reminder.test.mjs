@@ -1,7 +1,7 @@
 // bin/reminder on a scratch data dir, at 10:00:00 UTC on a set day: what an agent runs to set, list and cancel a reminder.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -198,4 +198,50 @@ test('reminder add while the shell saves a launcher-set reminder in the same mom
   assert.equal(r.status, 0, r.stderr);
   assert.ok(existsSync(hook + '.done'), 'the hook ran');
   assert.deepEqual(R.pendingList(s.store()).map((x) => x.text), ['early', 'from the launcher', 'tea']);
+});
+
+// The shell rings it after the CLI read the store and before the merge puts its removal in place: the ring is later, so it wins, and the CLI says so.
+test('reminder rm racing a ring says it is not pending and leaves it rung', (t) => {
+  const s = scratch(t);
+  const store = storeOf('20m tea');
+  const id = store.reminders[0].id;
+  s.write(store);
+  const rang = join(s.root, 'rang.json');
+  writeFileSync(rang, JSON.stringify(R.endReminder(store, id, 'rung', T + 2)));
+  const hook = join(s.root, 'ring');
+  writeFileSync(hook, `#!/bin/sh\n[ -e ${hook}.done ] && exit 0\ntouch ${hook}.done\ncp ${rang} ${s.path}\n`);
+  chmodSync(hook, 0o755);
+  s.env.DOTS_MERGE_BEFORE_SWAP = hook;
+  s.env.FIXED_NOW = String(T + 1);
+  const r = s.run('rm', id);
+  assert.ok(existsSync(hook + '.done'), 'the hook ran');
+  assert.equal(r.stdout, '');
+  assert.equal(r.stderr, `no pending reminder ${id}\n`);
+  assert.equal(r.status, 1);
+  assert.equal(s.store().reminders[0].ended, 'rung');
+});
+
+test('reminder add names the text as the trouble when the time was fine, and a missing time gets the usage', (t) => {
+  const s = scratch(t);
+  assert.equal(s.run('add', '20m', '\x1b\u200f').stderr, 'Cannot set 20m: it has no text\n');
+  const r = s.run('add', '', 'tea');
+  assert.match(r.stderr, /^usage: reminder add <when> <text>/);
+  assert.equal(r.status, 2);
+  assert.equal(s.read(), null);
+});
+
+test('a merge that fails says why in a line and leaves no temp file with the text in it', (t) => {
+  const s = scratch(t);
+  s.write(R.emptyStore());
+  const tmp = join(s.root, 'tmp');
+  mkdirSync(tmp);
+  s.env.TMPDIR = tmp;
+  // A store folder the merge cannot write in.
+  chmodSync(join(s.path, '..'), 0o555);
+  const r = s.run('add', '20m', 'secret tea');
+  chmodSync(join(s.path, '..'), 0o755);
+  assert.equal(r.status, 1);
+  assert.equal(r.stdout, '');
+  assert.equal(r.stderr.trim().split('\n').length, 1, r.stderr);
+  assert.deepEqual(readdirSync(tmp), []);
 });

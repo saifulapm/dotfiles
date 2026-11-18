@@ -14,6 +14,7 @@ const fail = (msg, code = 1) => {
   process.exit(code);
 };
 
+const usage = 'usage: reminder add <when> <text> | reminder list [--json] | reminder rm <id>';
 const machine = machineId(env.DOTS_MACHINE, read((env.XDG_CONFIG_HOME || env.HOME + '/.config') + '/chezmoi/chezmoi.toml'), read('/etc/hostname'));
 const path = join(env.XDG_DATA_HOME || env.HOME + '/.local/share', 'dots', 'reminders', machine + '.json');
 
@@ -22,23 +23,29 @@ function store() {
   return R.parseStore(readFileSync(path, 'utf8')) ?? fail(R.brokenStore(machine));
 }
 
-// The changed records go in as another machine's file would, so the merge keeps whatever the shell saved meanwhile.
+// The changed records go in as another machine's file would, so the merge keeps whatever the shell saved meanwhile. The temp file holds the text, so it goes before any refusal.
 function merge(records) {
   const dir = mkdtempSync(join(tmpdir(), 'reminder-'));
+  let r;
   try {
     const file = join(dir, machine + '.json');
     writeFileSync(file, JSON.stringify({ version: 1, reminders: records }));
-    const r = spawnSync(new URL('dots-sync-merge', import.meta.url).pathname, ['reminders', path, file], { encoding: 'utf8' });
-    if (r.status !== 0) fail(r.stderr.trim() || `dots-sync-merge exited ${r.status}`);
+    r = spawnSync(new URL('dots-sync-merge', import.meta.url).pathname, ['reminders', path, file], { encoding: 'utf8' });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+  if (r.status === 0) return;
+  // The merge's own refusal is one line; a crash is a stack, whose Error line says why.
+  const said = (r.stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  fail(`the store was left as it was: ${said.find((l) => /^\w*Error\b/.test(l)) ?? said[0] ?? `dots-sync-merge exited ${r.status ?? r.error?.code}`}`);
 }
 
 function add(when, words) {
   const now = Date.now();
-  const parsed = R.parseReminder(`${when ?? ''} ${words.join(' ')}`, now);
-  if (!when || (!parsed && !/\S/.test(words.join(' ')))) fail(`Cannot set ${when ?? 'a reminder'}: it has no text`);
+  if (!when) fail(usage, 2);
+  const parsed = R.parseReminder(`${when} ${words.join(' ')}`, now);
+  // The time read fine with a text beside it, so it is the text that cleaned away to nothing.
+  if (!parsed && R.parseReminder(`${when} x`, now)) fail(`Cannot set ${when}: it has no text`);
   if (!parsed) fail(`Cannot set ${when}: give a time as 20m, 1h30m or 17:30`);
   if (parsed.error) fail(parsed.error);
   const before = store();
@@ -66,10 +73,11 @@ function rm(id) {
   const r = R.pendingList(before).find((x) => x.id === id) ?? fail(`no pending reminder ${id}`);
   const after = R.endReminder(before, id, 'removed', now);
   merge(after.reminders.filter((x) => !before.reminders.includes(x)));
+  // A ring the shell saved after the read is later than this removal and wins the merge, so what landed is read back.
+  if (store().reminders.find((x) => x.id === id)?.ended !== 'removed') fail(`no pending reminder ${id}`);
   process.stdout.write(`removed: ${r.text}\n`);
 }
 
-const usage = 'usage: reminder add <when> <text> | reminder list [--json] | reminder rm <id>';
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === 'add') add(args[0], args.slice(1));
 else if (cmd === 'list' && (args.length === 0 || (args.length === 1 && args[0] === '--json'))) list(args[0] === '--json');
