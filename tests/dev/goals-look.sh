@@ -130,6 +130,20 @@ check "the question draws danger pixels ($red px)" test "$red" -gt 4
 wtype n
 until_ok 2000 state_is '.confirm == false'
 
+# A forged title in the file: a newline, U+202E and an ESC draw as one line, the store keeps the raw text.
+forged=$(printf 'two\nlines ‮RLO \033[31mesc')
+node --input-type=module - "$repo/shell/lib/goals.mjs" "$store" "$forged" >"$store.tmp" <<'JS'
+const G = await import(process.argv[2]);
+const { readFileSync } = await import("node:fs");
+const s = G.parseStore(readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify(G.addGoal(s, process.argv[4], null, Date.now(), "f")));
+JS
+mv "$store.tmp" "$store"
+until_ok 3000 state_is '.count == 4'
+echo "     forged: $(goals_state | jq -c '.blocks[] | select(.kind == "goal" and (.text | startswith("two"))) | {text, lines, box}')"
+check "a forged title draws as one line with no newline, control or bidi character" state_is '.blocks[] | select(.kind == "goal" and (.text | startswith("two"))) | .lines == 1 and (.text | test("[\u0000-\u001f‮]") | not)'
+check "and its tile is as high as Tax's, a one-line goal ($(goals_state | jq -c '[.blocks[] | select(.kind == "goal" and (.text == "Tax" or (.text | startswith("two")))) | .box.h]'))" state_is '[.blocks[] | select(.kind == "goal" and (.text == "Tax" or (.text | startswith("two")))) | .box.h] | length == 2 and .[0] == .[1]'
+
 wtype -k Escape
 until_ok 2000 state_is '.open == false and .drawing == false'
 

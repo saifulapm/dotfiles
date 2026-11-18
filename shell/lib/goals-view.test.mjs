@@ -60,6 +60,15 @@ test('blocks group each goal with the tasks under it, by row index', () => {
   );
 });
 
+test('a forged title and task text come out as one line in the order spelt', () => {
+  let s = G.addGoal(G.emptyStore(), 'a‮b\x1bc\nd', null, now, 'f');
+  s = G.addTask(s, 'f', 'e‮g\x1bh\ni', now, 'tf');
+  const [goal, task] = rows(s, { f: true }, false, now);
+  assert.equal(goal.text, 'abc d');
+  assert.equal(task.text, 'egh i');
+  assert.equal(s.goals[0].title, 'a‮b\x1bc\nd');
+});
+
 test('findRow finds a row by kind and id, or -1', () => {
   const list = rows(store, { b: true }, false, now);
   assert.equal(findRow(list, 'task', 't2'), 3);

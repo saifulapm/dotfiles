@@ -1,18 +1,20 @@
 // The Goals window's rows, from the store and the window's own fold state; j/k step over these.
 import { activeGoals, doneGoals, liveTasks, countdown } from './goals.mjs';
+import { line } from './voice.mjs';
 
 // A deadline is danger on its own calendar day and once it has passed.
 const onTheDay = (deadline, now) => deadline <= now || new Date(deadline).toDateString() === new Date(now).toDateString();
 
+// Titles and task texts go through line(), so forged text is one line in the order spelt; the store keeps the raw text.
 function goalRow(g, now) {
   const chip = g.deadline === null ? null : countdown(g.deadline, now);
   const chipTone = g.deadline === null ? null : onTheDay(g.deadline, now) ? 'danger' : 'muted';
-  return { kind: 'goal', id: g.id, goal: g.id, text: g.title, done: g.done, chip, chipTone };
+  return { kind: 'goal', id: g.id, goal: g.id, text: line(g.title), done: g.done, chip, chipTone };
 }
 
 function withTasks(out, g, unfolded, now) {
   out.push(goalRow(g, now));
-  if (unfolded[g.id]) liveTasks(g).forEach((t) => out.push({ kind: 'task', id: t.id, goal: g.id, text: t.text, done: t.done }));
+  if (unfolded[g.id]) liveTasks(g).forEach((t) => out.push({ kind: 'task', id: t.id, goal: g.id, text: line(t.text), done: t.done }));
 }
 
 // unfolded maps a goal id to true; the done group shows only when a goal is done.

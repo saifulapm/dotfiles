@@ -442,7 +442,7 @@ Item {
             const tasks = [];
             for (let i = 0; i < taskRepeater.count; i++)
                 tasks.push(taskRepeater.itemAt(i).drawn());
-            return { kind: "goal", text: title.text, color: String(color), box: view.box(tileItem), chip: chipLoader.item ? chipLoader.item.drawn() : null, tasks: tasks };
+            return { kind: "goal", text: title.text, lines: title.lineCount, color: String(color), box: view.box(tileItem), chip: chipLoader.item ? chipLoader.item.drawn() : null, tasks: tasks };
         }
 
         implicitHeight: tileColumn.implicitHeight + 24
