@@ -321,3 +321,49 @@ test('a tests/dev script that moves XDG_STATE_HOME links the nested session stat
     });
   assert.deepEqual(found, [], 'drop XDG_STATE_HOME= from the launch line, or ln -s "$DOTS_DEV_DIR/state/dots" into its state dir');
 });
+
+// A fake a check writes and marks executable must start with #!, since the shell's Process cannot run a script without one and the check then fails on its fake (m101's island-ask fake mem).
+export function fakesWithoutShebang(text) {
+  const lines = text.split('\n');
+  const marked = new Set();
+  for (const line of lines) {
+    const m = line.match(/^\s*chmod\s+\+x\s+(.*)$/);
+    if (m) for (const t of m[1].match(/"[^"]*"|\S+/g)) marked.add(t.replace(/^"|"$/g, ''));
+  }
+  const found = [];
+  lines.forEach((line, i) => {
+    const heredoc = line.match(/^\s*cat\s+>\s*"?([^"\s]+)"?\s+<<-?\s*['"]?\w+/);
+    const printf = line.match(/^\s*printf\s+(['"])(.*?)\1.*>\s*"?([^"\s]+)"?\s*$/);
+    if (heredoc && marked.has(heredoc[1]) && !/^#!/.test(lines[i + 1] ?? '')) found.push(i + 1);
+    if (printf && marked.has(printf[3]) && !/^#!/.test(printf[2])) found.push(i + 1);
+  });
+  return found;
+}
+
+// notify-send -A waits for an action, so one run in the foreground holds the check until it times out (m101's island-focus hung 9 minutes).
+export function foregroundActionSends(text) {
+  const found = [];
+  text.split('\n').forEach((line, i) => {
+    const code = line.replace(/(^|\s)#.*$/, '');
+    if (/\bnotify-send\b/.test(code) && /\s-A\b/.test(code) && !/&\s*$/.test(code)) found.push(i + 1);
+  });
+  return found;
+}
+
+test('the fake and notify-send lints catch the shapes that broke the island checks', () => {
+  assert.deepEqual(fakesWithoutShebang('cat >"$fake/mem" <<EOF\nprintf hi\nEOF\nchmod +x "$fake/mem"\n'), [1]);
+  assert.deepEqual(fakesWithoutShebang("printf 'echo hi\\n' >\"$f/claude\"\nchmod +x \"$f/claude\"\n"), [1]);
+  assert.deepEqual(fakesWithoutShebang('cat >"$fake/mem" <<EOF\n#!/bin/sh\nEOF\nchmod +x "$fake/mem"\n'), []);
+  assert.deepEqual(foregroundActionSends('notify-send -t 0 -A ok=OK "Deploy?" >/dev/null\n'), [1]);
+  assert.deepEqual(foregroundActionSends('notify-send -t 0 -A ok=OK "Deploy?" >/dev/null &\n# notify-send -A waits\n'), []);
+});
+
+test('every fake a tests/dev script marks executable starts with #!, and every notify-send -A runs in the background', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    const text = readFileSync(dir + f, 'utf8');
+    for (const n of fakesWithoutShebang(text)) found.push(`${f}:${n} fake without #!`);
+    for (const n of foregroundActionSends(text)) found.push(`${f}:${n} notify-send -A in the foreground`);
+  }
+  assert.deepEqual(found, []);
+});
