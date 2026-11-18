@@ -23,6 +23,12 @@ point click 200 900
 until_ok 2000 keyboard_is None
 check "a click on the paper sets it to None and focused false" bash -c "$(declare -f keyboard_is island island_is); keyboard_is None && island_is '.focused == false'"
 check "and the card stays" island_is '.mode == "notification"'
+# The virtual pointer presses only the left button, so the wheel stands for the other inputs the new handler takes.
+mod_i
+point move 200 900
+point wheel 1
+until_ok 2000 keyboard_is None
+check "a wheel turn over the paper gives the keyboard back too" bash -c "$(declare -f keyboard_is island island_is); keyboard_is None && island_is '.focused == false'"
 mod_i
 wtype -k Escape
 until_ok 3000 island_is '.mode == "rest"'

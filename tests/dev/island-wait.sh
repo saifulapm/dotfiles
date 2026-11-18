@@ -28,7 +28,11 @@ ask() { jq -n --arg id "$1" '{self: "macbook", questions: [{id: $id, project: "t
 no_questions() { printf '{"self": "macbook", "questions": []}\n' >"$DOTS_HUB_QUESTIONS"; }
 # One output pixel as #RRGGBB.
 px() { grim -g "$1,$2 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n' | tr a-f A-F | sed 's/^/#/'; }
-cleanup() { rm -rf "$fake"; }
+player=""
+cleanup() {
+  [ -z "$player" ] || kill "$player" 2>/dev/null
+  rm -rf "$fake"
+}
 
 until_ok 3000 island_is '.mode == "rest"'
 
@@ -134,5 +138,48 @@ for _ in $(seq 15); do
 done
 check "and never shows" test "$saw" = no
 timeout 0.5 qs ipc call notifs dnd false >/dev/null
+
+# 8. Do Not Disturb turned on while one waits keeps it off the island.
+sheet_open
+notify-send -t 0 late
+until_ok 2000 island_is '.waiting == 1'
+timeout 0.5 qs ipc call notifs dnd true >/dev/null
+esc
+saw=no
+for _ in $(seq 15); do
+  island_is '.mode == "notification"' && saw=yes
+  sleep 0.1
+done
+check "a notification that waited while Do Not Disturb went on never shows" test "$saw" = no
+timeout 0.5 qs ipc call notifs dnd false >/dev/null
+
+# 9. A replace of the one showing, sent while the sheet is open, updates it and waits as no copy.
+id=$(notify-send -p -t 0 "step 1")
+until_ok 3000 island_is '.mode == "notification" and .note.summary == "step 1" and .animating == false'
+sheet_open
+notify-send -r "$id" -t 0 "step 2"
+sleep 0.5
+check "a replace of the notification showing waits as nothing ($(island | jq .waiting))" island_is '.waiting == 0'
+esc
+until_ok 3000 island_is '.mode == "notification" and .note.summary == "step 2"'
+check "and after Esc it shows once, as its new text" island_is '.note.summary == "step 2"'
+dismiss
+saw=no
+for _ in $(seq 10); do
+  island_is '.mode == "notification"' && saw=yes
+  sleep 0.1
+done
+check "and no second copy follows it" test "$saw" = no
+
+# 10. A track starting while the sheet is open lights the dot as one, then plays after Esc.
+sheet_open
+"$repo/bin/dev-fake-mpris" Track Artist &
+player=$!
+until_ok 3000 island_is '.waiting == 1'
+check "a track starting while the sheet is open lights the dot ($(island | jq -c '{waiting, dot}'))" island_is '.waiting == 1 and .dot != null and .surface == "cheatsheet"'
+esc
+until_ok 3000 island_is '.mode == "playing"'
+check "and after Esc the island shows it playing, waiting 0" island_is '.mode == "playing" and .waiting == 0'
+kill "$player" 2>/dev/null
 exit "$fails"
 }
