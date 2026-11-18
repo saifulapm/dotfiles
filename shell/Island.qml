@@ -159,7 +159,7 @@ Item {
             playing,
             notice
         })
-    // A surface open in the island outranks every slot; an arrival closes it instead (PCGX7JPJ).
+    // A surface open in the island outranks every slot; what arrives waits behind it (7E95CSV2).
     readonly property string mode: H.modeOf(holder, slots)
     // The slots as they last were, so an arrival while a surface is open can be told from a state already live.
     property var slotsSeen: ({})

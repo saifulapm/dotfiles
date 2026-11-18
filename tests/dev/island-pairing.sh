@@ -182,12 +182,14 @@ until_ok 3000 rest
 open_launcher
 wtype ti
 until_ok 2000 launcher_is '.query == "ti"'
+# The agent's 4 s start once it has the request, so the time from just before asking is at least 4 s.
+asked_at=$(now_ms)
 authorize "$speaker" 5
 until_ok 3000 prompt_up
-shown_at=$(now_ms)
+check "the prompt shows over the launcher ($(island | jq -c '{surface, takeover}'))" island_is '.surface == "launcher" and .takeover == "pairing"'
 until_ok 8000 island_is '.takeover == null and .surface == "launcher" and .animating == false'
-left=$(($(now_ms) - shown_at))
-check "unanswered, the prompt leaves after the agent's 4 s ($left ms)" test "$left" -ge 3500
+left=$(($(now_ms) - asked_at))
+check "unanswered, the prompt leaves after the agent's 4 s ($left ms)" test "$left" -ge 4000
 check "the agent rejected it" answered authorize-5 org.bluez.Error.Rejected
 check "the launcher is back with ti ($(launcher | jq -c '{open, query}'))" launcher_is '.open and .query == "ti"'
 until_ok 2000 launcher_is '.keyboard and .settled'

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+/ grows the island into the six-column cheat sheet over the margins; Esc or a click outside closes it, another surface's key turns it into that surface, and a live state that arrives takes the island from it.
+# Mod+/ grows the island into the six-column cheat sheet over the margins; Esc or a click outside closes it, another surface's key turns it into that surface, a notification waits behind it, and a pairing request takes the island over it.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
