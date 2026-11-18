@@ -2,10 +2,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import * as R from '../../shell/lib/reminders.mjs';
-import { icloudEntry, machine, sync, world } from './lib.mjs';
+import { icloudEntry, machine, processArgs, sync, world } from './lib.mjs';
 import { icloud, report } from './icloud.mjs';
 
 const MIN = 60000;
@@ -189,11 +188,11 @@ test("the password reaches neither sync.json, the round's output nor any process
   t.after(fake.close);
   fake.delay = 400;
   add(a, '10m tea');
-  const running = sync(a, ['--only', 'reminders']);
+  let done = false;
+  const running = sync(a, ['--only', 'reminders']).finally(() => (done = true));
   const seen = [];
-  const poll = setInterval(() => seen.push(execFileSync('ps', ['-eo', 'args'], { encoding: 'utf8' })), 100);
+  while (!done) seen.push((await processArgs(a)).stdout);
   const r = await running;
-  clearInterval(poll);
   assert.equal(r.code, 0, r.stderr);
   assert.ok(fake.log.length >= 4 && seen.length >= 10, `${fake.log.length} requests, ${seen.length} ps reads`);
   assert.ok(seen.some((ps) => ps.includes('dots-sync-icloud')), 'ps caught the push running');

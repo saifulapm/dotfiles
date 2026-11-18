@@ -143,6 +143,9 @@ export function icloudEntry(m, fake, name = 'me') {
   m.env.DOTS_CALDAV_URL = fake.url;
 }
 
+// Every process's argv as ps prints it, read as machine m.
+export const processArgs = (m) => run(m, 'ps', ['-eo', 'args']);
+
 // The one place a sync test starts a process: as machine m, in its scratch env.
 const start = (m, cmd, args) => spawn(cmd, args, { env: checked(m.env) });
 
