@@ -18,6 +18,8 @@ chat_cleanup() {
 }
 
 chat() { timeout 0.5 qs ipc call chat state 2>/dev/null; }
+# Whether the requests the fake pxy logged, read as one array, pass a jq test.
+sent() { jq -se "$1" "$requests" >/dev/null 2>&1; }
 chat_is() { chat | jq -e "$@" >/dev/null 2>&1; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }

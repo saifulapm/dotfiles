@@ -1,4 +1,5 @@
 import Quickshell
+import Quickshell.Io
 import QtQuick
 import "." as Root
 import "lib/surface.mjs" as S
@@ -31,6 +32,11 @@ Item {
     property int replyBlocks: 0
     // How many of the reply's blocks have closed, each drawn once.
     property int replyClosed: 0
+    // Where the keys go: the field, or the reply list with one block picked (a row of rows).
+    property string focusArea: "input"
+    property int pick: -1
+    // Each finished reply's first row and its whole text, so Y copies the reply a picked block is in.
+    property var replies: []
     // A reply streaming outlives the surface's close; the card stays loaded until it ends.
     readonly property bool busy: streaming
     readonly property string url: Quickshell.env("DOTS_CHAT_URL") || "http://127.0.0.1:4100/v1/chat/completions"
@@ -63,7 +69,7 @@ Item {
         openMs = null;
         opens += 1;
         shown = true;
-        field.forceActiveFocus();
+        focusInput();
     }
 
     function close() {
@@ -164,8 +170,10 @@ Item {
     function finish(req) {
         if (req.status === 200) {
             draw(cutter.end(replyText));
-            if (replyText !== "")
+            if (replyText !== "") {
                 messages = messages.concat([{ role: "assistant", content: replyText }]);
+                replies = replies.concat([{ row: replyRow, text: replyText }]);
+            }
         } else if (error === "") {
             error = failure(req);
         }
@@ -186,6 +194,87 @@ Item {
         return C.clean(line || ("pxy answered HTTP " + req.status));
     }
 
+    function newChat() {
+        if (streaming)
+            return;
+        rows.clear();
+        messages = [];
+        replies = [];
+        conversation = 0;
+        title = "";
+        error = "";
+        replyText = "";
+        replyBlocks = 0;
+        replyClosed = 0;
+        pick = -1;
+        focusInput();
+    }
+
+    function toggleAlias() {
+        alias = alias === "chat" ? "default" : "chat";
+    }
+
+    // r asks again for the last message after pxy failed it.
+    function retry() {
+        if (streaming || error === "" || messages.length === 0 || messages[messages.length - 1].role !== "user")
+            return;
+        ask();
+    }
+
+    function blockRows() {
+        const out = [];
+        for (let i = 0; i < rows.count; i++) {
+            if (rows.get(i).kind === "block")
+                out.push(i);
+        }
+        return out;
+    }
+
+    // Tab moves to the reply list on the last block; with no reply yet it stays in the field.
+    function focusReplies() {
+        const found = blockRows();
+        if (!found.length)
+            return;
+        pick = found[found.length - 1];
+        focusArea = "replies";
+        replyKeys.forceActiveFocus();
+    }
+
+    function focusInput() {
+        focusArea = "input";
+        field.forceActiveFocus();
+    }
+
+    function move(by) {
+        const found = blockRows();
+        const next = found[Math.max(0, Math.min(found.length - 1, found.indexOf(pick) + by))];
+        if (next !== undefined)
+            pick = next;
+    }
+
+    function copy(text) {
+        textCopier.createObject(chat, { text: text });
+    }
+
+    function copyBlock() {
+        if (pick >= 0 && pick < rows.count)
+            copy(rows.get(pick).text);
+    }
+
+    function copyReply() {
+        const found = replies.filter(r => r.row <= pick);
+        if (found.length)
+            copy(found[found.length - 1].text);
+    }
+
+    // The last reply's blocks as drawn, so a check reads what the island shows.
+    function drawn() {
+        const out = [];
+        for (let i = replyRow; i < replyRow + replyBlocks && i < rows.count; i++)
+            out.push({ kind: rows.get(i).bkind, html: rows.get(i).html });
+        return out;
+    }
+
     function state() {
         return JSON.stringify({
             open: shown,
@@ -198,6 +287,9 @@ Item {
             error: error,
             rows: rows.count,
             input: field.text,
+            focus: focusArea,
+            pick: pick,
+            drawn: drawn(),
             openMs: openMs,
             opens: opens,
             settled: chat.settled,
@@ -207,6 +299,63 @@ Item {
 
     ListModel {
         id: rows
+    }
+
+    onPickChanged: {
+        const item = replyRepeater.itemAt(pick);
+        if (!item)
+            return;
+        if (item.y < list.contentY)
+            list.contentY = item.y;
+        else if (item.y + item.height > list.contentY + list.height)
+            list.contentY = item.y + item.height - list.height;
+    }
+
+    // The reply list's keys, held while Tab has moved there.
+    Item {
+        id: replyKeys
+        Keys.onPressed: event => {
+            const ctrl = event.modifiers & Qt.ControlModifier;
+            const shift = event.modifiers & Qt.ShiftModifier;
+            if (ctrl && event.key === Qt.Key_N)
+                chat.newChat();
+            else if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
+                chat.move(1);
+            else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
+                chat.move(-1);
+            else if (event.key === Qt.Key_Y && shift)
+                chat.copyReply();
+            else if (event.key === Qt.Key_Y)
+                chat.copyBlock();
+            else if (event.key === Qt.Key_M)
+                chat.toggleAlias();
+            else if (event.key === Qt.Key_R)
+                chat.retry();
+            else if (event.key === Qt.Key_Tab)
+                chat.focusInput();
+            else if (event.key === Qt.Key_Escape)
+                chat.close();
+            else
+                return;
+            event.accepted = true;
+        }
+    }
+
+    // wl-copy serves the copy itself, so it outlives the chat; the text goes on stdin, since one argument is capped at 128 KiB.
+    Component {
+        id: textCopier
+
+        Process {
+            property string text
+            running: true
+            stdinEnabled: true
+            command: ["wl-copy"]
+            onStarted: {
+                write(text);
+                stdinEnabled = false;
+            }
+            onExited: destroy()
+        }
     }
 
     // The island draws the fill and plays the open; this is the content.
@@ -380,16 +529,40 @@ Item {
                     spacing: 10
 
                     Repeater {
+                        id: replyRepeater
                         model: rows
 
-                        delegate: Loader {
+                        // The picked block sits on the lit tile while the reply list has the keys.
+                        delegate: Item {
+                            id: row
+                            required property int index
                             required property string kind
                             required property string bkind
                             required property string lang
                             required property string html
                             required property string text
                             width: messageColumn.width
-                            sourceComponent: kind === "user" ? userRow : bkind === "code" ? codeRow : blockRow
+                            height: rowLoader.height
+
+                            Rectangle {
+                                visible: chat.focusArea === "replies" && chat.pick === row.index
+                                x: -6
+                                y: -4
+                                width: parent.width + 12
+                                height: parent.height + 8
+                                radius: 10
+                                color: chat.bubble
+                            }
+
+                            Loader {
+                                id: rowLoader
+                                readonly property string bkind: row.bkind
+                                readonly property string lang: row.lang
+                                readonly property string html: row.html
+                                readonly property string text: row.text
+                                width: parent.width
+                                sourceComponent: row.kind === "user" ? userRow : row.bkind === "code" ? codeRow : blockRow
+                            }
                         }
                     }
 
@@ -438,8 +611,13 @@ Item {
                     focus: true
                     Keys.onPressed: event => {
                         const shift = event.modifiers & Qt.ShiftModifier;
+                        const ctrl = event.modifiers & Qt.ControlModifier;
                         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && !shift)
                             chat.send();
+                        else if (event.key === Qt.Key_Tab)
+                            chat.focusReplies();
+                        else if (ctrl && event.key === Qt.Key_N)
+                            chat.newChat();
                         else if (event.key === Qt.Key_Escape)
                             chat.close();
                         else

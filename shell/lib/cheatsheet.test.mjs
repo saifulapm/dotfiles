@@ -118,7 +118,7 @@ test('a filter matches the title or the key text, ignoring case', () => {
   assert.equal(filterRows(rows, '').length, rows.length);
 });
 
-const SURFACES = ['launcher', 'control', 'notifications', 'pass', 'tailscale', 'accounts', 'dns', 'goals'];
+const SURFACES = ['launcher', 'control', 'notifications', 'pass', 'tailscale', 'accounts', 'dns', 'goals', 'chat'];
 
 test('the six groups are the surfaces, the keys inside them, work, windows, system and the touchpad', () => {
   assert.deepEqual(GROUPS_SIX, ['SURFACES', 'IN SURFACES', 'WORK', 'WINDOWS', 'SYSTEM', 'TOUCHPAD']);
@@ -165,6 +165,8 @@ const CODE = {
   '1-9': [/\[1-9\]/],
   '1-5': [/Key_1\b/, /Key_5\b/],
   '⇧ D': [/ShiftModifier/, /Key_D\b/],
+  '⇧ Y': [/ShiftModifier/, /Key_Y\b/],
+  '⌃ N': [/ControlModifier/, /Key_N\b/],
   '⇧ O': [/Key_O\b/, /"O"/],
   'w␣': [/'w '/],
   'v␣': [/'v '/],
@@ -188,6 +190,7 @@ const FILES = {
   accounts: ['Accounts.qml'],
   dns: ['Dns.qml'],
   goals: ['Goals.qml'],
+  chat: ['Chat.qml'],
   prompts: ['Prompt.qml', 'PairingPrompt.qml', 'lib/bt-pairing.mjs', 'Pairing.qml'],
   picker: ['FilePicker.qml'],
 };
@@ -217,11 +220,16 @@ test('IN SURFACES lists every key Pass takes on its list and in a new entry', ()
 
 // No surface shows key hints (8HYAV3GE): the five tools in the island draw no legend, so the sheet is where their keys are.
 test('none of the island\'s tools draws a key strip or a key hint', () => {
-  const tools = { prompt: ['Prompt.qml'], polkit: ['PolkitPrompt.qml'], pinentry: ['PinentryPrompt.qml', 'lib/pinentry.mjs'], pairing: ['PairingPrompt.qml', 'lib/bt-pairing.mjs'], picker: ['FilePicker.qml', 'lib/picker.mjs'], pass: ['Pass.qml', 'lib/pass.mjs'], tailscale: ['Tailscale.qml', 'lib/tailscale.mjs'], accounts: ['Accounts.qml', 'lib/accounts.mjs'], dns: ['Dns.qml', 'lib/dns.mjs'], goals: ['Goals.qml', 'lib/goals-view.mjs'] };
+  const tools = { prompt: ['Prompt.qml'], polkit: ['PolkitPrompt.qml'], pinentry: ['PinentryPrompt.qml', 'lib/pinentry.mjs'], pairing: ['PairingPrompt.qml', 'lib/bt-pairing.mjs'], picker: ['FilePicker.qml', 'lib/picker.mjs'], pass: ['Pass.qml', 'lib/pass.mjs'], tailscale: ['Tailscale.qml', 'lib/tailscale.mjs'], accounts: ['Accounts.qml', 'lib/accounts.mjs'], dns: ['Dns.qml', 'lib/dns.mjs'], goals: ['Goals.qml', 'lib/goals-view.mjs'], chat: ['Chat.qml'] };
   for (const [name, files] of Object.entries(tools)) {
     const code = files.map(read).join('\n');
     for (const hint of [/\bKeyPair\b/, /\.keys\(\[/, /\bkeyText\(/, /\bhint:/]) assert.doesNotMatch(code, hint, `${name} draws a key hint: ${hint}`);
   }
+});
+
+test('IN SURFACES lists the chat\'s keys under Chat', () => {
+  const keys = IN_SURFACES.filter((r) => r.surface === 'chat').map((r) => r.key);
+  assert.deepEqual(keys, ['↵', '⇧ ↵', 'Tab', '⌃ N', 'Y', '⇧ Y', 'R', 'M']);
 });
 
 test('IN SURFACES lists Control\'s - and = under Control', () => {
@@ -248,7 +256,7 @@ test('a / that is the key itself stays a key, as the cheat sheet\'s own Mod / do
 test('IN SURFACES names each surface in a caption row before its keys, the shared keys under Every Surface', () => {
   const group = groupRowsSix(IN_SURFACES).find((g) => g.name === 'IN SURFACES');
   const captions = group.rows.filter((r) => r.caption).map((r) => r.caption);
-  assert.deepEqual(captions, ['Every Surface', 'Launcher', 'Control', 'Notifications', 'Pass', 'Tailscale', 'Accounts', 'DNS', 'Goals', 'Prompts', 'File Picker']);
+  assert.deepEqual(captions, ['Every Surface', 'Launcher', 'Control', 'Notifications', 'Pass', 'Tailscale', 'Accounts', 'DNS', 'Goals', 'Chat', 'Prompts', 'File Picker']);
   group.rows.forEach((r, i) => {
     if (r.caption) return;
     const above = group.rows.slice(0, i).reverse().find((x) => x.caption);

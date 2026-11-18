@@ -117,6 +117,15 @@ export const IN_SURFACES = [
   ['goals', 'E', 'Edit'],
   ['goals', '⇧ J / K', 'Reorder'],
   ['goals', 'D', 'Delete'],
+  // The chat's field sends on Enter; Tab moves to the reply list, where the letters work.
+  ['chat', '↵', 'Send'],
+  ['chat', '⇧ ↵', 'New Line'],
+  ['chat', 'Tab', 'Go to the Replies or Back'],
+  ['chat', '⌃ N', 'New Chat'],
+  ['chat', 'Y', 'Copy the Block'],
+  ['chat', '⇧ Y', 'Copy the Whole Reply'],
+  ['chat', 'R', 'Retry a Failed Message'],
+  ['chat', 'M', 'Switch Between Chat and Default'],
   // Polkit, gpg and Bluetooth pairing ask in one prompt; Esc cancels it as it closes any surface.
   ['prompts', '↵', 'Allow, Unlock or Pair'],
   ['picker', '↑ / ↓', 'Move'],
@@ -132,7 +141,7 @@ export const IN_SURFACES = [
 ].map(([surface, key, title]) => ({ title, key, group: 'IN SURFACES', surface }));
 
 // How a caption names each surface in IN SURFACES.
-const SURFACE_NAMES = { shared: 'Every Surface', launcher: 'Launcher', control: 'Control', notifications: 'Notifications', pass: 'Pass', tailscale: 'Tailscale', accounts: 'Accounts', dns: 'DNS', goals: 'Goals', prompts: 'Prompts', picker: 'File Picker' };
+const SURFACE_NAMES = { shared: 'Every Surface', launcher: 'Launcher', control: 'Control', notifications: 'Notifications', pass: 'Pass', tailscale: 'Tailscale', accounts: 'Accounts', dns: 'DNS', goals: 'Goals', chat: 'Chat', prompts: 'Prompts', picker: 'File Picker' };
 
 // IN SURFACES rows with a caption row before each surface's first row, so a key reads with the surface it belongs to.
 function captioned(rows) {
