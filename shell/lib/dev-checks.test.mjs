@@ -367,3 +367,201 @@ test('every fake a tests/dev script marks executable starts with #!, and every n
   }
   assert.deepEqual(found, []);
 });
+
+// m102 and m103 moved surfaces into the island and dozens of checks stalled on state keys the new state() dropped (settled, cardBox, legend, tabFill); these files' state() literals, each after its Ipc target where one is named, make a surface's keys.
+const stateSources = {
+  island: [['Desk.qml', 'target: "island"']],
+  launcher: [['shell.qml', 'target: "launcher"'], ['Launcher.qml']],
+  cheatsheet: [['shell.qml', 'target: "cheatsheet"'], ['CheatSheet.qml']],
+  control: [['shell.qml', 'target: "control"'], ['Control.qml'], ['ControlWifi.qml'], ['ControlAudio.qml'], ['ControlBluetooth.qml'], ['ControlPower.qml'], ['ControlDisplay.qml'], ['ControlRoute.qml']],
+  notifs: [['shell.qml', 'target: "notifs"'], ['Notifications.qml']],
+  record: [['shell.qml', 'target: "record"'], ['Recorder.qml']],
+};
+
+// Blanks comments and string contents, so a brace or an apostrophe in either cannot shift the scan.
+function jsCode(text) {
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      out += '\n';
+    } else if (c === '/' && text[i + 1] === '*') {
+      const e = text.indexOf('*/', i + 2);
+      i = e < 0 ? text.length : e + 1;
+      out += ' ';
+    } else if (c === '"' || c === "'" || c === '`') {
+      let j = i + 1;
+      while (j < text.length && text[j] !== c) j += text[j] === '\\' ? 2 : 1;
+      out += c + c;
+      i = j;
+    } else out += c;
+  }
+  return out;
+}
+
+// The top-level keys of each object literal the first state() after `after` returns; a literal nested in another one, or built in a callback, is not counted.
+export function stateKeys(text, after = '') {
+  const from = text.indexOf(after);
+  if (from < 0) return [];
+  const code = jsCode(text.slice(from));
+  const m = code.match(/function state\(\)(?:\s*:\s*\w+)?\s*\{/);
+  if (!m) return [];
+  const keys = new Set();
+  const stack = [];
+  let ret = -1;
+  let prev = '';
+  for (let i = m.index + m[0].length; i < code.length; i++) {
+    const c = code[i];
+    if (/\s/.test(c)) continue;
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i;
+      while (j < code.length && /[\w$]/.test(code[j])) j++;
+      const word = code.slice(i, j);
+      if (word === 'return' && stack.every((s) => s.ch === '{' && !s.obj)) ret = stack.length;
+      if (stack.at(-1)?.counted && (prev === '{' || prev === ',') && /^\s*[:,}]/.test(code.slice(j))) keys.add(word);
+      prev = word;
+      i = j - 1;
+    } else if (c === '{' || c === '(' || c === '[') {
+      const obj = c === '{' && (/^[(,:?[=]$/.test(prev) || prev === 'return');
+      stack.push({ ch: c, obj, counted: obj && ret >= 0 && !stack.some((s) => s.obj) });
+      prev = c;
+    } else if (c === '}' || c === ')' || c === ']') {
+      if (stack.length === 0) break;
+      stack.pop();
+      if (stack.length < ret) ret = -1;
+      prev = c;
+    } else {
+      if (c === ';' && stack.length === ret) ret = -1;
+      prev = c;
+    }
+  }
+  return [...keys];
+}
+
+// A shell line's words from `s` up to its first operator, each raw and unquoted; an unclosed quote ends them.
+function shellWords(s) {
+  const words = [];
+  let i = 0;
+  for (;;) {
+    while (s[i] === ' ' || s[i] === '\t') i++;
+    if (i >= s.length || /[|&;()<>]/.test(s[i])) return words;
+    let raw = '';
+    let value = '';
+    while (i < s.length && !/[\s|&;()<>]/.test(s[i])) {
+      if (s[i] === "'") {
+        const e = s.indexOf("'", i + 1);
+        if (e < 0) return words;
+        raw += s.slice(i, e + 1);
+        value += s.slice(i + 1, e);
+        i = e + 1;
+      } else if (s[i] === '"') {
+        let j = i + 1;
+        while (j < s.length && s[j] !== '"') {
+          if (s[j] === '\\' && /["$\\`]/.test(s[j + 1])) value += s[++j];
+          else value += s[j];
+          j++;
+        }
+        if (j >= s.length) return words;
+        raw += s.slice(i, j + 1);
+        i = j + 1;
+      } else {
+        raw += s[i];
+        value += s[i++];
+      }
+    }
+    words.push({ raw, value });
+  }
+}
+
+// jq's program word among its arguments: the first that is no option and no --arg's name or value.
+function jqProgram(words) {
+  for (let k = 0; k < words.length; k++) {
+    if (/^--(arg|argjson|slurpfile|rawfile)$/.test(words[k].value)) k += 2;
+    else if (!words[k].value.startsWith('-')) return words[k];
+  }
+  return null;
+}
+
+// The fields a jq program reads off its input's top level: `.name` before the first `|` outside parens, not after a name, `.`, `]`, `)` or `?`.
+export function jqFields(program) {
+  const p = program.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+  const fields = [];
+  let depth = 0;
+  for (let i = 0; i < p.length; i++) {
+    const c = p[i];
+    if (c === '(') depth++;
+    else if (c === ')') depth--;
+    else if (c === '|' && depth === 0) break;
+    else if (c === '.' && depth === 0 && !/[\w.\])?$]/.test(p[i - 1] ?? '')) {
+      const m = p.slice(i + 1).match(/^[A-Za-z_]\w*/);
+      if (m) fields.push(m[0]);
+    }
+  }
+  return fields;
+}
+
+// Each jq program a script applies to a surface's state, as [line, surface, field]: piped straight from qs ipc call or dots-call, from a function that prints the state, or through a function that passes "$@" or "$1" to such a jq.
+export function stateReads(text) {
+  const lines = text.split('\n');
+  const sources = new Map();
+  const wrappers = new Map();
+  const apps = (line) => {
+    const names = [...sources.keys(), ...wrappers.keys()].join('|');
+    const re = new RegExp(`(?<![\\w$-])(?:(?:qs ipc call|dots-call) (\\w+) state\\b${names ? `|(${names})(?![\\w(-])` : ''})`, 'g');
+    const found = [];
+    for (const m of line.matchAll(re)) {
+      const rest = line.slice(m.index + m[0].length);
+      if (m[2] && wrappers.has(m[2])) {
+        const program = /^[ \t]/.test(rest) && jqProgram(shellWords(rest));
+        if (program) found.push({ surface: wrappers.get(m[2]), program });
+        continue;
+      }
+      const pipe = /^(?:\s+2>(?:\/dev\/null|&1))*\s*\|\s*jq\s+/.exec(rest);
+      const program = pipe && jqProgram(shellWords(rest.slice(pipe[0].length)));
+      if (program) found.push({ surface: m[1] ?? sources.get(m[2]), program });
+    }
+    return found;
+  };
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const line of lines) {
+      const def = line.match(/^\s*(\w+)\(\)\s*\{(.*)\}\s*$/);
+      if (!def || sources.has(def[1]) || wrappers.has(def[1])) continue;
+      const src = def[2].match(/^\s*(?:timeout\s+\S+\s+)?(?:(?:qs ipc call|dots-call)\s+(\w+)\s+state|(\w+))(?:\s+2>\/dev\/null)?\s*;?\s*$/);
+      const surface = src && (src[1] ?? sources.get(src[2]));
+      const passed = apps(def[2]).find((a) => a.program.raw === '"$@"' || a.program.raw === '"$1"');
+      if (surface) sources.set(def[1], surface);
+      else if (passed) wrappers.set(def[1], passed.surface);
+      changed ||= !!(surface || passed);
+    }
+  }
+  const reads = [];
+  lines.forEach((line, i) => {
+    for (const a of apps(line)) for (const f of jqFields(a.program.value)) reads.push([i + 1, a.surface, f]);
+  });
+  return reads;
+}
+
+const surfaceKeys = () =>
+  Object.fromEntries(
+    Object.entries(stateSources).map(([s, files]) => [s, new Set(files.flatMap(([f, after]) => stateKeys(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'), after)))]),
+  );
+
+test("each mapped surface's state() yields its keys, the Control sections' among them", () => {
+  const keys = surfaceKeys();
+  for (const [s, k] of Object.entries(keys)) assert.ok(k.size >= 10, `${s} yields ${k.size} keys`);
+  for (const k of ['calendar', 'fill', 'mode']) assert.ok(keys.island.has(k), `island.${k}`);
+  for (const k of ['settled', 'cursorBox', 'panels', 'chargeLimit']) assert.ok(keys.control.has(k), `control.${k}`);
+  for (const k of ['open', 'dnd', 'summaries']) assert.ok(keys.notifs.has(k), `notifs.${k}`);
+  for (const k of ['fill', 'box', 'text', 'length']) assert.ok(!keys.control.has(k), `control has no nested ${k}`);
+});
+
+test('every first-level jq field a tests/dev script reads off a mapped surface\'s state is one its state() emits', () => {
+  const keys = surfaceKeys();
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    for (const [n, s, k] of stateReads(readFileSync(dir + f, 'utf8'))) if (keys[s] && !keys[s].has(k)) found.push(`${f}:${n} ${s}.${k}`);
+  }
+  assert.deepEqual(found, []);
+});
