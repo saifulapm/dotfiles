@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// reminder add <when> <text>: sets a reminder in this machine's synced store, as the launcher's `r ` mode does, for an agent or a terminal. The store changes only through dots-sync-merge's swap, so a shell save in the same moment merges in rather than being lost.
+// reminder add <when> <text> sets a reminder in this machine's synced store, as the launcher's `r ` mode does, for an agent or a terminal; reminder list shows those waiting. The store changes only through dots-sync-merge's swap, so a shell save in the same moment merges in rather than being lost.
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -48,6 +48,19 @@ function add(when, words) {
   process.stdout.write(`${parsed.text} · ${parsed.when}\n`);
 }
 
+// One line each, soonest first: the id rm takes, when it rings, the text; --json gives the records to an agent.
+function list(json) {
+  const now = Date.now();
+  const pending = R.pendingList(store());
+  if (json) return process.stdout.write(JSON.stringify(pending) + '\n');
+  if (!pending.length) return process.stdout.write('no reminders\n');
+  const rows = pending.map((r) => [r.id, R.whenText(r.due, now), r.text]);
+  const w = [0, 1].map((i) => Math.max(...rows.map((row) => row[i].length)));
+  process.stdout.write(rows.map(([id, when, text]) => `${id.padEnd(w[0])}  ${when.padEnd(w[1])}  ${text}\n`).join(''));
+}
+
+const usage = 'usage: reminder add <when> <text> | reminder list [--json]';
 const [cmd, ...args] = process.argv.slice(2);
 if (cmd === 'add') add(args[0], args.slice(1));
-else fail('usage: reminder add <when> <text>', 2);
+else if (cmd === 'list' && (args.length === 0 || (args.length === 1 && args[0] === '--json'))) list(args[0] === '--json');
+else fail(usage, 2);

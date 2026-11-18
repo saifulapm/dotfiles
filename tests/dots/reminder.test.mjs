@@ -10,6 +10,8 @@ import * as R from '../../shell/lib/reminders.mjs';
 const bin = new URL('../../bin/reminder', import.meta.url).pathname;
 const fixedNow = new URL('fixed-now.mjs', import.meta.url).pathname;
 const MIN = 60000;
+// The fixtures here and the CLI read one clock.
+process.env.TZ = 'UTC';
 const T = Date.UTC(2026, 10, 19, 10, 0, 0);
 
 function scratch(t) {
@@ -104,4 +106,45 @@ test('reminder add on a store that does not parse says so and leaves it', (t) =>
   assert.equal(r.stderr, R.brokenStore('a') + '\n');
   assert.equal(r.status, 1);
   assert.equal(s.read(), before);
+});
+
+const storeOf = (...qs) => qs.reduce((s, q) => R.setReminder(s, R.parseReminder(q, T), T).store, R.emptyStore());
+
+test('reminder list prints each pending reminder soonest first, with its id, when it rings and its text', (t) => {
+  const s = scratch(t);
+  // Set out of order, and one already rung, which is not listed.
+  const store = storeOf('10:00 call', '17:30 tea', '5m gone');
+  s.write(R.endReminder(store, store.reminders[2].id, 'rung', T));
+  const r = s.run('list');
+  assert.equal(r.status, 0, r.stderr);
+  const lines = r.stdout.split('\n').filter(Boolean);
+  assert.equal(lines.length, 2);
+  const [tea, call] = [store.reminders[1], store.reminders[0]];
+  assert.match(lines[0], new RegExp(`^${tea.id}\\s+17:30\\s+tea$`));
+  assert.match(lines[1], new RegExp(`^${call.id}\\s+tomorrow 10:00\\s+call$`));
+});
+
+test('reminder list --json prints the pending records for an agent', (t) => {
+  const s = scratch(t);
+  const store = storeOf('10:00 call', '17:30 tea');
+  s.write(store);
+  const got = JSON.parse(s.run('list', '--json').stdout);
+  assert.deepEqual(got.map((x) => [x.id, x.text, x.due]), [[store.reminders[1].id, 'tea', T + 450 * MIN], [store.reminders[0].id, 'call', T + 1440 * MIN]]);
+});
+
+test('reminder list with nothing pending says so and exits 0, and --json prints an empty array', (t) => {
+  const s = scratch(t);
+  assert.equal(s.run('list').stdout, 'no reminders\n');
+  assert.equal(s.run('list').status, 0);
+  assert.equal(s.run('list', '--json').stdout, '[]\n');
+});
+
+// Another machine's file may hold a text no CLI or launcher cleaned.
+test('reminder list prints a stored text holding a newline and an escape code as one clean line', (t) => {
+  const s = scratch(t);
+  const store = storeOf('20m tea');
+  store.reminders[0].text = 'a\nb\x1b[31m';
+  s.write(store);
+  assert.match(s.run('list').stdout, /\s10:20\s+a b \[31m\n$/);
+  assert.equal(JSON.parse(s.run('list', '--json').stdout)[0].text, 'a b [31m');
 });
