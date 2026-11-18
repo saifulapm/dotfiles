@@ -1,0 +1,99 @@
+#!/usr/bin/env node
+// The chat's checks talk to this, never to pxy: `dev-fake-pxy <dir>` listens on a free local port, writes it to <dir>/port, logs each request's body as a line of <dir>/requests.jsonl, and answers by a word in the last user message (no word: the fish loop).
+import { appendFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+
+const dir = process.argv[2];
+if (!dir) {
+  console.error('usage: dev-fake-pxy <dir>');
+  process.exit(2);
+}
+
+const FISH = 'Here is one:\n\n```fish\nfor f in *\n    echo $f\nend\n```\n\nRun it in a folder.';
+const MEM_ANSWER = "You decided the island's shape in SHAPE-1: one pill that morphs into each surface.";
+
+const call = (name, args, i = 0) => ({ index: i, id: `call_${i + 1}`, type: 'function', function: { name, arguments: JSON.stringify(args) } });
+
+// What each word asks of the fake: a reply, tool calls for the first round, an HTTP error, an error in the stream, or a stall.
+const SCENARIOS = [
+  ['hostile', { reply: `Red \x1b[31mtext‮evil.\n\n${'x'.repeat(1 << 20)}\n\nend.`, chunk: 65536, every: 5 }],
+  ['stall', { reply: 'Thinking about it', stall: 60000 }],
+  ['401', { status: 401, error: 'fake pxy: invalid API key' }],
+  ['stream error', { reply: 'Part', streamError: 'fake pxy: upstream overloaded' }],
+  ['shape', { tools: [call('mem_search', { query: 'island shape' })], reply: MEM_ANSWER }],
+  ['show shape-1', { tools: [call('mem_show', { id: 'SHAPE-1' })], reply: MEM_ANSWER }],
+  ['wiki', { tools: [call('mem_wiki', { project: 'dotfiles', slug: 'spec' })], reply: 'The spec is read.' }],
+  ['pwn', { tools: [call('mem_search', { query: 'x; touch PWNED' })], reply: 'Nothing found.' }],
+  ['big result', { tools: [call('mem_search', { query: 'big' })], reply: 'That was long.' }],
+  ['eleven', { tools: Array.from({ length: 11 }, (_, i) => call('mem_search', { query: `q${i + 1}` }, i)), reply: 'Eleven asked.' }],
+  ['slow', { reply: FISH, chunk: 2, every: 60 }],
+];
+
+function scenario(messages) {
+  const last = [...messages].reverse().find((m) => m.role === 'user');
+  const text = (Array.isArray(last?.content) ? last.content.map((p) => p.text ?? '').join(' ') : String(last?.content ?? '')).toLowerCase();
+  return SCENARIOS.find(([word]) => text.includes(word))?.[1] ?? { reply: FISH };
+}
+
+// The model pxy answers with: the alias's own, or the model asked for by name, such as the vision model.
+const modelFor = (asked) => ({ chat: 'fake/chat-model', default: 'fake/default-model' })[asked] ?? asked;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function answer(req, res, body) {
+  if (req.headers.authorization !== 'Bearer pxy-local') return refuse(res, 401, 'fake pxy: no key');
+  const s = scenario(body.messages ?? []);
+  if (s.status) return refuse(res, s.status, s.error);
+  const model = modelFor(body.model);
+  const lastIsTool = body.messages?.at(-1)?.role === 'tool';
+  res.writeHead(200, { 'content-type': 'text/event-stream' });
+  const send = (delta, finish = null) =>
+    res.write(`data: ${JSON.stringify({ id: 'fake', object: 'chat.completion.chunk', model, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`);
+  let closed = false;
+  res.on('close', () => (closed = true));
+  if (s.tools && !lastIsTool) {
+    send({ role: 'assistant', content: null, tool_calls: s.tools });
+    send({}, 'tool_calls');
+    res.end('data: [DONE]\n\n');
+    return;
+  }
+  const size = s.chunk ?? 6;
+  for (let at = 0; at < s.reply.length && !closed; at += size) {
+    send({ content: s.reply.slice(at, at + size) });
+    await sleep(s.every ?? 20);
+  }
+  if (s.stall) await sleep(s.stall);
+  if (closed) return;
+  if (s.streamError) {
+    res.end(`data: ${JSON.stringify({ error: { message: s.streamError, type: 'api_error' } })}\n\n`);
+    return;
+  }
+  send({}, 'stop');
+  res.end('data: [DONE]\n\n');
+}
+
+function refuse(res, status, message) {
+  res.writeHead(status, { 'content-type': 'application/json' });
+  res.end(JSON.stringify({ error: { code: null, message, type: 'api_error' } }));
+}
+
+const server = createServer((req, res) => {
+  let raw = '';
+  req.setEncoding('utf8');
+  req.on('data', (c) => (raw += c));
+  req.on('end', () => {
+    let body = {};
+    try {
+      body = JSON.parse(raw);
+    } catch (e) {
+      return refuse(res, 400, 'fake pxy: body is not JSON');
+    }
+    appendFileSync(`${dir}/requests.jsonl`, JSON.stringify(body) + '\n');
+    answer(req, res, body);
+  });
+});
+server.listen(0, '127.0.0.1', () => {
+  writeFileSync(`${dir}/port.tmp`, String(server.address().port));
+  renameSync(`${dir}/port.tmp`, `${dir}/port`);
+});
+process.on('SIGTERM', () => process.exit(0));

@@ -47,6 +47,8 @@ export DOTS_DNS=$repo/bin/dev-fake-dns
 export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
 # Taildrop's s picks files through a fake that reads DOTS_DEV_DIR/picked, since the nested bus has no portal.
 export DOTS_PICK_FILES=$repo/bin/dev-fake-pick-files
+# The chat never reaches pxy from a nested session: a chat check points it at bin/dev-fake-pxy, and anything else meets a refused port.
+export DOTS_CHAT_URL=${DOTS_CHAT_URL:-http://127.0.0.1:9/v1/chat/completions}
 # Dekho asks a fake that answers from dev/dekho's canned JSON and logs each call in the temp dir, never the real dekho, which reaches TMDB.
 export DOTS_DEKHO=$repo/bin/dev-fake-dekho
 # Deen asks a fake that answers from dev/deen's canned JSON, never the real deen, which reaches aladhan, quran.com's audio and the hadith CDN; a check that reads only local texts names another in DOTS_DEV_DEEN.

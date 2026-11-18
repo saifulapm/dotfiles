@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# The chat checks' mem: logs each argv as one JSON array line of DOTS_FAKE_MEM_LOG, and answers search, show and wiki from fixtures; a search for "big" answers 20 KiB.
+{
+jq -cn '$ARGS.positional' --args -- "$@" >>"${DOTS_FAKE_MEM_LOG:?}"
+case "$1" in
+  search) if [ "${*: -1}" = big ]; then head -c 20480 /dev/zero | tr '\0' 'b'; else printf '#SHAPE-1  1.00  decision  2026-11-16  The island is one pill that morphs into each surface\n'; fi ;;
+  show) printf 'The island is one pill that morphs into each surface (SHAPE-1).\n' ;;
+  --project) printf '# spec\n\nThe island redesign.\n' ;;
+  *) echo "fake mem: no fixture for $*" >&2; exit 1 ;;
+esac
+exit
+}

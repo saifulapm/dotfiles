@@ -955,3 +955,14 @@ test('every nested check, the bench and the fast suite wait for dots-calm', () =
   const just = readFileSync(new URL('../../justfile', import.meta.url), 'utf8');
   assert.match(just, /\ntest:\n\s+bin\/dots-calm && tests\/scratch\.sh timeout 5 node --test/);
 });
+
+// No check reaches a model provider: the nested session's chat goes to the fake pxy or to a refused port, and no check names pxy's own.
+test('dots-dev points the chat away from pxy, and no check or bench names port 4100', () => {
+  assert.match(readFileSync(new URL('../../bin/dots-dev', import.meta.url), 'utf8'), /\nexport DOTS_CHAT_URL=\$\{DOTS_CHAT_URL:-http:\/\/127\.0\.0\.1:9\//);
+  const named = readdirSync(dir)
+    .map((f) => [f, readFileSync(dir + f, 'utf8')])
+    .concat([['dots-bench', readFileSync(new URL('../../bin/dots-bench', import.meta.url), 'utf8')]])
+    .filter(([, text]) => /:4100\b/.test(text))
+    .map(([f]) => f);
+  assert.deepEqual(named, []);
+});
