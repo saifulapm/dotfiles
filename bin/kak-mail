@@ -190,9 +190,14 @@ def cmd_show(args):
         lines.append("")
     with open(out, "w") as f:
         f.write("\n".join(lines) + "\n")
+    # The thread opens where the reading starts: its first unread mail, else its newest; read before set_unread below clears the tags.
+    starts = {m["id"]: int(mark.split(":", 1)[0]) for m, mark in zip(msgs, marks)}
+    unread = [m for m in msgs if "unread" in m["tags"]]
+    first = min(unread, key=lambda m: m["timestamp"]) if unread else max(msgs, key=lambda m: m["timestamp"], default=None)
     # Opening a thread marks it read, but mail in the Screener stays unread until Saiful screens its sender in or out.
     set_unread(both(query, f"not ({box('Screener')[2]})"), False)
     print("set-option buffer mail_msgs " + " ".join(kq(x) for x in marks))
+    print(f"set-option buffer mail_start {starts[first['id']] if first else 1}")
 
 
 def shown(url):

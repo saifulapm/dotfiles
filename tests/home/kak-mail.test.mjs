@@ -651,3 +651,23 @@ test('a sender decision on a mail whose file moved since the last index still de
   assert.equal(res.status, 0, res.stderr);
   assert.equal(r.db('screened.db'), 'ann@first.test\n');
 });
+
+test('a thread opens on its first unread mail, or on its newest when all are read', (t) => {
+  const r = mailRig(t);
+  r.deliver({ 'Message-ID': '<t1@x.test>', Date: 'Sat, 14 Nov 2026 10:00:00 +0000' });
+  r.deliver({ 'Message-ID': '<t2@x.test>', Date: 'Sat, 14 Nov 2026 11:00:00 +0000', 'In-Reply-To': '<t1@x.test>', References: '<t1@x.test>' });
+  r.deliver({ 'Message-ID': '<t3@x.test>', Date: 'Sat, 14 Nov 2026 12:00:00 +0000', 'In-Reply-To': '<t2@x.test>', References: '<t1@x.test> <t2@x.test>' });
+  r.notmuch('tag', '+screened', '-new', '--', '*');
+  r.notmuch('tag', '-unread', '--', 'id:t1@x.test');
+  const thread = r.notmuch('search', '--output=threads', '--', 'id:t1@x.test').trim();
+  const out = join(r.M, 'show');
+  const start = () => {
+    const s = r.kakMail('show', '--out', out, thread);
+    assert.equal(s.status, 0, s.stderr);
+    const line = Number(s.stdout.match(/^set-option buffer mail_start (\d+)$/m)?.[1]);
+    return readFileSync(out, 'utf8').split('\n').slice(line - 1).find((l) => l.startsWith('Date:'));
+  };
+  assert.equal(start(), 'Date: Sat, 14 Nov 2026 11:00:00 +0000');
+  // That open marked the thread read, so the next one lands on the newest.
+  assert.equal(start(), 'Date: Sat, 14 Nov 2026 12:00:00 +0000');
+});

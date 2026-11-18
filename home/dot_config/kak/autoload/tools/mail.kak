@@ -11,6 +11,7 @@ declare-option -hidden str mail_query
 declare-option -hidden bool mail_unthreaded false
 declare-option -hidden str-list mail_ids
 declare-option -hidden str-list mail_msgs
+declare-option -hidden int mail_start 1
 declare-option -hidden str mail_return_buf
 # The buffer `mail` was opened from, where q in the boxes goes back to. Global,
 # since a window belongs to one buffer and edit -scratch *mail* leaves it.
@@ -178,7 +179,8 @@ define-command mail-thread -params 1 -docstring 'mail-thread <notmuch query>: re
     set-option buffer filetype mail-thread
     set-option buffer mail_query %arg{1}
     mail-thread-render
-    execute-keys gg
+    # kak-mail show sets mail_start to the first unread mail, else the newest, and the view puts it at the top.
+    execute-keys "%opt{mail_start}gvt"
 }
 
 define-command -hidden mail-thread-render %{
