@@ -20,8 +20,9 @@ const SCENARIOS = [
   ['stall', { reply: 'Thinking about it', stall: 60000 }],
   ['401', { status: 401, error: 'fake pxy: invalid API key' }],
   ['stream error', { reply: 'Part', streamError: 'fake pxy: upstream overloaded' }],
-  ['shape', { tools: [call('mem_search', { query: 'island shape' })], reply: MEM_ANSWER }],
+  // The longer word goes first, since a message that holds it holds the shorter one too.
   ['show shape-1', { tools: [call('mem_show', { id: 'SHAPE-1' })], reply: MEM_ANSWER }],
+  ['shape', { tools: [call('mem_search', { query: 'island shape' })], reply: MEM_ANSWER }],
   ['wiki', { tools: [call('mem_wiki', { project: 'dotfiles', slug: 'spec' })], reply: 'The spec is read.' }],
   ['pwn', { tools: [call('mem_search', { query: 'x; touch PWNED' })], reply: 'Nothing found.' }],
   ['big result', { tools: [call('mem_search', { query: 'big' })], reply: 'That was long.' }],
