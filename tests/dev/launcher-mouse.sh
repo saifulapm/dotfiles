@@ -49,7 +49,7 @@ wtype "c "
 until_ok 2000 state_is '.mode == "colorschemes" and .count == 40 and .top == 0'
 wheel_box launcher-row:4 1
 until_ok 1000 state_is '.top != 0'
-check "one wheel notch down over the forty colorschemes moves the first shown row by three ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 3 and (.results | length) == 8'
+check "one wheel notch down over the forty colorschemes moves the first shown card by three ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 3 and (.results | length) == 6'
 wheel_box launcher-row:4 -1
 until_ok 1000 state_is '.top == 0'
 check "and one notch up brings it back ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 0'
