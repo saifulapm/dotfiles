@@ -21,6 +21,8 @@ check "Y puts the whole reply on the clipboard" until_ok 2000 pasted "$(printf '
 wtype m
 check "m switches to the default alias ($(chat | jq -c .alias))" until_ok 2000 chat_is '.alias == "default"'
 wtype -k Tab
+check "Tab from the reply list opens the history page ($(chat | jq -c '{focus, page}'))" until_ok 2000 chat_is '.focus == "history" and .page == "history"'
+wtype -k Tab
 until_ok 2000 chat_is '.focus == "input" and .keyboard'
 wtype -- "two"
 wtype -M shift -k Return -m shift

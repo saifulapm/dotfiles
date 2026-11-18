@@ -24,6 +24,8 @@ check "with pxy back, r asks again and the reply streams ($(chat | jq -c '{error
 check "the retry sent the same message once more" sent '[.[] | .messages[-1].content] == ["write a fish loop"]'
 
 wtype -k Tab
+until_ok 2000 chat_is '.focus == "history"'
+wtype -k Tab
 until_ok 2000 chat_is '.focus == "input" and .keyboard'
 say "send 401"
 check "an HTTP 401 shows pxy's own message ($(chat | jq -c .error))" until_ok 3000 chat_is '.error == "fake pxy: invalid API key" and .failure.drawn'
