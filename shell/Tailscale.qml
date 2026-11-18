@@ -35,10 +35,12 @@ Item {
     readonly property bool isOn: status.state === "on"
     readonly property var rows: isOn ? status.machines : []
     readonly property var current: rows[selected] ?? null
-    readonly property Root.Motion motion: Root.Motion {
-        shown: panel.shown
-        tokens: panel.theme.tokens
-    }
+    // The island reports this as its surface while Tailscale shows, and grows to this width for it (board 8).
+    readonly property string name: "tailscale"
+    readonly property int wantWidth: 640
+    // True once the island has come to rest on Tailscale; the surfaces' window sets it.
+    property bool settled: false
+    implicitHeight: card.height
 
     function open(t0) {
         openT0 = t0;
@@ -146,7 +148,7 @@ Item {
             busy: busy,
             openMs: openMs,
             opens: opens,
-            settled: motion.settled,
+            settled: panel.settled,
             drawing: panel.visible,
             cardBox: card.drawnBox(),
             keyboard: panel.Window.active
@@ -205,8 +207,6 @@ Item {
     Component.onCompleted: Root.State.loaded.push("tailscale")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "tailscale")
 
-    visible: motion.drawing
-
     // Holds the keyboard while the card shows, the list or its one line: j and k move, Enter copies, s sends, t turns Tailscale off or on.
     Item {
         id: keyTarget
@@ -229,19 +229,13 @@ Item {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: card.wash
-    }
-
     Root.Surface {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: 168
-        width: 640
+        width: parent.width
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        motion: panel.motion
+        // The island draws the fill and plays the open.
+        bare: true
 
         ColumnLayout {
             id: column

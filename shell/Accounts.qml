@@ -42,10 +42,12 @@ Item {
     readonly property var stops: items.map((it, i) => it.stop ? i : -1).filter(i => i >= 0)
     readonly property int current: stops.length ? stops[Math.min(selected, stops.length - 1)] : -1
     readonly property var activeAccount: view.accounts.find(a => a.active) ?? null
-    readonly property Root.Motion motion: Root.Motion {
-        shown: panel.shown
-        tokens: panel.theme.tokens
-    }
+    // The island reports this as its surface while Accounts shows, and grows to this width for it (board 8).
+    readonly property string name: "accounts"
+    readonly property int wantWidth: 640
+    // True once the island has come to rest on Accounts; the surfaces' window sets it.
+    property bool settled: false
+    implicitHeight: card.height
 
     // A second open while a fetch runs leaves that fetch to finish and starts none.
     function open(t0) {
@@ -156,7 +158,7 @@ Item {
             openMs: openMs,
             cardMs: cardMs,
             opens: opens,
-            settled: motion.settled,
+            settled: panel.settled,
             cardBox: card.drawnBox(),
             keyboard: panel.Window.active
         });
@@ -251,8 +253,6 @@ Item {
     Component.onCompleted: Root.State.loaded.push("accounts")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "accounts")
 
-    visible: motion.drawing
-
     // Holds the keyboard while the card shows: j and k move between account and provider rows, r fetches again.
     Item {
         id: keyTarget
@@ -273,19 +273,13 @@ Item {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: card.wash
-    }
-
     Root.Surface {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: Math.max(24, Math.min(100, Math.round((parent.height - height) / 2)))
-        width: 640
+        width: parent.width
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        motion: panel.motion
+        // The island draws the fill and plays the open.
+        bare: true
 
         ColumnLayout {
             id: column

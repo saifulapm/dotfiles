@@ -32,10 +32,12 @@ Item {
     readonly property int count: G.activeGoals(store).length
     readonly property var c: theme.color
     readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property Root.Motion motion: Root.Motion {
-        shown: view.shown
-        tokens: view.theme.tokens
-    }
+    // The island reports this as its surface while Goals shows, and grows to this width for it (board 8).
+    readonly property string name: "goals"
+    readonly property int wantWidth: 640
+    // True once the island has come to rest on Goals; the surfaces' window sets it.
+    property bool settled: false
+    implicitHeight: panel.height
 
     onListChanged: selected = Math.max(0, Math.min(selected, list.length - 1))
 
@@ -85,9 +87,7 @@ Item {
             confirmLabel: confirm ? { text: promptLabel.text, color: String(promptLabel.color), box: box(promptLabel) } : null,
             openMs: openMs,
             opens: opens,
-            motion: motion.curves?.kind ?? null,
-            settleMs: motion.settleMs,
-            settled: motion.settled,
+            settled: view.settled,
             drawing: view.visible,
             cardBox: panel.drawnBox(),
             // The window has the keyboard; niri lists a layer Exclusive a moment before its keys arrive.
@@ -225,7 +225,6 @@ Item {
     }
 
     Component.onCompleted: Root.State.loaded.push("goals")
-    visible: motion.drawing
 
     Item {
         id: keys
@@ -263,19 +262,13 @@ Item {
                 event.accepted = false;
         }
 
-        Rectangle {
-            anchors.fill: parent
-            color: panel.wash
-        }
-
         Root.Surface {
             id: panel
-            x: Math.round((parent.width - width) / 2)
-            y: 104
-            width: 680
+            width: parent.width
             height: column.implicitHeight
             tokens: view.theme.tokens
-            motion: view.motion
+            // The island draws the fill and plays the open.
+            bare: true
 
             ColumnLayout {
                 id: column

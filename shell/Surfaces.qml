@@ -93,7 +93,7 @@ PanelWindow {
         }
     }
 
-    // t0 is taken before the first load, so a cold open's time includes loading. The launcher and the cheat sheet open before the other closes, so the island goes straight from one to the other and never reads null between.
+    // t0 is taken before the first load, so a cold open's time includes loading. A surface in the island opens before the other closes, so the island goes straight from one to the other and never reads null between.
     function openLauncher(t0, mode, typed) {
         launcherFromOverview = !!typed;
         launcherLoader.active = true;
@@ -121,8 +121,8 @@ PanelWindow {
 
     function openGoals(t0) {
         goalsLoader.active = true;
-        closeOthers(goalsView);
         goalsView.open(t0);
+        closeOthers(goalsView);
     }
 
     function toggleRecorder() {
@@ -141,26 +141,26 @@ PanelWindow {
 
     function openPass(t0) {
         passLoader.active = true;
-        closeOthers(pass);
         pass.open(t0);
+        closeOthers(pass);
     }
 
     function openTailscale(t0) {
         tailscaleLoader.active = true;
-        closeOthers(tailscale);
         tailscale.open(t0);
+        closeOthers(tailscale);
     }
 
     function openAccounts(t0) {
         accountsLoader.active = true;
-        closeOthers(accounts);
         accounts.open(t0);
+        closeOthers(accounts);
     }
 
     function openDns(t0) {
         dnsLoader.active = true;
-        closeOthers(dns);
         dns.open(t0);
+        closeOthers(dns);
     }
 
     // The Pinentry service calls this with each gpg request it shows.
@@ -359,7 +359,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder]
+    readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder, pass, tailscale, accounts, dns, goalsView]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null
@@ -517,12 +517,15 @@ PanelWindow {
         onTriggered: pinentryLoader.active = false
     }
 
+    // Pass, Tailscale, Accounts and DNS draw inside the island, on the island's fill, so they read the scheme's own tokens (board 8); each loads on its first open and unloads 30 s after its close.
     Loader {
         id: passLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.pass
         active: false
         sourceComponent: Root.Pass {
-            theme: panelTheme
+            theme: host.theme
         }
     }
 
@@ -535,55 +538,98 @@ PanelWindow {
         }
     }
 
+    // A surface in the island stays the island's last through its close, so its unload waits on its own close, not on what is drawn.
     Root.Tick {
         interval: 30000
-        running: !!host.pass && !host.pass.visible && !host.pass.busy
+        running: !!host.pass && !host.pass.shown && !host.pass.busy
         onTriggered: passLoader.active = false
     }
 
     Loader {
         id: tailscaleLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.tailscale
         active: false
         sourceComponent: Root.Tailscale {
-            theme: panelTheme
+            theme: host.theme
         }
     }
 
     Root.Tick {
         interval: 30000
-        running: !!host.tailscale && !host.tailscale.visible && !host.tailscale.busy
+        running: !!host.tailscale && !host.tailscale.shown && !host.tailscale.busy
         onTriggered: tailscaleLoader.active = false
     }
 
     Loader {
         id: accountsLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.accounts
         active: false
         sourceComponent: Root.Accounts {
-            theme: panelTheme
+            theme: host.theme
         }
     }
 
     Root.Tick {
         interval: 30000
-        running: !!host.accounts && !host.accounts.visible && !host.accounts.busy
+        running: !!host.accounts && !host.accounts.shown && !host.accounts.busy
         onTriggered: accountsLoader.active = false
     }
 
     Loader {
         id: dnsLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.dns
         active: false
         sourceComponent: Root.Dns {
-            theme: panelTheme
+            theme: host.theme
         }
     }
 
     Root.Tick {
         interval: 30000
-        running: !!host.dns && !host.dns.visible && !host.dns.busy
+        running: !!host.dns && !host.dns.shown && !host.dns.busy
         onTriggered: dnsLoader.active = false
+    }
+
+    // A check waits on these before it reads a tool's pixels.
+    Binding {
+        when: !!host.pass && !!host.island
+        target: host.pass
+        property: "settled"
+        value: host.island?.surface === "pass" && !(host.island?.animating ?? true)
+    }
+
+    Binding {
+        when: !!host.tailscale && !!host.island
+        target: host.tailscale
+        property: "settled"
+        value: host.island?.surface === "tailscale" && !(host.island?.animating ?? true)
+    }
+
+    Binding {
+        when: !!host.accounts && !!host.island
+        target: host.accounts
+        property: "settled"
+        value: host.island?.surface === "accounts" && !(host.island?.animating ?? true)
+    }
+
+    Binding {
+        when: !!host.dns && !!host.island
+        target: host.dns
+        property: "settled"
+        value: host.island?.surface === "dns" && !(host.island?.animating ?? true)
+    }
+
+    Binding {
+        when: !!host.goalsView && !!host.island
+        target: host.goalsView
+        property: "settled"
+        value: host.island?.surface === "goals" && !(host.island?.animating ?? true)
     }
 
     Loader {
@@ -602,12 +648,15 @@ PanelWindow {
         onTriggered: pickerLoader.active = false
     }
 
+    // Goals draws inside the island too; it warms with the rest once the Desk's store is there, and stays.
     Loader {
         id: goalsLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.goalsView
         active: false
         sourceComponent: Root.Goals {
-            theme: panelTheme
+            theme: host.theme
             goals: host.goals
         }
     }

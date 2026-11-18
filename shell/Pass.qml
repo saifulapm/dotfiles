@@ -42,10 +42,12 @@ Item {
     readonly property var found: P.passRows(entries, query)
     readonly property var rows: found.slice(0, 8)
     readonly property var current: rows[selected] ?? null
-    readonly property Root.Motion motion: Root.Motion {
-        shown: pass.shown
-        tokens: pass.theme.tokens
-    }
+    // The island reports this as its surface while Pass shows, and grows to this width for it (board 8).
+    readonly property string name: "pass"
+    readonly property int wantWidth: 640
+    // True once the island has come to rest on Pass; the surfaces' window sets it.
+    property bool settled: false
+    implicitHeight: card.height
 
     function open(t0) {
         openT0 = t0;
@@ -281,7 +283,7 @@ Item {
             qr: mode === "qr" && qr ? { issuer: qrIssuer.text, account: qrAccount.text, meta: qrMeta.text, question: qrQuestion.text } : null,
             openMs: openMs,
             opens: opens,
-            settled: motion.settled,
+            settled: pass.settled,
             drawing: pass.visible,
             cardBox: card.drawnBox(),
             keyboard: pass.Window.active
@@ -402,21 +404,13 @@ Item {
     Component.onCompleted: Root.State.loaded.push("pass")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "pass")
 
-    visible: motion.drawing
-
-    Rectangle {
-        anchors.fill: parent
-        color: card.wash
-    }
-
     Root.Surface {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: 168
-        width: 640
+        width: parent.width
         height: column.implicitHeight
         tokens: pass.theme.tokens
-        motion: pass.motion
+        // The island draws the fill and plays the open.
+        bare: true
 
         ColumnLayout {
             id: column

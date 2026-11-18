@@ -50,10 +50,12 @@ Item {
     readonly property var leases: D.leasesView(leasesText)
     readonly property var lease: leases.length ? leases[Math.min(leaseSelected, leases.length - 1)] : null
     readonly property bool anyTimed: items.some(it => it.kind === "device" && it.openUntil !== null)
-    readonly property Root.Motion motion: Root.Motion {
-        shown: panel.shown
-        tokens: panel.theme.tokens
-    }
+    // The island reports this as its surface while DNS Shield shows, and grows to this width for it (board 8).
+    readonly property string name: "dns"
+    readonly property int wantWidth: 880
+    // True once the island has come to rest on DNS Shield; the surfaces' window sets it.
+    property bool settled: false
+    implicitHeight: card.height
 
     // The last full state on disk draws at once, then the full read redraws it.
     function open(t0) {
@@ -236,7 +238,7 @@ Item {
             open: shown,
             visible: panel.visible,
             drawing: panel.visible,
-            settled: motion.settled,
+            settled: panel.settled,
             keyboard: panel.Window.active,
             busy: busy,
             opens: opens,
@@ -358,8 +360,6 @@ Item {
     Component.onCompleted: Root.State.loaded.push("dns")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "dns")
 
-    visible: motion.drawing
-
     // Holds the keyboard while the card shows, unless the allow field or the name field has it.
     Item {
         id: keyTarget
@@ -399,19 +399,13 @@ Item {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        color: card.wash
-    }
-
     Root.Surface {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: Math.max(24, Math.min(84, Math.round((parent.height - height) / 2)))
-        width: Math.min(1040, parent.width - 48)
+        width: parent.width
         height: column.implicitHeight
         tokens: panel.theme.tokens
-        motion: panel.motion
+        // The island draws the fill and plays the open.
+        bare: true
 
         ColumnLayout {
             id: column

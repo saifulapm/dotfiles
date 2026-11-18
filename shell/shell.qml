@@ -417,10 +417,10 @@ ShellRoot {
     Root.Ipc {
         target: "goals"
 
-        // The store lives in the Desk, so Goals opens only once the Desk has loaded.
+        // The store lives in the Desk, so Goals opens only once the Desk has read it; a save before that would write the empty store over it.
         function open(): void {
             const t0 = Date.now();
-            if (!root.desk)
+            if (!root.desk?.goals?.ready)
                 return;
             surfacesLoader.active = true;
             surfacesLoader.item.openGoals(t0);
