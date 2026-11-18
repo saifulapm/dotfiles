@@ -339,7 +339,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [launcher, cheatsheet, control]
+    readonly property var islandSurfaces: [launcher, cheatsheet, control, recorder]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null
@@ -446,6 +446,26 @@ PanelWindow {
             theme: panelTheme
             screen: host.screen
         }
+    }
+
+    // The Recorder's bar draws inside the island, on the island's fill, so it reads the scheme's own tokens; its dim stays over the whole output.
+    Loader {
+        id: recorderBarLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
+        anchors.fill: parent
+        visible: host.islandLast === host.recorder
+        active: !!host.recorder
+        sourceComponent: Root.RecorderBar {
+            recorder: host.recorder
+            theme: host.theme
+        }
+    }
+
+    Binding {
+        when: !!host.recorder
+        target: host.recorder
+        property: "bar"
+        value: recorderBarLoader.item
     }
 
     Loader {

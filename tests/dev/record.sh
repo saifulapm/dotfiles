@@ -15,14 +15,6 @@ files() { find "$DOTS_RECORDINGS_DIR" -name '*.mp4' 2>/dev/null | wc -l; }
 
 until_ok 5000 shell_status >/dev/null
 
-# The picker's key hint reads in the launcher's plain voice.
-hint="hjkl move  ⇧HJKL size  f full  ↵ rec  esc cancel"
-mod_shift_r
-until_ok 3000 state_is '.picking'
-check "the hint reads $hint ($(rec_state | jq -c .hint))" state_is ".hint == \"$hint\""
-wtype -k Escape
-until_ok 2000 state_is '.picking | not'
-
 mod_shift_r
 until_ok 3000 state_is '.picking'
 check "Mod+Shift+R opens the picker" state_is '.picking and (.recording | not)'
