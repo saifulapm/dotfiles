@@ -144,9 +144,9 @@ until_ok 8000 bash -c "! timeout 0.5 qs ipc call island state | jq -e '.mode == 
 left=$(($(now_ms) - dropped))
 check "the toast leaves about 5 s after the drop (${left} ms)" test "$left" -gt 4000 -a "$left" -lt 6500
 
-# The chip draws on the toast and on the cursor row in the one design's fills; a panel reads the desk tokens, so the row's chip is the paper.
-for t in artboard:#2B2F36:#E4E6EA; do
-  IFS=: read -r name toast row <<<"$t"
+# The toast draws its chip in the design's fill; in the centre a file is a chip with the file's name on the tile, as board 5 draws it.
+for t in artboard:#2B2F36; do
+  IFS=: read -r name toast <<<"$t"
   send_files "$heic"
   toast_for "Taildrop · 1 file"
   box=$(island | jq -c .note.chipBox)
@@ -154,21 +154,19 @@ for t in artboard:#2B2F36:#E4E6EA; do
   echo "     $name toast chip $box"
   check "$name: the toast's chip reads HEIC and draws $toast ($n px)" test "$(island | jq -r .note.chip)" = HEIC -a "$n" -gt 40
   open_centre
-  box=$(centre | jq -c '.chips[0].box')
-  n=$(near "$(geo "$box")" $(rgb "$row") 8)
-  echo "     $name row chip $box"
-  check "$name: the cursor row's chip reads HEIC and draws $row ($n px)" test "$(centre | jq -r '.chips[0].text')" = HEIC -a "$n" -gt 40
-  check "$name: a row about no file has no chip ($(centre | jq -c '[.chips[] | .text?]'))" centre_is 'any(.chips[]; . == null)'
+  echo "     $name centre chip $(centre | jq -c '[.notes[].file]')"
+  check "$name: the centre's Taildrop tile draws a chip reading IMG_2041.HEIC" centre_is 'any(.notes[]; .file.text == "IMG_2041.HEIC" and .file.w > 40)'
+  check "$name: a tile about no file has no chip" centre_is 'any(.notes[]; .file == null)'
   close_centre
 done
 
-# The centre covers the output while open, so its row's drag must let the pointer through to the window under it.
+# The centre is the island now; its tile's chip drags out to the window under the island.
 send_files "$heic"
 toast_for "Taildrop · 1 file"
 open_centre
 n=$(drop_count)
-drag_to_target "$(centre | jq -c '.chips[0].box')"
-check "the centre row's chip drops file://$heic on the window under the centre ($(drops -1))" test "$(drop_count)" -gt "$n" -a "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
+drag_to_target "$(centre | jq -c '[.notes[] | select(.file)][0].file')"
+check "the centre tile's chip drops file://$heic on the window under the centre ($(drops -1))" test "$(drop_count)" -gt "$n" -a "$(drops -1 | jq -r .uriList)" = "file://$heic"$'\r'
 check "and the centre is still open after the drop" centre_is '.open'
 close_centre
 

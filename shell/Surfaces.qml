@@ -103,8 +103,8 @@ PanelWindow {
 
     function openNotifs(t0) {
         notifsLoader.active = true;
-        closeOthers(notifications);
         notifications.open(t0);
+        closeOthers(notifications);
     }
 
     function openCheatsheet(t0) {
@@ -316,14 +316,31 @@ PanelWindow {
         }
     }
 
+    // The notification centre draws inside the island, on the island's fill, so it reads the scheme's own tokens.
     Loader {
         id: notifsLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.notifications
         active: false
         sourceComponent: Root.Notifications {
-            theme: panelTheme
+            theme: host.theme
             notifs: host.notifs
         }
+    }
+
+    Binding {
+        target: host.notifs
+        property: "seen"
+        value: host.notifications?.shown ?? false
+    }
+
+    // A check waits on this before it reads the centre's pixels.
+    Binding {
+        when: !!host.notifications && !!host.island
+        target: host.notifications
+        property: "settled"
+        value: host.island?.surface === "notifs" && !(host.island?.animating ?? true)
     }
 
     // The cheat sheet draws inside the island, on the island's fill, so it reads the scheme's own tokens.
@@ -339,7 +356,7 @@ PanelWindow {
     }
 
     // The surfaces that draw inside the island, and the one of them shown, or null.
-    readonly property var islandSurfaces: [launcher, cheatsheet, control, recorder]
+    readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
     // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null

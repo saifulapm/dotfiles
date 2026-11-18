@@ -95,9 +95,8 @@ close_centre() {
   niri msg action spawn -- dots-call notifs close
   until_ok 2000 centre_is '.open == false'
 }
-row_chips() { notifs | jq -c '[.actions[] | [.[] | ascii_downcase | gsub("[\\[\\]]"; "")]]'; }
-legend() { notifs | jq -r '.legend | ascii_downcase | gsub("[\\[\\]]"; "")'; }
-legend_has() { [[ "$(legend)" == *"$1"* ]]; }
+# The selected tile's buttons as drawn; only it draws any.
+row_chips() { notifs | jq -c '[.actions[] | .text | ascii_downcase]'; }
 
 notify-send -a T -A old=Old older >/dev/null 9>&- &
 older=$!
@@ -105,15 +104,14 @@ until_ok 2000 shows older
 ask -A yes=Yes -A no=No newer
 until_ok 2000 shows newer
 open_centre
-check "the selected row draws its chips and the other none ($(row_chips))" test "$(row_chips)" = '[["1 yes","2 no"],[]]'
-check "the legend names 1-3 action ($(legend))" legend_has "1-3 action"
+check "the selected tile draws its buttons, Yes inverted ($(row_chips))" test "$(row_chips)" = '["yes","no"]' -a "$(notifs | jq -c '[.actions[].inverted]')" = '[true,false]'
 wtype -k 1
 until_ok 2000 printed yes
 check "1 on the row prints yes ($(cat "$out"))" printed yes
 check "and the centre closes" until_ok 2000 centre_is '.open == false'
 # The action dismissed it, so its app holds it no more: its row draws no chips, and 1 there runs nothing.
 open_centre
-check "reopened, the acted row draws no chips ($(row_chips))" test "$(row_chips)" = '[[],[]]'
+check "reopened, the acted row draws no buttons ($(row_chips))" test "$(row_chips)" = '[]'
 wtype -k 1
 sleep 0.5
 check "and 1 there leaves the centre open" centre_is .open
@@ -140,19 +138,18 @@ until_ok 2000 shows kept
 systemctl --user restart "$DOTS_DEV_UNIT"
 until_ok 5000 at_rest
 open_centre
-check "after a shell restart its row draws no chips ($(row_chips))" test "$(row_chips)" = '[[]]'
+check "after a shell restart its row draws no buttons ($(row_chips))" test "$(row_chips)" = '[]'
 close_centre
 done_asking
 
 # The chips stand out from what they sit on: the island's dark card, and Mod+A's cursor row.
-apart() { jq -e 'map(ascii_downcase) | .[0] != .[2] and .[1] != .[2]' >/dev/null <<<"$1"; }
 ask -A yes=Yes ink
 until_ok 2000 shows ink
 ink=$(island | jq -c .note.actionInk)
 check "the card's first button, inverted, draws its word apart from its fill ($ink)" jq -e 'map(ascii_downcase) | .[0] != .[1]' <<<"$ink"
 open_centre
-ink=$(notifs | jq -c .actionInk)
-check "the row's chip key and word differ from their fill ($ink)" apart "$ink"
+ink=$(notifs | jq -c '[.actions[0].ink, .actions[0].fill]')
+check "the tile's inverted button draws its word apart from its fill ($ink)" jq -e 'map(ascii_downcase) | .[0] != .[1]' <<<"$ink"
 close_centre
 done_asking
 

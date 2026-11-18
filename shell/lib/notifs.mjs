@@ -49,6 +49,23 @@ export function cycleStay(rules, app) {
   return withRule(rules, app, rule);
 }
 
+// The Stays on screen pills in the order the rules tile draws them; -1 is Default, the app's own time.
+const STAY_PILLS = [-1, 3000, 10000, 0];
+
+export function setStays(rules, app, ms) {
+  const rule = Object.assign({}, ruleOf(rules, app));
+  if (ms >= 0) rule.stays = ms;
+  else delete rule.stays;
+  return withRule(rules, app, rule);
+}
+
+// h and l step along the pills, stopping at either end.
+export function stepStays(rules, app, dir) {
+  const stays = ruleOf(rules, app)?.stays;
+  const at = STAY_PILLS.indexOf(stays >= 0 ? stays : -1);
+  return setStays(rules, app, STAY_PILLS[Math.max(0, Math.min(STAY_PILLS.length - 1, at + dir))]);
+}
+
 const stayText = (ms) => (ms === 0 ? 'until dismissed' : ms / 1000 + ' s');
 
 export const ruleText = (rule) => (rule?.muted ? ' · muted' : '') + (rule?.dnd ? ' · through DND' : '') + (rule?.stays >= 0 ? ' · stays ' + stayText(rule.stays) : '');

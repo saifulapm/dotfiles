@@ -84,7 +84,8 @@ notify-send -a Chat hello
 until_ok 2000 shows hello
 mod_a
 until_ok 3000 centre_open
-# The newest row, hello, is selected; j selects the critical's row under it.
+# The newest row, hello, is selected; j passes A's head and j again selects the critical's row under it.
+wtype -k j
 wtype -k j
 wtype -k d
 until_ok 2000 eval '! in_history stuck'

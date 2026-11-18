@@ -196,6 +196,11 @@ test('every IN SURFACES row names a key its surface\'s code handles, a shared ro
   }
 });
 
+test('IN SURFACES lists the notification centre\'s rules keys', () => {
+  const keys = IN_SURFACES.filter((r) => r.surface === 'notifications').map((r) => r.key);
+  assert.deepEqual(keys, ['↵', 'D', '⇧ D', 'M', 'I', 'S', 'H / L', '/', '1-9']);
+});
+
 test('IN SURFACES lists Control\'s - and = under Control', () => {
   const keys = IN_SURFACES.filter((r) => r.surface === 'control').map((r) => r.key);
   assert.ok(keys.includes('- / ='), keys.join());

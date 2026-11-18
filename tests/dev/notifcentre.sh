@@ -34,7 +34,7 @@ check "d dismisses the selected entry" state_is '.count == 2 and .summaries == [
 # wtype -k D sends the keysym without Shift, which Qt reads as d, so the check holds Shift as a person does.
 wtype -M shift -k d -m shift
 until_ok 2000 state_is '.count == 0'
-check "D clears the history and shows the key hint" state_is '.count == 0 and .groups == [] and .hint'
+check "D clears the history and draws Nothing new" state_is '.count == 0 and .groups == [] and .empty'
 
 wtype -k Escape
 until_ok 2000 centre_closed
@@ -45,11 +45,13 @@ until_ok 2000 island_is notification
 mod_a
 until_ok 3000 centre_open
 wtype -k d
-until_ok 2000 island_is rest
-check "a critical notification dismissed with d leaves the island" island_is rest
+until_ok 2000 state_is '.count == 0'
 check "the dismiss took it from the history" state_is '.count == 0'
+# The centre is the island now, so the critical's leaving shows once the centre closes.
 wtype -k Escape
 until_ok 2000 centre_closed
+until_ok 2000 island_is rest
+check "a critical notification dismissed with d does not come back to the island" island_is rest
 check "at rest the shell runs one timer" bash -c 'timeout 0.5 qs ipc call shell status | jq -e ".timers == 1" >/dev/null'
 
 exit $((fails > 0))

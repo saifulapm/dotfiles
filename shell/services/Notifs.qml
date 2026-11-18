@@ -17,6 +17,8 @@ Scope {
     // While the island holds arrivals, a surface being open, each waits here in arrival order with its expiry; they show one at a time once it lets go, and one that ran out meanwhile stays in the history only (3WG2NHE3).
     property bool held: false
     property var queue: []
+    // While the notification centre is open, an arrival joins its list there at once, so it neither shows nor waits.
+    property bool seen: false
     onHeldChanged: if (!held && !current)
         release()
     // Newest first, at most 200, kept in the state dir across restarts.
@@ -75,6 +77,16 @@ Scope {
         save();
     }
 
+    function setStays(app, ms) {
+        rules = N.setStays(rules, app, ms);
+        save();
+    }
+
+    function stepStay(app, dir) {
+        rules = N.stepStays(rules, app, dir);
+        save();
+    }
+
     function remember(e, n) {
         history = N.addEntry(history, e);
         const kept = {};
@@ -93,7 +105,7 @@ Scope {
 
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
     function show(e) {
-        if (!N.shows(e, N.ruleOf(rules, e.app), dnd))
+        if (seen || !N.shows(e, N.ruleOf(rules, e.app), dnd))
             return;
         // A replace of the one showing updates it in place, held or not, so it never waits as a second copy.
         if (current?.key !== e.key && (held || queue.length)) {

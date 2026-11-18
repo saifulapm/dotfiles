@@ -38,8 +38,9 @@ until_ok 2000 centre_is '.count == 2'
 # A toast on the island would take a click meant for the centre, so they leave first.
 until_ok 15000 island_rest
 open_centre
-check "the centre lists newer then older, newer selected ($(notifs | jq -c '{selected, groups}'))" centre_is '.selected == 0 and .groups == [{app: "T", entries: ["newer", "older"]}]'
-click_box notif-row:1
+# Row 0 is T's head, so newer is row 1 and older row 2.
+check "the centre lists newer then older, newer selected ($(notifs | jq -c '{selected, groups}'))" centre_is '.selected == 1 and .groups == [{app: "T", entries: ["newer", "older"]}]'
+click_box notif-row:2
 until_ok 2000 printed default
 check "a click on the older row runs its default action ($(cat "$out"))" printed default
 until_ok 2000 closed
@@ -55,7 +56,7 @@ sender=$!
 until_ok 2000 centre_is '.count == 2'
 until_ok 15000 island_rest
 open_centre
-read -r jx jy < <(shell_spot notif-row:0)
+read -r jx jy < <(shell_spot notif-row:1)
 point press "$jx" "$jy"
 point move "$((jx + 4))" "$((jy + 3))" 2
 point release
@@ -81,33 +82,34 @@ wait "$sender" 2>/dev/null
 sender=
 
 timeout 0.5 qs ipc call notifs clear >/dev/null
-for i in $(seq 1 20); do notify-send -a bulk "bulk $i"; done
-until_ok 5000 centre_is '.count == 20'
+# Forty, so the list is taller than the island lets it be; row 0 is bulk's head.
+for i in $(seq 1 40); do notify-send -a bulk "bulk $i"; done
+until_ok 5000 centre_is '.count == 40'
 open_centre
-check "twenty rows open at the top, the first selected ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 0 and .scrollY == 0'
-wheel_box notif-row:2 1
+check "forty rows open at the top, the first selected ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 1 and .scrollY == 0'
+wheel_box notif-row:3 1
 until_ok 1000 centre_is '.scrollY != 0'
-check "one wheel notch down moves the list 60 px and leaves the selection ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.scrollY == 60 and .selected == 0'
+check "one wheel notch down moves the list 60 px and leaves the selection ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.scrollY == 60 and .selected == 1'
 wtype j
-until_ok 1000 centre_is '.selected == 1'
-check "then j selects the second row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 1'
+until_ok 1000 centre_is '.selected == 2'
+check "then j selects the second row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 2'
 check "and it is in view ($(notifs | jq -c '{cursorBox, listBox}'))" in_view
 
 point wheel 4
 until_ok 1000 centre_is '.scrollY == 300'
-check "four more notches move the list to 300 px, past the selected row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.scrollY == 300 and .selected == 1'
+check "four more notches move the list to 300 px, past the selected row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.scrollY == 300 and .selected == 2'
 wtype j
-until_ok 1000 centre_is '.selected == 2'
-check "j selects the third row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 2 and .scrollY < 300'
+until_ok 1000 centre_is '.selected == 3'
+check "j selects the third row ($(notifs | jq -c '{selected, scrollY}'))" centre_is '.selected == 3 and .scrollY < 300'
 check "and brings it back into view ($(notifs | jq -c '{cursorBox, listBox}'))" in_view
 
-at=$(shell_spot notif-row:5)
+at=$(shell_spot notif-row:6)
 # shellcheck disable=SC2086
 point move $at
 wtype j
-until_ok 1000 centre_is '.selected != 2'
+until_ok 1000 centre_is '.selected != 3'
 sleep 0.3
-check "with the pointer resting on the sixth row, j moves the selection one row ($(notifs | jq -c .selected))" centre_is '.selected == 3'
+check "with the pointer resting on the sixth row, j moves the selection one row ($(notifs | jq -c .selected))" centre_is '.selected == 4'
 check "and the centre stays open" centre_is .open
 wtype -k Escape
 until_ok 2000 closed

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon, stacked } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, setStays, stepStays, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon, stacked } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -368,4 +368,15 @@ test("a notification replaces its own app's older one in the same stack, and no 
   assert.equal(stacked(h, { app: 'dl', stack: 'c' }), null);
   assert.equal(stacked(h, { app: 'dl', stack: '' }), null);
   assert.equal(stacked(h, { app: 'dl' }), null);
+});
+
+test('a stays pill sets the app\'s time, Default drops it, and h and l step along the pills and stop at the ends', () => {
+  assert.deepEqual(setStays({}, 'Mail', 3000), { Mail: { stays: 3000 } });
+  assert.deepEqual(setStays({ Mail: { stays: 3000, muted: true } }, 'Mail', -1), { Mail: { muted: true } });
+  assert.deepEqual(setStays({ Mail: { stays: 3000 } }, 'Mail', -1), {});
+  assert.deepEqual(stepStays({}, 'Mail', 1), { Mail: { stays: 3000 } });
+  assert.deepEqual(stepStays({ Mail: { stays: 10000 } }, 'Mail', 1), { Mail: { stays: 0 } });
+  assert.deepEqual(stepStays({ Mail: { stays: 0 } }, 'Mail', 1), { Mail: { stays: 0 } });
+  assert.deepEqual(stepStays({}, 'Mail', -1), {});
+  assert.deepEqual(stepStays({ __proto__x: {} }, '__proto__', 1), { __proto__x: {}, ['__proto__']: { stays: 3000 } });
 });

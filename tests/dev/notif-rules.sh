@@ -38,7 +38,7 @@ notify-send -t 1 -a T first
 until_ok 2000 listed first
 until_ok 2000 mode_is rest
 key_on_newest -k m
-check "m on a T row: the heading ends · muted ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 1 · muted"
+check "m on a T row: the heading ends · muted ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · muted"
 
 notify-send -a T x
 check "a muted T's notification keeps the island at rest" sent_rests x
@@ -66,14 +66,14 @@ check "D clears the history" state_is '.count == 0'
 notify-send -a T w
 check "after D clears the history, a muted T still keeps the island at rest" sent_rests w
 key_on_newest -k m
-check "m again: the heading has no suffix ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 1"
+check "m again: the heading has no suffix ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t"
 notify-send -a T v
 check "and the next T notification shows" until_ok 2000 shows v
 until_ok 7000 mode_is rest
 
 timeout 0.5 qs ipc call notifs dnd true >/dev/null
 key_on_newest -k i
-check "i under Do Not Disturb: the heading ends · through DND ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 2 · through dnd"
+check "i under Do Not Disturb: the heading ends · through DND ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · through dnd"
 notify-send -a U u1
 check "a U notification under Do Not Disturb keeps the island at rest" sent_rests u1
 notify-send -a T d1
@@ -87,9 +87,9 @@ for _ in 1 2 3 4; do
   heads+=("$(jq -r '.heads[0].text' <<<"$seen")")
 done
 check "s four times: 3 s, 10 s, until dismissed, then no stay ($(printf '%s; ' "${heads[@]}"))" \
-  test "${heads[*],,}" = "t · 3 · through dnd · stays 3 s t · 3 · through dnd · stays 10 s t · 3 · through dnd · stays until dismissed t · 3 · through dnd"
+  test "${heads[*],,}" = "t · through dnd · 3 s t · through dnd · 10 s t · through dnd · until dismissed t · through dnd"
 key_on_newest -k s -k s -k m
-check "all three on one app ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 3 · muted · through dnd · stays 10 s"
+check "all three on one app ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · muted · 10 s"
 key_on_newest -k m
 
 # Each held time runs from the state read as it showed to the shell's mode change back to rest.
@@ -110,7 +110,7 @@ key_on_newest -k d
 check "d in Mod+A dismisses it" until_ok 2000 mode_is rest
 
 key_on_newest -k s -k s
-check "s twice more: stays 3 s ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · 4 · through dnd · stays 3 s"
+check "s twice more: stays 3 s ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "t · through dnd · 3 s"
 notify-send -t 0 -a T w2
 until_ok 2000 shows w2
 since=$(island | jq .since)
@@ -118,14 +118,14 @@ until_ok 5000 mode_is rest
 held=$(held_since "$since")
 check "with stays 3 s, -t 0 leaves after 3 s (${held} ms)" test "$held" -ge 2900 -a "$held" -le 3500
 
-# A long app name elides before its rule, so the heading still ends with it.
+# A long app name elides before its badge, so the head still ends with it.
 long=$(printf 'long%.0s' {1..40})
 notify-send -t 1 -a "$long" l1
 until_ok 2000 listed l1
 until_ok 2000 mode_is rest
 key_on_newest -k m
-long_head() { jq -e '. as $s | any(.heads[]; (.text | ascii_downcase | startswith("long")) and .elided and .rule == " · muted" and .ruleRight <= $s.cardRight)' <<<"$seen" >/dev/null; }
-check "a long app name elides and its · muted is drawn whole ($(jq -c '[.heads[] | {text: .text[-12:], elided, rule, ruleRight}] + [{cardRight}]' <<<"$seen"))" long_head
+long_head() { jq -e '. as $s | any(.heads[]; (.app | startswith("long")) and .elided and .badge == "Muted" and .badgeRight <= $s.cardRight)' <<<"$seen" >/dev/null; }
+check "a long app name elides and its Muted badge is drawn whole ($(jq -c '[.heads[] | {app: .app[-12:], elided, badge, badgeRight}] + [{cardRight}]' <<<"$seen"))" long_head
 
 # Criticals set aside come back newest first; a muted app's is passed over, not left blocking the older one.
 notify-send -u critical -a D d2
@@ -143,7 +143,7 @@ notify-send -t 1 -a __proto__ p1
 until_ok 2000 listed p1
 until_ok 2000 mode_is rest
 key_on_newest -k m
-check "an app named __proto__ groups and mutes on its own ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "__proto__ · 1 · muted"
+check "an app named __proto__ groups and mutes on its own ($(jq -c '[.heads[].text]' <<<"$seen"))" had_head "__proto__ · muted"
 notify-send -a constructor k1
 check "and one named constructor still shows" until_ok 2000 shows k1
 until_ok 7000 mode_is rest
@@ -153,7 +153,6 @@ store_is() { jq -e "$1" "$store" >/dev/null; }
 check "notifications.json holds rules with key T beside dnd ($(jq -c .rules "$store"))" store_is '(.rules.T == {dnd: true, stays: 3000}) and (.rules.slack == {muted: true}) and (.rules["__proto__"] == {muted: true}) and has("dnd")'
 key_on_newest
 before=$(jq -c '[.heads[].text]' <<<"$seen")
-check "the legend shows m mute, i DND and s stay ($(jq -c .legend <<<"$seen"))" eval 'jq -e ".legend | ascii_downcase | contains(\"m mute  i dnd  s stay\")" <<<"$seen" >/dev/null'
 systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
 # The unit restarts after 500 ms; until then the old instance's socket may still answer.
 sleep 0.8
