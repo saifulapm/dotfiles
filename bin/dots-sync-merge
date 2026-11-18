@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals|youtube> <store> <pulled>...` merges the pulled files into the local store, and `mail` hands its files to dots-sync-mail beside it.
+// dots sync's merge step with the shell's models: `machine` prints the id Notes.qml uses, `<notes|goals|reminders|youtube> <store> <pulled>...` merges the pulled files into the local store, and `mail` hands its files to dots-sync-mail beside it.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import * as goals from '../shell/lib/goals.mjs';
 import * as notes from '../shell/lib/notes.mjs';
+import * as reminders from '../shell/lib/reminders.mjs';
 import * as youtube from '../shell/lib/youtube-playlists.mjs';
 
 const read = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
@@ -24,7 +25,7 @@ let restamped = 0;
 
 // Merging a store with itself only sorts it, so the two compare equal when the others brought nothing and the file stays untouched.
 function round(unit, path, others, last) {
-  const model = { notes, goals, youtube }[unit];
+  const model = { notes, goals, reminders, youtube }[unit];
   const text = existsSync(path) ? readFileSync(path, 'utf8') : null;
   const local = text === null ? model.emptyStore() : model.parseStore(text);
   if (!local) fail(`${basename(path)}: the local store is broken, so it is left as it is`, 4);
@@ -92,6 +93,10 @@ function recent(unit, store) {
     const kept = eachPlaylist(store, (l) => (newest(l) <= limit ? keep(l, ok) : (dropped++, null)));
     return { store: kept, dropped };
   }
+  if (unit === 'reminders') {
+    const kept = store.reminders.filter((r) => Math.max(...Object.values(r.stamps)) <= limit || (dropped++, false));
+    return { store: Object.assign({}, store, { reminders: kept }), dropped };
+  }
   const kept = store.goals.filter(ok).map((g) => Object.assign({}, g, { tasks: g.tasks.filter(ok) }));
   return { store: Object.assign({}, store, { goals: kept }), dropped };
 }
@@ -108,6 +113,14 @@ function restamp(unit, store) {
     const stamps = Object.fromEntries(Object.entries(x.stamps).map(([f, t]) => [f, t > limit ? now : t]));
     return Object.assign({}, x, { stamps, updatedAt: Math.max(now, ...Object.values(stamps)) });
   };
+  if (unit === 'reminders') {
+    const fixStamps = (r) => {
+      if (Math.max(...Object.values(r.stamps)) <= limit) return r;
+      fixed++;
+      return Object.assign({}, r, { stamps: Object.fromEntries(Object.entries(r.stamps).map(([f, t]) => [f, t > limit ? now : t])) });
+    };
+    return { store: Object.assign({}, store, { reminders: store.reminders.map(fixStamps) }), fixed };
+  }
   const out =
     unit === 'notes'
       ? Object.assign({}, store, { notes: store.notes.map(fix) })
@@ -119,7 +132,7 @@ function restamp(unit, store) {
 
 // A pulled file that does not parse, or its records stamped ahead, are left out and the rest still merge; exit 5 then names them last, so the unit shows the error while this machine's store still goes up.
 function merge(unit, path, files) {
-  const model = { notes, goals, youtube }[unit];
+  const model = { notes, goals, reminders, youtube }[unit];
   const others = [];
   const skipped = [];
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
@@ -131,6 +144,12 @@ function merge(unit, path, files) {
     }
     const { store: kept, dropped } = recent(unit, store);
     if (dropped) skipped.push(`${unit}: left out ${dropped} record${dropped === 1 ? '' : 's'} from ${basename(f)}, stamped more than a day ahead`);
+    if (unit === 'reminders') {
+      const { store: usable, dropped: unusable } = reminders.usableOnly(kept);
+      others.push(usable);
+      if (unusable) skipped.push(`${unit}: left out ${unusable} record${unusable === 1 ? '' : 's'} from ${basename(f)}, with no text or a due no clock holds`);
+      continue;
+    }
     if (unit !== 'youtube') {
       others.push(kept);
       continue;
@@ -190,5 +209,5 @@ function fixList(l, limit, now, count) {
 const [cmd, path, ...files] = process.argv.slice(2);
 if (cmd === 'machine') process.stdout.write(machine() + '\n');
 else if (cmd === 'mail' && path) process.exit(spawnSync(new URL('dots-sync-mail', import.meta.url).pathname, [path, ...files], { stdio: 'inherit' }).status ?? 1);
-else if ((cmd === 'notes' || cmd === 'goals' || cmd === 'youtube') && path) merge(cmd, path, files);
-else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals|youtube|mail> <store> <other>...', 2);
+else if ((cmd === 'notes' || cmd === 'goals' || cmd === 'reminders' || cmd === 'youtube') && path) merge(cmd, path, files);
+else fail('usage: dots-sync-merge machine | dots-sync-merge <notes|goals|reminders|youtube|mail> <store> <other>...', 2);

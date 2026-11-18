@@ -9,7 +9,7 @@ root=Dropbox:dots-sync
 data=${XDG_DATA_HOME:-$HOME/.local/share}/dots
 state=${XDG_STATE_HOME:-$HOME/.local/state}/dots
 status=$state/sync.json
-units=(notes goals youtube fish ssh mail)
+units=(notes goals reminders youtube fish ssh mail)
 # auto, or push or pull when --adopt picks a side of an ssh conflict.
 adopt=auto
 machine=
@@ -67,6 +67,10 @@ sync_notes() {
 
 sync_goals() {
   store_unit goals
+}
+
+sync_reminders() {
+  store_unit reminders
 }
 
 # Playlists and Saved only: History and the download index live under the state dir, which no unit reads.
@@ -276,7 +280,7 @@ record() {
 }
 
 usage() {
-  echo "usage: dots sync [--only notes|goals|youtube|fish|ssh|mail | --adopt local|remote]" >&2
+  echo "usage: dots sync [--only notes|goals|reminders|youtube|fish|ssh|mail | --adopt local|remote]" >&2
   exit 2
 }
 
@@ -284,7 +288,7 @@ main() {
   case "${1:-}" in
     '') ;;
     --only)
-      [[ ${2:-} =~ ^(notes|goals|youtube|fish|ssh|mail)$ ]] || usage
+      [[ ${2:-} =~ ^(notes|goals|reminders|youtube|fish|ssh|mail)$ ]] || usage
       units=("$2")
       ;;
     --adopt)
@@ -309,9 +313,9 @@ main() {
   # The lock sits beside the state it guards, so a just dev session and the live timer never meet on it.
   mkdir -p "$state"
   exec 9>"$state/dots-sync.lock"
-  # A notes, goals or youtube round comes from a store change that would otherwise wait for the next timer round, an ssh round from dots secrets, which checks ~/.ssh right after, and a mail round from a person starting it, so each waits its turn.
+  # A notes, goals, reminders or youtube round comes from a store change that would otherwise wait for the next timer round, an ssh round from dots secrets, which checks ~/.ssh right after, and a mail round from a person starting it, so each waits its turn.
   local wait=-n
-  [[ ${units[*]} == notes || ${units[*]} == goals || ${units[*]} == youtube || ${units[*]} == ssh || ${units[*]} == mail ]] && wait='-w 600'
+  [[ ${units[*]} == notes || ${units[*]} == goals || ${units[*]} == reminders || ${units[*]} == youtube || ${units[*]} == ssh || ${units[*]} == mail ]] && wait='-w 600'
   # shellcheck disable=SC2086 # $wait is one flag, or a flag and its seconds
   if ! flock $wait 9; then
     echo "already running"
