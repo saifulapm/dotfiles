@@ -81,6 +81,8 @@ until_ok 3000 rest
 
 ask down "$(request open "$here/open")"
 shown
+# The last request's cursor sat on shots/one.png; the new folder has no such file, and nothing may ask for its size.
+check "reopening in another folder measures no file from the last one ($(journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -c 'unhandled Python exception'))" bash -c '! journalctl --user -u "$DOTS_DEV_UNIT" --no-pager -o cat | grep -q "unhandled Python exception"'
 wtype down
 until_ok 3000 state_is --arg f "$HOME/Downloads" '.folder == $f and .listed'
 check "typing down fills the filter field and narrows the places to Downloads, which opens ($(pk_state | jq -c '[.typed, .matches, .folder]'))" \

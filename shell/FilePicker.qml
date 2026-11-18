@@ -200,13 +200,13 @@ Item {
     function enter(path, keepQuery) {
         if (!keepQuery)
             query = "";
+        // The last folder's rows go before the folder changes, so no key acts on them here, nothing draws them, and no old row is joined to the new folder to be measured.
+        entries = [];
+        listed = false;
         folder = path;
         marked = [];
         selected = saving ? -1 : 0;
         landOn = saving ? saveName : "";
-        // The last folder's rows go with it, so no key acts on them here and nothing draws them.
-        entries = [];
-        listed = false;
         list();
     }
 
