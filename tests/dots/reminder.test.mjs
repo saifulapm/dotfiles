@@ -1,7 +1,7 @@
 // bin/reminder on a scratch data dir, at 10:00:00 UTC on a set day: what an agent runs to set, list and cancel a reminder.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -25,7 +25,7 @@ function scratch(t) {
     mkdirSync(join(path, '..'), { recursive: true });
     writeFileSync(path, JSON.stringify(store));
   };
-  return { run, read, write, store: () => R.parseStore(read()) };
+  return { root, env, path, run, read, write, store: () => R.parseStore(read()) };
 }
 
 test('reminder add 20m tea prints the text, how long and the clock, and the store holds it pending', (t) => {
@@ -147,4 +147,55 @@ test('reminder list prints a stored text holding a newline and an escape code as
   s.write(store);
   assert.match(s.run('list').stdout, /\s10:20\s+a b \[31m\n$/);
   assert.equal(JSON.parse(s.run('list', '--json').stdout)[0].text, 'a b [31m');
+});
+
+test('reminder rm ends a pending reminder as removed, so the removal travels as one made with d in the launcher', (t) => {
+  const s = scratch(t);
+  const store = storeOf('20m tea', '30m call');
+  s.write(store);
+  const r = s.run('rm', store.reminders[0].id);
+  assert.equal(r.stdout, 'removed: tea\n', r.stderr);
+  assert.equal(r.status, 0);
+  const by = Object.fromEntries(s.store().reminders.map((x) => [x.text, x]));
+  assert.deepEqual([by.tea.ended, by.tea.stamps.ended, by.call.ended], ['removed', T, null]);
+});
+
+test('reminder rm of an id no reminder has says so, exits 1 and leaves the store', (t) => {
+  const s = scratch(t);
+  s.write(storeOf('20m tea'));
+  const before = s.read();
+  const r = s.run('rm', 'nope');
+  assert.equal(r.stderr, 'no pending reminder nope\n');
+  assert.equal(r.status, 1);
+  assert.equal(s.read(), before);
+});
+
+// The shell may have rung it a moment before the agent's rm arrived.
+test('reminder rm of a reminder that already rang says it is not pending and changes nothing', (t) => {
+  const s = scratch(t);
+  const store = storeOf('20m tea');
+  const id = store.reminders[0].id;
+  s.write(R.endReminder(store, id, 'rung', T - 1));
+  const before = s.read();
+  const r = s.run('rm', id);
+  assert.equal(r.stderr, `no pending reminder ${id}\n`);
+  assert.equal(r.status, 1);
+  assert.equal(s.read(), before);
+});
+
+// The hook stands in for the shell: once, it saves a launcher-set reminder over the store the CLI already read, at the worst moment.
+test('reminder add while the shell saves a launcher-set reminder in the same moment leaves both pending', (t) => {
+  const s = scratch(t);
+  const early = storeOf('10m early');
+  s.write(early);
+  const late = join(s.root, 'late.json');
+  writeFileSync(late, JSON.stringify(R.setReminder(early, R.parseReminder('15m from the launcher', T), T).store));
+  const hook = join(s.root, 'save-late');
+  writeFileSync(hook, `#!/bin/sh\n[ -e ${hook}.done ] && exit 0\ntouch ${hook}.done\ncp ${late} ${s.path}\n`);
+  chmodSync(hook, 0o755);
+  s.env.DOTS_MERGE_BEFORE_SWAP = hook;
+  const r = s.run('add', '20m', 'tea');
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(existsSync(hook + '.done'), 'the hook ran');
+  assert.deepEqual(R.pendingList(s.store()).map((x) => x.text), ['early', 'from the launcher', 'tea']);
 });
