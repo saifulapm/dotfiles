@@ -113,6 +113,12 @@ Item {
         ask();
     }
 
+    // The launcher's "? " question, sent as if typed into the field.
+    function askFrom(text) {
+        field.text = text;
+        send();
+    }
+
     // One request to pxy for the conversation so far; its stream is read as it grows.
     function ask() {
         error = "";

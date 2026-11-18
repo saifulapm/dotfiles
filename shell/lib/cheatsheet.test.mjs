@@ -175,6 +175,7 @@ const CODE = {
   '>␣': [/'> '/],
   'r␣': [/'r '/],
   'c␣': [/'c '/],
+  '?␣': [/'\? '/],
 };
 const pattern = (key) => CODE[key] || (/^[A-Z]$/.test(key) ? [new RegExp(`Key_${key}\\b`)] : null);
 
@@ -277,5 +278,5 @@ test('minus, equal, [ and ] read as the keys they print', () => {
 // The launcher draws no legend, so the sheet is the only place its prefixes show.
 test('IN SURFACES lists every launcher prefix', () => {
   const keys = IN_SURFACES.filter((r) => r.surface === 'launcher').map((r) => r.key);
-  for (const k of ['w␣', 'v␣', ':␣', '=␣', '>␣', 'r␣', 'c␣']) assert.ok(keys.includes(k), `no launcher row for ${k}`);
+  for (const k of ['w␣', 'v␣', ':␣', '=␣', '>␣', 'r␣', 'c␣', '?␣']) assert.ok(keys.includes(k), `no launcher row for ${k}`);
 });

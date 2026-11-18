@@ -40,6 +40,8 @@ Item {
 
     // Enter acted on a row and closed the launcher; Esc never sends it.
     signal launched
+    // Enter on "? " and a question; the surfaces' window opens the chat with it, which closes the launcher.
+    signal chatWanted(string text)
     readonly property var tokens: theme.tokens
     readonly property var fonts: tokens ? tokens.type : ({})
     // The island's own text and the tones lifted to read on its fill.
@@ -208,6 +210,13 @@ Item {
 
     // An app is spawned through niri, so it is niri's child and outlives a shell restart; copyOnly (Shift+Enter) runs a row's copyExec instead, when it has one.
     function launch(copyOnly) {
+        if (mode === "chat") {
+            if (parsed.q.trim() !== "") {
+                chatWanted(parsed.q.trim());
+                launched();
+            }
+            return;
+        }
         const row = rows[selected];
         // A pending reminder or one that cannot be set has nothing to run.
         if (!row || (mode === "reminder" && !row.remind))

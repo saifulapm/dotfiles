@@ -26,7 +26,7 @@ export function rank(entries, query) {
     .map((x) => x.e);
 }
 
-const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands', 'r ': 'reminder', 'c ': 'colorschemes' };
+const PREFIXES = { 'w ': 'windows', 'v ': 'clipboard', ': ': 'emoji', '= ': 'calculator', '> ': 'commands', 'r ': 'reminder', 'c ': 'colorschemes', '? ': 'chat' };
 
 export function parseQuery(text) {
   const mode = PREFIXES[text.slice(0, 2)];
@@ -34,7 +34,7 @@ export function parseQuery(text) {
 }
 
 // Each prefix mode's chip in the search field, a Symbols Nerd Font glyph and a name; apps shows none.
-const CHIPS = { windows: [0xf05af, 'Windows'], clipboard: [0xf0147, 'Clipboard'], emoji: [0xf01f5, 'Emoji'], calculator: [0xf00ec, 'Calculator'], commands: [0xf018d, 'Commands'], reminder: [0xf0020, 'Remind'], colorschemes: [0xf03d8, 'Colorschemes'] };
+const CHIPS = { windows: [0xf05af, 'Windows'], clipboard: [0xf0147, 'Clipboard'], emoji: [0xf01f5, 'Emoji'], calculator: [0xf00ec, 'Calculator'], commands: [0xf018d, 'Commands'], reminder: [0xf0020, 'Remind'], colorschemes: [0xf03d8, 'Colorschemes'], chat: [0xf0674, 'Ask'] };
 export function chipOf(mode) {
   const c = CHIPS[mode];
   return c ? { glyph: String.fromCodePoint(c[0]), name: c[1] } : null;

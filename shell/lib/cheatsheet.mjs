@@ -76,6 +76,7 @@ export const IN_SURFACES = [
   ['launcher', '>␣', 'Commands'],
   ['launcher', 'r␣', 'Remind'],
   ['launcher', 'c␣', 'Colorschemes'],
+  ['launcher', '?␣', 'Ask the Chat'],
   ['control', 'H J K L', 'Move Between Tiles'],
   ['control', '↵', 'Toggle or Open'],
   ['control', '- / =', 'Step a Slider'],

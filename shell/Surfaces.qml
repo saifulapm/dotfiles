@@ -238,6 +238,12 @@ PanelWindow {
         closeOthers(chat);
     }
 
+    // The launcher's "? " question opens the chat and sends it there.
+    function askChat(text) {
+        openChat(Date.now());
+        chat?.askFrom(text);
+    }
+
     function openDns(t0) {
         if (host.takeoverItem)
             return;
@@ -395,6 +401,7 @@ PanelWindow {
             apps: host.apps
             schemes: host.themeList
             reminders: host.reminders
+            onChatWanted: text => host.askChat(text)
             // A launch or a picked window from the overview closes it too; Esc returns to it.
             onLaunched: {
                 if (host.overview)
