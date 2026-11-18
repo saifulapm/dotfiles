@@ -78,6 +78,35 @@ wtype d
 until_ok 2000 pending 'length == 2'
 check "and d removes tea, not its neighbour" stored '([.reminders[] | select(.ended == "removed") | .text] == ["tea"]) and ([.reminders[] | select(.ended == null) | .text] | sort) == ["pulled", "renew"]'
 close_launcher
+# The same with the cursor left where Tab puts it, on the first row, in a shell just started so nothing earlier is held.
+restart_shell
+put_store --argjson now $((now_s * 1000)) '{version: 1, reminders: [{id: "rw", text: "renew", due: ($now + 7200000)}, {id: "tq", text: "tea", due: ($now + 10800000)}] | map(. + {created: $now, ended: null, stamps: {text: $now, due: $now, ended: $now}})}'
+open_launcher
+wtype "r "
+until_ok 3000 state_is '.results == ["renew", "tea"]'
+wtype -k Tab
+put_store --argjson now $((now_s * 1000)) '{version: 1, reminders: [{id: "nw", text: "pulled", due: ($now + 3600000)}, {id: "rw", text: "renew", due: ($now + 7200000)}, {id: "tq", text: "tea", due: ($now + 10800000)}] | map(. + {created: $now, ended: null, stamps: {text: $now, due: $now, ended: $now}})}'
+until_ok 3000 state_is '.results == ["pulled", "renew", "tea"]'
+check "the cursor Tab left on renew stays on it when a pull puts a reminder above it" state_is '.results[.selected] == "renew"'
+wtype d
+until_ok 2000 pending 'length == 2'
+check "and d removes renew, not the pulled one" stored '([.reminders[] | select(.ended == "removed") | .text] == ["renew"]) and ([.reminders[] | select(.ended == null) | .text] | sort) == ["pulled", "tea"]'
+close_launcher
+# Typing a new reminder after moving through the list puts the cursor on the row that sets it.
+open_launcher
+wtype "r "
+until_ok 3000 state_is '.results == ["pulled", "tea"]'
+wtype -k Tab
+wtype -k j
+until_ok 2000 state_is '.selected == 1'
+close_launcher
+open_launcher
+wtype "r 5m x"
+until_ok 3000 state_is '.results[0] == "x"'
+check "r 5m x after a j selects its own row" state_is '.selected == 0'
+wtype -k Return
+until_ok 2000 state_is '.open == false'
+check "and Enter sets it" pending 'length == 3 and any(.[]; .text == "x")'
 put_store '{version: 1, reminders: []}'
 open_launcher
 wtype "r 5m x"

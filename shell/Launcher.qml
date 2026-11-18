@@ -164,21 +164,23 @@ Item {
     onRowsChanged: if (mode === "clipboard")
         decodeThumbs()
 
-    // The pending reminder under the cursor; a pull that reorders the rows moves the cursor with it, so d removes the one the cursor was on.
+    // The pending reminder under the cursor and the query it was under; a pull that reorders the rows moves the cursor with it, so d removes the one the cursor was on, while a typed query keeps the cursor where typing puts it.
     property string heldReminder: ""
+    property string heldQuery: ""
+    // A keystroke moves found twice, once against the old parsed query, so the hold is taken only once every binding has settled.
     function holdReminder() {
         heldReminder = found[scrollTop + selected]?.reminderId ?? "";
+        heldQuery = query;
     }
-    onSelectedChanged: holdReminder()
-    onScrollTopChanged: holdReminder()
+    onSelectedChanged: Qt.callLater(holdReminder)
+    onScrollTopChanged: Qt.callLater(holdReminder)
     onFoundChanged: {
-        if (mode !== "reminder" || !heldReminder)
-            return;
-        const s = Lib.keepReminder(found, heldReminder, scrollTop, pageSize, columns);
+        const s = mode === "reminder" && heldReminder && heldQuery === query ? Lib.keepReminder(found, heldReminder, scrollTop, pageSize, columns) : null;
         if (s) {
             scrollTop = s.top;
             selected = s.selected;
         }
+        Qt.callLater(holdReminder);
     }
 
     function close() {
