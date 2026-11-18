@@ -103,3 +103,14 @@ test('a shell save that lands just before the merge puts its result in place is 
   assert.ok(existsSync(hook + '.done'), 'the hook ran');
   assert.deepEqual(R.pendingList(store(a)).map((r) => r.text).sort(), ['early', 'from b', 'late save']);
 });
+
+test('a pulled record of the wrong shape is left out and named, while the reminders beside it still merge', async () => {
+  const w = world();
+  const b = machine(w, 'b');
+  const good = set(R.emptyStore(), '20m tea', T).reminders[0];
+  write(join(w.remote, 'dots-sync/reminders/c.json'), { version: 1, reminders: [good, Object.assign({}, good, { id: 12345 }), 7] });
+  const r = await sync(b, ['--only', 'reminders']);
+  assert.equal(r.code, 5);
+  assert.equal(status(b).reminders.error, 'reminders: left out 2 records from c.json, which are not reminders');
+  assert.deepEqual(R.pendingList(store(b)).map((x) => x.text), ['tea']);
+});

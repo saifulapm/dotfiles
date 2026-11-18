@@ -137,11 +137,13 @@ function merge(unit, path, files) {
   const skipped = [];
   // This machine's own remote file is merged too, so a reinstall with no local store gets its goals and notes back before its first push.
   for (const f of files) {
-    const store = model.parseStore(read(f));
+    const pulled = unit === 'reminders' ? reminders.parsePulled(read(f)) : { store: model.parseStore(read(f)), odd: 0 };
+    const store = pulled && pulled.store;
     if (!store) {
       skipped.push(`${unit}: skipped ${basename(f)}, which does not parse`);
       continue;
     }
+    if (pulled.odd) skipped.push(`${unit}: left out ${pulled.odd} record${pulled.odd === 1 ? '' : 's'} from ${basename(f)}, which ${pulled.odd === 1 ? 'is not a reminder' : 'are not reminders'}`);
     const { store: kept, dropped } = recent(unit, store);
     if (dropped) skipped.push(`${unit}: left out ${dropped} record${dropped === 1 ? '' : 's'} from ${basename(f)}, stamped more than a day ahead`);
     if (unit === 'reminders') {

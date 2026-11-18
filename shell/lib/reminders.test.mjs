@@ -239,3 +239,11 @@ test('one rung without a pull says rang late and the time it was due', () => {
   assert.deepEqual(S.lateText(r, now), { summary: 'Reminder · tea', body: 'rang late · due at 14:30 · set at 14:10' });
   assert.equal(S.lateText({ ...r, due: at('2026-10-21T09:05:00+06:00'), created: at('2026-10-21T08:00:00+06:00') }, now).body, 'rang late · due yesterday at 09:05 · set yesterday at 08:00');
 });
+
+test('a pulled reminder whose id is a name every object has merges like any other', () => {
+  const rec = (id) => ({ id, text: id, due: now + 60000, created: now, ended: null, stamps: { text: now, due: now, ended: now } });
+  const pulled = S.parseStore(JSON.stringify({ version: 1, reminders: ['constructor', '__proto__', 'toString'].map(rec) }));
+  const merged = S.mergeStores(S.mergeStores(S.emptyStore(), pulled), pulled);
+  assert.deepEqual(merged.reminders.map((r) => r.id), ['__proto__', 'constructor', 'toString']);
+  assert.deepEqual(S.migrateOld(S.emptyStore(), [{ id: 'constructor', text: 'x', due: now, created: now }]).reminders.map((r) => r.id), ['constructor']);
+});

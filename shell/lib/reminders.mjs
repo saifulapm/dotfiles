@@ -152,6 +152,19 @@ export function parseStore(text) {
   return { version: 1, reminders: data.reminders.map(readRecord) };
 }
 
+// Another machine's file keeps its well-formed records and counts the rest, so one odd record never hides the reminders beside it; null when the file itself is not a store.
+export function parsePulled(text) {
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (!isObject(data) || !Array.isArray(data.reminders)) return null;
+  const ok = data.reminders.filter(validRecord);
+  return { store: { version: 1, reminders: ok.map(readRecord) }, odd: data.reminders.length - ok.length };
+}
+
 const usable = (r) => oneLine(r.text) !== '' && isTime(r.due) && isTime(r.created);
 
 // Another machine's records that could never be listed or rung are left out, and counted for the sync round to name.
@@ -201,7 +214,8 @@ function mergeRecord(a, b) {
 }
 
 export function mergeStores(a, b) {
-  const byId = {};
+  // No prototype, so a pulled id like constructor or __proto__ is an ordinary key.
+  const byId = Object.create(null);
   a.reminders.concat(b.reminders).forEach((r) => {
     byId[r.id] = byId[r.id] ? mergeRecord(byId[r.id], r) : r;
   });
