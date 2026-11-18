@@ -10,8 +10,30 @@ const PASTE =
 // Shift+Enter puts the clip on the clipboard and presses nothing.
 const COPY = 'cliphist -db-path "$1" decode "$2" | wl-copy';
 
-export function clipRows(text, q, db) {
+// How long ago a clip was copied, as its card reads it.
+function ageText(s) {
+  if (s < 60) return 'now';
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h`;
+  return `${Math.floor(s / 86400)} d`;
+}
+
+// bin/dots-clip-store logs "id epoch" per copy; a clip copied again logs a newer line, which wins.
+function stamps(times) {
+  const at = new Map();
+  for (const line of (times || '').split('\n')) {
+    const [id, t] = line.split(' ');
+    if (id && t && Number.isFinite(Number(t))) at.set(id, Number(t));
+  }
+  return at;
+}
+
+const HEX = /^#[0-9a-f]{6}$/i;
+
+// times is the clip-times log and now the epoch in seconds; a clip with no stamp has no age.
+export function clipRows(text, q, db, times = '', now = 0) {
   const needle = q.trim().toLowerCase();
+  const at = stamps(times);
   return text
     .split('\n')
     .filter((line) => line.includes('\t'))
@@ -23,6 +45,9 @@ export function clipRows(text, q, db) {
         title: image ? 'image · ' + image[1] : preview,
         detail: '',
         glyph: image ? '◫' : '¶',
+        age: at.has(id) ? ageText(now - at.get(id)) : '',
+        image: !!image,
+        swatch: HEX.test(preview) ? preview : '',
         id,
         exec: ['sh', '-c', PASTE, 'sh', db, id, TERMINALS.join(' ')],
         copyExec: ['sh', '-c', COPY, 'sh', db, id],

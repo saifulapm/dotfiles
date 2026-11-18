@@ -51,3 +51,18 @@ test('a terminal pastes on Ctrl+Shift+V and every other window on Ctrl+V', () =>
 test('each clip carries a glyph for its type: ¶ for text, ◫ for an image', () => {
   assert.deepEqual(clipRows(list, '', db).map((r) => r.glyph), ['¶', '◫', '¶']);
 });
+
+test('each clip carries its age from the clip-times log, newest stamp of its id winning, and none when unlogged', () => {
+  const list = '9\tnewest\n8\t#C8381E\n7\t[[ binary data 12 KiB png 640x480 ]]\n6\tunlogged\n';
+  const times = '7 1000\n8 1000\n9 1000\n9 3540\n8 2400\n';
+  const rows = clipRows(list, '', db, times, 3600);
+  assert.deepEqual(rows.map((r) => r.age), ['1 min', '20 min', '43 min', '']);
+  assert.deepEqual(clipRows(list, '', db, '9 3600\n7 0\n8 -90000\n', 3600 + 2 * 86400).map((r) => r.age), ['2 d', '3 d', '2 d', '']);
+  assert.deepEqual(clipRows('1\tnow\n', '', db, '1 3599\n', 3600).map((r) => r.age), ['now']);
+  assert.deepEqual(clipRows('1\tlater\n', '', db, '1 3600\n', 3600 + 7200).map((r) => r.age), ['2 h']);
+});
+
+test('an image clip is marked for its thumbnail, and a text clip of one hex colour carries it as a swatch', () => {
+  const rows = clipRows('8\t#C8381E\n7\t[[ binary data 12 KiB png 640x480 ]]\n6\t#C8381E is red\n5\t#c8381e\n', '', db);
+  assert.deepEqual(rows.map((r) => [r.image, r.swatch]), [[false, '#C8381E'], [true, ''], [false, ''], [false, '#c8381e']]);
+});

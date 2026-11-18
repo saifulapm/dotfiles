@@ -79,7 +79,7 @@ Item {
         case "windows":
             return Lib.windowRows(windowList, parsed.q);
         case "clipboard":
-            return Clips.clipRows(clipList, parsed.q, clipDb);
+            return Clips.clipRows(clipList, parsed.q, clipDb, clipTimes, Math.floor(Date.now() / 1000));
         case "emoji":
             return Emoji.emojiRows(emojiList, parsed.q);
         case "calculator":
@@ -103,7 +103,10 @@ Item {
         }
         return [];
     }
-    readonly property var rows: found.slice(scrollTop, scrollTop + 8)
+    // Clips draw as cards two to a row, four at a time; every other mode as rows, eight at a time.
+    readonly property int columns: mode === "clipboard" ? 2 : 1
+    readonly property int pageSize: mode === "clipboard" ? 4 : 8
+    readonly property var rows: found.slice(scrollTop, scrollTop + pageSize)
     readonly property var look: L.launcherLook(theme.tokens)
     implicitHeight: column.implicitHeight + 32
 
@@ -133,9 +136,29 @@ Item {
     }
 
     function listClips() {
+        clipTimesFile.reload();
         if (!clipper.running)
             clipper.running = true;
     }
+
+    // Each image clip on screen is decoded once into the runtime dir, where its card's thumbnail reads it.
+    readonly property string thumbDir: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/dots-clip-thumbs"
+    property var thumbsReady: ({})
+    property bool thumbsAgain: false
+    function decodeThumbs() {
+        const ids = rows.filter(r => r.image && !thumbsReady[r.id]).map(r => r.id);
+        if (ids.length === 0)
+            return;
+        if (thumber.running) {
+            thumbsAgain = true;
+            return;
+        }
+        thumber.command = ["sh", "-c", 'd=$1 db=$2; shift 2; mkdir -p -m 700 "$d"; for id; do [ -s "$d/$id" ] || cliphist -db-path "$db" decode "$id" >"$d/$id"; done', "sh", thumbDir, clipDb].concat(ids);
+        thumber.ids = ids;
+        thumber.running = true;
+    }
+    onRowsChanged: if (mode === "clipboard")
+        decodeThumbs()
 
     function close() {
         shown = false;
@@ -156,20 +179,20 @@ Item {
             return;
         reminders.remove(row.reminderId);
         // A scrolled list keeps its window on the rows that are left.
-        const s = Lib.scroll(scrollTop, selected, 0, found.length, 8);
+        const s = Lib.scroll(scrollTop, selected, 0, found.length, pageSize);
         scrollTop = s.top;
         selected = s.selected;
     }
 
     function move(by) {
-        const s = Lib.scroll(scrollTop, selected, by, found.length, 8);
+        const s = Lib.scroll(scrollTop, selected, by, found.length, pageSize);
         scrollTop = s.top;
         selected = s.selected;
     }
 
     // The wheel moves the window of rows; wheelRest holds a touchpad's part of a row.
     function turn(angle) {
-        const s = Lib.wheel({ top: scrollTop, selected, rest: wheelRest }, angle, found.length, 8);
+        const s = Lib.wheel({ top: scrollTop, selected, rest: wheelRest }, angle, found.length, pageSize);
         scrollTop = s.top;
         selected = s.selected;
         wheelRest = s.rest;
@@ -248,6 +271,8 @@ Item {
             kinds: rows.map((r, i) => rowRepeater.itemAt(i)?.kind ?? null),
             notes: rows.map((r, i) => rowRepeater.itemAt(i)?.noteText ?? null),
             answer: rowRepeater.itemAt(0)?.answerDrawn ?? null,
+            clips: rows.map((r, i) => rowRepeater.itemAt(i)?.clipDrawn ?? null),
+            columns: columns,
             empty: empty.visible ? empty.text : null,
             heads: rows.map((r, i) => rowRepeater.itemAt(i)?.headText ?? null),
             pending: pending.length,
@@ -303,6 +328,31 @@ Item {
                         }, w));
             } catch (e) {
                 console.warn("launcher: niri windows exited " + code + ": " + e.message);
+            }
+        }
+    }
+
+    // bin/dots-clip-store's "id epoch" log, read with the clips, since cliphist keeps no times.
+    property string clipTimes: ""
+    FileView {
+        id: clipTimesFile
+        path: (Quickshell.env("XDG_STATE_HOME") || Quickshell.env("HOME") + "/.local/state") + "/dots/clip-times"
+        printErrors: false
+        onLoaded: launcher.clipTimes = text()
+        onLoadFailed: launcher.clipTimes = ""
+    }
+
+    Process {
+        id: thumber
+        property var ids: []
+        onExited: {
+            const ready = Object.assign({}, launcher.thumbsReady);
+            for (const id of ids)
+                ready[id] = true;
+            launcher.thumbsReady = ready;
+            if (launcher.thumbsAgain) {
+                launcher.thumbsAgain = false;
+                launcher.decodeThumbs();
             }
         }
     }
@@ -487,10 +537,14 @@ Item {
                 onWheel: event => launcher.turn(event.angleDelta.y)
             }
 
-            Column {
+            Grid {
                 id: list
                 width: parent.width
-                spacing: 4
+                columns: launcher.columns
+                columnSpacing: 8
+                rowSpacing: launcher.columns > 1 ? 8 : 4
+                // One cell's width, the grid's less its gaps, shared by the columns.
+                readonly property real cell: (width - (columns - 1) * columnSpacing) / columns
 
                 // Nothing found: a muted magnifier over the query as typed.
                 Column {
@@ -531,7 +585,8 @@ Item {
                         required property var modelData
                         required property int index
                         readonly property bool current: index === launcher.selected
-                        readonly property string kind: launcher.mode === "calculator" ? "answer" : modelData.remind ? "tile" : "row"
+                        readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : modelData.remind ? "tile" : "row"
+                        readonly property var clipDrawn: kind === "clip" ? { text: clipText.text, age: clipAge.text, height: rowBox.height, textHeight: clipText.height, lines: clipText.lineCount, thumb: thumb.status === Image.Ready, swatch: swatch.visible ? String(swatch.color) : null } : null
                         readonly property var answerDrawn: kind === "answer" ? { text: answer.text, size: answer.font.pixelSize, bold: answer.font.bold, under: under.text } : null
                         readonly property string headText: modelData.head ? headLabel.text : ""
                         // A colorscheme row's strip as drawn, for the state.
@@ -541,7 +596,7 @@ Item {
                         readonly property real detailWidth: note.width
                         readonly property string noteText: note.text
                         readonly property string slot: modelData.icon || letter.text
-                        width: list.width
+                        width: list.cell
 
                         Text {
                             id: headLabel
@@ -559,14 +614,87 @@ Item {
                         // 48 px and flat, only the selected row filled; a calculator's answer is 80 px and unfilled, a reminder to set one 56 px tile.
                         Rectangle {
                             id: rowBox
-                            width: list.width
-                            height: kind === "answer" ? 80 : kind === "tile" ? 56 : 48
-                            radius: 12
-                            color: kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
+                            width: parent.width
+                            height: kind === "answer" ? 80 : kind === "clip" ? 84 : kind === "tile" ? 56 : 48
+                            radius: kind === "clip" ? 14 : 12
+                            color: kind === "clip" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && kind === "row") ? Qt.alpha(launcher.on, 0.07) : "transparent"
 
                             Root.Click {
                                 name: "launcher-row:" + index
                                 onTapped: launcher.runRow(index)
+                            }
+
+                            // A clip's card: an image's thumbnail or a colour's swatch, then up to three lines of its text cut to the card, and its age.
+                            Row {
+                                visible: kind === "clip"
+                                x: 12
+                                y: 11
+                                width: parent.width - 24
+                                height: parent.height - 22
+                                spacing: 12
+
+                                Rectangle {
+                                    visible: !!modelData.image
+                                    width: 104
+                                    height: 62
+                                    radius: 8
+                                    color: Qt.alpha(launcher.on, 0.12)
+                                    Image {
+                                        id: thumb
+                                        anchors.fill: parent
+                                        fillMode: Image.PreserveAspectCrop
+                                        source: kind === "clip" && modelData.image && launcher.thumbsReady[modelData.id] ? "file://" + launcher.thumbDir + "/" + modelData.id : ""
+                                        sourceSize.width: 208
+                                        sourceSize.height: 124
+                                        asynchronous: true
+                                        cache: false
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: swatch
+                                    visible: !!modelData.swatch
+                                    width: 62
+                                    height: 62
+                                    radius: 10
+                                    color: modelData.swatch || "transparent"
+                                }
+
+                                Column {
+                                    width: parent.width - (modelData.image ? 116 : modelData.swatch ? 74 : 0)
+                                    height: parent.height
+
+                                    Text {
+                                        id: clipText
+                                        width: parent.width
+                                        // Three 15 px lines, a gap and the age fit the card's 62 px inside its padding.
+                                        height: Math.min(implicitHeight, 45)
+                                        textFormat: Text.PlainText
+                                        text: kind === "clip" ? look.title(modelData.title) : ""
+                                        wrapMode: Text.WrapAnywhere
+                                        maximumLineCount: 3
+                                        elide: Text.ElideRight
+                                        lineHeightMode: Text.FixedHeight
+                                        lineHeight: 15
+                                        color: launcher.on
+                                        font.family: launcher.fonts.ui ?? ""
+                                        font.pixelSize: 12
+                                    }
+
+                                    Item {
+                                        width: 1
+                                        height: parent.height - clipText.height - clipAge.height
+                                    }
+
+                                    Text {
+                                        id: clipAge
+                                        textFormat: Text.PlainText
+                                        text: modelData.age ?? ""
+                                        color: launcher.tones.muted
+                                        font.family: launcher.fonts.ui ?? ""
+                                        font.pixelSize: 11
+                                    }
+                                }
                             }
 
                             // The answer at 40 px bold with the expression under it.
@@ -602,7 +730,7 @@ Item {
                             }
 
                             RowLayout {
-                                visible: kind !== "answer"
+                                visible: kind === "row" || kind === "tile"
                                 anchors.fill: parent
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
