@@ -34,7 +34,9 @@ Item {
     // The new entry's generated password and its length.
     property string generated: ""
     property int length: P.LENGTH.start
-    readonly property string pathTag: P.pathTag(entries, newPath.text)
+    // The new entry's name as typed; its form is made only while it shows.
+    property string newName: ""
+    readonly property string pathTag: P.pathTag(entries, newName)
     // What the clipboard's QR says it is (issuer, account, type, digits, period), never its secret, while q picks the entry to save it to.
     property var qr: null
 
@@ -68,7 +70,7 @@ Item {
         selected = 0;
         mode = "list";
         qr = null;
-        newPath.text = "";
+        newName = "";
         listed = false;
         lister.running = true;
         shown = true;
@@ -147,11 +149,11 @@ Item {
     // The new-entry row starts it under the typed name; n starts it empty.
     function startNew(path) {
         hide();
+        newName = path;
         mode = "new";
-        newPath.text = path;
         length = P.LENGTH.start;
         generate();
-        newPath.forceActiveFocus();
+        newLoader.item.focusName();
     }
 
     function generate() {
@@ -172,7 +174,7 @@ Item {
     function save() {
         if (pathTag !== "new" || generated === "" || changer.running)
             return;
-        change("insert", newPath.text.trim(), generated);
+        change("insert", newName.trim(), generated);
         generated = "";
         mode = "list";
         results.forceActiveFocus();
@@ -185,7 +187,7 @@ Item {
         else if (event.key === Qt.Key_Escape)
             back();
         else if (event.key === Qt.Key_Tab)
-            (onLength ? newPath : lengthBox).forceActiveFocus();
+            onLength ? newLoader.item.focusName() : newLoader.item.focusLength();
         else if (onLength && (event.key === Qt.Key_Minus || event.key === Qt.Key_H))
             lengthen(-1);
         else if (onLength && (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === Qt.Key_L))
@@ -199,7 +201,7 @@ Item {
         qr = null;
         mode = "list";
         generated = "";
-        newPath.text = "";
+        newName = "";
         results.forceActiveFocus();
     }
 
@@ -294,15 +296,15 @@ Item {
             mode: mode,
             // The cursor row as drawn while its password shows, and the seconds it has left.
             revealed: cur?.revealed ? { text: cur.shownText(), hides: cur.hidesText() } : null,
-            newEntry: mode === "new" ? { path: newPath.text, tag: tagText.text, length: generated.length, lengthText: lengthText.text, focus: lengthBox.activeFocus ? "length" : "path" } : null,
-            deleteLine: deleteLine.visible ? deleteLine.text : "",
-            deleteColor: String(deleteLine.color),
+            newEntry: newLoader.item ? newLoader.item.drawn : null,
+            deleteLine: deleteLoader.item ? deleteLoader.item.drawn.text : "",
+            deleteColor: deleteLoader.item ? deleteLoader.item.drawn.color : "",
             note: toolNote.text,
             // The island's ink and fill and its danger tone, which the rows, Copy and the delete question draw in.
             on: String(on),
             fill: String(fill),
             danger: String(tones.danger),
-            qr: mode === "qr" && qr ? { issuer: qrIssuer.text, account: qrAccount.text, meta: qrMeta.text, question: qrQuestion.text } : null,
+            qr: qrLoader.item ? qrLoader.item.drawn : null,
             openMs: openMs,
             opens: opens,
             settled: pass.settled,
@@ -445,13 +447,18 @@ Item {
         text: "M"
     }
 
-    Root.Surface {
+    // The island draws the fill and plays the open; this is the content, and a press on it is a press on Pass.
+    Item {
         id: card
+        objectName: "card"
         width: parent.width
         height: column.implicitHeight + 32
-        tokens: pass.theme.tokens
-        // The island draws the fill and plays the open.
-        bare: true
+
+        // The card as drawn this frame, in the window's pixels.
+        function drawnBox() {
+            const a = mapToItem(null, 0, 0);
+            return { x: a.x, y: a.y, w: width, h: height };
+        }
 
         Column {
             id: column
@@ -521,51 +528,55 @@ Item {
             }
 
             // What the QR holds, then the question; the list under it picks the entry.
-            Column {
-                visible: pass.mode === "qr" && !!pass.qr
+            Loader {
+                id: qrLoader
+                active: pass.mode === "qr" && !!pass.qr
                 x: 12
                 width: column.width - 24
-                topPadding: 6
-                bottomPadding: 6
-                spacing: 4
-
-                Text {
-                    id: qrIssuer
-                    width: parent.width
-                    textFormat: Text.PlainText
-                    text: pass.qr?.issuer ?? ""
-                    elide: Text.ElideRight
-                    color: pass.on
-                    font.family: pass.fonts.ui ?? ""
-                    font.pixelSize: 15
-                    font.weight: Font.Bold
-                }
-                Text {
-                    id: qrAccount
-                    width: parent.width
-                    textFormat: Text.PlainText
-                    text: pass.qr?.account ?? ""
-                    elide: Text.ElideRight
-                    color: pass.tones.muted
-                    font.family: pass.fonts.ui ?? ""
-                    font.pixelSize: 13
-                }
-                Text {
-                    id: qrMeta
-                    textFormat: Text.PlainText
-                    text: pass.qr?.meta ?? ""
-                    color: pass.tones.muted
-                    font.family: pass.fonts.ui ?? ""
-                    font.pixelSize: 12
-                }
-                Text {
-                    id: qrQuestion
+                sourceComponent: Column {
+                    readonly property var drawn: ({ issuer: qrIssuer.text, account: qrAccount.text, meta: qrMeta.text, question: qrQuestion.text })
                     topPadding: 6
-                    textFormat: Text.PlainText
-                    text: "Save to which entry?"
-                    color: pass.on
-                    font.family: pass.fonts.ui ?? ""
-                    font.pixelSize: 13
+                    bottomPadding: 6
+                    spacing: 4
+
+                    Text {
+                        id: qrIssuer
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        text: pass.qr?.issuer ?? ""
+                        elide: Text.ElideRight
+                        color: pass.on
+                        font.family: pass.fonts.ui ?? ""
+                        font.pixelSize: 15
+                        font.weight: Font.Bold
+                    }
+                    Text {
+                        id: qrAccount
+                        width: parent.width
+                        textFormat: Text.PlainText
+                        text: pass.qr?.account ?? ""
+                        elide: Text.ElideRight
+                        color: pass.tones.muted
+                        font.family: pass.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
+                    Text {
+                        id: qrMeta
+                        textFormat: Text.PlainText
+                        text: pass.qr?.meta ?? ""
+                        color: pass.tones.muted
+                        font.family: pass.fonts.ui ?? ""
+                        font.pixelSize: 12
+                    }
+                    Text {
+                        id: qrQuestion
+                        topPadding: 6
+                        textFormat: Text.PlainText
+                        text: "Save to which entry?"
+                        color: pass.on
+                        font.family: pass.fonts.ui ?? ""
+                        font.pixelSize: 13
+                    }
                 }
             }
 
@@ -864,44 +875,48 @@ Item {
                     }
 
                     // The delete question, in the danger tone, with its two answers.
-                    Rectangle {
-                        visible: pass.mode === "delete"
+                    Loader {
+                        id: deleteLoader
+                        active: pass.mode === "delete"
                         width: list.width
-                        height: 48
-                        radius: 12
-                        color: pass.tile
+                        sourceComponent: Rectangle {
+                            readonly property var drawn: ({ text: deleteLine.text, color: String(deleteLine.color) })
+                            height: 48
+                            radius: 12
+                            color: pass.tile
 
-                        Text {
-                            id: deleteLine
-                            x: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width - deleteButtons.width - 36
-                            textFormat: Text.PlainText
-                            text: P.deleteText(pass.deleting)
-                            elide: Text.ElideRight
-                            color: pass.tones.danger
-                            font.family: pass.fonts.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-
-                        Row {
-                            id: deleteButtons
-                            anchors.right: parent.right
-                            anchors.rightMargin: 8
-                            anchors.verticalCenter: parent.verticalCenter
-                            spacing: 8
-
-                            Button {
-                                label: "Keep"
-                                name: "pass-keep"
-                                onTapped: pass.answerDelete(false)
+                            Text {
+                                id: deleteLine
+                                x: 12
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - deleteButtons.width - 36
+                                textFormat: Text.PlainText
+                                text: P.deleteText(pass.deleting)
+                                elide: Text.ElideRight
+                                color: pass.tones.danger
+                                font.family: pass.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
                             }
-                            Button {
-                                label: "Delete"
-                                name: "pass-delete"
-                                tint: pass.tones.danger
-                                onTapped: pass.answerDelete(true)
+
+                            Row {
+                                id: deleteButtons
+                                anchors.right: parent.right
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 8
+
+                                Button {
+                                    label: "Keep"
+                                    name: "pass-keep"
+                                    onTapped: pass.answerDelete(false)
+                                }
+                                Button {
+                                    label: "Delete"
+                                    name: "pass-delete"
+                                    tint: pass.tones.danger
+                                    onTapped: pass.answerDelete(true)
+                                }
                             }
                         }
                     }
@@ -909,189 +924,199 @@ Item {
             }
 
             // The new entry: its name, then the generated password at 20 px with its length, then Cancel and Save.
-            Column {
-                visible: pass.mode === "new"
+            Loader {
+                id: newLoader
+                active: pass.mode === "new"
                 width: column.width
-                spacing: 8
-
-                Row {
-                    height: 36
-                    spacing: 12
-
-                    Rectangle {
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 32
-                        height: 32
-                        radius: 16
-                        color: pass.tile
-                        Text {
-                            anchors.centerIn: parent
-                            textFormat: Text.PlainText
-                            text: String.fromCodePoint(0xF0141)
-                            color: pass.on
-                            font.family: "Symbols Nerd Font Mono"
-                            font.pixelSize: 16
-                        }
-                        Root.Click {
-                            name: "pass-back"
-                            onTapped: pass.back()
-                        }
+                sourceComponent: Column {
+                    function focusName() {
+                        newPath.forceActiveFocus();
                     }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        text: "New entry"
-                        color: pass.on
-                        font.family: pass.fonts.ui ?? ""
-                        font.pixelSize: 15
-                        font.weight: Font.Bold
+                    function focusLength() {
+                        lengthBox.forceActiveFocus();
                     }
-                }
+                    readonly property var drawn: ({ path: newPath.text, tag: tagText.text, length: pass.generated.length, lengthText: lengthText.text, focus: lengthBox.activeFocus ? "length" : "path" })
+                    spacing: 8
 
-                // The name, tagged new or exists.
-                Rectangle {
-                    width: column.width
-                    height: 44
-                    radius: 12
-                    color: newPath.activeFocus ? pass.sel : pass.tile
+                    Row {
+                        height: 36
+                        spacing: 12
 
-                    TextInput {
-                        id: newPath
-                        anchors.left: parent.left
-                        anchors.leftMargin: 14
-                        anchors.right: tagText.left
-                        anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        color: pass.on
-                        selectionColor: Qt.alpha(pass.on, 0.3)
-                        font.family: pass.fonts.ui ?? ""
-                        font.pixelSize: 13
-                        clip: true
-                        Keys.onPressed: event => pass.newKey(event, false)
-
+                        Rectangle {
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 32
+                            height: 32
+                            radius: 16
+                            color: pass.tile
+                            Text {
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF0141)
+                                color: pass.on
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 16
+                            }
+                            Root.Click {
+                                name: "pass-back"
+                                onTapped: pass.back()
+                            }
+                        }
                         Text {
-                            visible: newPath.text === ""
                             anchors.verticalCenter: parent.verticalCenter
                             textFormat: Text.PlainText
-                            text: "folder/name"
-                            color: pass.tones.muted
-                            font: newPath.font
-                        }
-                    }
-
-                    Text {
-                        id: tagText
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
-                        anchors.verticalCenter: parent.verticalCenter
-                        textFormat: Text.PlainText
-                        text: pass.pathTag
-                        color: pass.pathTag === "exists" ? pass.tones.danger : pass.tones.muted
-                        font.family: pass.fonts.ui ?? ""
-                        font.pixelSize: 12
-                    }
-                }
-
-                // Holds focus after Tab, where - and + (or h and l) shorten and lengthen the password.
-                Rectangle {
-                    id: lengthBox
-                    width: column.width
-                    height: 92
-                    radius: 12
-                    color: activeFocus ? pass.sel : pass.tile
-                    Keys.onPressed: event => pass.newKey(event, true)
-
-                    Text {
-                        id: preview
-                        x: 14
-                        y: 14
-                        width: parent.width - 28 - 42
-                        textFormat: Text.PlainText
-                        text: pass.generated
-                        elide: Text.ElideRight
-                        color: pass.on
-                        font.family: pass.fonts.mono ?? ""
-                        font.pixelSize: 20
-                        font.weight: Font.Bold
-                        font.letterSpacing: 1
-                    }
-
-                    // Another password at the same length.
-                    Rectangle {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 14
-                        anchors.verticalCenter: preview.verticalCenter
-                        width: 32
-                        height: 32
-                        radius: 10
-                        color: pass.circle
-                        Text {
-                            anchors.centerIn: parent
-                            textFormat: Text.PlainText
-                            text: String.fromCodePoint(0xF0450)
+                            text: "New entry"
                             color: pass.on
-                            font.family: "Symbols Nerd Font Mono"
+                            font.family: pass.fonts.ui ?? ""
                             font.pixelSize: 15
+                            font.weight: Font.Bold
                         }
-                        Root.Click {
-                            name: "pass-regenerate"
-                            onTapped: pass.generate()
+                    }
+
+                    // The name, tagged new or exists.
+                    Rectangle {
+                        height: 44
+                        radius: 12
+                        color: newPath.activeFocus ? pass.sel : pass.tile
+
+                        TextInput {
+                            id: newPath
+                            anchors.left: parent.left
+                            anchors.leftMargin: 14
+                            anchors.right: tagText.left
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: pass.on
+                            selectionColor: Qt.alpha(pass.on, 0.3)
+                            font.family: pass.fonts.ui ?? ""
+                            font.pixelSize: 13
+                            clip: true
+                            Keys.onPressed: event => pass.newKey(event, false)
+                            Component.onCompleted: text = pass.newName
+                            onTextChanged: pass.newName = text
+
+                            Text {
+                                visible: newPath.text === ""
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: "folder/name"
+                                color: pass.tones.muted
+                                font: newPath.font
+                            }
+                        }
+
+                        Text {
+                            id: tagText
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: pass.pathTag
+                            color: pass.pathTag === "exists" ? pass.tones.danger : pass.tones.muted
+                            font.family: pass.fonts.ui ?? ""
+                            font.pixelSize: 12
+                        }
+                    }
+
+                    // Holds focus after Tab, where - and + (or h and l) shorten and lengthen the password.
+                    Rectangle {
+                        id: lengthBox
+                        height: 92
+                        radius: 12
+                        color: activeFocus ? pass.sel : pass.tile
+                        Keys.onPressed: event => pass.newKey(event, true)
+
+                        Text {
+                            id: preview
+                            x: 14
+                            y: 14
+                            width: parent.width - 28 - 42
+                            textFormat: Text.PlainText
+                            text: pass.generated
+                            elide: Text.ElideRight
+                            color: pass.on
+                            font.family: pass.fonts.mono ?? ""
+                            font.pixelSize: 20
+                            font.weight: Font.Bold
+                            font.letterSpacing: 1
+                        }
+
+                        // Another password at the same length.
+                        Rectangle {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
+                            anchors.verticalCenter: preview.verticalCenter
+                            width: 32
+                            height: 32
+                            radius: 10
+                            color: pass.circle
+                            Text {
+                                anchors.centerIn: parent
+                                textFormat: Text.PlainText
+                                text: String.fromCodePoint(0xF0450)
+                                color: pass.on
+                                font.family: "Symbols Nerd Font Mono"
+                                font.pixelSize: 15
+                            }
+                            Root.Click {
+                                name: "pass-regenerate"
+                                onTapped: pass.generate()
+                            }
+                        }
+
+                        Row {
+                            x: 14
+                            anchors.bottom: parent.bottom
+                            anchors.bottomMargin: 14
+                            spacing: 8
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: "Length"
+                                color: pass.tones.muted
+                                font.family: pass.fonts.ui ?? ""
+                                font.pixelSize: 12
+                            }
+                            Step {
+                                label: "−"
+                                name: "pass-shorter"
+                                onTapped: pass.lengthen(-1)
+                            }
+                            Text {
+                                id: lengthText
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 28
+                                horizontalAlignment: Text.AlignHCenter
+                                textFormat: Text.PlainText
+                                text: String(pass.length)
+                                color: pass.on
+                                font.family: pass.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+                            Step {
+                                label: "+"
+                                name: "pass-longer"
+                                onTapped: pass.lengthen(1)
+                            }
                         }
                     }
 
                     Row {
-                        x: 14
-                        anchors.bottom: parent.bottom
-                        anchors.bottomMargin: 14
+                        anchors.right: parent.right
                         spacing: 8
 
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            textFormat: Text.PlainText
-                            text: "Length"
-                            color: pass.tones.muted
-                            font.family: pass.fonts.ui ?? ""
-                            font.pixelSize: 12
+                        Button {
+                            label: "Cancel"
+                            name: "pass-cancel"
+                            onTapped: pass.back()
                         }
-                        Step {
-                            label: "−"
-                            name: "pass-shorter"
-                            onTapped: pass.lengthen(-1)
+                        Button {
+                            label: "Save"
+                            name: "pass-save"
+                            tint: pass.on
+                            onTapped: pass.save()
                         }
-                        Text {
-                            id: lengthText
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 28
-                            horizontalAlignment: Text.AlignHCenter
-                            textFormat: Text.PlainText
-                            text: String(pass.length)
-                            color: pass.on
-                            font.family: pass.fonts.ui ?? ""
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                        }
-                        Step {
-                            label: "+"
-                            name: "pass-longer"
-                            onTapped: pass.lengthen(1)
-                        }
-                    }
-                }
-
-                Row {
-                    anchors.right: parent.right
-                    spacing: 8
-
-                    Button {
-                        label: "Cancel"
-                        name: "pass-cancel"
-                        onTapped: pass.back()
-                    }
-                    Button {
-                        label: "Save"
-                        name: "pass-save"
-                        tint: pass.on
-                        onTapped: pass.save()
                     }
                 }
             }
