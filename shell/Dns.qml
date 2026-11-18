@@ -1,12 +1,12 @@
 import Quickshell
 import Quickshell.Io
 import QtQuick
-import QtQuick.Layouts
 import "." as Root
-import "lib/voice.mjs" as L
 import "lib/dns.mjs" as D
+import "lib/surface.mjs" as S
+import "lib/island-tones.mjs" as T
 
-// DNS Shield: carried and router devices with Kid mode, from dots-dns state; space, 1-4, o, a and n write through dots-dns, then the card reads state again.
+// DNS Shield drawn inside the island on its fill (board 8): the devices on the left, the cursor device's tile on the right. Space, 1-5, o, O, a and n write through dots-dns, then it reads state again.
 Item {
     id: panel
 
@@ -16,7 +16,7 @@ Item {
     // The last state read, kept while the surface stays loaded, so a reopen draws it at once.
     property string stateText: ""
     property real now: Date.now()
-    // The countdown's clock: a timed open's badge and bar redraw from it, the rows do not.
+    // The countdown's clock: a timed open's chip and bar redraw from it, the rows do not.
     property real clock: Date.now()
     // The cursor's place among the device rows.
     property int selected: 0
@@ -30,15 +30,18 @@ Item {
     property string leasesText: "[]"
     property int leaseSelected: 0
     property bool naming: false
-    // The reason dots-dns gave for the last refused write, drawn under the pane until the tick clears it.
+    // The reason dots-dns gave for the last refused write, drawn in the tile until the tick clears it.
     property string writeError: ""
     readonly property bool busy: cachedReader.running || reader.running || writer.running || leasesReader.running
 
     readonly property string command: Quickshell.env("DOTS_DNS") || Quickshell.shellDir + "/bin/dots-dns"
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: L.listLook(theme.tokens)
-    readonly property var marks: D.dnsLook(theme.tokens)
+    readonly property var tokens: theme.tokens
+    readonly property var fonts: tokens ? tokens.type : ({})
+    // The island's own text and fill, and the tones lifted to read on it.
+    readonly property color on: S.surfaceStyle(tokens, "island").text
+    readonly property color fill: S.surfaceStyle(tokens, "island").fill
+    readonly property var tones: tokens ? T.islandTones(tokens) : ({ muted: "gray", accent: "blue", danger: "red", ok: "green" })
+    readonly property var marks: D.dnsLook(tokens)
     readonly property var view: D.dnsView(stateText, now)
     readonly property var items: D.dnsItems(view)
     readonly property var stops: items.map((it, i) => it.stop ? i : -1).filter(i => i >= 0)
@@ -78,7 +81,7 @@ Item {
         pending = [];
     }
 
-    // Nothing on this card is timed yet; the host calls this on every frame.
+    // Nothing here is timed yet; the host calls this on every frame.
     function swapped() {
     }
 
@@ -86,7 +89,7 @@ Item {
         selected = Math.max(0, Math.min(stops.length - 1, selected + by));
     }
 
-    // Enter runs nothing on a device, so a click on one moves the cursor there and its pane shows; a group row takes none.
+    // Enter runs nothing on a device, so a click on one moves the cursor there and its tile shows; a caption takes none.
     function clickRow(i) {
         // While the allow field is open its Enter writes to the selected device, so the cursor stays where the field was opened.
         if (fieldOpen)
@@ -162,7 +165,7 @@ Item {
         keyTarget.forceActiveFocus();
     }
 
-    // n lists the router's leases in the card; an unreachable router has none to give.
+    // n lists the router's leases; an unreachable router has none to give.
     function openAdd() {
         if (view.routerLine !== "" || leasesReader.running)
             return;
@@ -205,6 +208,12 @@ Item {
         queue({ kind: "add", args: args });
     }
 
+    // An item's box as drawn this frame, in the window's pixels.
+    function boxOf(item) {
+        const a = item.mapToItem(null, 0, 0);
+        return { x: a.x, y: a.y, w: item.width, h: item.height };
+    }
+
     function state() {
         const groups = [];
         const rows = [];
@@ -212,11 +221,11 @@ Item {
         for (let i = 0; i < rowRepeater.count; i++) {
             const r = rowRepeater.itemAt(i);
             if (r.it.kind === "group")
-                groups.push({ text: r.groupLabel, right: r.groupRight, line: r.groupLine });
+                groups.push({ text: r.groupLabel, line: r.groupLine });
             else if (r.it.kind === "device")
                 rows.push(r.drawn());
             if (r.isCurrent)
-                box = r.drawnBox();
+                box = panel.boxOf(r);
         }
         const cats = [];
         for (let i = 0; i < catRepeater.count; i++)
@@ -230,9 +239,9 @@ Item {
         const leaseRows = [];
         for (let i = 0; i < leaseRepeater.count; i++)
             leaseRows.push(leaseRepeater.itemAt(i).drawn());
-        const keys = [];
-        for (let i = 0; i < keyRepeater.count; i++)
-            keys.push(keyRepeater.itemAt(i).keyLabel);
+        const openButtons = [];
+        for (let i = 0; i < openRepeater.count; i++)
+            openButtons.push(openRepeater.itemAt(i).label);
         return JSON.stringify({
             loaded: true,
             open: shown,
@@ -243,25 +252,25 @@ Item {
             busy: busy,
             opens: opens,
             heading: heading.text,
+            addButton: addButton.visible ? addLabel.text : "",
             cursor: device ? device.key : "",
             carried: rows.filter(r => r.key.startsWith("carried:")).length,
             router: rows.filter(r => r.key.startsWith("router:")).length,
             groups: groups,
             rows: rows,
             cursorBox: box,
-            cardBox: card.drawnBox(),
+            cardBox: panel.boxOf(card),
+            listWidth: list.width,
+            tileBox: tile.visible ? panel.boxOf(tile) : null,
             pane: {
                 name: paneName.text,
-                path: panePath.text,
-                pathTruncated: panePath.truncated,
-                badge: paneBadge.drawnText,
-                paused: pausedText.visible ? pausedText.text : "",
+                kid: kidSwitch.on,
                 categories: cats,
-                until: untilRow.visible ? untilText.text : "",
-                left: untilRow.visible ? leftText.text : "",
+                open: openRow.visible ? openCaption.text : "",
+                openButtons: openButtons,
+                left: leftText.visible ? leftText.text : "",
                 allow: allow,
-                blocks: blocks,
-                hint: paneHint.visible ? paneHint.text : ""
+                blocks: blocks
             },
             field: fieldOpen ? fieldInput.text : null,
             add: adding ? {
@@ -279,8 +288,7 @@ Item {
             errorLines: writeErrorText.lineCount,
             errorTruncated: writeErrorText.truncated,
             errorColor: String(writeErrorText.color),
-            footer: footerText.text,
-            keys: keys
+            footer: footerText.text
         });
     }
 
@@ -290,7 +298,7 @@ Item {
         stdout: StdioCollector {
             id: cachedOut
         }
-        // A card closed while the cache was read starts no full read.
+        // A surface closed while the cache was read starts no full read.
         onExited: {
             panel.take(cachedOut.text);
             if (panel.shown)
@@ -310,7 +318,7 @@ Item {
         }
     }
 
-    // The card reads state after every write, so a refused write leaves the rows as dots-dns has them, and shows dots-dns's reason.
+    // It reads state after every write, so a refused write leaves the rows as dots-dns has them, and shows dots-dns's reason.
     Process {
         id: writer
         stderr: StdioCollector {
@@ -344,7 +352,7 @@ Item {
         onTriggered: panel.writeError = ""
     }
 
-    // A timed open counts down once a second while the card shows; at its end the collector brings Kid back, so the card reads state again.
+    // A timed open counts down once a second while DNS Shield shows; at its end the collector brings Kid back, so it reads state again.
     Root.Tick {
         interval: 1000
         repeat: true
@@ -360,7 +368,7 @@ Item {
     Component.onCompleted: Root.State.loaded.push("dns")
     Component.onDestruction: Root.State.loaded = Root.State.loaded.filter(n => n !== "dns")
 
-    // Holds the keyboard while the card shows, unless the allow field or the name field has it.
+    // Holds the keyboard while DNS Shield shows, unless the allow field or the name field has it.
     Item {
         id: keyTarget
         Keys.onPressed: event => {
@@ -399,223 +407,229 @@ Item {
         }
     }
 
-    Root.Surface {
+    // The island draws the fill and plays the open; this is its content, 16 px in from its edge.
+    Item {
         id: card
         width: parent.width
-        height: column.implicitHeight
-        tokens: panel.theme.tokens
-        // The island draws the fill and plays the open.
-        bare: true
+        height: column.implicitHeight + 32
 
-        ColumnLayout {
+        Column {
             id: column
-            width: parent.width
-            spacing: 0
+            x: 16
+            y: 16
+            width: parent.width - 32
+            spacing: 8
 
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.topMargin: 16
-                Layout.bottomMargin: 16
+            // The shield and the name, the state's age, and Add device.
+            Item {
+                width: column.width
+                height: 36
 
-                Rectangle {
-                    implicitWidth: heading.implicitWidth + 14
-                    implicitHeight: heading.implicitHeight + 6
-                    radius: 8
-                    color: look.label.fill
+                Row {
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 10
+                    Glyph {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "\u{F0498}"
+                        font.pixelSize: 17
+                    }
                     Text {
                         id: heading
+                        anchors.verticalCenter: parent.verticalCenter
                         textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: marks.heading(panel.adding)
-                        color: look.label.color
-                        font.family: fonts.ui
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                        font.letterSpacing: 0
+                        text: panel.marks.heading(panel.adding)
+                        color: panel.on
+                        font.family: panel.fonts.ui ?? ""
+                        font.pixelSize: 15
+                        font.weight: Font.Bold
                     }
                 }
-                Item {
-                    Layout.fillWidth: true
+
+                Row {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 12
+                    Text {
+                        id: footerText
+                        anchors.verticalCenter: parent.verticalCenter
+                        textFormat: Text.PlainText
+                        text: panel.view.footer
+                        color: panel.tones.muted
+                        font.family: panel.fonts.ui ?? ""
+                        font.pixelSize: 11
+                    }
+                    Rectangle {
+                        id: addButton
+                        visible: !panel.adding
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: addRow.implicitWidth + 24
+                        height: 32
+                        radius: 10
+                        color: Qt.alpha(panel.on, 0.07)
+                        Row {
+                            id: addRow
+                            anchors.centerIn: parent
+                            spacing: 6
+                            Glyph {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "\u{F0415}"
+                                font.pixelSize: 13
+                            }
+                            Text {
+                                id: addLabel
+                                anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
+                                text: "Add device"
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
+                                font.pixelSize: 12
+                            }
+                        }
+                    }
                 }
             }
 
-            Rule {}
+            // The two panes: about a third for the list, the rest for the tile.
+            Item {
+                width: column.width
+                height: Math.max(panel.adding ? addList.height : list.height, panel.adding ? addTile.height : tile.visible ? tile.height : 0)
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 0
-
-                // The device list: two groups, the cursor row inverted, and the dashed row for a device from the leases.
+                // The devices under their two captions, the cursor row on a lighter tile.
                 Column {
                     id: list
                     visible: !panel.adding
-                    Layout.preferredWidth: Math.round(card.width * 0.54)
-                    Layout.alignment: Qt.AlignTop
-                    Layout.margins: 8
+                    width: 340
+                    spacing: 4
 
                     Repeater {
                         id: rowRepeater
                         model: panel.items
 
-                        Rectangle {
+                        Item {
                             id: rowItem
                             required property var modelData
                             required property int index
                             readonly property var it: modelData
                             readonly property bool isCurrent: index === panel.current
+                            readonly property bool hasLine: it.kind === "group" && (it.line || "") !== ""
+                            readonly property string groupLabel: it.kind === "group" ? captionText.text : ""
+                            readonly property string groupLine: hasLine ? groupLineText.text : ""
+                            function drawn() {
+                                return {
+                                    key: it.key,
+                                    glyph: rowGlyph.text,
+                                    name: nameText.text,
+                                    badge: chip.visible ? chipText.text : "",
+                                    chipFill: chip.visible ? String(chip.color) : "",
+                                    chipInk: chip.visible ? String(chipText.color) : "",
+                                    age: ageText.text,
+                                    truncated: nameText.truncated,
+                                    lines: nameText.lineCount,
+                                    opacity: deviceRow.opacity,
+                                    nameBox: panel.boxOf(nameText)
+                                };
+                            }
+
+                            width: list.width
+                            height: it.kind === "group" ? (hasLine ? 40 : 24) : 44
+
                             // A click on the row does what Enter does on it.
                             Root.Click {
                                 name: "dns-row:" + (rowItem.it.key ?? rowItem.index)
                                 onTapped: panel.clickRow(rowItem.index)
                             }
-                            readonly property bool hasLine: it.kind === "group" && (it.line || "") !== ""
-                            readonly property var group: it.kind === "group" ? marks.group(it) : null
-                            readonly property string groupLabel: groupText.text
-                            readonly property string groupRight: groupRightText.text
-                            readonly property string groupLine: hasLine ? groupLineText.text : ""
-                            readonly property color ink: isCurrent ? look.cursor.text : c.ink
-                            function drawn() {
-                                return { key: it.key, name: nameText.text, badge: rowBadge.drawnText, age: ageText.text, truncated: nameText.truncated, lines: nameText.lineCount, opacity: deviceRow.opacity };
-                            }
-                            // The row as drawn this frame, in the window's pixels.
-                            function drawnBox() {
-                                const a = mapToItem(null, 0, 0);
-                                return { x: a.x, y: a.y, w: width * card.scale, h: height * card.scale };
-                            }
 
-                            width: list.width
-                            implicitHeight: it.kind === "group" ? (hasLine ? 50 : 30) : it.kind === "add" ? 52 : 42
-                            radius: look.cursor.radius
-                            color: isCurrent ? look.cursor.fill : "transparent"
-
-                            ColumnLayout {
+                            Text {
+                                id: captionText
                                 visible: rowItem.it.kind === "group"
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.bottom: parent.bottom
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                anchors.bottomMargin: 4
-                                spacing: 4
-                                RowLayout {
-                                    Layout.fillWidth: true
-                                    Text {
-                                        id: groupText
-                                        textFormat: Text.PlainText
-                                        text: rowItem.group ? rowItem.group.text : ""
-                                        color: look.small.color
-                                        font.family: look.small.font
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: 0
-                                    }
-                                    Item {
-                                        Layout.fillWidth: true
-                                    }
-                                    Text {
-                                        id: groupRightText
-                                        textFormat: Text.PlainText
-                                        text: rowItem.group ? rowItem.group.right : ""
-                                        color: look.small.color
-                                        font.family: look.small.font
-                                        font.pixelSize: look.small.size
-                                        font.letterSpacing: 0
-                                    }
-                                }
-                                // Why the router's rows are dim and since when.
-                                Text {
-                                    id: groupLineText
-                                    visible: rowItem.hasLine
-                                    Layout.fillWidth: true
-                                    textFormat: Text.PlainText
-                                    text: rowItem.it.line || ""
-                                    elide: Text.ElideRight
-                                    color: c.danger
-                                    font.family: look.small.font
-                                    font.pixelSize: 11
-                                    font.weight: Font.Normal
-                                    font.letterSpacing: 0
-                                }
+                                x: 4
+                                height: 22
+                                verticalAlignment: Text.AlignBottom
+                                textFormat: Text.PlainText
+                                text: rowItem.it.kind === "group" ? panel.marks.group(rowItem.it).text : ""
+                                color: panel.tones.muted
+                                font.family: panel.fonts.ui ?? ""
+                                font.pixelSize: 10
+                                font.letterSpacing: 1.2
                             }
-
-                            RowLayout {
-                                id: deviceRow
-                                visible: rowItem.it.kind === "device"
-                                opacity: rowItem.it.dim ? 0.45 : 1
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 14
-                                Text {
-                                    id: nameText
-                                    Layout.fillWidth: true
-                                    textFormat: Text.PlainText
-                                    text: rowItem.it.name || ""
-                                    maximumLineCount: 1
-                                    elide: Text.ElideRight
-                                    color: rowItem.ink
-                                    font.family: look.name.font
-                                    font.pixelSize: 15
-                                    font.weight: rowItem.isCurrent ? Font.Medium : Font.Normal
-                                    font.letterSpacing: look.name.spacing
-                                }
-                                Item {
-                                    Layout.preferredWidth: 150
-                                    implicitHeight: rowBadge.implicitHeight
-                                    Badge {
-                                        id: rowBadge
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        kid: rowItem.it.kid === true
-                                        timed: rowItem.it.kind === "device" && rowItem.it.openUntil !== null
-                                        label: rowItem.it.kind === "device" ? D.badgeText(rowItem.it, panel.clock) : ""
-                                        cursorRow: rowItem.isCurrent
-                                    }
-                                }
-                                Text {
-                                    id: ageText
-                                    Layout.preferredWidth: 56
-                                    horizontalAlignment: Text.AlignRight
-                                    textFormat: Text.PlainText
-                                    text: rowItem.it.age || ""
-                                    color: rowItem.isCurrent ? look.cursor.detail : c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 12
-                                }
+                            // Why the router's rows are dim and since when.
+                            Text {
+                                id: groupLineText
+                                visible: rowItem.hasLine
+                                x: 4
+                                y: 24
+                                width: parent.width - 8
+                                textFormat: Text.PlainText
+                                text: rowItem.it.line || ""
+                                elide: Text.ElideRight
+                                color: panel.tones.danger
+                                font.family: panel.fonts.ui ?? ""
+                                font.pixelSize: 11
                             }
 
                             Rectangle {
-                                visible: rowItem.it.kind === "add"
+                                id: deviceRow
+                                visible: rowItem.it.kind === "device"
                                 anchors.fill: parent
-                                anchors.topMargin: 10
-                                anchors.leftMargin: 4
-                                anchors.rightMargin: 4
-                                radius: look.cursor.radius
-                                color: "transparent"
-                                Root.Dashed {
-                                    anchors.fill: parent
-                                    frame: true
-                                    color: c.line
-                                }
+                                radius: 12
+                                color: rowItem.isCurrent ? Qt.alpha(panel.on, 0.12) : "transparent"
+                                opacity: rowItem.it.dim ? 0.45 : 1
+
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter
-                                    anchors.left: parent.left
-                                    anchors.leftMargin: 12
-                                    spacing: 12
-                                    Text {
-                                        textFormat: Text.PlainText
-                                        text: look.keyText("n")
-                                        color: c.ink
-                                        font.family: fonts.mono
-                                        font.pixelSize: 11
-                                        font.bold: true
+                                    x: 12
+                                    width: parent.width - 24
+                                    spacing: 10
+                                    Glyph {
+                                        id: rowGlyph
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 16
+                                        text: rowItem.it.glyph || ""
                                     }
                                     Text {
+                                        id: nameText
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: parent.width - rowGlyph.width - (chip.visible ? chip.width + 10 : 0) - ageText.width - 30
                                         textFormat: Text.PlainText
-                                        text: "add a device from the router's leases"
-                                        color: c.muted
-                                        font.family: fonts.ui
+                                        text: rowItem.it.name || ""
+                                        maximumLineCount: 1
+                                        elide: Text.ElideRight
+                                        color: panel.on
+                                        font.family: panel.fonts.ui ?? ""
                                         font.pixelSize: 13
+                                        font.weight: Font.Bold
+                                    }
+                                    // Kid inverted, or a timed open's minutes left on a lighter chip.
+                                    Rectangle {
+                                        id: chip
+                                        readonly property bool kid: rowItem.it.kid === true
+                                        visible: chipText.text !== ""
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: chipText.implicitWidth + 16
+                                        height: 20
+                                        radius: 10
+                                        color: kid ? panel.on : Qt.alpha(panel.on, 0.12)
+                                        Text {
+                                            id: chipText
+                                            anchors.centerIn: parent
+                                            textFormat: Text.PlainText
+                                            text: rowItem.it.kind === "device" ? D.badgeText(rowItem.it, panel.clock) : ""
+                                            color: chip.kid ? panel.fill : panel.on
+                                            font.family: panel.fonts.ui ?? ""
+                                            font.pixelSize: 10
+                                            font.weight: Font.Bold
+                                        }
+                                    }
+                                    Text {
+                                        id: ageText
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 60
+                                        horizontalAlignment: Text.AlignRight
+                                        textFormat: Text.PlainText
+                                        text: rowItem.it.age || ""
+                                        color: panel.tones.muted
+                                        font.family: panel.fonts.ui ?? ""
+                                        font.pixelSize: 11
                                     }
                                 }
                             }
@@ -623,40 +637,39 @@ Item {
                     }
                 }
 
-                // The add sub-list in place of the devices: the router's leases not yet listed.
-                ColumnLayout {
+                // The add list in place of the devices: the router's leases not yet listed.
+                Column {
                     id: addList
                     visible: panel.adding
-                    Layout.preferredWidth: Math.round(card.width * 0.54)
-                    Layout.alignment: Qt.AlignTop
-                    Layout.margins: 8
-                    spacing: 0
+                    width: 340
+                    spacing: 4
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 12
-                        Layout.rightMargin: 12
-                        Layout.topMargin: 6
-                        Layout.bottomMargin: 4
+                    Item {
+                        width: addList.width
+                        height: 24
                         Text {
                             id: leasesHead
+                            x: 4
+                            height: 22
+                            verticalAlignment: Text.AlignBottom
                             textFormat: Text.PlainText
-                            text: marks.leasesHead(panel.leases.length).text
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: look.small.size
-                            font.letterSpacing: 0
-                        }
-                        Item {
-                            Layout.fillWidth: true
+                            text: panel.marks.leasesHead(panel.leases.length).text
+                            color: panel.tones.muted
+                            font.family: panel.fonts.ui ?? ""
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.2
                         }
                         Text {
+                            anchors.right: parent.right
+                            anchors.rightMargin: 4
+                            height: 22
+                            verticalAlignment: Text.AlignBottom
                             textFormat: Text.PlainText
-                            text: marks.leasesHead(panel.leases.length).right
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: look.small.size
-                            font.letterSpacing: 0
+                            text: panel.marks.leasesHead(panel.leases.length).right
+                            color: panel.tones.muted
+                            font.family: panel.fonts.ui ?? ""
+                            font.pixelSize: 10
+                            font.letterSpacing: 1.2
                         }
                     }
 
@@ -671,477 +684,381 @@ Item {
                             function drawn() {
                                 return { mac: modelData.mac, name: leaseName.text, ip: leaseIp.text, truncated: leaseName.truncated, lines: leaseName.lineCount };
                             }
-                            Layout.fillWidth: true
-                            implicitHeight: 42
-                            radius: look.cursor.radius
-                            color: isCurrent ? look.cursor.fill : "transparent"
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                spacing: 14
-                                Text {
-                                    id: leaseName
-                                    Layout.fillWidth: true
-                                    textFormat: Text.PlainText
-                                    text: leaseRow.modelData.name
-                                    maximumLineCount: 1
-                                    elide: Text.ElideRight
-                                    color: leaseRow.isCurrent ? look.cursor.text : c.ink
-                                    font.family: look.name.font
-                                    font.pixelSize: 15
-                                }
-                                Text {
-                                    id: leaseIp
-                                    textFormat: Text.PlainText
-                                    text: leaseRow.modelData.ip
-                                    color: leaseRow.isCurrent ? look.cursor.detail : c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
-
-                    Text {
-                        id: addNote
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 12
-                        Layout.topMargin: 10
-                        textFormat: Text.PlainText
-                        wrapMode: Text.WordWrap
-                        text: "read from the router's DHCP leases · devices already in the list are left out"
-                        color: c.muted
-                        font.family: fonts.ui
-                        font.pixelSize: 12
-                    }
-                }
-
-                Item {
-                    Layout.fillHeight: true
-                    implicitWidth: 1
-                }
-
-                // The pane for the cursor device; an OPEN one shows only its recent blocks and the way back to Kid.
-                ColumnLayout {
-                    visible: !panel.adding
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.topMargin: 18
-                    Layout.bottomMargin: 18
-                    spacing: 16
-
-                    // The path's line runs under the badge, so it has the pane's whole width.
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 3
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 12
+                            width: addList.width
+                            height: 44
+                            radius: 12
+                            color: isCurrent ? Qt.alpha(panel.on, 0.12) : "transparent"
                             Text {
-                                id: paneName
-                                Layout.fillWidth: true
+                                id: leaseName
+                                anchors.verticalCenter: parent.verticalCenter
+                                x: 12
+                                width: parent.width - 24 - leaseIp.width - 10
                                 textFormat: Text.PlainText
-                                text: panel.paneView ? panel.paneView.name : ""
+                                text: leaseRow.modelData.name
                                 maximumLineCount: 1
                                 elide: Text.ElideRight
-                                color: c.ink
-                                font.family: look.name.font
-                                font.pixelSize: 17
-                                font.weight: Font.Medium
-                            }
-                            Badge {
-                                id: paneBadge
-                                Layout.alignment: Qt.AlignTop
-                                kid: !!panel.device && panel.device.kid
-                                timed: panel.timedOpen
-                                label: panel.device ? D.badgeText(panel.device, panel.clock) : ""
-                                cursorRow: false
-                            }
-                        }
-                        Text {
-                            id: panePath
-                            Layout.fillWidth: true
-                            textFormat: Text.PlainText
-                            text: panel.paneView ? panel.paneView.path : ""
-                            elide: Text.ElideRight
-                            color: c.muted
-                            font.family: fonts.mono
-                            font.pixelSize: 12
-                        }
-                    }
-
-                    ColumnLayout {
-                        visible: panel.paneFull
-                        Layout.fillWidth: true
-                        spacing: 0
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Layout.bottomMargin: 4
-                            Text {
-                                textFormat: Text.PlainText
-                                text: look.tabText("Categories")
-                                color: look.small.color
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                                font.letterSpacing: 0
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                            }
-                            Text {
-                                id: pausedText
-                                visible: panel.timedOpen
-                                textFormat: Text.PlainText
-                                text: panel.paneView ? panel.paneView.paused : ""
-                                color: look.small.color
-                                font.family: look.small.font
-                                font.pixelSize: look.small.size
-                            }
-                        }
-                        Repeater {
-                            id: catRepeater
-                            model: panel.paneView ? panel.paneView.categories : []
-                            ColumnLayout {
-                                id: catRow
-                                required property var modelData
-                                readonly property bool isOn: modelData.value === "ON"
-                                readonly property bool isPaused: modelData.value === "paused"
-                                readonly property bool hasNote: modelData.key === "youtube_kids" && !!panel.paneView && panel.paneView.shared !== ""
-                                function drawn() {
-                                    return { n: Number(catKey.text), label: catLabel.text, value: catValue.text, note: hasNote ? catNote.text : "" };
-                                }
-                                Layout.fillWidth: true
-                                Layout.topMargin: 5
-                                Layout.bottomMargin: 5
-                                spacing: 2
-                                RowLayout {
-                                Layout.fillWidth: true
-                                spacing: 12
-                                Text {
-                                    id: catKey
-                                    Layout.preferredWidth: 14
-                                    textFormat: Text.PlainText
-                                    text: String(catRow.modelData.n)
-                                    color: c.ink
-                                    font.family: fonts.mono
-                                    font.pixelSize: 11
-                                    font.bold: true
-                                }
-                                Text {
-                                    id: catLabel
-                                    Layout.fillWidth: true
-                                    textFormat: Text.PlainText
-                                    text: catRow.modelData.label
-                                    color: catRow.isPaused ? c.muted : c.ink
-                                    font.family: fonts.ui
-                                    font.pixelSize: 14
-                                }
-                                // A paused category keeps its knob at on, drawn hollow.
-                                Rectangle {
-                                    implicitWidth: 30
-                                    implicitHeight: 16
-                                    radius: 8
-                                    color: catRow.isOn ? c.ink : "transparent"
-                                    border.width: catRow.isOn ? 0 : 1.5
-                                    border.color: c.muted
-                                    Rectangle {
-                                        x: catRow.isOn || catRow.isPaused ? parent.width - width - 2 : 2
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: catRow.isOn ? 12 : 10
-                                        height: width
-                                        radius: width / 2
-                                        color: catRow.isOn ? c.surface : c.muted
-                                    }
-                                }
-                                Text {
-                                    id: catValue
-                                    Layout.preferredWidth: 48
-                                    horizontalAlignment: Text.AlignRight
-                                    textFormat: Text.PlainText
-                                    text: catRow.modelData.value
-                                    color: catRow.isOn ? c.ink : c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 11
-                                    font.weight: catRow.isOn ? Font.DemiBold : Font.Normal
-                                }
-                                }
-                                // On a router row YouTube Kids is one setting for every home-router device, so 2 changes them all.
-                                Text {
-                                    id: catNote
-                                    visible: catRow.hasNote
-                                    Layout.leftMargin: 26
-                                    textFormat: Text.PlainText
-                                    text: panel.paneView ? panel.paneView.shared : ""
-                                    color: c.muted
-                                    font.family: fonts.ui
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
-
-                    // OPEN FOR on a KID device; a timed open shows its end, what is left, a bar of its length and how to end it.
-                    ColumnLayout {
-                        visible: panel.paneFull
-                        Layout.fillWidth: true
-                        spacing: 8
-                        Text {
-                            textFormat: Text.PlainText
-                            text: look.tabText(panel.timedOpen ? "Open" : "Open for")
-                            color: look.small.color
-                            font.family: look.small.font
-                            font.pixelSize: look.small.size
-                            font.letterSpacing: 0
-                        }
-                        RowLayout {
-                            id: untilRow
-                            visible: panel.timedOpen
-                            Layout.fillWidth: true
-                            Text {
-                                id: untilText
-                                Layout.fillWidth: true
-                                textFormat: Text.PlainText
-                                text: panel.paneView ? panel.paneView.until : ""
-                                color: c.ink
-                                font.family: fonts.ui
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
                                 font.pixelSize: 13
+                                font.weight: Font.Bold
                             }
                             Text {
-                                id: leftText
+                                id: leaseIp
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
                                 textFormat: Text.PlainText
-                                text: panel.timedOpen ? D.badgeText(panel.device, panel.clock).replace("open · ", "") : ""
-                                color: c.ink
-                                font.family: fonts.mono
-                                font.pixelSize: 13
-                                font.weight: Font.Medium
-                            }
-                        }
-                        Rectangle {
-                            visible: panel.timedOpen
-                            Layout.fillWidth: true
-                            implicitHeight: 4
-                            radius: 2
-                            color: c.line
-                            Rectangle {
-                                width: parent.width * (panel.timedOpen ? D.openFraction(panel.device, panel.clock) : 0)
-                                height: parent.height
-                                radius: parent.radius
-                                color: c.ink
-                            }
-                        }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-                            Repeater {
-                                model: panel.timedOpen ? [["o", "+30m"], ["O", "2h"]] : [["o", "30m"], ["O", "2h"]]
-                                Rectangle {
-                                    required property var modelData
-                                    implicitWidth: openRow.implicitWidth + 20
-                                    implicitHeight: openRow.implicitHeight + 10
-                                    radius: 6
-                                    color: "transparent"
-                                    border.width: 1
-                                    border.color: c.line
-                                    Row {
-                                        id: openRow
-                                        anchors.centerIn: parent
-                                        spacing: 8
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: modelData[0]
-                                            color: c.ink
-                                            font.family: fonts.mono
-                                            font.pixelSize: 12
-                                            font.weight: Font.Medium
-                                        }
-                                        Text {
-                                            textFormat: Text.PlainText
-                                            text: modelData[1]
-                                            color: c.ink
-                                            font.family: fonts.mono
-                                            font.pixelSize: 12
-                                        }
-                                    }
-                                }
-                            }
-                            Item {
-                                Layout.fillWidth: true
-                            }
-                            Text {
-                                visible: panel.timedOpen
-                                textFormat: Text.PlainText
-                                text: look.keyText("space") + " " + look.tabText("ends it now")
-                                color: c.muted
-                                font.family: fonts.mono
+                                text: leaseRow.modelData.ip
+                                color: panel.tones.muted
+                                font.family: panel.fonts.ui ?? ""
                                 font.pixelSize: 11
                             }
                         }
                     }
+                }
 
-                    ColumnLayout {
-                        visible: panel.paneFull
-                        Layout.fillWidth: true
-                        spacing: 0
-                        Head {
-                            text: look.tabText("Allow list") + " · " + (panel.paneView ? panel.paneView.allow.length : 0)
-                            word: look.keyText("a") + " " + look.tabText("add")
-                        }
-                        Repeater {
-                            id: allowRepeater
-                            model: panel.paneView ? panel.paneView.allow : []
+                // The cursor device's tile: its Kid mode switch, the five categories, Open for a while, its allow list and its recent blocks.
+                Rectangle {
+                    id: tile
+                    visible: !panel.adding && !!panel.device
+                    x: 352
+                    width: parent.width - 352
+                    height: tileColumn.implicitHeight + 24
+                    radius: 14
+                    color: Qt.alpha(panel.on, 0.07)
+
+                    Column {
+                        id: tileColumn
+                        x: 14
+                        y: 12
+                        width: parent.width - 28
+                        spacing: 4
+
+                        Item {
+                            width: tileColumn.width
+                            height: 36
                             Text {
-                                required property var modelData
-                                Layout.fillWidth: true
-                                Layout.topMargin: 4
-                                Layout.bottomMargin: 4
+                                id: paneName
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: parent.width - kidRow.width - 10
                                 textFormat: Text.PlainText
-                                text: modelData
+                                text: panel.paneView ? panel.paneView.name : ""
                                 maximumLineCount: 1
                                 elide: Text.ElideRight
-                                color: c.ink
-                                font.family: fonts.ui
-                                font.pixelSize: 14
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
                             }
-                        }
-                        // One line for a domain to allow: Enter adds it, Esc leaves it.
-                        Rectangle {
-                            visible: panel.fieldOpen
-                            Layout.fillWidth: true
-                            Layout.topMargin: 4
-                            implicitHeight: fieldInput.implicitHeight + 10
-                            radius: 6
-                            color: "transparent"
-                            border.width: 1
-                            border.color: c.accent
-                            TextInput {
-                                id: fieldInput
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                verticalAlignment: TextInput.AlignVCenter
-                                clip: true
-                                color: c.ink
-                                font.family: fonts.ui
-                                font.pixelSize: 14
-                                Keys.onPressed: event => {
-                                    if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                                        panel.closeField(true);
-                                    else if (event.key === Qt.Key_Escape)
-                                        panel.closeField(false);
-                                    else
-                                        return;
-                                    event.accepted = true;
+                            Row {
+                                id: kidRow
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 10
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: "Kid mode"
+                                    color: panel.tones.muted
+                                    font.family: panel.fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                }
+                                Switch {
+                                    id: kidSwitch
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    on: !!panel.device && panel.device.kid
                                 }
                             }
                         }
-                    }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 0
-                        Head {
-                            text: look.tabText("Recent blocks")
-                        }
                         Repeater {
-                            id: blockRepeater
-                            // The collector keeps 20; the card draws the newest 6, so it stays on a laptop's screen.
-                            model: panel.paneView ? panel.paneView.blocks.slice(0, 6) : []
-                            RowLayout {
+                            id: catRepeater
+                            model: panel.paneFull && panel.paneView ? panel.paneView.categories : []
+                            Column {
+                                id: catRow
                                 required property var modelData
+                                readonly property bool hasNote: modelData.key === "youtube_kids" && !!panel.paneView && panel.paneView.shared !== ""
                                 function drawn() {
-                                    return { domain: blockDomain.text, age: blockAge.text };
+                                    return { label: catLabel.text, value: catValue.text, on: catSwitch.on, note: hasNote ? catNote.text : "" };
                                 }
-                                Layout.fillWidth: true
-                                Layout.topMargin: 4
-                                Layout.bottomMargin: 4
-                                Text {
-                                    id: blockDomain
-                                    Layout.fillWidth: true
-                                    textFormat: Text.PlainText
-                                    text: modelData.domain
-                                    maximumLineCount: 1
-                                    elide: Text.ElideRight
-                                    color: c.ink
-                                    font.family: fonts.mono
-                                    font.pixelSize: 12
+                                width: tileColumn.width
+                                Item {
+                                    width: catRow.width
+                                    height: 36
+                                    Text {
+                                        id: catLabel
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        textFormat: Text.PlainText
+                                        text: catRow.modelData.label
+                                        color: panel.on
+                                        font.family: panel.fonts.ui ?? ""
+                                        font.pixelSize: 13
+                                    }
+                                    Row {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 10
+                                        Text {
+                                            id: catValue
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            textFormat: Text.PlainText
+                                            text: catRow.modelData.value
+                                            color: panel.tones.muted
+                                            font.family: panel.fonts.ui ?? ""
+                                            font.pixelSize: 12
+                                        }
+                                        Switch {
+                                            id: catSwitch
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            on: catRow.modelData.on
+                                        }
+                                    }
                                 }
+                                // On a router row YouTube Kids is one setting for every home-router device, so a change to it changes them all.
                                 Text {
-                                    id: blockAge
+                                    id: catNote
+                                    visible: catRow.hasNote
+                                    bottomPadding: 4
                                     textFormat: Text.PlainText
-                                    text: modelData.age
-                                    color: c.muted
-                                    font.family: fonts.mono
-                                    font.pixelSize: 12
+                                    text: panel.paneView ? panel.paneView.shared : ""
+                                    color: panel.tones.muted
+                                    font.family: panel.fonts.ui ?? ""
+                                    font.pixelSize: 11
                                 }
                             }
                         }
-                        Text {
-                            id: paneHint
-                            visible: !!panel.paneView && panel.paneView.hint !== ""
-                            Layout.topMargin: 8
-                            textFormat: Text.PlainText
-                            text: panel.paneView ? panel.paneView.hint : ""
-                            color: c.muted
-                            font.family: fonts.ui
-                            font.pixelSize: 13
-                        }
-                    }
 
-                    // Why the last write was refused, for 5 s.
-                    Text {
-                        id: writeErrorText
-                        visible: panel.writeError !== ""
-                        Layout.fillWidth: true
-                        // The reason can quote a name anyone on the network set, so it elides in the pane's room and never widens the pane into the list.
-                        Layout.preferredWidth: 0
-                        textFormat: Text.PlainText
-                        text: panel.writeError
-                        elide: Text.ElideRight
-                        color: c.danger
-                        font.family: look.small.font
-                        font.pixelSize: 11
-                        font.weight: Font.Normal
-                        font.letterSpacing: 0
+                        // Open for a while, or a timed open's end and the time left over a bar of its length.
+                        Item {
+                            id: openRow
+                            visible: panel.paneFull
+                            width: tileColumn.width
+                            height: 44
+                            Row {
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 10
+                                Text {
+                                    id: openCaption
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: panel.timedOpen && panel.paneView ? panel.paneView.until : "Open for a while"
+                                    color: panel.tones.muted
+                                    font.family: panel.fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                }
+                                Text {
+                                    id: leftText
+                                    visible: panel.timedOpen
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: panel.timedOpen ? D.badgeText(panel.device, panel.clock) + " left" : ""
+                                    color: panel.on
+                                    font.family: panel.fonts.ui ?? ""
+                                    font.pixelSize: 12
+                                    font.weight: Font.Bold
+                                }
+                            }
+                            Row {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 8
+                                Repeater {
+                                    id: openRepeater
+                                    model: ["30 min", "2 h"]
+                                    Rectangle {
+                                        required property string modelData
+                                        readonly property string label: modelData
+                                        width: openLabel.implicitWidth + 24
+                                        height: 30
+                                        radius: 10
+                                        color: Qt.alpha(panel.on, 0.12)
+                                        Text {
+                                            id: openLabel
+                                            anchors.centerIn: parent
+                                            textFormat: Text.PlainText
+                                            text: parent.modelData
+                                            color: panel.on
+                                            font.family: panel.fonts.ui ?? ""
+                                            font.pixelSize: 12
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Rectangle {
+                            visible: panel.timedOpen
+                            width: tileColumn.width
+                            height: 4
+                            radius: 2
+                            color: Qt.alpha(panel.on, 0.16)
+                            Rectangle {
+                                width: parent.width * (panel.timedOpen ? D.openFraction(panel.device, panel.clock) : 0)
+                                height: parent.height
+                                radius: parent.radius
+                                color: panel.on
+                            }
+                        }
+
+                        // The allow list beside the recent blocks, so the tile stays short.
+                        Row {
+                            width: tileColumn.width
+                            topPadding: 6
+                            spacing: 12
+
+                            Column {
+                                visible: panel.paneFull
+                                width: (tileColumn.width - 12) / 2
+                                spacing: 2
+                                Caption {
+                                    text: "Allowed sites · " + (panel.paneView ? panel.paneView.allow.length : 0)
+                                }
+                                Repeater {
+                                    id: allowRepeater
+                                    model: panel.paneFull && panel.paneView ? panel.paneView.allow : []
+                                    Text {
+                                        required property var modelData
+                                        width: parent.width
+                                        height: 22
+                                        verticalAlignment: Text.AlignVCenter
+                                        textFormat: Text.PlainText
+                                        text: modelData
+                                        maximumLineCount: 1
+                                        elide: Text.ElideRight
+                                        color: panel.on
+                                        font.family: panel.fonts.ui ?? ""
+                                        font.pixelSize: 12
+                                    }
+                                }
+                                // One line for a domain to allow: Enter adds it, Esc leaves it.
+                                Rectangle {
+                                    visible: panel.fieldOpen
+                                    width: parent.width
+                                    height: 28
+                                    radius: 8
+                                    color: Qt.alpha(panel.on, 0.12)
+                                    TextInput {
+                                        id: fieldInput
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 8
+                                        anchors.rightMargin: 8
+                                        verticalAlignment: TextInput.AlignVCenter
+                                        clip: true
+                                        color: panel.on
+                                        selectionColor: Qt.alpha(panel.on, 0.3)
+                                        font.family: panel.fonts.ui ?? ""
+                                        font.pixelSize: 12
+                                        Keys.onPressed: event => {
+                                            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                                                panel.closeField(true);
+                                            else if (event.key === Qt.Key_Escape)
+                                                panel.closeField(false);
+                                            else
+                                                return;
+                                            event.accepted = true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Column {
+                                width: (tileColumn.width - 12) / 2
+                                spacing: 2
+                                Caption {
+                                    text: "Recent blocks"
+                                }
+                                Repeater {
+                                    id: blockRepeater
+                                    // The collector keeps 20; the tile draws the newest 6, so it stays on a laptop's screen.
+                                    model: panel.paneView ? panel.paneView.blocks.slice(0, 6) : []
+                                    Item {
+                                        required property var modelData
+                                        function drawn() {
+                                            return { domain: blockDomain.text, age: blockAge.text };
+                                        }
+                                        width: parent.width
+                                        height: 22
+                                        Text {
+                                            id: blockDomain
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: parent.width - blockAge.width - 8
+                                            textFormat: Text.PlainText
+                                            text: modelData.domain
+                                            maximumLineCount: 1
+                                            elide: Text.ElideRight
+                                            color: panel.on
+                                            font.family: panel.fonts.ui ?? ""
+                                            font.pixelSize: 12
+                                        }
+                                        Text {
+                                            id: blockAge
+                                            anchors.right: parent.right
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            textFormat: Text.PlainText
+                                            text: modelData.age
+                                            color: panel.tones.muted
+                                            font.family: panel.fonts.ui ?? ""
+                                            font.pixelSize: 11
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Why the last write was refused, for 5 s.
+                        Text {
+                            id: writeErrorText
+                            visible: panel.writeError !== ""
+                            width: tileColumn.width
+                            topPadding: 4
+                            // The reason can quote a name anyone on the network set, so it elides in the tile's width.
+                            textFormat: Text.PlainText
+                            text: panel.writeError
+                            maximumLineCount: 1
+                            elide: Text.ElideRight
+                            color: panel.tones.danger
+                            font.family: panel.fonts.ui ?? ""
+                            font.pixelSize: 11
+                        }
                     }
                 }
 
-                // The add pane: the name to add the lease as, what the lease says, and that it starts in Kid mode on the router.
-                ColumnLayout {
+                // The add tile: the name to add the lease as, what the lease says, and that it starts in Kid mode on the router.
+                Rectangle {
+                    id: addTile
                     visible: panel.adding
-                    Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
-                    Layout.leftMargin: 22
-                    Layout.rightMargin: 22
-                    Layout.topMargin: 18
-                    Layout.bottomMargin: 18
-                    spacing: 16
+                    x: 352
+                    width: parent.width - 352
+                    height: addColumn.implicitHeight + 24
+                    radius: 14
+                    color: Qt.alpha(panel.on, 0.07)
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
+                    Column {
+                        id: addColumn
+                        x: 14
+                        y: 12
+                        width: parent.width - 28
                         spacing: 4
-                        Head {
-                            text: look.tabText("Add as")
+
+                        Caption {
+                            text: "Add as"
                         }
                         Rectangle {
-                            Layout.fillWidth: true
-                            implicitHeight: nameInput.implicitHeight + 12
-                            radius: 6
-                            color: "transparent"
-                            border.width: panel.naming ? 2 : 1
-                            border.color: panel.naming ? c.accent : c.line
+                            width: addColumn.width
+                            height: 32
+                            radius: 10
+                            color: Qt.alpha(panel.on, panel.naming ? 0.16 : 0.12)
                             TextInput {
                                 id: nameInput
                                 anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
                                 verticalAlignment: TextInput.AlignVCenter
                                 clip: true
-                                color: c.ink
-                                font.family: fonts.ui
-                                font.pixelSize: 15
+                                color: panel.on
+                                selectionColor: Qt.alpha(panel.on, 0.3)
+                                font.family: panel.fonts.ui ?? ""
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
                                 Keys.onPressed: event => {
                                     if (event.key === Qt.Key_Tab)
                                         panel.toggleNaming();
@@ -1155,245 +1072,129 @@ Item {
                                 }
                             }
                         }
-                        Text {
-                            textFormat: Text.PlainText
-                            text: "type to rename, tab back to the leases"
-                            color: c.muted
-                            font.family: fonts.ui
-                            font.pixelSize: 12
-                        }
-                    }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-                        Head {
-                            text: look.tabText("From the lease")
+                        Caption {
+                            topPadding: 8
+                            text: "From the lease"
                         }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                textFormat: Text.PlainText
-                                text: "Hostname"
-                                color: c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 13
-                            }
+                        Pair {
+                            label: "Hostname"
                             Text {
                                 id: leaseHost
-                                Layout.fillWidth: true
-                                // Any device names its own lease, so the hostname takes the room the row has and never widens the pane into the list.
-                                Layout.preferredWidth: 0
+                                // Any device names its own lease, so the hostname elides in the room the row has.
+                                width: Math.min(implicitWidth, addColumn.width - 100)
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 horizontalAlignment: Text.AlignRight
                                 textFormat: Text.PlainText
                                 text: panel.lease ? panel.lease.name : ""
                                 elide: Text.ElideRight
-                                color: c.ink
-                                font.family: fonts.mono
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
                                 font.pixelSize: 13
                             }
                         }
-                        RowLayout {
-                            Layout.fillWidth: true
-                            Text {
-                                textFormat: Text.PlainText
-                                text: "Address"
-                                color: c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 13
-                            }
+                        Pair {
+                            label: "Address"
                             Text {
                                 id: leaseAddress
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignRight
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 textFormat: Text.PlainText
                                 text: panel.lease ? panel.lease.ip : ""
-                                color: c.ink
-                                font.family: fonts.mono
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
                                 font.pixelSize: 13
                             }
                         }
-                        RowLayout {
-                            Layout.fillWidth: true
+                        Pair {
+                            label: "Enforced by"
                             Text {
-                                textFormat: Text.PlainText
-                                text: "Enforced by"
-                                color: c.muted
-                                font.family: fonts.ui
-                                font.pixelSize: 13
-                            }
-                            Text {
-                                Layout.fillWidth: true
-                                horizontalAlignment: Text.AlignRight
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
                                 textFormat: Text.PlainText
                                 text: "Home router"
-                                color: c.ink
-                                font.family: fonts.mono
+                                color: panel.on
+                                font.family: panel.fonts.ui ?? ""
                                 font.pixelSize: 13
                             }
                         }
-                    }
 
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 4
-                        Head {
-                            text: look.tabText("Starts as Kid")
+                        Caption {
+                            topPadding: 8
+                            text: "Starts as Kid"
                         }
                         Text {
                             textFormat: Text.PlainText
                             text: "YouTube · Social · Adult · Gambling"
-                            color: c.ink
-                            font.family: fonts.ui
-                            font.pixelSize: 14
+                            color: panel.on
+                            font.family: panel.fonts.ui ?? ""
+                            font.pixelSize: 13
+                        }
+                        Text {
+                            id: addNote
+                            width: addColumn.width
+                            topPadding: 8
+                            textFormat: Text.PlainText
+                            wrapMode: Text.WordWrap
+                            text: "From the router's DHCP leases; listed devices are left out."
+                            color: panel.tones.muted
+                            font.family: panel.fonts.ui ?? ""
+                            font.pixelSize: 11
                         }
                     }
                 }
             }
-
-            Rule {}
-
-            Text {
-                id: footerText
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.topMargin: 10
-                Layout.bottomMargin: 10
-                textFormat: Text.PlainText
-                text: view.footer
-                color: c.muted
-                font.family: look.small.font
-                font.pixelSize: look.small.size
-                font.letterSpacing: look.small.spacing
-            }
-
-            Rule {}
-
-            // The key strip as Accounts draws it, each pair as plain dim text.
-            Flow {
-                Layout.fillWidth: true
-                Layout.leftMargin: 18
-                Layout.rightMargin: 18
-                Layout.topMargin: 12
-                Layout.bottomMargin: 12
-                spacing: 8
-
-                Repeater {
-                    id: keyRepeater
-                    model: panel.adding ? D.addKeys(look) : D.dnsKeys(look)
-                    KeyPair {
-                        id: keyPair
-                        theme: panel.theme
-                        look: panel.look
-                    }
-                }
-            }
         }
     }
 
-    // The 1 px slot between a card's parts; it draws no line, so the card reads as one piece.
-    component Rule: Item {
-        Layout.fillWidth: true
-        implicitHeight: 1
+    // A glyph from the symbols font in the island's ink.
+    component Glyph: Text {
+        textFormat: Text.PlainText
+        color: panel.on
+        font.family: "Symbols Nerd Font Mono"
+        font.pixelSize: 15
     }
 
-    // A section's head in the pane, with an optional word at the right.
-    component Head: RowLayout {
-        property string text: ""
-        property string word: ""
-        Layout.fillWidth: true
-        Layout.bottomMargin: 4
-        Text {
-            textFormat: Text.PlainText
-            text: parent.text
-            color: look.small.color
-            font.family: look.small.font
-            font.pixelSize: look.small.size
-            font.letterSpacing: 0
-        }
-        Item {
-            Layout.fillWidth: true
-        }
-        Text {
-            visible: parent.word !== ""
-            textFormat: Text.PlainText
-            text: parent.word
-            color: look.small.color
-            font.family: look.small.font
-            font.pixelSize: look.small.size
-            font.letterSpacing: 0
-        }
+    // A section's caption inside a tile, in the muted tone.
+    component Caption: Text {
+        height: 26 + topPadding
+        verticalAlignment: Text.AlignVCenter
+        textFormat: Text.PlainText
+        color: panel.tones.muted
+        font.family: panel.fonts.ui ?? ""
+        font.pixelSize: 12
     }
 
-    // KID with a filled dot, OPEN with a hollow one, a timed open with a dashed outline and a clock; on the cursor row it takes the cursor's text colour.
-    component Badge: Rectangle {
-        id: badgeRoot
-        property bool kid: false
-        property bool timed: false
+    // A muted label at the left of a 28 px row, its value at the right.
+    component Pair: Item {
         property string label: ""
-        property bool cursorRow: false
-        readonly property color tone: cursorRow ? look.cursor.text : kid || timed ? c.ink : c.muted
-        // The badge as drawn, for the state function.
-        readonly property string drawnText: badgeText.text
-        implicitWidth: badgeRow.implicitWidth + 17
-        implicitHeight: badgeRow.implicitHeight + 4
-        radius: height / 2
-        color: "transparent"
-        border.width: badgeRoot.timed ? 0 : 1
-        border.color: kid || cursorRow ? tone : c.line
-        Root.Dashed {
-            visible: badgeRoot.timed
-            anchors.fill: parent
-            frame: true
-            color: badgeRoot.tone
+        width: addColumn.width
+        height: 28
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+            textFormat: Text.PlainText
+            text: parent.label
+            color: panel.tones.muted
+            font.family: panel.fonts.ui ?? ""
+            font.pixelSize: 13
         }
-        Row {
-            id: badgeRow
-            anchors.centerIn: parent
-            spacing: 6
-            Rectangle {
-                visible: !badgeRoot.timed
-                anchors.verticalCenter: parent.verticalCenter
-                width: 6
-                height: 6
-                radius: 3
-                color: badgeRoot.kid ? badgeRoot.tone : "transparent"
-                border.width: badgeRoot.kid ? 0 : 1.5
-                border.color: badgeRoot.tone
-            }
-            // The clock of a timed open: a ring and its hand.
-            Rectangle {
-                visible: badgeRoot.timed
-                anchors.verticalCenter: parent.verticalCenter
-                width: 10
-                height: 10
-                radius: 5
-                color: "transparent"
-                border.width: 1.2
-                border.color: badgeRoot.tone
-                Rectangle {
-                    x: 4.4
-                    y: 2
-                    width: 1.2
-                    height: 3.4
-                    color: badgeRoot.tone
-                }
-                Rectangle {
-                    x: 4.4
-                    y: 4.4
-                    width: 2.6
-                    height: 1.2
-                    color: badgeRoot.tone
-                }
-            }
-            Text {
-                id: badgeText
-                textFormat: Text.PlainText
-                text: badgeRoot.label
-                color: badgeRoot.tone
-                font.family: fonts.mono
-                font.pixelSize: 11
-            }
+    }
+
+    // Board 8's switch: on is the island's ink with a knob of its fill at the right; off is the track with a muted knob at the left.
+    component Switch: Rectangle {
+        property bool on: false
+        width: 38
+        height: 22
+        radius: 11
+        color: on ? panel.on : Qt.alpha(panel.on, 0.16)
+        Rectangle {
+            x: parent.on ? parent.width - width - 3 : 3
+            anchors.verticalCenter: parent.verticalCenter
+            width: 16
+            height: 16
+            radius: 8
+            color: parent.on ? panel.fill : panel.tones.muted
         }
     }
 }

@@ -1,8 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listLook } from './voice.mjs';
 import { schemeTokens } from './colorscheme-file.mjs';
-import { dnsView, dnsItems, dnsLook, dnsKeys, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, addKeys, writeError } from './dns.mjs';
+import { dnsView, dnsItems, dnsLook, paneOf, kidArgs, categoryArgs, allowArgs, badgeText, openFraction, openArgs, leasesView, addArgs, writeError } from './dns.mjs';
 
 process.env.TZ = 'Asia/Dhaka';
 
@@ -39,21 +38,27 @@ const sample = (over) => ({
 const view = (over) => dnsView(JSON.stringify(sample(over)), NOW);
 const at = (v, key) => v.carried.concat(v.router).find((d) => d.key === key);
 
-test('the board sample reads as 3 carried and 5 router devices, with KID or OPEN and the age of each last block', () => {
+const MONITOR = '\u{F0379}';
+const PHONE = '\u{F011C}';
+const TABLET = '\u{F04F7}';
+
+test('the board sample reads as 3 carried and 5 router devices, a Kid chip on the Kid ones, the age of each last block and a glyph by name', () => {
   const v = view();
-  assert.deepEqual(v.carried.map((d) => [d.name, d.badge, d.age]), [["Saiful's iPhone", 'OPEN', '—'], ['iPad', 'KID', '2m'], ["Wife's iPhone", 'OPEN', '—']]);
-  assert.deepEqual(v.router.map((d) => [d.name, d.badge, d.age]), [['macbook', 'OPEN', '—'], ['nuc', 'OPEN', '—'], ['mini', 'OPEN', '—'], ["Sister's phone", 'KID', '41m'], ['Living-room TV', 'KID', '1h']]);
+  assert.deepEqual(v.carried.map((d) => [d.name, d.badge, d.age, d.glyph]), [["Saiful's iPhone", '', '—', PHONE], ['iPad', 'Kid', '2 min', TABLET], ["Wife's iPhone", '', '—', PHONE]]);
+  assert.deepEqual(v.router.map((d) => [d.name, d.badge, d.age, d.glyph]), [
+    ['macbook', '', '—', MONITOR], ['nuc', '', '—', MONITOR], ['mini', '', '—', MONITOR], ["Sister's phone", 'Kid', '41 min', PHONE], ['Living-room TV', 'Kid', '1 h', MONITOR],
+  ]);
   assert.equal(v.footer, 'as of 15:12');
 });
 
-test('a block under a minute old reads now, and one days old reads in days', () => {
-  const v = view({ 'carried:dev00iphone': { last_block: S - 20 }, 'carried:dev00wife': { last_block: S - 3 * 86400 } });
-  assert.deepEqual([at(v, 'carried:dev00iphone').age, at(v, 'carried:dev00wife').age], ['now', '3d']);
+test('a block under a minute old reads now, a day old yesterday, and older ones in days', () => {
+  const v = view({ 'carried:dev00iphone': { last_block: S - 20 }, 'carried:dev00ipad': { last_block: S - 30 * 3600 }, 'carried:dev00wife': { last_block: S - 3 * 86400 } });
+  assert.deepEqual(['carried:dev00iphone', 'carried:dev00ipad', 'carried:dev00wife'].map((k) => at(v, k).age), ['now', 'yesterday', '3 d']);
 });
 
-test('the cursor stops on every device across both groups, never on a group label or the add row', () => {
+test('the cursor stops on every device across both groups, never on a group label', () => {
   const items = dnsItems(view());
-  assert.deepEqual(items.map((i) => i.kind), ['group', 'device', 'device', 'device', 'group', 'device', 'device', 'device', 'device', 'device', 'add']);
+  assert.deepEqual(items.map((i) => i.kind), ['group', 'device', 'device', 'device', 'group', 'device', 'device', 'device', 'device', 'device']);
   assert.deepEqual(items.filter((i) => i.stop).map((i) => i.key), [
     'carried:dev00iphone', 'carried:dev00ipad', 'carried:dev00wife',
     'router:02:00:00:00:00:01', 'router:02:00:00:00:00:02', 'router:02:00:00:00:00:03', 'router:02:00:00:00:00:04', 'router:02:00:00:00:00:05',
@@ -63,65 +68,52 @@ test('the cursor stops on every device across both groups, never on a group labe
 
 const artboard = () => schemeTokens('artboard');
 
-test('the groups read in plain words with their count', () => {
+test('the groups read as capitals with their count', () => {
   const groups = dnsItems(view()).filter((i) => i.kind === 'group');
-  assert.deepEqual(groups.map((g) => dnsLook(artboard()).group(g)), [{ text: 'Carried profile · 3', right: 'Last block' }, { text: 'Home router · 5', right: 'Last block' }]);
+  assert.deepEqual(groups.map((g) => dnsLook(artboard()).group(g)), [{ text: 'CARRIED PROFILE · 3' }, { text: 'HOME ROUTER · 5' }]);
 });
 
-test("the key strip is the board's, each key as typed so o and O read apart", () => {
-  const strip = dnsKeys(listLook(artboard())).map((k) => `${k.key} ${k.word}`.trim());
-  assert.deepEqual(strip, ['space kid mode', '1-5 categories', 'o open 30m', 'O 2h', 'a allow', 'n add device', 'esc']);
-});
-
-test("a carried KID device's pane: its path, KID, the five categories with YouTube Kids and Gambling off, its allow list and recent blocks", () => {
+test("a carried Kid device's tile: the five categories with YouTube Kids and Gambling allowed, its allow list and recent blocks", () => {
   assert.deepEqual(paneOf(at(view(), 'carried:dev00ipad')), {
     name: 'iPad',
-    path: 'Carried profile · uBlockDNS',
-    badge: 'KID',
     categories: [
-      { n: 1, key: 'youtube', label: 'YouTube', value: 'ON' },
-      { n: 2, key: 'youtube_kids', label: 'YouTube Kids', value: 'OFF' },
-      { n: 3, key: 'social', label: 'Social', value: 'ON' },
-      { n: 4, key: 'adult', label: 'Adult', value: 'ON' },
-      { n: 5, key: 'gambling', label: 'Gambling', value: 'OFF' },
+      { n: 1, key: 'youtube', label: 'YouTube', value: 'blocked', on: true },
+      { n: 2, key: 'youtube_kids', label: 'YouTube Kids', value: 'allowed', on: false },
+      { n: 3, key: 'social', label: 'Social', value: 'blocked', on: true },
+      { n: 4, key: 'adult', label: 'Adult', value: 'blocked', on: true },
+      { n: 5, key: 'gambling', label: 'Gambling', value: 'allowed', on: false },
     ],
-    paused: '',
     until: '',
     shared: '',
     allow: ['khanacademy.org', 'wikipedia.org'],
-    blocks: [{ domain: 'youtube.com', age: '2m' }, { domain: 'i.ytimg.com', age: '2m' }, { domain: 'tiktok.com', age: '1h' }],
-    hint: '',
+    blocks: [{ domain: 'youtube.com', age: '2 min' }, { domain: 'i.ytimg.com', age: '2 min' }, { domain: 'tiktok.com', age: '1 h' }],
   });
 });
 
-test("an OPEN device's pane shows its recent blocks and that space turns Kid mode on, and nothing else", () => {
+test("an OPEN device's tile shows its recent blocks and nothing else", () => {
   const v = view({ 'carried:dev00wife': { allow: ['khanacademy.org'], blocks: [{ domain: 'reddit.com', at: S - 600 }] } });
   assert.deepEqual(paneOf(at(v, 'carried:dev00wife')), {
     name: "Wife's iPhone",
-    path: 'Carried profile · uBlockDNS',
-    badge: 'OPEN',
     categories: [],
-    paused: '',
     until: '',
     shared: '',
     allow: [],
-    blocks: [{ domain: 'reddit.com', age: '10m' }],
-    hint: 'space turns Kid mode on',
+    blocks: [{ domain: 'reddit.com', age: '10 min' }],
   });
 });
 
-test("a router KID device's pane reads Home router with all five categories on with Kid and the shared allow list", () => {
+test("a router Kid device's tile blocks all five categories and shows the shared allow list", () => {
   const pane = paneOf(at(view(), 'router:02:00:00:00:00:04'));
-  assert.deepEqual([pane.name, pane.path, pane.badge, pane.hint], ["Sister's phone", 'Home router', 'KID', '']);
-  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube ON', '2 YouTube Kids ON', '3 Social ON', '4 Adult ON', '5 Gambling ON']);
+  assert.equal(pane.name, "Sister's phone");
+  assert.deepEqual(pane.categories.map((c) => `${c.label} ${c.value}`), ['YouTube blocked', 'YouTube Kids blocked', 'Social blocked', 'Adult blocked', 'Gambling blocked']);
   assert.deepEqual(pane.allow, ['wikipedia.org']);
   assert.equal(pane.shared, 'shared by every home-router device');
 });
 
-test("a router allowing YouTube Kids reads it OFF on every Kid router row's pane", () => {
+test("a router allowing YouTube Kids reads it allowed on every Kid router row's tile", () => {
   const off = { categories: { youtube: true, youtube_kids: false, social: true, adult: true, gambling: true } };
   const v = view({ 'router:02:00:00:00:00:04': off, 'router:02:00:00:00:00:05': off });
-  assert.deepEqual(['router:02:00:00:00:00:04', 'router:02:00:00:00:00:05'].map((k) => paneOf(at(v, k)).categories[1].value), ['OFF', 'OFF']);
+  assert.deepEqual(['router:02:00:00:00:00:04', 'router:02:00:00:00:00:05'].map((k) => paneOf(at(v, k)).categories[1].value), ['allowed', 'allowed']);
 });
 
 test('space turns Kid off on a KID device and on on an OPEN one', () => {
@@ -178,31 +170,27 @@ test('state that will not parse draws no devices and no footer', () => {
 // A timed open: the iPad paused until 15:36, 24:10 left of 30 minutes, as DnsOpen draws it.
 const opened = (over) => view(Object.assign({ 'carried:dev00ipad': { kid: false, open_until: S + 24 * 60 + 10 } }, over));
 
-test('a timed open reads open · mm:ss left in its badge and counts down from the clock', () => {
+test('a timed open reads mm:ss in its chip and counts down from the clock', () => {
   const ipad = at(opened(), 'carried:dev00ipad');
-  assert.deepEqual([badgeText(ipad, NOW), badgeText(ipad, NOW + 70e3), badgeText(ipad, NOW + 3600e3)], ['open · 24:10 left', 'open · 23:00 left', 'open · 00:00 left']);
-  assert.equal(badgeText(at(opened(), 'carried:dev00wife'), NOW), 'OPEN');
-  assert.equal(badgeText(at(opened(), 'router:02:00:00:00:00:04'), NOW), 'KID');
+  assert.deepEqual([badgeText(ipad, NOW), badgeText(ipad, NOW + 70e3), badgeText(ipad, NOW + 3600e3)], ['24:10', '23:00', '00:00']);
+  assert.equal(badgeText(at(opened(), 'carried:dev00wife'), NOW), '');
+  assert.equal(badgeText(at(opened(), 'router:02:00:00:00:00:04'), NOW), 'Kid');
   const twoHours = at(opened({ 'carried:dev00ipad': { kid: false, open_until: S + 7200 } }), 'carried:dev00ipad');
-  assert.equal(badgeText(twoHours, NOW), 'open · 120:00 left');
+  assert.equal(badgeText(twoHours, NOW), '120:00');
 });
 
-test("a timed open's pane: Kid paused until HH:MM, its categories paused, the open's end and bar, its allow list and blocks", () => {
+test("a timed open's tile: its categories paused and off, the open's end and bar, its allow list and blocks", () => {
   const ipad = at(opened(), 'carried:dev00ipad');
   const pane = paneOf(ipad);
-  assert.equal(pane.path, 'Carried profile · Kid mode paused until 15:36');
-  assert.equal(pane.badge, 'OPEN');
-  assert.deepEqual(pane.categories.map((c) => `${c.n} ${c.label} ${c.value}`), ['1 YouTube paused', '2 YouTube Kids paused', '3 Social paused', '4 Adult paused', '5 Gambling paused']);
-  assert.equal(pane.paused, 'paused while open');
+  assert.deepEqual(pane.categories.map((c) => `${c.label} ${c.value} ${c.on}`), ['YouTube paused false', 'YouTube Kids paused false', 'Social paused false', 'Adult paused false', 'Gambling paused false']);
   assert.equal(pane.until, 'Open until 15:36');
   assert.deepEqual(pane.allow, ['khanacademy.org', 'wikipedia.org']);
-  assert.equal(pane.hint, '');
   // 24:10 of the 30 minutes is about 81%; with more than 30 minutes left the bar is of 2 hours.
   assert.equal(Math.round(openFraction(ipad, NOW) * 100), 81);
   assert.equal(openFraction(ipad, NOW + 3600e3), 0);
   const twoHours = at(opened({ 'carried:dev00ipad': { kid: false, open_until: S + 3600 } }), 'carried:dev00ipad');
   assert.equal(openFraction(twoHours, NOW), 0.5);
-  assert.deepEqual([paneOf(at(view(), 'carried:dev00ipad')).until, paneOf(at(view(), 'carried:dev00ipad')).paused], ['', '']);
+  assert.equal(paneOf(at(view(), 'carried:dev00ipad')).until, '');
 });
 
 test('o and O open a KID device for 30m and 2h and restart a timed one, but not an OPEN one; space ends a timed open', () => {
@@ -221,7 +209,7 @@ const down = (o) => Object.assign(sample(o), { router: { ok: false, as_of: S - 1
 test('an unreachable router dims its rows, says since when under its label, and the footer gives both ages', () => {
   const v = dnsView(JSON.stringify(down()), NOW);
   assert.deepEqual([v.carried.map((d) => d.dim), v.router.map((d) => d.dim)], [[false, false, false], [true, true, true, true, true]]);
-  assert.deepEqual(v.router.map((d) => d.badge), ['OPEN', 'OPEN', 'OPEN', 'KID', 'KID']);
+  assert.deepEqual(v.router.map((d) => d.badge), ['', '', '', 'Kid', 'Kid']);
   assert.equal(v.footer, 'profiles as of 15:12 · router as of 14:58');
   const groups = dnsItems(v).filter((i) => i.kind === 'group');
   assert.deepEqual(groups.map((g) => g.line), ['', 'router unreachable · as of 14:58']);
@@ -254,7 +242,7 @@ test('the leases read as hostname or unnamed with their address, one-lined, and 
     ['02:00:00:00:00:43', 'Chrome cast', '192.168.0.160', 'Chrome cast'],
   ]);
   assert.deepEqual(leasesView('nope'), []);
-  assert.deepEqual(dnsLook(artboard()).leasesHead(3), { text: 'On the network now · 3', right: 'IP' });
+  assert.deepEqual(dnsLook(artboard()).leasesHead(3), { text: 'ON THE NETWORK NOW · 3', right: 'IP' });
 });
 
 test('Enter adds the lease under the typed name, one-lined, and an empty name adds nothing', () => {
@@ -263,10 +251,6 @@ test('Enter adds the lease under the typed name, one-lined, and an empty name ad
   assert.deepEqual(addArgs(galaxy, 'two\nlines‮'), ['add', '02:00:00:00:00:41', 'two lines']);
   assert.equal(addArgs(galaxy, ' \n'), null);
   assert.equal(addArgs(undefined, 'x'), null);
-});
-
-test("the add list's key strip is the board's", () => {
-  assert.deepEqual(addKeys(listLook(artboard())).map((k) => `${k.key} ${k.word}`.trim()), ['↵ add in kid mode', 'tab name', 'j/k lease', 'esc back']);
 });
 
 test("a refused write reads as the collector's reason, one-lined and stripped", () => {

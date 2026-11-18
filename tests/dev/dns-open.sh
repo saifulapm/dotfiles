@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DNS Shield draws the cached state before the full one answers; o and O open a Kid device for a while, its badge counts down, and Kid comes back at the deadline, also when it passed while the shell was down.
+# DNS Shield draws the cached state before the full one answers; o and O open a Kid device for 30 min or 2 h, its chip and tile count down, Kid comes back at the deadline, also when it passed while the shell was down, and nothing reads state after Esc.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -39,38 +39,48 @@ idle
 
 wtype j
 until_ok 1000 state_is --arg k "$ipad" '.cursor == $k'
+check "the iPad's tile reads Open for a while with 30 min and 2 h ($(dns_state | jq -c '.pane | [.open, .openButtons]'))" state_is '.pane.open == "Open for a while" and .pane.openButtons == ["30 min", "2 h"]'
 wtype o
-check "o on the iPad logs one open $ipad 30m" until_ok 3000 logged_is "open $ipad 30m" 1
-check "its row's badge reads open · 30:00 left or a second or so less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^open · (30:00|29:5[0-9]) left$'
-echo "     pane: $(dns_state | jq -c '.pane | {path, badge, paused, categories: [.categories[].value], until, left}')"
-check "the pane says Kid mode is paused until HH:MM" state_is '.pane.path | test("^Carried profile · Kid mode paused until [0-9]{2}:[0-9]{2}$")'
-check "its categories read paused while open" state_is '.pane.paused == "paused while open" and ([.pane.categories[].value] == ["paused", "paused", "paused", "paused", "paused"])'
-check "and OPEN reads Open until HH:MM with the time left" state_is '(.pane.until | test("^Open until [0-9]{2}:[0-9]{2}$")) and (.pane.left | test("^(30:00|29:[0-9]{2}) left$"))'
+check "o (30 min) on the iPad logs one open $ipad 30m" until_ok 3000 logged_is "open $ipad 30m" 1
+check "its row's chip reads 30:00 or a second or so less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^(30:00|29:5[0-9])$'
+echo "     pane: $(dns_state | jq -c '.pane | {kid, categories: [.categories[].value], open, left}')"
+check "the tile's Kid mode switch is off" state_is '.pane.kid == false'
+check "its categories read paused, their switches off" state_is '[.pane.categories[].value] == ["paused", "paused", "paused", "paused", "paused"] and all(.pane.categories[]; .on == false)'
+check "and the tile reads Open until HH:MM with the time left" state_is '(.pane.open | test("^Open until [0-9]{2}:[0-9]{2}$")) and (.pane.left | test("^(30:00|29:[0-9]{2}) left$"))'
 first=$(badge_of "$ipad")
 sleep 1.5
-check "the badge counts down while the card shows ($first, then $(badge_of "$ipad"))" test "$(badge_of "$ipad")" != "$first"
+check "the chip counts down while DNS Shield shows ($first, then $(badge_of "$ipad"))" test "$(badge_of "$ipad")" != "$first"
 
 wtype O
-check "O logs one open $ipad 2h" until_ok 3000 logged_is "open $ipad 2h" 1
-check "and the badge reads open · 120:00 left or a little less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^open · (120:00|119:5[0-9]) left$'
-# The path's line runs under the badge with the pane's width, so it draws whole.
-idle
-check "the pane draws Carried profile · Kid mode paused until HH:MM whole ($(dns_state | jq -c '.pane | [.path, .pathTruncated]'))" state_is '(.pane.path | test("^Carried profile · Kid mode paused until [0-9]{2}:[0-9]{2}$")) and .pane.pathTruncated == false'
+check "O (2 h) logs one open $ipad 2h" until_ok 3000 logged_is "open $ipad 2h" 1
+check "and the chip reads 120:00 or a little less ($(badge_of "$ipad"))" until_ok 3000 badge_like "$ipad" '^(120:00|119:5[0-9])$'
+check "and the tile reads 120 min left ($(dns_state | jq -c .pane.left))" until_ok 1000 state_is '.pane.left | test("^(120:00|119:5[0-9]) left$")'
 idle
 wtype -k space
 check "space ends the open: one kid $ipad on" until_ok 3000 logged_is "kid $ipad on" 1
-check "and the row reads KID with its categories back" until_ok 3000 state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "KID") and ([.pane.categories[].value] == ["ON", "OFF", "ON", "ON", "OFF"])'
+check "and the row reads Kid with its categories back" until_ok 3000 state_is --arg k "$ipad" 'any(.rows[]; .key == $k and .badge == "Kid") and ([.pane.categories[].value] == ["blocked", "allowed", "blocked", "blocked", "allowed"])'
 
-# A 5-second open runs out with the card shown: the card reads state again at 0:00 and the collector brings Kid back.
+# A 5-second open runs out with DNS Shield shown: it reads state again at 0:00 and the collector brings Kid back.
 idle
 echo 5 >"$DOTS_DEV_DIR/dns-open-seconds"
 wtype o
-until_ok 3000 badge_like "$ipad" '^open · 00:0[0-5] left$'
+until_ok 3000 badge_like "$ipad" '^00:0[0-5]$'
 reads=$(logged state)
-check "a 5-second open reads KID once it runs out ($(badge_of "$ipad"))" until_ok 10000 badge_like "$ipad" '^KID$'
-check "the card read state again at the deadline, with no key pressed ($reads, then $(logged state) state calls)" test "$(logged state)" -gt "$reads"
+check "a 5-second open reads Kid once it runs out ($(badge_of "$ipad"))" until_ok 10000 badge_like "$ipad" '^Kid$'
+check "it read state again at the deadline, with no key pressed ($reads, then $(logged state) state calls)" test "$(logged state)" -gt "$reads"
+
+# A 2-second open whose deadline falls after Esc: nothing reads state once DNS Shield closed, though the island still draws it through its close.
+idle
+echo 2 >"$DOTS_DEV_DIR/dns-open-seconds"
+wtype o
+until_ok 3000 badge_like "$ipad" '^00:0[12]$'
+idle
+wtype -k Escape
+lines=$(wc -l <"$log")
+sleep 2.5
+check "in the 2.5 s after Esc, across the open's deadline, the fake's log gains no line ($lines, then $(wc -l <"$log"))" test "$(wc -l <"$log")" = "$lines"
+until_ok 3000 state_is '.drawing == false'
 rm "$DOTS_DEV_DIR/dns-open-seconds"
-close_dns
 
 # An open whose deadline passed while the shell was down ends at the next start, before DNS Shield opens. The shell is frozen first, so it cannot read the file before its restart.
 until_ok 33000 state_is '.loaded == false'
@@ -90,7 +100,7 @@ check "and the state file has the iPad back in Kid mode" ipad_kid_on_disk
 until_ok 20000 state_is '.loaded == false'
 open_dns
 idle
-check "DNS Shield then draws the iPad as KID" badge_like "$ipad" '^KID$'
+check "DNS Shield then draws the iPad with a Kid chip" badge_like "$ipad" '^Kid$'
 close_dns
 
 exit $((fails > 0))

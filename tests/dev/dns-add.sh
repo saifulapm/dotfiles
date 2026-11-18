@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# n in DNS Shield lists the router's new leases in the card and adds one in Kid mode under a typed name; while the router is unreachable its rows dim, take no write, and the group says since when.
+# Add device (n) in DNS Shield lists the router's new leases in the left pane and adds one in Kid mode under HOME ROUTER with a typed name; while the router is unreachable its rows dim, take no write, and its caption says since when.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -19,17 +19,18 @@ calls() { if [ -e "$log" ]; then wc -l <"$log"; else echo 0; fi; }
 open_dns() { niri msg action spawn -- dots-call dns toggle; until_ok 3000 state_is '.open and .settled and .keyboard'; }
 close_dns() { wtype -k Escape; until_ok 3000 state_is '.drawing == false'; }
 idle() { until_ok "${1:-3000}" state_is '.busy == false and (.rows | length) > 0'; }
-cursor_to() { local i; for i in $(seq 1 12); do state_is --arg k "$1" '.cursor == $k' && return 0; wtype j; sleep 0.1; done; state_is --arg k "$1" '.cursor == $k'; }
+cursor_to() { for _ in $(seq 1 12); do state_is --arg k "$1" '.cursor == $k' && return 0; wtype j; sleep 0.1; done; state_is --arg k "$1" '.cursor == $k'; }
 adding() { until_ok 3000 state_is '.add != null and .busy == false'; }
 galaxy=02:00:00:00:00:41
 
 open_dns
 idle
+check "the header has Add device ($(dns_state | jq -c .addButton))" state_is '.addButton == "Add device"'
 wtype n
 adding
 echo "     add: $(dns_state | jq -c '{heading, add}')"
-check "n heads the card DNS Shield › Add device" state_is '.heading == "DNS Shield › Add device"'
-check "and lists the 3 leases with their addresses under On the network now · 3" state_is '.add.head == "On the network now · 3" and ([.add.leases[] | [.name, .ip]] == [["Galaxy-A54", "192.168.0.143"], ["android-7f2c", "192.168.0.151"], ["Chromecast", "192.168.0.160"]])'
+check "n heads DNS Shield › Add device" state_is '.heading == "DNS Shield › Add device"'
+check "and lists the 3 leases with their addresses under ON THE NETWORK NOW · 3" state_is '.add.head == "ON THE NETWORK NOW · 3" and ([.add.leases[] | [.name, .ip]] == [["Galaxy-A54", "192.168.0.143"], ["android-7f2c", "192.168.0.151"], ["Chromecast", "192.168.0.160"]])'
 list_width=$(dns_state | jq .add.listWidth)
 check "the lease list is $list_width px wide, its note on one line" state_is '(.add.listWidth | type) == "number" and .add.listWidth > 300 and .add.noteLines == 1'
 check "the cursor lease's hostname and address show at the right, and the name field starts from it" state_is --arg m "$galaxy" '.add.cursor == $m and .add.host == "Galaxy-A54" and .add.address == "192.168.0.143" and .add.name == "Galaxy-A54"'
@@ -44,13 +45,14 @@ check "typing replaces the name ($(dns_state | jq -c .add.name))" until_ok 1000 
 wtype -k Return
 check "Enter logs one add $galaxy Sister's phone" until_ok 3000 logged_is "add $galaxy Sister's phone" 1
 check "and returns to the list with the cursor on her row" until_ok 3000 state_is --arg k "router:$galaxy" '.add == null and .cursor == $k'
-check "her row reads Sister's phone, KID ($(dns_state | jq -c --arg k "router:$galaxy" '.rows[] | select(.key == $k)'))" state_is --arg k "router:$galaxy" 'any(.rows[]; .key == $k and .name == "Sister'"'"'s phone" and .badge == "KID") and .router == 6'
+check "her row reads Sister's phone with a Kid chip ($(dns_state | jq -c --arg k "router:$galaxy" '.rows[] | select(.key == $k)'))" state_is --arg k "router:$galaxy" 'any(.rows[]; .key == $k and .name == "Sister'"'"'s phone" and .badge == "Kid") and .router == 6'
+check "under HOME ROUTER · 6, as its last row ($(dns_state | jq -c '[.groups[1].text, .rows[-1].key]'))" state_is --arg k "router:$galaxy" '.groups[1].text == "HOME ROUTER · 6" and .rows[-1].key == $k'
 idle
 wtype n
 adding
 check "her lease is gone from the list" state_is '[.add.leases[].name] == ["android-7f2c", "Chromecast"]'
 wtype -k Escape
-check "Esc goes back to the list, the card still open" until_ok 1000 state_is '.add == null and .open'
+check "Esc goes back to the list, DNS Shield still open" until_ok 1000 state_is '.add == null and .open'
 close_dns
 
 # Hostnames come from whatever a device sends the router: a newline, a bidi override, an escape sequence, none at all and 200 characters.
@@ -85,7 +87,7 @@ idle
 echo "     down: $(dns_state | jq -c '{groups, footer, opacity: [.rows[] | .opacity]}')"
 check "the router rows draw dimmed and the carried rows do not" state_is '[.rows[] | select(.key | startswith("router:")) | .opacity < 1] | all and length == 6'
 check "and the carried rows at full opacity" state_is '[.rows[] | select(.key | startswith("carried:")) | .opacity == 1] | all'
-check "router rows keep their last values" state_is '[.rows[] | select(.key | startswith("router:")) | .badge] == ["OPEN", "OPEN", "OPEN", "KID", "KID", "KID"]'
+check "router rows keep their last values" state_is '[.rows[] | select(.key | startswith("router:")) | .badge] == ["", "", "", "Kid", "Kid", "Kid"]'
 check "the line under HOME ROUTER reads router unreachable · as of HH:MM" state_is '.groups[1].line | test("^router unreachable · as of [0-9]{2}:[0-9]{2}$")'
 check "the carried group has no such line" state_is '.groups[0].line == ""'
 check "the footer gives both ages ($(dns_state | jq -c .footer))" state_is '.footer | test("^profiles as of [0-9]{2}:[0-9]{2} · router as of [0-9]{2}:[0-9]{2}$")'

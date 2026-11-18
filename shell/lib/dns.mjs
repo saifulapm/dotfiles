@@ -1,4 +1,4 @@
-// DNS Shield's card from `dots-dns state`: carried and router devices in two groups, KID, OPEN or open for a while, the pane for the cursor device, and the router's leases to add one from.
+// DNS Shield from `dots-dns state`: carried and router devices in two groups, Kid, OPEN or open for a while, the tile for the cursor device, and the router's leases to add one from.
 import { line, listLook } from './voice.mjs';
 import { CONTROL } from './clean.mjs';
 
@@ -6,21 +6,28 @@ import { CONTROL } from './clean.mjs';
 const clean = (s) => line(String(s == null ? '' : s).replace(CONTROL, ' '));
 
 const CATEGORIES = [['youtube', 'YouTube'], ['youtube_kids', 'YouTube Kids'], ['social', 'Social'], ['adult', 'Adult'], ['gambling', 'Gambling']];
-const PATHS = { carried: 'Carried profile · uBlockDNS', router: 'Home router' };
-const PATH_NAMES = { carried: 'Carried profile', router: 'Home router' };
 
 const pad = (n) => String(n).padStart(2, '0');
 const hhmm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 const timeOf = (s) => hhmm(new Date(s * 1000));
 
-// The age of a block in whole units, floored: "2m", "41m", "1h"; none reads as a dash.
+// The age of a block in whole units, floored, as board 8 writes it: "2 min", "1 h", "yesterday"; none reads as a dash.
 function ageOf(at, now) {
   if (typeof at !== 'number') return '—';
   const s = Math.max(0, Math.floor(now / 1000 - at));
   if (s < 60) return 'now';
-  if (s < 3600) return `${Math.floor(s / 60)}m`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h`;
-  return `${Math.floor(s / 86400)}d`;
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h`;
+  if (s < 2 * 86400) return 'yesterday';
+  return `${Math.floor(s / 86400)} d`;
+}
+
+// State names no kind of device, so the row's glyph is guessed from its name: a phone, a tablet, else a screen.
+const GLYPHS = { monitor: '\u{F0379}', phone: '\u{F011C}', tablet: '\u{F04F7}' };
+function glyphOf(name) {
+  if (/ipad|tablet/i.test(name)) return GLYPHS.tablet;
+  if (/phone|android|pixel|galaxy/i.test(name)) return GLYPHS.phone;
+  return GLYPHS.monitor;
 }
 
 function parse(text) {
@@ -34,16 +41,18 @@ function parse(text) {
 function deviceOf(d, now, routerOk) {
   const key = String(d.key);
   const cats = d.categories || {};
+  // A device with no name reads as its id or MAC, so its row is never blank.
+  const name = clean(d.name) || key.slice(key.indexOf(':') + 1);
   return {
     key,
-    // A device with no name reads as its id or MAC, so its row is never blank.
-    name: clean(d.name) || key.slice(key.indexOf(':') + 1),
+    name,
+    glyph: glyphOf(name),
     path: d.path,
     kid: d.kid === true,
     openUntil: typeof d.open_until === 'number' ? d.open_until : null,
     // An unreachable router's rows keep their last values, drawn dim, and take no write.
     dim: d.path === 'router' && !routerOk,
-    badge: d.kid === true ? 'KID' : 'OPEN',
+    badge: d.kid === true ? 'Kid' : '',
     age: ageOf(d.last_block, now),
     categories: CATEGORIES.map(([k, label], i) => ({ n: i + 1, key: k, label, on: cats[k] === true })),
     allow: (Array.isArray(d.allow) ? d.allow : []).map(clean),
@@ -67,25 +76,24 @@ export function dnsView(text, now) {
   };
 }
 
-// The card's rows in drawing order; the cursor stops on devices only, so j and k cross from one group into the next.
+// The list's rows in drawing order; the cursor stops on devices only, so j and k cross from one group into the next.
 export function dnsItems(view) {
   const items = [];
   for (const [label, list, groupLine] of [['Carried profile', view.carried, ''], ['Home router', view.router, view.routerLine]]) {
     items.push({ kind: 'group', label, count: list.length, line: groupLine, stop: false });
     for (const d of list) items.push(Object.assign({ kind: 'device', stop: true }, d));
   }
-  items.push({ kind: 'add', stop: false });
   return items;
 }
 
 const timed = (d) => d.openUntil !== null;
 const secondsLeft = (d, nowMs) => Math.max(0, Math.ceil(d.openUntil - nowMs / 1000));
 
-// A timed open counts down in minutes and seconds: "24:10", a 2-hour one from "120:00".
+// A row's chip: Kid, or a timed open counting down in minutes and seconds, "24:10", a 2-hour one from "120:00"; an OPEN device has none.
 export function badgeText(d, nowMs) {
   if (!timed(d)) return d.badge;
   const s = secondsLeft(d, nowMs);
-  return `open · ${pad(Math.floor(s / 60))}:${pad(s % 60)} left`;
+  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
 }
 
 // The bar is of the open's length: 30 minutes, or 2 hours while more than 30 minutes are left.
@@ -94,21 +102,17 @@ export function openFraction(d, nowMs) {
   return s / (s > 1800 ? 7200 : 1800);
 }
 
-// An OPEN device shows its recent blocks and the one way back; a timed open shows what Kid mode will bring back, paused.
+// An OPEN device's tile shows its recent blocks; a timed open shows what Kid mode will bring back, paused, with its switches off.
 export function paneOf(d) {
   const shown = d.kid || timed(d);
   return {
     name: d.name,
-    path: timed(d) ? `${PATH_NAMES[d.path] || ''} · Kid mode paused until ${timeOf(d.openUntil)}` : PATHS[d.path] || '',
-    badge: d.badge,
-    categories: shown ? d.categories.map((c) => ({ n: c.n, key: c.key, label: c.label, value: timed(d) ? 'paused' : c.on ? 'ON' : 'OFF' })) : [],
-    paused: timed(d) ? 'paused while open' : '',
+    categories: shown ? d.categories.map((c) => ({ n: c.n, key: c.key, label: c.label, value: timed(d) ? 'paused' : c.on ? 'blocked' : 'allowed', on: !timed(d) && c.on })) : [],
     until: timed(d) ? `Open until ${timeOf(d.openUntil)}` : '',
     // A router's YouTube Kids is one setting that every home-router device shares.
     shared: d.path === 'router' && shown ? 'shared by every home-router device' : '',
     allow: shown ? d.allow : [],
     blocks: d.blocks,
-    hint: shown ? '' : 'space turns Kid mode on',
   };
 }
 
@@ -129,11 +133,6 @@ export function allowArgs(d, text) {
 // o and O open a KID device, and restart or lengthen a timed open.
 export const openArgs = (d, length) => ((d.kid || timed(d)) && !d.dim ? ['open', d.key, length] : null);
 
-// A key chip draws its key as typed, since o and O are two keys.
-const keys = (look, pairs) => pairs.map(([k, w]) => ({ key: k, word: look.tabText(w) }));
-
-export const dnsKeys = (look) => keys(look, [['space', 'kid mode'], ['1-5', 'categories'], ['o', 'open 30m'], ['O', '2h'], ['a', 'allow'], ['n', 'add device'], ['esc', '']]);
-
 // `dots-dns leases`: the router's leases not yet listed, each with the name the field starts from.
 export function leasesView(text) {
   const list = parse(text);
@@ -153,14 +152,12 @@ export function addArgs(lease, text) {
 // A refused write's reason: the first line dots-dns wrote to stderr, after its "dots-dns: ". It can quote a name or domain anyone on the network set, so it is cleaned like one.
 export const writeError = (stderr) => clean(String(stderr).split('\n')[0].replace(/^dots-dns: /, ''));
 
-export const addKeys = (look) => keys(look, [['↵', 'add in kid mode'], ['tab', 'name'], ['j/k', 'lease'], ['esc', 'back']]);
-
-// A group label with its count after it, a column word at the right, and the heading.
+// A caption in capitals with its count after it, as board 8 draws them, and the heading.
 export function dnsLook(tokens) {
   const look = listLook(tokens);
   return {
-    group: (g) => ({ text: look.groupHead(g.label, g.count), right: look.tabText('Last block') }),
-    leasesHead: (n) => ({ text: look.groupHead('On the network now', n), right: look.tabText('IP') }),
+    group: (g) => ({ text: look.groupHead(g.label, g.count).toUpperCase() }),
+    leasesHead: (n) => ({ text: look.groupHead('On the network now', n).toUpperCase(), right: look.tabText('IP') }),
     heading: (adding) => look.heading(adding ? 'DNS Shield › Add device' : 'DNS Shield', ''),
   };
 }
