@@ -48,6 +48,12 @@ check "an empty Goals says No goals yet, with no key hint in its state ($(goals_
 
 wtype n
 answer title "Ship v2"
+# A refused deadline says why on a line of its own; the field keeps its room for what is typed.
+answer deadline soon
+until_ok 2000 state_is '.prompt.error != ""'
+check "a refused deadline says why and leaves the field its width ($(goals_state | jq -c '.prompt | {error, fieldWidth}'))" state_is '.prompt.kind == "deadline" and (.prompt.error | test("not a deadline")) and .prompt.fieldWidth > 200'
+wtype -M ctrl a -m ctrl
+wtype -k BackSpace
 answer deadline 3d
 t0=$(now_ms)
 until_ok 2000 state_is '.active == ["Ship v2"] and .prompt == null'

@@ -90,7 +90,7 @@ Item {
             done: G.doneGoals(store).map(g => g.title),
             count: count,
             empty: emptyLoader.item ? emptyLoader.item.text : null,
-            prompt: prompt ? { kind: prompt.kind, text: input.text, error: prompt.error } : null,
+            prompt: prompt ? { kind: prompt.kind, text: input.text, error: prompt.error, fieldWidth: input.width } : null,
             confirm: confirm,
             // Each goal tile and the done row as drawn, top to bottom: its fill, its chip and its tasks' checkboxes.
             blocks: Array.from({ length: blockRepeater.count }, (_, i) => blockRepeater.itemAt(i)?.item).filter(b => b).map(b => b.drawn()),
@@ -421,15 +421,19 @@ Item {
                             event.accepted = true;
                         }
                     }
-                    Text {
-                        visible: (view.prompt?.error ?? "") !== ""
-                        Layout.rightMargin: 14
-                        textFormat: Text.PlainText
-                        text: view.prompt?.error ?? ""
-                        color: view.danger
-                        font.family: view.fonts.ui ?? ""
-                        font.pixelSize: 12
-                    }
+                }
+
+                // A refused value's reason, on a line of its own, so the field keeps its room for what is typed.
+                Text {
+                    visible: (view.prompt?.error ?? "") !== ""
+                    x: 14
+                    width: column.width - 28
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    text: view.prompt?.error ?? ""
+                    color: view.danger
+                    font.family: view.fonts.ui ?? ""
+                    font.pixelSize: 12
                 }
             }
         }
