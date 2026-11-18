@@ -116,7 +116,12 @@ wtype -k Return
 until_ok 3000 titled "Test Keyboard"
 check "over Control the chip reads Control ($(pair | jq -c .chip), $(island | jq -c '{surface, takeover}'))" eval 'pair_is ".chip == \"Control\"" && island_is ".surface == \"control\" and .takeover == \"pairing\""'
 check "Control draws no pairing card of its own ($(control | jq -c .pairNote))" control_is '.pairNote == null'
-wtype -k Return
+# The power key opens Control's Power page, but not under a prompt (M7J9ETQA).
+niri msg action spawn -- dots-call control section power
+sleep 0.5
+check "the power key under the prompt leaves Control on Bluetooth ($(control | jq -c .section), $(island | jq -c .takeover))" eval 'control_is ".section == \"bluetooth\"" && island_is ".takeover == \"pairing\""'
+# The prompt, not Control, holds the keys, and the section call above opened nothing.
+wtype -k Return # early on purpose
 until_ok 3000 prop_is "$keyboard" Connected true
 check "Enter pairs and connects Test Keyboard" prop_is "$keyboard" Connected true
 until_ok 3000 island_is '.takeover == null and .surface == "control" and .animating == false'

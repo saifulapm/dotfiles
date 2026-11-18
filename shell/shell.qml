@@ -512,6 +512,9 @@ ShellRoot {
 
         // Opens Control on one section by name, as the power key opens it on Power.
         function section(name: string): void {
+            // A prompt holds the island until it is answered, so the power key leaves Control's page under it as it was (M7J9ETQA).
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             open();
             surfacesLoader.item.control.show(name);
         }

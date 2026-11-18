@@ -132,7 +132,7 @@ check "a passkey to type draws 111111 for Test Phone ($(pair | jq -c .code.text)
 knob Mistyped o "$phone"
 until_ok 3000 toast_is "Pairing failed: Test Phone"
 check "typed wrong on the device, the question goes and the island shows Pairing failed: Test Phone ($(island | jq -c '{mode, text}'))" toast_is "Pairing failed: Test Phone"
-check "and Control's keys move again" state_is '.typing | not'
+check "and the prompt hands the island back to Control, which holds the keys again ($(island | jq -c .takeover))" eval 'island_is ".takeover == null" && state_is ".open and .keyboard"'
 
 # A PIN typed in the island.
 knob SetPairing osu "$phone" pin 0
