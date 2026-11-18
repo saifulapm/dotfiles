@@ -69,8 +69,15 @@ check "ctrl+V attaches the clipboard's image" until_ok 2000 ask_is '(.attached |
 
 mkdir -p "$fake/files"
 echo report >"$fake/files/report.txt"
+# Option 1's box in the window, which the picker will cover.
+read -r bx by bw bh < <(island | jq -r '.ask.options[0].box | "\(.[0]) \(.[1]) \(.[2]) \(.[3])"')
 wtype -k a
 until_ok 4000 eval 'pk_state | jq -e ".open and .settled and .listed" >/dev/null'
+check "the attach key draws the picker over the question ($(island | jq -c '{takeover, mode}'))" until_ok 2000 eval 'island | jq -e ".takeover == \"picker\"" >/dev/null'
+answers=$(wc -l <"$calls" 2>/dev/null || echo 0)
+dots-pointer "$box" move $((ox + (ow - win) / 2 + bx + bw / 2)) $((oy + by + bh / 2)) wait 100 click left >/dev/null 2>&1
+sleep 0.5
+check "a click where a question option was answers nothing and leaves the picker open" eval '[ "$(wc -l <"$calls" 2>/dev/null || echo 0)" = "$answers" ] && pk_state | jq -e .open >/dev/null'
 # The picker draws in the island's window, so it holds that window's keyboard; the keys typed into it next prove it has them.
 check "a opens the file picker, which takes the keyboard" eval 'island_focus Exclusive && pk_state | jq -e .open >/dev/null'
 wtype -M ctrl l -m ctrl
@@ -81,6 +88,7 @@ wtype -k Return
 until_ok 3000 eval 'pk_state | jq -e ".open == false" >/dev/null'
 check "a file chosen in the picker is attached ($(island | jq -c .ask.attached))" until_ok 2000 ask_is '.attached[1] == "report.txt"'
 check "and the island has the keyboard back" until_ok 2000 island_focus Exclusive
+check "the question is back, still open in full ($(island | jq -c '{takeover, mode, expanded: .ask.expanded}'))" until_ok 2000 ask_is '.expanded'
 
 want="answer --by popup --screenshot $XDG_RUNTIME_DIR/dots-island-attach/$(island | jq -r '.ask.attached[0]') --screenshot $fake/files/report.txt -- Q1 $rest"
 wtype -k 2

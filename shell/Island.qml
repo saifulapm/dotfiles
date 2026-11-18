@@ -176,8 +176,8 @@ Item {
         modeSince = Date.now();
         modeBefore = modeNow;
         modeNow = mode;
-        // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out.
-        if (focused && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
+        // The keyboard goes back once what it was given for is gone, such as a notification whose 5 s ran out; the file picker covering a question for an attachment hands it back after.
+        if (focused && !attaching && ["calendar", "question", "notification", "leaseCard", "sharingCard", "mediaCard"].indexOf(mode) < 0)
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way; the rest picks its mode from the same slots it reads, so a slot that empties never meets a mode not yet moved on.
@@ -747,7 +747,8 @@ Item {
             lines: askText.lineCount,
             truncated: askText.truncated,
             summary: askSummary.visible ? askSummary.text : null,
-            options: askOptions.visible ? Array.from({ length: askRows.count }, (_, i) => askRows.itemAt(i)?.drawn ?? null) : [],
+            // Each option as drawn, with its box in the window read now, since a binding would not follow the layout.
+            options: askOptions.visible ? Array.from({ length: askRows.count }, (_, i) => askRows.itemAt(i)).map(o => o ? Object.assign({ box: (p => [Math.round(p.x), Math.round(p.y), Math.round(o.width), Math.round(o.height)])(o.mapToItem(null, 0, 0)) }, o.drawn) : null) : [],
             links: askLinks.urls,
             attached: askFiles.map(Q.baseName),
             failed: askFailed,
