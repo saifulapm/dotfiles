@@ -17,7 +17,7 @@ Scope {
     // While the island holds arrivals, a surface being open, each waits here in arrival order with its expiry; they show one at a time once it lets go, and one that ran out meanwhile stays in the history only (3WG2NHE3).
     property bool held: false
     property var queue: []
-    // While the notification centre is open, an arrival joins its list there at once, so it neither shows nor waits.
+    // While the notification centre is open, an arrival that keeps a history entry joins its list there at once, so it neither shows nor waits; a transient one, kept nowhere, waits as it would behind any surface.
     property bool seen: false
     onHeldChanged: if (!held && !current)
         release()
@@ -103,9 +103,16 @@ Scope {
         save();
     }
 
+    // A notification that arrives while the centre is open joins its list there at once, so it neither shows nor waits; a replace of the one the island holds still updates it there.
+    function arrive(e) {
+        if (seen && current?.key !== e.key)
+            return;
+        show(e);
+    }
+
     // The island is cleared here, not by the closed signal, since after a restart no live object is left.
     function show(e) {
-        if (seen || !N.shows(e, N.ruleOf(rules, e.app), dnd))
+        if (!N.shows(e, N.ruleOf(rules, e.app), dnd))
             return;
         // A replace of the one showing updates it in place, held or not, so it never waits as a second copy.
         if (current?.key !== e.key && (held || queue.length)) {
@@ -196,7 +203,7 @@ Scope {
         e.key = key;
         history = [e].concat(history.filter(h => h.key !== key));
         save();
-        show(e);
+        arrive(e);
     }
 
     // A newer notification in an older one's stack takes its key, as a replace does, and the older one's app hears it expired.
@@ -295,7 +302,7 @@ Scope {
                 notifs.restack(n, older);
             } else {
                 notifs.remember(e, n);
-                notifs.show(e);
+                notifs.arrive(e);
             }
             // Once a newer one in its stack holds its key, its close is not that key's.
             n.closed.connect(() => {

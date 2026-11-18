@@ -30,6 +30,8 @@ Item {
     property bool searching: false
     readonly property string query: input.text
     property int selected: 0
+    // The row the cursor is on, by what it is, so an arrival that puts rows above it does not move it to another.
+    property string selectedKey: ""
     property int opens: 0
     property var openMs: null
     // When the open being timed was requested, or -1 once its first frame is swapped.
@@ -198,8 +200,15 @@ Item {
     }
 
     onQueryChanged: selected = C.firstNote(rows)
-    onRowsChanged: selected = Lib.clampSelected(selected, rows.length)
-    onSelectedChanged: list.positionViewAtIndex(selected, ListView.Contain)
+    onRowsChanged: {
+        selected = C.follow(rows, selectedKey, selected);
+        // A new rows array resets the list, so the cursor's row is brought back into view once it has laid out.
+        Qt.callLater(() => list.positionViewAtIndex(selected, ListView.Contain));
+    }
+    onSelectedChanged: {
+        selectedKey = C.rowKey(rows[selected]);
+        list.positionViewAtIndex(selected, ListView.Contain);
+    }
     Component.onCompleted: Root.State.loaded.push("notifs")
 
     Keys.onPressed: event => {
@@ -223,8 +232,11 @@ Item {
             dismiss();
         else if (row && k === Qt.Key_M)
             notifs.toggleRule(row.app, "muted");
-        else if (row && k === Qt.Key_I)
-            notifs.toggleRule(row.app, "dnd");
+        else if (row && k === Qt.Key_I) {
+            // Show during Do Not Disturb is greyed while the app is muted, so i leaves it as it is.
+            if (!Lib.ruleOf(notifs.rules, row.app)?.muted)
+                notifs.toggleRule(row.app, "dnd");
+        }
         else if (row && k === Qt.Key_S)
             notifs.cycleStay(row.app);
         else if (k === Qt.Key_Slash) {
@@ -578,6 +590,9 @@ Item {
                             image: payload.mime === "text/uri-list" ? rowFace.url : ""
                             // Outside the island the window takes no input while a row drags, so the drop reaches the window under it.
                             onDraggingChanged: centre.dragging = dragging
+                            // An arrival mid-drag rebuilds the rows, so a row that goes while dragging hands the window its input back.
+                            Component.onDestruction: if (dragging)
+                                centre.dragging = false
                             onClicked: mouse => {
                                 centre.selected = row.index;
                                 for (let i = 0; i < buttons.count; i++) {

@@ -58,6 +58,28 @@ sleep 0.5
 check "after the close Three does not show on the island ($(island | jq -c '{mode}'))" island_is '.mode == "rest"'
 open_centre
 
+# The cursor stays on its row when an arrival from another app puts rows above it, so d dismisses what it was on.
+sel() { notifs | jq -c '[.notes[] | select(.selected) | .summary]'; }
+wtype -k j
+until_ok 1000 notifs_is '[.notes[] | select(.selected) | .summary] == ["Two"]'
+notify-send -a Chat "Hi"
+until_ok 1000 notifs_is '.groups[0].app == "Chat"'
+check "an arrival from Chat leaves the cursor on Two ($(sel))" notifs_is '[.notes[] | select(.selected) | .summary] == ["Two"]'
+wtype -k d
+until_ok 1000 notifs_is '(.summaries | index("Two")) == null'
+check "and d dismisses Two, not the arrival ($(notifs | jq -c .summaries))" notifs_is '(.summaries | index("Hi")) != null'
+
+# A transient notification keeps no history, so it waits behind the centre and shows once it closes.
+notify-send -e -a Ping "ping"
+until_ok 1000 island_is '.waiting == 1'
+check "a transient arriving while the centre is open waits ($(island | jq -c '{waiting}'))" island_is '.waiting == 1'
+wtype -k Escape
+pinged() { island_is '.mode == "notification" and (.text | contains("ping"))'; }
+until_ok 3000 pinged
+check "and shows once the centre closes ($(island | jq -c '{mode, text}'))" pinged
+until_ok 8000 island_is '.mode == "rest"'
+open_centre
+
 # Shift+D clears all, as the header's Clear all does.
 wtype -M shift -k d -m shift
 until_ok 2000 notifs_is '.count == 0'
@@ -66,7 +88,22 @@ wtype -k Escape
 until_ok 3000 at_rest
 check "Esc closes the centre and gives the keyboard back" surfaces_focus None
 
+# A critical set aside behind a toast comes back after the close, even when the toast's time ran out while the centre was open.
+notify-send -u critical -a A stuck
+stuck() { island_is '.mode == "notification" and (.text | contains("stuck"))'; }
+until_ok 2000 stuck
+notify-send -a B hello
+until_ok 2000 island_is '.mode == "notification" and (.text | contains("hello"))'
+open_centre
+sleep 6
+wtype -k Escape
+until_ok 3000 island_is '.surface == null'
+until_ok 3000 stuck
+check "a critical set aside behind a toast that ran out while the centre was open comes back after the close ($(island | jq -c '{mode, text}'))" stuck
+
 # Mod+Shift+A clears and Mod+D toggles Do Not Disturb without opening anything; the check spawns each bind's command through niri.
+niri msg action spawn -- dots-call notifs clear
+until_ok 2000 notifs_is '.count == 0'
 notify-send -t 1 -a Mail "Four"
 until_ok 2000 notifs_is '.count == 1'
 until_ok 3000 island_is '.mode == "rest"'

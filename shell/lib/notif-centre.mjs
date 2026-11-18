@@ -1,5 +1,5 @@
 // The notification centre as board 5 draws it inside the island: pure pieces, so node can test them.
-import { group, ruleOf, visible } from './notifs.mjs';
+import { clampSelected, group, ruleOf, visible } from './notifs.mjs';
 import { line } from './voice.mjs';
 
 const stayText = (ms) => (ms === 0 ? 'Until dismissed' : ms / 1000 + ' s');
@@ -28,6 +28,15 @@ export function centreRows(history, query, rules, openRules) {
     for (const entry of g.entries) rows.push({ kind: 'note', app: g.app, entry });
   });
   return rows;
+}
+
+// What a row is, whatever its index: a note by its key, a head or rule by its app and field.
+export const rowKey = (r) => (!r ? '' : r.kind === 'note' ? `note:${r.entry.key}` : r.kind === 'rule' ? `rule:${r.app}:${r.field}` : `head:${r.app}`);
+
+// The index the cursor moves to when the rows change: the row it was on, wherever that went, else the same index, clamped.
+export function follow(rows, key, selected) {
+  const i = key ? rows.findIndex((r) => rowKey(r) === key) : -1;
+  return i >= 0 ? i : clampSelected(selected, rows.length);
 }
 
 // The header's count: every notification, or how many a search leaves of them.

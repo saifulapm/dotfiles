@@ -50,6 +50,9 @@ key j
 key Return
 sleep 0.3
 check "and Enter on it does not toggle it ($(mail_rule))" notifs_is '.rules.Mail.dnd != true'
+key i
+sleep 0.3
+check "nor does i while Mail is muted ($(mail_rule))" notifs_is '.rules.Mail.dnd != true'
 # Esc closes the rules tile first, then the centre.
 key Escape
 close_centre

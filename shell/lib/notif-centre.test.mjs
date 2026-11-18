@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ageText, badgeText, centreRows, countText, firstNote } from './notif-centre.mjs';
+import { ageText, badgeText, centreRows, countText, firstNote, follow, rowKey } from './notif-centre.mjs';
 
 const note = (key, app, summary, time) => ({ key, app, summary, body: '', time });
 
@@ -64,4 +64,23 @@ test('an age reads as board 5 writes it', () => {
   assert.equal(ageText(2 * 60_000 + 5), '2 min');
   assert.equal(ageText(3 * 3_600_000), '3 h');
   assert.equal(ageText(2 * 86_400_000), '2 d');
+});
+
+test('the cursor follows its row when an arrival puts rows above it, and stays put when its row goes', () => {
+  const mail = [note(2, 'Mail', 'Two', 20), note(1, 'Mail', 'One', 10)];
+  const before = centreRows(mail, '', {}, '');
+  const on = rowKey(before[2]);
+  assert.equal(on, 'note:1');
+  const after = centreRows([note(3, 'Chat', 'Hi', 30)].concat(mail), '', {}, '');
+  assert.equal(after[follow(after, on, 2)].entry.summary, 'One');
+  // On a rule row of Mail's open tile, Chat's arrival leaves it on Mail's rule.
+  const rules = centreRows(mail, '', {}, 'Mail');
+  const mute = rowKey(rules[1]);
+  assert.equal(mute, 'rule:Mail:muted');
+  const moved = centreRows([note(3, 'Chat', 'Hi', 30)].concat(mail), '', {}, 'Mail');
+  assert.deepEqual([moved[follow(moved, mute, 1)].app, moved[follow(moved, mute, 1)].field], ['Mail', 'muted']);
+  // A dismissed row is gone, so the cursor keeps its index, clamped.
+  const left = centreRows([mail[0]], '', {}, '');
+  assert.equal(follow(left, 'note:1', 2), 1);
+  assert.equal(rowKey(undefined), '');
 });

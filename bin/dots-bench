@@ -115,6 +115,7 @@ control_warm=$(median "${control_warms[@]}")
 # The notification centre in the island, timed as Control is: open number $1, its time as the centre measured it, then closed with the keyboard back.
 notifs_state() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 notifs_reported() { notifs_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
+notifs_count_is() { notifs_state | jq -e ".count == $1" >/dev/null; }
 notifs_closed() { notifs_state | jq -e '.open == false' >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
 notifs_once() {
   qs ipc call notifs open >/dev/null || die "notifs open failed"
@@ -123,6 +124,10 @@ notifs_once() {
   qs ipc call notifs close >/dev/null
   until_ok 3000 notifs_closed || die "the notification centre never gave the keyboard back"
 }
+# The centre is timed over forty notifications in its history, which outlives each kill, so the open draws a list taller than the island lets it be.
+for i in $(seq 1 40); do notify-send -a Bench "bench $i" "a body that draws on one line"; done
+until_ok 5000 notifs_count_is 40 || die "the forty notifications never reached the history"
+sleep 1
 notifs_colds=()
 for i in 1 2 3 4 5; do
   systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
@@ -141,6 +146,8 @@ done
 echo "     notifs cold opens: ${notifs_colds[*]}; warm opens: ${notifs_warms[*]}"
 notifs_cold=$(median "${notifs_colds[@]}")
 notifs_warm=$(median "${notifs_warms[@]}")
+# The rows after this read the centre as they did before m104 timed it, with no history.
+qs ipc call notifs clear >/dev/null
 
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
