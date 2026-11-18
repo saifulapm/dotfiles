@@ -127,3 +127,29 @@ test('with two calendars named Dots reminders, the unit fails saying so and noth
   assert.equal(status(a).reminders.error, 'reminders: iCloud has 2 calendars named Dots reminders');
   assert.equal(fake.count('PUT'), 0);
 });
+
+test('a removed reminder has its event deleted, once', async (t) => {
+  const { fake, a } = await setup();
+  t.after(fake.close);
+  const tea = add(a, '10m tea');
+  const walk = add(a, '20m walk');
+  await round(a);
+  write(a, R.endReminder(read(a), tea.id, 'removed', Date.now()));
+  await round(a);
+  assert.deepEqual((await report(fake, 'Dots reminders')).map((e) => e.uid), [walk.id]);
+  fake.log.length = 0;
+  await round(a);
+  assert.equal(fake.count('DELETE'), 0);
+});
+
+test('a DELETE answered 404 leaves the unit ok', async (t) => {
+  const { fake, a } = await setup();
+  t.after(fake.close);
+  const tea = add(a, '10m tea');
+  await round(a);
+  fake.calendars.find((c) => c.name === 'Dots reminders').events.clear();
+  write(a, R.endReminder(read(a), tea.id, 'removed', Date.now()));
+  await round(a);
+  assert.equal(fake.count('DELETE'), 1);
+  assert.equal(status(a).reminders.ok, true);
+});
