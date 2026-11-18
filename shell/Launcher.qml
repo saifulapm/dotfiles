@@ -92,7 +92,7 @@ Item {
                 return sum.length ? sum : Lib.convertRows(parsed.q, Date.now(), zones);
             }
         case "reminder":
-            return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.broken : false);
+            return Rem.reminderRows(parsed.q, Date.now(), pending, reminders ? reminders.brokenText : "");
         case "commands":
             return Lib.commandRows(parsed.q, Quickshell.shellDir + "/bin", machine);
         case "colorschemes":

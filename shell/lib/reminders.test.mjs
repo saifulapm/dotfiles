@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 // Reminders read and write the local clock, so every test runs at home.
 process.env.TZ = 'Asia/Dhaka';
-const { parseReminder, whenText, addReminder, dueReminders, firedText, reminderRows, readReminders, MAX_PENDING, BROKEN } = await import('./reminders.mjs');
+const { parseReminder, whenText, addReminder, firedText, reminderRows, readReminders, MAX_PENDING, BROKEN } = await import('./reminders.mjs');
 
 const at = (s) => new Date(s).getTime();
 const now = at('2026-10-22T14:52:00+06:00');
@@ -37,7 +37,7 @@ test('a time past what a Date holds is too far ahead, and a year is still set', 
     const r = parseReminder(q, now);
     assert.equal(r.due, undefined, q);
     assert.equal(r.error, `Cannot set ${q.split(' ')[0]}: it is too far ahead`, q);
-    assert.deepEqual(reminderRows(q, now, [], false), [{ title: r.error, detail: '' }], q);
+    assert.deepEqual(reminderRows(q, now, [], ''), [{ title: r.error, detail: '' }], q);
   }
   assert.equal(parseReminder('8760h renew', now).due, now + 8760 * 3600000);
 });
@@ -68,12 +68,6 @@ test('a new reminder is stored with an id, text, due and created, soonest first,
   const full = addReminder(list, parseReminder('5m one more', now), now);
   assert.equal(full.list.length, 50);
   assert.match(full.error, /50/);
-});
-
-test('due reminders are the ones at or before now, the rest stay pending', () => {
-  const list = [{ id: 'a', text: 'x', due: now - 60000, created: now - 120000 }, { id: 'b', text: 'y', due: now, created: now - 60000 }, { id: 'c', text: 'z', due: now + 1, created: now }];
-  const { fire, keep } = dueReminders(list, now);
-  assert.deepEqual([fire.map((r) => r.id), keep.map((r) => r.id)], [['a', 'b'], ['c']]);
 });
 
 test('a rung reminder reads Reminder · its text, and says when it was set', () => {
@@ -109,11 +103,11 @@ test('with 50 waiting the preview row says no more can be set', () => {
 });
 
 test('while reminders.json does not parse, the preview row says so and sets nothing', () => {
-  const top = reminderRows('5m tea', now, pending, true)[0];
-  assert.equal(top.title, BROKEN);
-  assert.match(BROKEN, /reminders\.json does not parse/);
+  const top = reminderRows('5m tea', now, pending, BROKEN)[0];
+  assert.equal(top.title, 'reminders.json does not parse; fix or remove it first');
   assert.equal(top.remind, undefined);
-  assert.equal(reminderRows('', now, pending, true).length, 2);
+  assert.equal(reminderRows('', now, pending, BROKEN).length, 2);
+  assert.equal(reminderRows('5m tea', now, pending, S.brokenStore('mac'))[0].title, 'reminders/mac.json does not parse; fix or remove it first');
 });
 
 test('reminders.json is read as the list, each text one line with no control or bidi characters', () => {

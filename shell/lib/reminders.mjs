@@ -1,10 +1,12 @@
-// The launcher's `r ` mode: a time then the words to be reminded of, stored as {id, text, due, created} in ~/.local/state/dots/reminders.json and rung by the minute tick. Times are the local clock's.
+// The launcher's `r ` mode: a time then the words to be reminded of, kept in the synced store below and rung at its due second. Times are the local clock's.
 import { line } from './voice.mjs';
 import { CONTROL, MARK } from './clean.mjs';
 
 export const MAX_PENDING = 50;
 // What the preview row says while the file does not parse; nothing is set over it.
 export const BROKEN = 'reminders.json does not parse; fix or remove it first';
+// The same for this machine's file of the synced store.
+export const brokenStore = (machine) => `reminders/${machine}.json does not parse; fix or remove it first`;
 
 const MIN = 60000;
 const DAY = 86400000;
@@ -42,7 +44,7 @@ const oneLine = (s) => line(s.replace(CONTROL, ' ').replace(MARK, ''));
 const isTime = (ms) => typeof ms === 'number' && !Number.isNaN(new Date(ms).getTime());
 const isReminder = (r) => r !== null && typeof r === 'object' && typeof r.id === 'string' && typeof r.text === 'string' && isTime(r.due) && isTime(r.created);
 
-// reminders.json's text as the pending list. Anything in it that is not a reminder makes it broken, so nothing is set over what it holds; each text is drawn as one line, as a typed one is.
+// The old reminders.json's text as its pending list, which moves into the store. Anything in it that is not a reminder makes it broken, so it is left as it is; each text is one line, as a typed one is.
 export function readReminders(text) {
   let l;
   try {
@@ -88,11 +90,6 @@ export function addReminder(list, parsed, now) {
   return { list: list.concat([r]).sort((a, b) => a.due - b.due), error: '' };
 }
 
-// Splits the list into those due by now, which ring, and the rest, which stay.
-export function dueReminders(list, now) {
-  return { fire: list.filter((r) => r.due <= now), keep: list.filter((r) => r.due > now) };
-}
-
 // The notification a rung reminder raises.
 export function firedText(r, now) {
   const days = daysBetween(r.created, now);
@@ -100,10 +97,10 @@ export function firedText(r, now) {
   return { summary: `Reminder · ${r.text}`, body: `set ${day}at ${clock(r.created)}` };
 }
 
-// The launcher's rows in `r ` mode: the reminder the query would set (or why it cannot), then the pending ones, the first under the pending head.
+// The launcher's rows in `r ` mode: the reminder the query would set (or why it cannot), then the pending ones, the first under the pending head; broken is why nothing can be set, or ''.
 export function reminderRows(q, now, list, broken) {
   const parsed = parseReminder(q, now);
-  const error = parsed && (parsed.error || (broken ? BROKEN : list.length >= MAX_PENDING ? `At most ${MAX_PENDING} reminders can wait` : ''));
+  const error = parsed && (parsed.error || broken || (list.length >= MAX_PENDING ? `At most ${MAX_PENDING} reminders can wait` : ''));
   const top = !parsed ? [] : error ? [{ title: error, detail: '' }] : [{ title: parsed.text, detail: parsed.when, remind: { text: parsed.text, due: parsed.due } }];
   return top.concat(list.map((r, i) => ({ title: r.text, detail: whenText(r.due, now), reminderId: r.id, head: i === 0 })));
 }
