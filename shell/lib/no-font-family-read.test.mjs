@@ -22,7 +22,6 @@ const BASELINE = {
   'FilePicker.qml': 1,
   'Island.qml': 1,
   'Lock.qml': 1,
-  'PolkitPrompt.qml': 1,
   'files.qml': 1,
 };
 

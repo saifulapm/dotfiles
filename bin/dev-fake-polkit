@@ -86,6 +86,12 @@ class Authority(dbus.service.Object):
             reply_handler=done, error_handler=failed, timeout=600,
         )
 
+    # The caller went away mid-request, as a killed pkexec does: the authority tells the agent to drop it.
+    @dbus.service.method(FAKE, in_signature="s")
+    def Cancel(self, cookie):
+        sender, path = self.agent
+        dbus.Interface(self.bus.get_object(sender, path), AGENT).CancelAuthentication(cookie)
+
     @dbus.service.method(FAKE, in_signature="s", out_signature="s")
     def Result(self, cookie):
         return self.results.get(cookie, "")

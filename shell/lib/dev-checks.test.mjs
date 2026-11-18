@@ -891,3 +891,12 @@ test('every island surface and takeover that calls theme.notice draws it', () =>
 test('every island surface and takeover that calls theme.notice names a card that fills it', () => {
   assert.deepEqual(drawnSurfaces().filter(([, text]) => callsNotice(text) && !hasFillingCard(text)).map(([n]) => n), [], 'name an item objectName: "card" with anchors.fill: parent');
 });
+
+// A prompt that takes the island over holds another process's request, and a press the surfaces' window reads as outside it cancels that request, so every takeover names a card that fills it, notice or not.
+test('every takeover names a card that fills it', () => {
+  const text = readFileSync(new URL('../Surfaces.qml', import.meta.url), 'utf8');
+  const takeovers = surfaceFiles(text).filter(([name]) => new RegExp(`readonly property var takeovers: \\[[^\\]]*\\b${name}\\b`).test(text));
+  assert.ok(takeovers.length >= 1, 'Surfaces.qml lists its takeovers');
+  const bare = takeovers.filter(([, file]) => !hasFillingCard(readFileSync(new URL(`../${file}`, import.meta.url), 'utf8')));
+  assert.deepEqual(bare.map(([n, f]) => `${n} (${f})`), [], 'name an item objectName: "card" with anchors.fill: parent');
+});

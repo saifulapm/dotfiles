@@ -1,9 +1,7 @@
 import QtQuick
-import QtQuick.Layouts
 import "." as Root
-import "lib/voice.mjs" as V
 
-// The one Overlay prompt a polkit request shows, drawn in the Surfaces window.
+// A polkit request as board 7's prompt, drawn inside the island over whatever it covers: Cancel and Allow, the password field, and a red line after a wrong password.
 Item {
     id: prompt
 
@@ -12,8 +10,14 @@ Item {
     property int submits: 0
     // The agent's AuthFlow while a request runs.
     property var flow: null
-    // The request's text as the card draws it, copied, since the agent may delete a cancelled request while its close still plays.
+    // The request's text as the prompt draws it, copied, since the agent may delete a cancelled request while the island still draws it on its way out.
     property var seen: null
+    // The surface this prompt returns to, as its chip's words; the surfaces' window sets it.
+    property string chip: ""
+    // True once the island has come to rest on the prompt; the surfaces' window sets it.
+    property bool settled: false
+    // A wrong password's line, until the next key.
+    property string wrong: ""
     readonly property var asked: flow ? {
         message: flow.message,
         inputPrompt: flow.inputPrompt,
@@ -23,31 +27,26 @@ Item {
     } : null
     onAskedChanged: if (asked)
         seen = asked
-
-    readonly property var c: theme.color
-    readonly property var fonts: theme.tokens ? theme.tokens.type : ({})
-    readonly property var look: V.listLook(theme.tokens)
-    readonly property Root.Motion motion: Root.Motion {
-        shown: prompt.shown
-        tokens: prompt.theme.tokens
-        onDrawingChanged: if (!drawing)
-            prompt.seen = null
-    }
+    // The island reports this as its takeover while the prompt shows, and grows to this width for it (board 7).
+    readonly property string name: "polkit"
+    readonly property int wantWidth: 520
+    implicitHeight: card.implicitHeight + 40
 
     function show(f) {
         flow = f;
-        input.text = "";
+        wrong = "";
+        card.input.text = "";
         shown = true;
-        input.forceActiveFocus();
+        card.input.forceActiveFocus();
     }
 
-    // Hiding the prompt, by Esc or by another surface opening, cancels the request it holds.
+    // Hiding the prompt, by Esc, Cancel or a click outside, cancels the request it holds.
     function close() {
         if (!shown)
             return;
         const f = flow;
         shown = false;
-        input.text = "";
+        card.input.text = "";
         flow = null;
         if (f && !f.isCompleted)
             f.cancelAuthenticationRequest();
@@ -57,14 +56,14 @@ Item {
     function finish() {
         flow = null;
         shown = false;
-        input.text = "";
+        card.input.text = "";
     }
 
     function submit() {
         if (!flow)
             return;
-        flow.submit(input.text);
-        input.text = "";
+        flow.submit(card.input.text);
+        card.input.text = "";
         submits += 1;
     }
 
@@ -72,34 +71,28 @@ Item {
     }
 
     function state() {
-        // The hint as drawn, read from its key items.
-        const hint = [];
-        for (let i = 0; i < hintRepeater.count; i++)
-            hint.push(hintRepeater.itemAt(i).keyLabel + " " + hintRepeater.itemAt(i).wordLabel);
+        const d = card.drawn();
         return JSON.stringify({
-            heading: pill.text,
-            hint: hint.join("  "),
             open: shown,
-            motion: motion.curves?.kind ?? null,
-            settleMs: motion.settleMs,
-            settled: motion.settled,
+            settled: prompt.settled,
             drawing: prompt.visible,
-            cardBox: card.drawnBox(),
+            keyboard: card.input.activeFocus,
             message: flow?.message ?? "",
-            drawnMessage: messageText.text,
+            drawnMessage: d.request,
             prompt: flow?.inputPrompt ?? "",
             error: flow?.supplementaryIsError ? flow.supplementaryMessage : "",
-            field: input.text.length,
-            // How many answers this shell has handed a request, by Enter or by a click on the ↵ chip.
+            // The field's length, never its text.
+            field: card.input.text.length,
+            // How many answers this shell has handed a request, by Enter or by Allow.
             submits: submits,
-            // The password field as drawn, which Control's Wi-Fi line matches.
-            fieldLook: {
-                font: input.font.family,
-                px: input.font.pixelSize,
-                ink: String(input.color),
-                border: String(fieldBox.border.color),
-                placeholder: String(placeholder.color)
-            }
+            title: d.title,
+            detail: d.detail,
+            chip: d.chip,
+            drawnField: d.field,
+            wrong: d.error,
+            danger: d.danger,
+            buttons: d.buttons,
+            width: prompt.width
         });
     }
 
@@ -109,147 +102,51 @@ Item {
             if (prompt.flow?.isCompleted)
                 prompt.finish();
         }
+        // PAM refused the password; the agent starts a fresh session, so the prompt stays with its field cleared.
+        function onAuthenticationFailed() {
+            card.input.text = "";
+            prompt.wrong = "Wrong password, try again";
+        }
     }
 
     Component.onCompleted: Root.State.loaded.push("polkit")
-    visible: motion.drawing
 
-    Rectangle {
+    // A press anywhere on the prompt is on its card, so the surfaces' window never takes it for a click outside.
+    Item {
+        objectName: "card"
         anchors.fill: parent
-        color: card.wash
     }
 
-    Root.Surface {
+    Root.Prompt {
         id: card
-        x: Math.round((parent.width - width) / 2)
-        y: Math.round((parent.height - height) / 3)
-        width: 520
-        height: column.implicitHeight
-        tokens: prompt.theme.tokens
-        motion: prompt.motion
+        x: 20
+        y: 20
+        width: parent.width - 40
+        theme: prompt.theme
+        clickName: "polkit"
+        glyph: 0xF099D
+        title: "Authentication required"
+        detail: prompt.seen?.inputPrompt ? prompt.seen.inputPrompt.replace(/:\s*$/, "") : "Password"
+        chip: prompt.chip
+        request: prompt.seen?.message ?? ""
+        field: true
+        secret: !prompt.seen?.responseVisible
+        placeholder: "Password"
+        // A wrong password reads as its own line; the daemon's own error word, when it has one, takes its place.
+        error: prompt.wrong !== "" ? prompt.wrong : prompt.seen?.supplementaryIsError ? prompt.seen.supplementaryMessage : ""
+        quiet: "Cancel"
+        primary: "Allow"
+        onQuietTapped: prompt.close()
+        onPrimaryTapped: prompt.submit()
+        onEntered: prompt.submit()
+        onEscaped: prompt.close()
+    }
 
-        ColumnLayout {
-            id: column
-            width: parent.width
-            spacing: 0
-
-            // The title in the launcher's pill.
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.margins: 20
-                Layout.bottomMargin: 10
-
-                Rectangle {
-                    implicitWidth: pill.implicitWidth + 18
-                    implicitHeight: pill.implicitHeight + 6
-                    radius: 8
-                    color: prompt.look.label.fill
-                    Text {
-                        id: pill
-                        textFormat: Text.PlainText
-                        anchors.centerIn: parent
-                        text: prompt.look.heading("authenticate", "")
-                        color: prompt.look.label.color
-                        font.family: prompt.fonts.ui
-                        font.pixelSize: 12
-                        font.weight: Font.Medium
-                    }
-                }
-            }
-
-            Text {
-                id: messageText
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                wrapMode: Text.Wrap
-                text: V.inOrder(prompt.seen?.message)
-                color: prompt.c.ink
-                font.family: prompt.fonts.display
-                font.pixelSize: 22
-            }
-
-            Rectangle {
-                id: fieldBox
-                Layout.fillWidth: true
-                Layout.margins: 20
-                implicitHeight: 44
-                color: "transparent"
-                border.width: 1
-                border.color: prompt.c.ink
-
-                TextInput {
-                    id: input
-                    anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    verticalAlignment: TextInput.AlignVCenter
-                    echoMode: prompt.seen?.responseVisible ? TextInput.Normal : TextInput.Password
-                    color: prompt.c.ink
-                    font.family: prompt.fonts.ui
-                    font.pixelSize: 16
-                    clip: true
-                    Keys.onReturnPressed: prompt.submit()
-                    Keys.onEnterPressed: prompt.submit()
-                    Keys.onEscapePressed: prompt.close()
-                }
-
-                Text {
-                    id: placeholder
-                    textFormat: Text.PlainText
-                    visible: input.text === ""
-                    anchors.verticalCenter: parent.verticalCenter
-                    x: 12
-                    text: V.inOrder(prompt.seen?.inputPrompt) || "Password"
-                    color: prompt.c.muted
-                    font.family: prompt.fonts.ui
-                    font.pixelSize: 16
-                }
-            }
-
-            // The daemon's word replaces the key hint while it has one.
-            Text {
-                visible: !!prompt.seen?.supplementaryMessage
-                textFormat: Text.PlainText
-                Layout.fillWidth: true
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.bottomMargin: 16
-                wrapMode: Text.Wrap
-                text: V.inOrder(prompt.seen?.supplementaryMessage)
-                color: prompt.seen?.supplementaryIsError ? prompt.c.danger : prompt.c.muted
-                font.family: prompt.fonts.ui
-                font.pixelSize: 10
-                font.letterSpacing: 1.2
-            }
-
-            // The key hint as the launcher's legend draws it, each pair as plain dim text.
-            Row {
-                visible: !prompt.seen?.supplementaryMessage
-                Layout.leftMargin: 20
-                Layout.rightMargin: 20
-                Layout.bottomMargin: 16
-                spacing: 8
-
-                Repeater {
-                    id: hintRepeater
-                    model: prompt.look.keys([["↵", "authenticate"], ["esc", "cancel"]])
-
-                    KeyPair {
-                        id: keyPair
-                        required property int index
-                        theme: prompt.theme
-                        look: prompt.look
-
-                        // The first chip is ↵ and the second esc, so a click on one does what its key does.
-                        Root.Click {
-                            name: "polkit-key:" + keyPair.index
-                            onTapped: keyPair.index === 0 ? prompt.submit() : prompt.close()
-                        }
-                    }
-                }
-            }
+    Connections {
+        target: card.input
+        function onTextChanged() {
+            if (card.input.text !== "")
+                prompt.wrong = "";
         }
     }
 }

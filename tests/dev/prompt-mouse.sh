@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The polkit and pinentry cards by mouse: a click on the ↵ chip answers as Enter does, and a click on the esc chip cancels as Esc does.
+# The polkit and pinentry prompts by mouse: a click on Allow or the ↵ chip answers as Enter does, and a click on Cancel or the esc chip cancels as Esc does.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -27,13 +27,13 @@ fake Begin s m1 >/dev/null
 until_ok 3000 pk_is '.open and .settled'
 wtype abc
 until_ok 2000 pk_is '.field == 3'
-click_box polkit-key:0
+click_box polkit-primary
 until_ok 2000 pk_is '.submits == 1'
-check "a click on polkit's ↵ chip hands the typed password to the request, as Enter does ($(pk_state | jq -c '{submits, field}'))" pk_is '.submits == 1 and .field == 0'
+check "a click on polkit's Allow hands the typed password to the request, as Enter does ($(pk_state | jq -c '{submits, field}'))" pk_is '.submits == 1 and .field == 0'
 until_ok 5000 pk_is '.open and .settled'
-click_box polkit-key:1
+click_box polkit-quiet
 until_ok 3000 result_is m1 org.freedesktop.PolicyKit1.Error.Cancelled
-check "a click on its esc chip cancels the request" result_is m1 org.freedesktop.PolicyKit1.Error.Cancelled
+check "a click on its Cancel cancels the request" result_is m1 org.freedesktop.PolicyKit1.Error.Cancelled
 until_ok 2000 pk_is '.open | not'
 check "and the prompt closes" pk_is '.open | not'
 

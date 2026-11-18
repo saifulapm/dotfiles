@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A polkit request shows the shell's one prompt with exclusive keyboard, and Esc cancels the request.
+# A polkit request shows the shell's one prompt, in the island, with exclusive keyboard, and Esc cancels the request.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -54,11 +54,11 @@ check "Esc then cancels the first" result_is c2 org.freedesktop.PolicyKit1.Error
 until_ok 2000 state_is '.open | not'
 check "and the prompt closes" state_is '.open | not'
 
-# The heading and key hint read in plain words.
+# The prompt names its buttons in plain words and draws no key hint (8HYAV3GE).
 fake Begin s h1 >/dev/null
-until_ok 3000 state_is '.open'
-check "the heading reads Authenticate ($(pk_state | jq -c .heading))" state_is '.heading == "Authenticate"'
-check "the hint reads ↵ authenticate  esc cancel ($(pk_state | jq -c .hint))" state_is '.hint == "↵ authenticate  esc cancel"'
+until_ok 3000 state_is '.open and .settled'
+check "the buttons read Cancel and Allow ($(pk_state | jq -c '[.buttons[].text]'))" state_is '[.buttons[].text] == ["Cancel", "Allow"]'
+check "no key hint is drawn ($(pk_state | jq -c 'has("hint")'))" state_is 'has("hint") | not'
 wtype -k Escape
 until_ok 3000 result_is h1 org.freedesktop.PolicyKit1.Error.Cancelled
 until_ok 2000 state_is '.open | not'

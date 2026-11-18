@@ -5,6 +5,7 @@ import "." as Root
 import "lib/click.mjs" as ClickLib
 import "lib/launcher.mjs" as Lib
 import "lib/voice.mjs" as V
+import "lib/takeover.mjs" as T
 
 // The one Overlay window every surface draws in; it stays mapped, since a remap costs 20 to 30 ms.
 PanelWindow {
@@ -95,6 +96,8 @@ PanelWindow {
 
     // t0 is taken before the first load, so a cold open's time includes loading. A surface in the island opens before the other closes, so the island goes straight from one to the other and never reads null between.
     function openLauncher(t0, mode, typed) {
+        if (host.takeoverItem)
+            return;
         launcherFromOverview = !!typed;
         launcherLoader.active = true;
         launcher.open(t0, mode, typed);
@@ -102,62 +105,129 @@ PanelWindow {
     }
 
     function openNotifs(t0) {
+        if (host.takeoverItem)
+            return;
         notifsLoader.active = true;
         notifications.open(t0);
         closeOthers(notifications);
     }
 
     function openCheatsheet(t0) {
+        if (host.takeoverItem)
+            return;
         cheatsheetLoader.active = true;
         cheatsheet.open(t0);
         closeOthers(cheatsheet);
     }
 
     function openControl(t0) {
+        if (host.takeoverItem)
+            return;
         controlLoader.active = true;
         control.open(t0);
         closeOthers(control);
     }
 
     function openGoals(t0) {
+        if (host.takeoverItem)
+            return;
         goalsLoader.active = true;
         goalsView.open(t0);
         closeOthers(goalsView);
     }
 
     function toggleRecorder() {
+        if (host.takeoverItem && !(recorder?.recording ?? false))
+            return;
         recorderLoader.active = true;
         if (!recorder.shown && !recorder.recording)
             closeOthers(recorder);
         recorder.toggle();
     }
 
-    // The polkit agent calls this when a request arrives.
+    // The polkit agent calls this when a request arrives; it takes the island over whatever shows (7E95CSV2).
     function openPolkit(flow) {
         polkitLoader.active = true;
-        closeOthers(polkit);
+        takeOver(polkit);
         polkit.show(flow);
     }
 
+    // The prompts that take the island over the surface in it and hand it back once answered, cancelled or hung up; each loads in the island's surface slot.
+    readonly property var takeovers: [polkit]
+    // Their names as they showed, oldest first, and the item each took the keyboard from.
+    property var stack: []
+    property var focusUnder: ({})
+    readonly property var takeoverItem: takeovers.find(t => t && t.name === stack[stack.length - 1]) ?? null
+    // What the island draws: the newest prompt, else the open surface.
+    readonly property var drawnSurface: takeoverItem ?? islandSurface
+
+    // Called just before a prompt shows: it goes on top of the stack, and the item that had the keyboard is kept for its return.
+    function takeOver(p) {
+        if (stack.indexOf(p.name) < 0)
+            focusUnder = Object.assign({}, focusUnder, { [p.name]: host.contentItem.Window.activeFocusItem });
+        stack = T.push(stack, p.name);
+    }
+
+    // A prompt that left hands the keyboard back to what it covered; one that left from under another passes what it covered to the one above it.
+    function handBack(p) {
+        const at = stack.indexOf(p.name);
+        if (at < 0)
+            return;
+        const under = Object.assign({}, focusUnder);
+        const was = under[p.name];
+        delete under[p.name];
+        if (at < stack.length - 1)
+            under[stack[at + 1]] = was;
+        focusUnder = under;
+        stack = T.drop(stack, p.name);
+        if (at === stack.length && was)
+            was.forceActiveFocus();
+    }
+
+    Binding {
+        when: !!host.island
+        target: host.island
+        property: "takeover"
+        value: host.takeoverItem?.name ?? null
+    }
+
+    // A prompt's chip names what it returns to: the prompt before it, else the surface; nothing over the resting island.
+    function chipFor(name) {
+        return T.chipText(T.under(islandSurface?.name ?? null, stack.slice(0, stack.indexOf(name) + 1)));
+    }
+
+    // True once the island has come to rest on that prompt, so a check can read its pixels.
+    function settledOn(name) {
+        return island?.takeover === name && !(island?.animating ?? true);
+    }
+
     function openPass(t0) {
+        if (host.takeoverItem)
+            return;
         passLoader.active = true;
         pass.open(t0);
         closeOthers(pass);
     }
 
     function openTailscale(t0) {
+        if (host.takeoverItem)
+            return;
         tailscaleLoader.active = true;
         tailscale.open(t0);
         closeOthers(tailscale);
     }
 
     function openAccounts(t0) {
+        if (host.takeoverItem)
+            return;
         accountsLoader.active = true;
         accounts.open(t0);
         closeOthers(accounts);
     }
 
     function openDns(t0) {
+        if (host.takeoverItem)
+            return;
         dnsLoader.active = true;
         dns.open(t0);
         closeOthers(dns);
@@ -268,7 +338,7 @@ PanelWindow {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         onPressed: mouse => {
-            const s = host.all.find(s => s?.shown);
+            const s = host.takeoverItem ?? host.all.find(s => s?.shown);
             // After Mod+I a press of any button outside the island gives the keyboard back and goes no further; one on it is the island's.
             if (!s && host.island?.wantsKeys) {
                 const box = host.island.maskItem;
@@ -361,17 +431,17 @@ PanelWindow {
     // The surfaces that draw inside the island, and the one of them shown, or null.
     readonly property var islandSurfaces: [launcher, notifications, cheatsheet, control, recorder, pass, tailscale, accounts, dns, goalsView]
     readonly property var islandSurface: islandSurfaces.find(s => s?.shown) ?? null
-    // The last of them shown keeps its size while the island closes, so its content does not collapse mid-morph.
+    // The last thing the island drew, a surface or a prompt, keeps its size while the island closes, so its content does not collapse mid-morph.
     property var islandLast: null
-    onIslandSurfaceChanged: if (islandSurface)
-        islandLast = islandSurface
+    onDrawnSurfaceChanged: if (drawnSurface)
+        islandLast = drawnSurface
 
     // While a card is open, a click on the island is a click outside that card, so the island takes no input.
     Binding {
         when: !!host.island
         target: host.island
         property: "cardOpen"
-        value: host.shown && !host.islandSurface
+        value: host.shown && !host.islandSurface && !host.takeoverItem
     }
 
     Binding {
@@ -492,12 +562,19 @@ PanelWindow {
         value: recorderBarLoader.item
     }
 
+    // The polkit prompt draws inside the island, on the island's fill, over the surface it covers (board 7).
     Loader {
         id: polkitLoader
+        parent: host.island ? host.island.surfaceSlot : host.contentItem
         anchors.fill: parent
+        visible: host.islandLast === host.polkit
         active: false
         sourceComponent: Root.PolkitPrompt {
-            theme: panelTheme
+            theme: host.theme
+            chip: host.chipFor(name)
+            settled: host.settledOn(name)
+            onShownChanged: if (!shown)
+                host.handBack(host.polkit)
         }
     }
 

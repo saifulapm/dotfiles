@@ -160,16 +160,16 @@ Item {
             notice
         })
     // A surface open in the island outranks every slot; an arrival closes it instead (PCGX7JPJ).
-    readonly property string mode: H.modeOf(surface, slots)
+    readonly property string mode: H.modeOf(holder, slots)
     // The slots as they last were, so an arrival while a surface is open can be told from a state already live.
     property var slotsSeen: ({})
     signal surfaceYielded
     onSlotsChanged: {
-        if (surface && H.surfaceYields(slotsSeen, slots))
+        if (holder && H.surfaceYields(slotsSeen, slots))
             surfaceYielded();
-        if (surface && slots.question && !slots.question.pairing && slots.question.id !== slotsSeen.question?.id && questionsWaiting.indexOf(slots.question.id) < 0)
+        if (holder && slots.question && !slots.question.pairing && slots.question.id !== slotsSeen.question?.id && questionsWaiting.indexOf(slots.question.id) < 0)
             questionsWaiting = questionsWaiting.concat([slots.question.id]);
-        if (surface && slots.playing && I.trackText(slots.playing) !== I.trackText(slotsSeen.playing ?? {}))
+        if (holder && slots.playing && I.trackText(slots.playing) !== I.trackText(slotsSeen.playing ?? {}))
             mediaWaiting = true;
         slotsSeen = slots;
     }
@@ -184,7 +184,7 @@ Item {
             release();
     }
     // The lease's text is read back from what is drawn, since each theme words it its own way; the rest picks its mode from the same slots it reads, so a slot that empties never meets a mode not yet moved on.
-    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLook.slot.label.text, leaseLook.slot.who.text(lease.who), leaseLook.time(lease.left)].filter(t => t).join(" ") : I.islandText(H.modeOf(surface, slots), slots, clock.now)
+    readonly property string text: mode === "sharingCard" ? shareRows.map(I.shareRowText).join(" · ") : mode === "leaseCard" ? (c => [c.who, c.unlocked, c.time].join(" · "))(leaseCardDrawn()) : mode === "lease" ? [leaseLook.slot.label.text, leaseLook.slot.who.text(lease.who), leaseLook.time(lease.left)].filter(t => t).join(" ") : I.islandText(H.modeOf(holder, slots), slots, clock.now)
     // How the theme's board draws a notification and the OSD.
     readonly property var noteLook: V.islandLook(theme.tokens)
     readonly property var chipLook: V.chipLook(theme.tokens)
@@ -214,7 +214,7 @@ Item {
         })
     readonly property string part: ["notification", "question", "calendar", "leaseCard", "sharingCard", "mediaCard", "surface"].indexOf(mode) >= 0 ? mode : live ? "live" : "label"
     // Board 2's one-line state of this mode, picked from the same slots the mode reads, or null; heldLive keeps the last one so it leaves drawn.
-    readonly property var live: L.liveState(H.modeOf(surface, slots), slots, clock.now)
+    readonly property var live: L.liveState(H.modeOf(holder, slots), slots, clock.now)
     property var heldLive: null
     onLiveChanged: if (live)
         heldLive = live
@@ -284,11 +284,11 @@ Item {
 
     function morph() {
         // An open surface's content is its name, whatever notification or question stays current under it, so a switch from one surface to another morphs as well.
-        const content = part + ":" + (part === "surface" ? surface : notification?.key ?? question?.id ?? "");
+        const content = part + ":" + (part === "surface" ? holder : notification?.key ?? question?.id ?? "");
         const fresh = morphedFor !== "" && content !== morphedFor;
         const switching = fresh && part === "surface" && morphedFor.startsWith("surface:");
         // Only an open from the resting clock glides; a switch from another surface has no clock to move.
-        const glide = fresh && !switching && part === "surface" && surface === "control" && modeBefore === "rest" && !!clockTarget;
+        const glide = fresh && !switching && part === "surface" && holder === "control" && modeBefore === "rest" && !!clockTarget;
         morphedFor = content;
         // A new morph that is not the glide ends any glide still drawn; the second of the width's and height's calls keeps it.
         if (fresh && !glide)
@@ -923,13 +923,16 @@ Item {
     readonly property var output: Quickshell.screens.find(s => s.name === niri.focusedOutput) ?? Quickshell.screens[0]
     // Hidden with the margins while the shown window runs edge to edge, as a fullscreen window covers it: the resting island, media, the mic and notifications hide, while an open surface and every question show over it (BRQAT409, 4AEWRR0H).
     readonly property bool overFullscreen: niri.edgeToEdge(output.name, output.width)
-    visible: !!surface || !overFullscreen || !!question
+    visible: !!holder || !overFullscreen || !!question
     width: parent ? parent.width : 0
     height: parent ? parent.height : 0
     property real fillStartedAt: 0
     property real fillEndedAt: 0
     // The surface open inside the island by name, or null; what waits behind it, a count; and the prompt that took the island over, or null (SCNB8HVY).
     property var surface: null
+    property var takeover: null
+    // What the island draws in its surface part: the prompt that took it over, else the open surface (7E95CSV2).
+    readonly property var holder: takeover ?? surface
     // The open surface's size as it asks for it, and the part its content draws in.
     property real surfaceWidth: 0
     property real surfaceHeight: 0
@@ -948,7 +951,7 @@ Item {
     property bool mediaWaiting: false
     // A question answered elsewhere while it waited drops out of the count; questions show one at a time, so they count as one.
     readonly property int waiting: Wait.count(notifs.queue) + (question && questionsWaiting.indexOf(question.id) >= 0 ? 1 : 0) + (mediaWaiting ? 1 : 0)
-    onSurfaceChanged: if (!surface) {
+    onHolderChanged: if (!holder) {
         questionsWaiting = [];
         mediaWaiting = false;
     }
@@ -956,9 +959,8 @@ Item {
     Binding {
         target: island.notifs
         property: "held"
-        value: !!island.surface || island.overFullscreen || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
+        value: !!island.holder || island.overFullscreen || (!!island.question && !island.question.pairing && island.notifs.queue.length > 0)
     }
-    readonly property var takeover: null
     // The surfaces' window holds the keyboard for the island while this is true; a hidden island takes none, so a fullscreen window keeps its keys.
     readonly property bool wantsKeys: focused && !attaching && visible
     // At rest the surfaces' window takes clicks only on this.
@@ -1699,7 +1701,7 @@ Item {
             IslandPart {
                 id: surfacePart
                 shown: island.part === "surface"
-                key: island.surface ?? ""
+                key: island.holder ?? ""
                 swap: island.motion?.swap ?? null
                 staggered: true
                 x: Math.round((parent.width - width) / 2)

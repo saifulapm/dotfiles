@@ -211,6 +211,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.notifications?.shown)
                 close();
             else
@@ -243,6 +246,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.launcher?.shown)
                 close();
             else
@@ -320,6 +326,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.pass?.shown)
                 close();
             else
@@ -347,6 +356,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.tailscale?.shown)
                 close();
             else
@@ -374,6 +386,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.accounts?.shown)
                 close();
             else
@@ -401,6 +416,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.dns?.shown)
                 close();
             else
@@ -431,6 +449,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.goalsView?.shown)
                 close();
             else
@@ -459,6 +480,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.cheatsheet?.shown)
                 close();
             else
@@ -493,6 +517,9 @@ ShellRoot {
         }
 
         function toggle(): void {
+            // A prompt holds the island until it is answered, so a surface's key neither opens nor closes anything under it.
+            if (surfacesLoader.item?.takeoverItem)
+                return;
             if (surfacesLoader.item?.control?.shown)
                 close();
             else
