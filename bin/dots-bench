@@ -81,6 +81,37 @@ echo "     warm opens: ${warms[*]}; c mode warm opens: ${schemes_warms[*]}"
 warm=$(median "${warms[@]}")
 schemes_warm=$(median "${schemes_warms[@]}")
 
+# Control in the island: open number $1, its time as Control measured it, then closed with the keyboard back.
+control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
+control_reported() { control_state | jq -e ".opens == $1 and (.openMs | type) == \"number\"" >/dev/null; }
+control_closed() { control_state | jq -e '.open == false' >/dev/null && niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == "None")' >/dev/null; }
+control_once() {
+  qs ipc call control open >/dev/null || die "control open failed"
+  until_ok 3000 control_reported "$1" || die "control open $1 never reported openMs"
+  control_state | jq -r .openMs
+  qs ipc call control close >/dev/null
+  until_ok 3000 control_closed || die "Control never gave the keyboard back"
+}
+# Cold is Control's first open after a start, before the warm-up has made it: the median of five starts, as the launcher's.
+control_colds=()
+for i in 1 2 3 4 5; do
+  systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
+  until_ok 3000 paper_gone || die "the killed shell's paper never went away"
+  until_ok 10000 layer_up dots-paper || die "dots-paper never mapped"
+  until_ok 3000 status_has '(.firstFrameMs | type) == "number"' || die "status never reported firstFrameMs"
+  control_colds+=("$(control_once 1)") || exit 1
+done
+sleep 2
+control_warms=()
+for i in 0 1 2 3 4 5; do
+  sleep 0.3
+  ms=$(control_once $((2 + i))) || exit 1
+  ((i > 0)) && control_warms+=("$ms")
+done
+echo "     control cold opens: ${control_colds[*]}; warm opens: ${control_warms[*]}"
+control_cold=$(median "${control_colds[@]}")
+control_warm=$(median "${control_warms[@]}")
+
 # Pass loads on its open and unloads 30 s after it closes, so the open after that is a cold one.
 pass_state() { timeout 0.5 qs ipc call pass state 2>/dev/null; }
 pass_is() { pass_state | jq -e "$1" >/dev/null; }
@@ -205,6 +236,20 @@ for i in 1 2 3; do
 done
 switch_morph_max=$(middle "${switch_maxes[@]}")
 echo "     morph switch: longest gaps ${switch_maxes[*]}, p95 ${switch_p95}"
+# The island's open from rest into Control, its clock gliding with it, three times warm and read as the open is.
+control_maxes=() control_p95=0
+for i in 1 2 3; do
+  dots-call control toggle >/dev/null || die "control toggle failed"
+  until_ok 3000 island_is '.surface == "control" and .animating == false and .morph.kind == "open"' || die "the island never settled on Control"
+  read -r mx p95 < <(morph_stats)
+  [ -n "$mx" ] || die "the island recorded no frames for its open into Control"
+  control_maxes+=("$mx") control_p95=$(worse "$control_p95" "$p95")
+  wtype -k Escape
+  until_ok 3000 island_is '.surface == null and .animating == false' || die "the island never settled back at rest"
+  until_ok 3000 host_focus None || die "Control never gave the keyboard back"
+done
+control_morph_max=$(middle "${control_maxes[@]}")
+echo "     morph control: longest gaps ${control_maxes[*]}, p95 ${control_p95}"
 sleep 5
 rss_kib=$(shell_status | jq -r .rssKiB) || die "status did not answer after the opens"
 # GPU buffers are shmem, which RSS misses, so the unit's cgroup anon+shmem is read at the same moment.
@@ -291,6 +336,6 @@ sleep "$idle_s"
 t1=$(cpu_ticks)
 cpu=$(awk -v d=$((t1 - t0)) -v hz="$(getconf CLK_TCK)" -v s="$idle_s" 'BEGIN { printf "%.2f", d / hz / s * 100 }')
 
-node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95"
+node "$(dirname "$0")/../shell/lib/bench.mjs" "$first_frame" "$rss_kib" "$cold" "$warm" "$timers" "$cpu" "$switch_max" "$switched_kib" "$anon_shmem_kib" "$schemes_cold" "$schemes_warm" "$pass_cold" "$files_cold" "$app_first_frame" "$app_rss_kib" "$app_left" "$dekho_first_frame" "$dekho_rss_kib" "$dekho_left" "$deen_first_frame" "$deen_rss_kib" "$deen_left" "$open_max" "$open_p95" "$close_max" "$close_p95" "$switch_morph_max" "$switch_p95" "$control_cold" "$control_warm" "$control_morph_max" "$control_p95"
 exit
 }

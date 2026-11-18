@@ -4,10 +4,11 @@ import { execFileSync } from 'node:child_process';
 import { report, switchCycle, limits, frameStats, morphIntervals, BUDGETS, BASELINE, SPREAD } from './bench.mjs';
 
 const cli = new URL('./bench.mjs', import.meta.url).pathname;
-const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 }, morphSwitch: { max: 17, p95: 8 } };
+const good = { firstFrameMs: 130, rssKiB: 152576, coldMs: 38, warmMs: 4, schemesColdMs: 35, schemesWarmMs: 9, passColdMs: 3, filesColdMs: 11, appFirstFrameMs: 310, appRssKiB: 180224, appLeft: 0, dekhoFirstFrameMs: 180, dekhoRssKiB: 131072, dekhoLeft: 0, deenFirstFrameMs: 220, deenRssKiB: 141072, deenLeft: 0, timers: 1, switchMs: 120, switchedKiB: 157000, anonShmemKiB: 236544, cpu: '0.03', morphOpen: { max: 14, p95: 9 }, morphClose: { max: 15, p95: 10 }, morphSwitch: { max: 17, p95: 8 }, controlColdMs: 30, controlWarmMs: 5, morphControl: { max: 18, p95: 7 } };
 const rest = ['180224', '0', '180', '131072', '0', '220', '141072', '0'];
 const head = ['130', '152576', '38', '4', '1', '0.03', '120', '157000', '236544', '35', '9', '3', '11', '310'];
-const morph = ['14', '9', '15', '10', '17', '8'];
+// The three morph pairs, then Control's cold and warm opens and its morph.
+const morph = ['14', '9', '15', '10', '17', '8', '30', '5', '18', '7'];
 const args = [...head, ...rest];
 
 test('the limits are the budget or the baseline plus its spread, whichever holds a row tighter', () => {
@@ -53,6 +54,9 @@ test('every measure within its limit reads ok and passes', () => {
     'morph open    14/9 ms ≤ 36/12 ms ok',
     'morph close   15/10 ms ≤ 36/12 ms ok',
     'morph switch  17/8 ms ≤ 36/12 ms ok',
+    'morph control 18/7 ms ≤ 36/12 ms ok',
+    'control cold  30 ms   ≤ 50 ms    ok',
+    'control warm  5 ms    ≤ 16 ms    ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -321,4 +325,11 @@ test('a morph switch with a longest interval of 37 ms or a p95 of 13 ms is OVER,
     () => execFileSync('node', [cli, ...args, '14', '9', '15', '10'], { stdio: 'pipe' }),
     (e) => e.status === 1 && /morph switch +none/.test(e.stdout.toString()),
   );
+});
+
+test("Control's opens and its morph read OVER past their budgets", () => {
+  assert.equal(report({ ...good, controlColdMs: 51 }, BUDGETS).over, true);
+  assert.equal(report({ ...good, controlWarmMs: 17 }, BUDGETS).over, true);
+  assert.equal(report({ ...good, morphControl: { max: 37, p95: 7 } }, BUDGETS).over, true);
+  assert.equal(report({ ...good, morphControl: null }, BUDGETS).over, true);
 });
