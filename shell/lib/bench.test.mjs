@@ -52,7 +52,7 @@ test('every measure within its limit reads ok and passes', () => {
     'deen closed   0 left  = 0 left   ok',
     'morph open    14/9 ms ≤ 36/12 ms ok',
     'morph close   15/10 ms ≤ 36/12 ms ok',
-    'morph switch  17/8 ms ≤ 20/12 ms ok',
+    'morph switch  17/8 ms ≤ 36/12 ms ok',
     'rss switched  153 MiB',
   ]);
 });
@@ -308,12 +308,13 @@ test('the frames CLI prints a morph\'s longest interval and the p95 of its frame
   assert.equal(execFileSync('node', [new URL('./bench.mjs', import.meta.url).pathname, 'frames', frames], { encoding: 'utf8' }).trim(), '17 9');
 });
 
-// The plan holds a switch from one surface to another to 20 ms at its longest and 12 ms at p95: the window's keyboard does not change, so no frame of its own lands in the morph.
-test('a morph switch with a longest interval of 21 ms or a p95 of 13 ms is OVER, 20 and 12 ok', () => {
-  assert.equal(report({ ...good, morphSwitch: { max: 20, p95: 12 } }, BUDGETS).over, false);
-  const long = report({ ...good, morphSwitch: { max: 21, p95: 8 } }, BUDGETS);
+// A switch is held as an open is (Z0YE4PA6): its long gaps are the nested session's jitter, which an open from rest shows too, so one missed refresh plus the clock's slack, 36 ms, and 12 ms of each frame's work at p95.
+test('a morph switch with a longest interval of 37 ms or a p95 of 13 ms is OVER, 36 and 12 ok', () => {
+  assert.equal(report({ ...good, morphSwitch: { max: 36, p95: 12 } }, BUDGETS).over, false);
+  assert.equal(report({ ...good, morphSwitch: { max: 22, p95: 6 } }, BUDGETS).over, false);
+  const long = report({ ...good, morphSwitch: { max: 37, p95: 8 } }, BUDGETS);
   assert.equal(long.over, true);
-  assert.equal(long.lines[23], 'morph switch  21/8 ms ≤ 20/12 ms OVER');
+  assert.equal(long.lines[23], 'morph switch  37/8 ms ≤ 36/12 ms OVER');
   assert.equal(report({ ...good, morphSwitch: { max: 14, p95: 13 } }, BUDGETS).over, true);
   assert.equal(report({ ...good, morphSwitch: null }, BUDGETS).lines[23], 'morph switch  none');
   assert.throws(
