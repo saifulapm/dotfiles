@@ -139,6 +139,8 @@ fi
 source "$dev_out"
 # A check run from inside tmux inherits TMUX, which points every tmux call, dots colorscheme's reload among them, at the live server over the nested TMUX_TMPDIR; a check that switched to rose-pine-dawn left the live tmux in it.
 unset TMUX
+# An agent's shell carries PINENTRY_USER_DATA=curses, which sends bin/dots-pinentry to pinentry-curses, so no gpg prompt would reach the nested shell.
+unset PINENTRY_USER_DATA GPG_TTY
 # Every qs ipc call below must reach the worktree shell, never the live one.
 : "${QS_CONFIG_PATH:?}" "${DOTS_DEV_DIR:?}" "${DOTS_DEV_UNIT:?}"
 

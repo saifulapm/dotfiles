@@ -913,3 +913,9 @@ test('the surfaces window holds no card host and no veil', () => {
   }
   assert.deepEqual(found, []);
 });
+
+// An agent's shell carries PINENTRY_USER_DATA=curses, which sends bin/dots-pinentry to pinentry-curses, so a gpg check saw no prompt and its reds read as the shell's (m106 t3); lib.sh drops it for every check.
+test('lib.sh unsets PINENTRY_USER_DATA and GPG_TTY before any check runs', () => {
+  const lib = readFileSync(new URL('../../tests/dev/lib.sh', import.meta.url), 'utf8');
+  assert.match(lib, /^unset\b[^\n]*\bPINENTRY_USER_DATA\b[^\n]*\bGPG_TTY\b/m);
+});
