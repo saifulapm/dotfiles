@@ -15,7 +15,7 @@ cleanup() { kill "$player" 2>/dev/null; }
 
 until_ok 3000 island_is '.mode == "rest"'
 # notify-send -A waits for an action, so it runs in the background until the card is put away.
-notify-send -t 0 -A ok=OK "Deploy?" >/dev/null &
+notify-send -t 0 -A ok=OK "Deploy?" >/dev/null 9>&- &
 until_ok 3000 island_is '.mode == "notification" and .animating == false'
 mod_i
 check "Mod+I on a notification card makes the window's keyboard Exclusive and focused true" bash -c "$(declare -f keyboard_is island island_is); keyboard_is Exclusive && island_is '.focused'"
@@ -37,7 +37,7 @@ until_ok 3000 island_is '.mode == "rest"'
 niri msg action spawn -- foot -c /dev/null sh -c "cat > '$typed'"
 until_ok 5000 bash -c '[ "$(niri msg -j focused-window | jq -r .app_id)" = foot ]'
 niri msg action maximize-column
-"$repo/bin/dev-fake-mpris" Track Artist &
+"$repo/bin/dev-fake-mpris" Track Artist 9>&- &
 player=$!
 until_ok 3000 island_is '.mode == "playing" and .animating == false'
 # shellcheck disable=SC2046

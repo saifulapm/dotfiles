@@ -23,7 +23,7 @@ ask() {
     const s = require("net").connect(sock, () => s.write(line + "\n"));
     s.on("data", (d) => chunks.push(d));
     s.on("close", () => require("fs").writeFileSync(file, Buffer.concat(chunks)));
-  ' "$sock" "$2" "$out/$1" &
+  ' "$sock" "$2" "$out/$1" 9>&- &
 }
 answered() { [ -e "$out/$1" ]; }
 shown() { until_ok 4000 state_is '.open and .settled and .listed'; }

@@ -31,7 +31,7 @@ last_psk() { bus call org.freedesktop.NetworkManager "$nm" org.dots.FakeNM LastP
 last_psk_is() { [ "$(last_psk)" = "s \"$1\"" ]; }
 
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" 9>&- &
 fake_pid=$!
 cleanup() { kill "$fake_pid" 2>/dev/null; }
 fake_up() { bus status org.freedesktop.NetworkManager >/dev/null 2>&1; }

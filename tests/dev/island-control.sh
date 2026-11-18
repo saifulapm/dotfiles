@@ -24,7 +24,7 @@ tile_is() { control | jq -e --arg t "$1" ".tiles[] | select(.title == \$t) | $2"
 # Quickshell's NetworkManager client talks to the system bus, which in the nested session is the nested session bus.
 bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
 # Dots Secured takes jk-hl-pass, a password of the keys that move and step Control.
-DOTS_FAKE_SECURED_PSK=jk-hl-pass DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" &
+DOTS_FAKE_SECURED_PSK=jk-hl-pass DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-networkmanager" 9>&- &
 fake_pid=$!
 cleanup() {
   pointer_stop

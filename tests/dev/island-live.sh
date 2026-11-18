@@ -9,7 +9,7 @@ settled() { island_is "$1 and .animating == false"; }
 music=$(printf '\U000F075A')
 
 until_ok 3000 settled '.mode == "rest"'
-"$repo/bin/dev-fake-mpris" "Paranoid Android" Radiohead &
+"$repo/bin/dev-fake-mpris" "Paranoid Android" Radiohead 9>&- &
 player=$!
 cleanup() { kill "$player" 2>/dev/null; }
 until_ok 3000 settled '.mode == "playing"'
@@ -22,7 +22,7 @@ kill "$player"
 until_ok 3000 settled '.mode == "rest"'
 
 long=$(printf 'Long%.0s' {1..50})
-"$repo/bin/dev-fake-mpris" "$long" Artist &
+"$repo/bin/dev-fake-mpris" "$long" Artist 9>&- &
 player=$!
 until_ok 3000 settled '.mode == "playing"'
 check "a 200-character title is cut with an ellipsis ($(island | jq -c '.live.elided'))" island_is '.live.elided == true'

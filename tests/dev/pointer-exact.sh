@@ -43,7 +43,7 @@ s.bind(sys.argv[1]); s.listen(4)
 held = []
 while True:
     held.append(s.accept()[0])
-' "$b/mute.sock" &
+' "$b/mute.sock" 9>&- &
 mute=$!
 cleanup() { kill "$mute" 2>/dev/null; }
 until_ok 2000 test -S "$b/mute.sock"

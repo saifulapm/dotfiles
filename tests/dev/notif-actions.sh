@@ -58,7 +58,7 @@ check "Enter runs the default action ($(cat "$out"))" printed default
 done_asking
 
 # notify-send closes its notification as it exits after an action, so the resident one comes from gdbus, and the bus shows the action.
-gdbus monitor --session --dest org.freedesktop.Notifications >"$out" &
+gdbus monitor --session --dest org.freedesktop.Notifications >"$out" 9>&- &
 monitor=$!
 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
   --method org.freedesktop.Notifications.Notify T 0 "" stay "" '["yes", "Yes"]' '{"resident": <true>}' 0 >/dev/null
@@ -99,7 +99,7 @@ row_chips() { notifs | jq -c '[.actions[] | [.[] | ascii_downcase | gsub("[\\[\\
 legend() { notifs | jq -r '.legend | ascii_downcase | gsub("[\\[\\]]"; "")'; }
 legend_has() { [[ "$(legend)" == *"$1"* ]]; }
 
-notify-send -a T -A old=Old older >/dev/null &
+notify-send -a T -A old=Old older >/dev/null 9>&- &
 older=$!
 until_ok 2000 shows older
 ask -A yes=Yes -A no=No newer
@@ -134,7 +134,7 @@ check "and the shell keeps running" shell_status
 close_centre
 done_asking
 
-notify-send -a T -A yes=Yes kept >/dev/null &
+notify-send -a T -A yes=Yes kept >/dev/null 9>&- &
 sender=$!
 until_ok 2000 shows kept
 systemctl --user restart "$DOTS_DEV_UNIT"

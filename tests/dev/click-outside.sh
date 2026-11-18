@@ -83,7 +83,7 @@ until_ok 2000 layer_keys None
 # The file picker answers its asker when a click outside closes it, so the asking app never hangs.
 answer=$DOTS_DEV_DIR/picker-answer
 request=$(jq -cn --arg f "$HOME" '{mode: "open", multiple: false, title: "", app: "", folder: $f, name: "", filters: [], filter: 0, accept: ""}')
-{ printf '%s\n' "$request"; sleep 8; } | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-picker-$WAYLAND_DISPLAY.sock" >"$answer" 2>/dev/null &
+{ printf '%s\n' "$request"; sleep 8; } 9>&- | socat - "UNIX-CONNECT:$XDG_RUNTIME_DIR/dots-picker-$WAYLAND_DISPLAY.sock" >"$answer" 2>/dev/null 9>&- &
 picker_is() { timeout 0.5 dots-call picker state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
 until_ok 4000 picker_is '.open'
 point click 40 $((oh - 40))

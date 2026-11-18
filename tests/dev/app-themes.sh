@@ -42,7 +42,7 @@ themes=(catppuccin-mocha github-light gruvbox-dark artboard)
 # mpv: two players on this display, each with the socket dots-ipc.lua opens.
 mpv_socks() { local pid; for pid in $(pgrep -x mpv); do grep -qzxF "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" "/proc/$pid/environ" 2>/dev/null && echo "$XDG_RUNTIME_DIR/mpv-$pid.sock"; done; }
 # A socket a crash left behind, whose mpv is gone, must not stop a switch; socat killed outright leaves its socket as a crashed mpv does.
-socat UNIX-LISTEN:"$XDG_RUNTIME_DIR/mpv-999999.sock",fork /dev/null &
+socat UNIX-LISTEN:"$XDG_RUNTIME_DIR/mpv-999999.sock",fork /dev/null 9>&- &
 stale=$!
 until_ok 2000 test -S "$XDG_RUNTIME_DIR/mpv-999999.sock"
 kill -9 "$stale"

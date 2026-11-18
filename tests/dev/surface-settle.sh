@@ -30,7 +30,7 @@ until_ok 2000 surface_is record '.drawing == false'
 
 # pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent instead.
 fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
 fake_pid=$!
 cleanup() { kill "$fake_pid" 2>/dev/null; }
 until_ok 3000 fake Registered >/dev/null 2>&1

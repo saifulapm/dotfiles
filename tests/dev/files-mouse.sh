@@ -40,7 +40,7 @@ at() {
 opened() { cat "$work/opened" 2>/dev/null; }
 
 export DROP_OUT=$DOTS_DEV_DIR/drops.json
-env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 &
+env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 9>&- &
 target=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e 'any(.[]; .title == \"drop-target\")' >/dev/null"
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"

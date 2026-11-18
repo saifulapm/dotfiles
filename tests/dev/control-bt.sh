@@ -50,7 +50,7 @@ check "with no adapter the page reads No Bluetooth ($(control_state | jq -c .emp
 timeout 0.5 qs ipc call control close
 until_ok 3000 state_is '.open == false'
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" 9>&- &
 fake_pid=$!
 cleanup() {
   bus call org.bluez "$headphones" org.bluez.Device1 Disconnect 2>/dev/null

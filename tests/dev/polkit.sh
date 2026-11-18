@@ -11,7 +11,7 @@ focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "do
 # busctl prints a string reply as s "<value>".
 result_is() { [ "$(fake Result s "$1" 2>/dev/null)" = "s \"$2\"" ]; }
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
 fake_pid=$!
 cleanup() { kill "$fake_pid" 2>/dev/null; }
 until_ok 3000 fake Registered >/dev/null 2>&1

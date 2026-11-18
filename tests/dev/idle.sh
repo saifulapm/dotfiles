@@ -87,7 +87,7 @@ check "the fresh steps dim 4 s after it ends" within "$dim_at" 3.5 4.9
 timeout 0.5 qs ipc call idle times 240 300 360 >/dev/null
 until_ok 2000 idle_is '.dimmed | not'
 
-env -u QS_CONFIG_PATH qs -p "$repo/dev/idle-inhibitor.qml" >/dev/null 2>&1 &
+env -u QS_CONFIG_PATH qs -p "$repo/dev/idle-inhibitor.qml" >/dev/null 2>&1 9>&- &
 inhibitor=$!
 cleanup() { kill "$inhibitor" 2>/dev/null; }
 shown() { niri msg -j windows | jq -e 'any(.[]; .title == "idle-inhibitor")' >/dev/null; }

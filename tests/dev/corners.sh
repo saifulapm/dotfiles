@@ -11,7 +11,7 @@ wayland-scanner private-code "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$b
 gcc -I"$b" -o "$b/pointer" "$repo/dev/pointer.c" "$b/protocol.c" -lwayland-client || exit 1
 read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
 mkfifo "$b/in"
-"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 &
+"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 9>&- &
 ptr=$!
 exec 7>"$b/in"
 cleanup() {

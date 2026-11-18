@@ -14,7 +14,7 @@ frag=$XDG_STATE_HOME/dots/theme-out/niri.kdl
 
 # niri's own stream counts its loads, so a quiet history is read only after niri has loaded what was written.
 events=$DOTS_DEV_DIR/config-events
-niri msg -j event-stream >"$events" 2>/dev/null &
+niri msg -j event-stream >"$events" 2>/dev/null 9>&- &
 stream=$!
 cleanup() { kill $stream 2>/dev/null; }
 loads() { grep -c '^{"ConfigLoaded"' "$events"; }

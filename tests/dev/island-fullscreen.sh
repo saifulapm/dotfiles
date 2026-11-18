@@ -32,9 +32,9 @@ niri msg action spawn -- foot -c /dev/null sh -c 'sleep 600'
 until_ok 5000 bash -c '[ "$(niri msg -j focused-window | jq -r .app_id)" = foot ]'
 niri msg action fullscreen-window
 until_ok 3000 island_is '.shown == false'
-"$repo/bin/dev-fake-mpris" Track Artist &
+"$repo/bin/dev-fake-mpris" Track Artist 9>&- &
 player=$!
-pw-record -P '{ application.name = "Rec" }' --raw - >/dev/null 2>&1 &
+pw-record -P '{ application.name = "Rec" }' --raw - >/dev/null 2>&1 9>&- &
 recs+=($!)
 notify-send hi
 sleep 1.5

@@ -52,7 +52,7 @@ until_ok 3000 links_null
 
 # A stream with no application name, and a capture stream linked to a sink's monitor, which gets no row.
 pw-cli create-node adapter '{ factory.name = support.null-audio-sink node.name = bare-stream node.description = "Bare stream" media.class = Stream/Output/Audio audio.position = [ FL FR ] node.autoconnect = true object.linger = true }' >/dev/null
-pw-record --target dots-null -P '{ application.name = "Test Recorder" stream.capture.sink = true }' --raw - >/dev/null 2>&1 &
+pw-record --target dots-null -P '{ application.name = "Test Recorder" stream.capture.sink = true }' --raw - >/dev/null 2>&1 9>&- &
 players+=($!)
 until_ok 3000 node_id node.name bare-stream >/dev/null
 until_ok 3000 node_id application.name "Test Recorder" >/dev/null

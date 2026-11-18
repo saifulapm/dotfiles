@@ -44,7 +44,7 @@ other_is() { [ "$(mpris org.mpris.MediaPlayer2.dotsfake PlaybackStatus | jq -r .
 
 systemctl --user stop youtube-audio 'youtube-video-*' 2>/dev/null
 # Registered first, so a key that falls back to the bus's first player reaches it and not the Queue.
-"$repo/bin/dev-fake-mpris" Other Artist &
+"$repo/bin/dev-fake-mpris" Other Artist 9>&- &
 other=$!
 until_ok 3000 other_is Playing
 busctl --user call org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Pause

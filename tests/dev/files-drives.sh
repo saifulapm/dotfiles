@@ -45,7 +45,7 @@ check "before the drive, no TESTUSB in the places ($(files_state | jq -c .places
 automounter=
 if ! pgrep -x udiskie >/dev/null && ! pgrep -f '[b]in/udiskie' >/dev/null; then
   exec_start=$(sed -n 's/^ExecStart=//p' "$repo/home/dot_config/systemd/user/udiskie.service")
-  env -u DBUS_SYSTEM_BUS_ADDRESS $exec_start >/dev/null 2>&1 &
+  env -u DBUS_SYSTEM_BUS_ADDRESS $exec_start >/dev/null 2>&1 9>&- &
   automounter=$!
   sleep 1
 fi

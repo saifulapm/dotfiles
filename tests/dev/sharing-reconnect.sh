@@ -14,7 +14,7 @@ niri msg action spawn -- foot -c /dev/null
 foot_open() { niri msg -j windows | jq -e 'any(.[]; .app_id == "foot")' >/dev/null; }
 until_ok 5000 foot_open
 
-wf-recorder -y -f "$DOTS_DEV_DIR/share.mp4" >/dev/null 2>&1 &
+wf-recorder -y -f "$DOTS_DEV_DIR/share.mp4" >/dev/null 2>&1 9>&- &
 wf=$!
 until_ok 3000 reads "LIVE SCREEN"
 check "a wf-recorder share reads LIVE SCREEN" reads "LIVE SCREEN"

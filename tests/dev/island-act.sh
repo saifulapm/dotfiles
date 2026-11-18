@@ -14,7 +14,7 @@ notifs() { timeout 0.5 qs ipc call notifs state 2>/dev/null; }
 in_history() { notifs | jq -e --arg s "$1" 'any(.summaries[]; . == $s)' >/dev/null; }
 
 # -w keeps notify-send waiting, and it prints the action it was told was invoked.
-notify-send -u critical -A default=Open -w "deploy done" >"$out" &
+notify-send -u critical -A default=Open -w "deploy done" >"$out" 9>&- &
 until_ok 2000 mode_is notification
 mod_i
 until_ok 2000 island_focus Exclusive

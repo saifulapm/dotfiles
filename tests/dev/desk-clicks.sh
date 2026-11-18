@@ -55,9 +55,9 @@ results=$DOTS_DEV_DIR/together
 mkdir -p "$results"
 clicks=()
 for i in 1 2 3 4; do
-  "$mouse" click $((hx + 200 + i * 10)) $((hy + 200)) >"$results/his$i" &
+  "$mouse" click $((hx + 200 + i * 10)) $((hy + 200)) >"$results/his$i" 9>&- &
   clicks+=($!)
-  "$mouse" click $((fx + 300 + i * 10)) $((fy + 300)) >"$results/ours$i" &
+  "$mouse" click $((fx + 300 + i * 10)) $((fy + 300)) >"$results/ours$i" 9>&- &
   clicks+=($!)
 done
 # By pid: a bare wait would wait for the nested session lib.sh runs in the background too.
@@ -88,7 +88,7 @@ import socket, sys
 s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(4)
 held = []
 while True: held.append(s.accept()[0])
-' "$mute" &
+' "$mute" 9>&- &
 mute_pid=$!
 cleanup() { kill "$mute_pid" 2>/dev/null; }
 mkdir -p "$DOTS_DEV_DIR/mutepath"

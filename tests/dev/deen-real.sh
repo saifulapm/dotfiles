@@ -38,7 +38,7 @@ printf 'ao=null\n' >"$work/mpv/mpv.conf"
 # 36:1's first word, recorded as the CDN's file would be, so Enter plays it without the network.
 ffmpeg -hide_banner -loglevel error -y -f lavfi -i sine=frequency=440:duration=30 "$work/cache/deen/audio/wbw/036_001_001.mp3"
 
-"$aladhan_bin" "$backend/tests/fixtures/aladhan-2026-10.json" "$work/aladhan.log" >"$work/aladhan.addr" 2>"$work/aladhan.err" &
+"$aladhan_bin" "$backend/tests/fixtures/aladhan-2026-10.json" "$work/aladhan.log" >"$work/aladhan.addr" 2>"$work/aladhan.err" 9>&- &
 aladhan_pid=$!
 until_ok 10000 test -s "$work/aladhan.addr"
 aladhan_url=http://127.0.0.1:$(head -1 "$work/aladhan.addr" | grep -oE '[0-9]+$')

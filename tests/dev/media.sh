@@ -7,7 +7,7 @@ until_ok 5000 shell_status >/dev/null
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 
-"$repo/bin/dev-fake-mpris" Track Artist &
+"$repo/bin/dev-fake-mpris" Track Artist 9>&- &
 player=$!
 cleanup() { kill "$player" 2>/dev/null; }
 until_ok 3000 mode_is playing

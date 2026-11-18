@@ -24,7 +24,7 @@ open_window() {
 act() {
   local summary=$1 key=$2
   shift 2
-  notify-send "$@" "$summary" >/dev/null &
+  notify-send "$@" "$summary" >/dev/null 9>&- &
   until_ok 2000 shows "$summary"
   mod_i
   wtype -k "$key"

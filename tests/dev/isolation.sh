@@ -78,7 +78,7 @@ check "the live tmux does not list dots-iso" eval '! live_tmux_lists'
 activatable() { gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus --method org.freedesktop.DBus.ListActivatableNames | grep -qF "'org.freedesktop.impl.portal.desktop.dots'"; }
 check "the nested bus can start dots-portal" activatable
 picker_open() { dots-call picker state | jq -e '.open' >/dev/null; }
-gdbus call --session --timeout 20 --dest org.freedesktop.impl.portal.desktop.dots --object-path /org/freedesktop/portal/desktop --method org.freedesktop.impl.portal.FileChooser.OpenFile /org/freedesktop/portal/desktop/request/1_1/iso '' '' 'Open File' '{}' >/dev/null 2>&1 &
+gdbus call --session --timeout 20 --dest org.freedesktop.impl.portal.desktop.dots --object-path /org/freedesktop/portal/desktop --method org.freedesktop.impl.portal.FileChooser.OpenFile /org/freedesktop/portal/desktop/request/1_1/iso '' '' 'Open File' '{}' >/dev/null 2>&1 9>&- &
 caller=$!
 check "a FileChooser call on the nested bus opens the nested shell's picker" until_ok 5000 picker_open
 wtype -k Escape

@@ -9,7 +9,7 @@ scripts=$repo/home/dot_claude/skills/desktop/scripts
 screen=$scripts/screen
 # pkexec always reaches the live polkitd, so a fake authority on the nested bus asks the nested shell's agent instead.
 fake() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" call org.freedesktop.PolicyKit1 /org/freedesktop/PolicyKit1/Authority org.dots.FakePolkit "$@"; }
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
 fake_pid=$! pin_pid=
 cleanup() { kill "$fake_pid" $pin_pid 2>/dev/null; }
 until_ok 3000 fake Registered >/dev/null 2>&1
@@ -58,7 +58,7 @@ check "once it closes, the same screen type reaches the launched foot again" unt
 
 # A pinentry card from bin/dots-pinentry, held open by a GETPIN on its stdin.
 mkfifo "$DOTS_DEV_DIR/pin.in"
-"$repo/bin/dots-pinentry" <"$DOTS_DEV_DIR/pin.in" >"$DOTS_DEV_DIR/pin.out" &
+"$repo/bin/dots-pinentry" <"$DOTS_DEV_DIR/pin.in" >"$DOTS_DEV_DIR/pin.out" 9>&- &
 pin_pid=$!
 exec 9>"$DOTS_DEV_DIR/pin.in"
 echo GETPIN >&9

@@ -30,7 +30,7 @@ read_shot() {
 }
 stamps=()
 start=$(now_ms)
-"$repo/bin/dots" colorscheme rose-pine-dawn >/dev/null &
+"$repo/bin/dots" colorscheme rose-pine-dawn >/dev/null 9>&- &
 pid=$!
 n=0
 while (($(now_ms) - start < 3000)); do

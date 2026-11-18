@@ -30,7 +30,7 @@ in_view() { centre_is '.cursorBox.y >= .listBox.y and .cursorBox.y + .cursorBox.
 until_ok 5000 shell_status >/dev/null
 
 # notify-send -A waits for an action and prints its key; the newer row, with no action, is the one selected.
-notify-send -a T -A default=Open -A later=Later older >"$out" &
+notify-send -a T -A default=Open -A later=Later older >"$out" 9>&- &
 sender=$!
 until_ok 2000 centre_is '.count == 1'
 notify-send -a T newer
@@ -50,7 +50,7 @@ sender=
 
 # A press that moves a few pixels and lets go short of the drag threshold is a click, not a drop.
 : >"$out"
-notify-send -a T -A default=Open -A later=Later jittered >"$out" &
+notify-send -a T -A default=Open -A later=Later jittered >"$out" 9>&- &
 sender=$!
 until_ok 2000 centre_is '.count == 2'
 until_ok 15000 island_rest
@@ -66,7 +66,7 @@ kill "$sender" 2>/dev/null
 wait "$sender" 2>/dev/null
 # A click on the selected row's chip runs that chip's action, as its number does, not the default.
 : >"$out"
-notify-send -a T -A default=Open -A later=Later chipped >"$out" &
+notify-send -a T -A default=Open -A later=Later chipped >"$out" 9>&- &
 sender=$!
 until_ok 2000 centre_is 'any(.summaries[]; . == "chipped")'
 until_ok 15000 island_rest

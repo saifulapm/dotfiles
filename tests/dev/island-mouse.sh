@@ -119,7 +119,7 @@ until_ok 2000 mode_is rest
 check "Esc closes it" mode_is rest
 
 # A notification's click still opens the notification: its default action runs and the calendar never opens.
-notify-send -a T -A default=Open "click me" >"$out" &
+notify-send -a T -A default=Open "click me" >"$out" 9>&- &
 sender=$!
 until_ok 2000 mode_is notification
 click_island
@@ -140,7 +140,7 @@ fake_event '{"CastStopped":{"stream_id":3001}}' >/dev/null
 until_ok 3000 mode_is rest
 
 # A paused player is nothing live: a click opens the calendar, never the media card.
-"$repo/bin/dev-fake-mpris" Track Artist &
+"$repo/bin/dev-fake-mpris" Track Artist 9>&- &
 player=$!
 until_ok 3000 mode_is playing
 busctl --user call org.mpris.MediaPlayer2.dotsfake /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player Pause

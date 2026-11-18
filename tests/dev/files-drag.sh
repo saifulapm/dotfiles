@@ -28,7 +28,7 @@ wayland-scanner private-code "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$b
 gcc -I"$b" -o "$b/pointer" "$repo/dev/pointer.c" "$b/protocol.c" -lwayland-client || exit 1
 read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
 mkfifo "$b/in"
-"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 &
+"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 9>&- &
 ptr=$!
 exec 7>"$b/in"
 done_count() { grep -c "^done $1" "$b/log"; }
@@ -44,7 +44,7 @@ point() {
 origin() { niri msg -j windows | jq -r --arg t "$1" '.[] | select(.app_id == $t or .title == $t) | .layout | "\((.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]) | floor) \((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor)"'; }
 
 export DROP_OUT=$DOTS_DEV_DIR/drops.json
-env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 &
+env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 9>&- &
 target=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e 'any(.[]; .title == \"drop-target\")' >/dev/null"
 niri msg action spawn -- sh -c "HOME='$h' XDG_CONFIG_HOME='$h/.config' DOTS_FILES_SORT=name exec dots-files >>'$log' 2>&1"

@@ -12,7 +12,7 @@ result_is() { [ "$(fake Result s "$1" 2>/dev/null)" = "s \"$2\"" ]; }
 pin_state() { timeout 0.5 dots-call pinentry state 2>/dev/null; }
 pin_is() { pin_state | jq -e "$1" >/dev/null 2>&1; }
 out=$(mktemp -d)
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-polkit" 9>&- &
 fake_pid=$!
 cleanup() {
   pointer_stop
@@ -37,14 +37,14 @@ check "a click on its esc chip cancels the request" result_is m1 org.freedesktop
 until_ok 2000 pk_is '.open | not'
 check "and the prompt closes" pk_is '.open | not'
 
-printf 'SETDESC typed-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' | "$repo/bin/dots-pinentry" >"$out/typed.assuan" &
+printf 'SETDESC typed-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/typed.assuan" 9>&- &
 until_ok 3000 pin_is '.open and .description == "typed-request"'
 wtype one
 click_box pinentry-key:0
 until_ok 3000 grep -qx 'D one' "$out/typed.assuan"
 check "a click on pinentry's ↵ chip answers with what was typed" grep -qx 'D one' "$out/typed.assuan"
 
-printf 'SETDESC confirm-request\nCONFIRM\nBYE\n' | "$repo/bin/dots-pinentry" >"$out/confirm.assuan" &
+printf 'SETDESC confirm-request\nCONFIRM\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/confirm.assuan" 9>&- &
 until_ok 3000 pin_is '.open and .description == "confirm-request"'
 click_box pinentry-key:0
 # Allowed, CONFIRM answers OK; denied, it answers ERR, and gpg reads OK closing connection only once the card has answered.
@@ -52,7 +52,7 @@ allowed=$'OK Pleased to meet you\nOK\nOK\nOK closing connection'
 until_ok 3000 grep -q '^OK closing connection' "$out/confirm.assuan"
 check "a click on a confirm card's ↵ allow chip allows it ($(tr '\n' ' ' <"$out/confirm.assuan"))" test "$(cat "$out/confirm.assuan")" = "$allowed"
 
-printf 'SETDESC cancel-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' | "$repo/bin/dots-pinentry" >"$out/cancel.assuan" &
+printf 'SETDESC cancel-request\nSETPROMPT Secret:\nGETPIN\nBYE\n' 9>&- | "$repo/bin/dots-pinentry" >"$out/cancel.assuan" 9>&- &
 until_ok 3000 pin_is '.open and .description == "cancel-request"'
 click_box pinentry-key:1
 until_ok 3000 grep -q '^ERR 83886179' "$out/cancel.assuan"

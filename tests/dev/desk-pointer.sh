@@ -84,7 +84,7 @@ turned_now() { read -r _ _ _ _ v < <(slider 1); [ "$v" != "$turned" ]; }
 check "screen scroll over the second scale turns it from $turned" until_ok 2000 turned_now
 
 # A window that reports where the pointer is, entering or moving: fullscreen, so its surface starts at (0,0).
-python3 - "$DOTS_DEV_DIR/where" <<'EOF' &
+python3 - "$DOTS_DEV_DIR/where" 9>&- <<'EOF' &
 import sys, gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk

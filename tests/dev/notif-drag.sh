@@ -43,7 +43,7 @@ wayland-scanner private-code "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$b
 gcc -I"$b" -o "$b/pointer" "$repo/dev/pointer.c" "$b/protocol.c" -lwayland-client || exit 1
 read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
 mkfifo "$b/in"
-"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 &
+"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 9>&- &
 ptr=$!
 exec 7>"$b/in"
 done_count() { grep -c "^done $1" "$b/log"; }
@@ -58,7 +58,7 @@ point() {
 }
 
 export DROP_OUT=$DOTS_DEV_DIR/drops.json
-env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 &
+env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 9>&- &
 target=$!
 target_up() { niri msg -j windows | jq -e 'any(.[]; .title == "drop-target")' >/dev/null; }
 until_ok 5000 target_up
@@ -174,7 +174,7 @@ close_centre
 
 # A click on an action chip runs that action, and the card's own click, the default action, does not run as well. Only a resident notification is still there to take both, and notify-send prints only the first, so a resident one is sent and the bus is read.
 acted=$DOTS_DEV_DIR/acted
-gdbus monitor --session --dest org.freedesktop.Notifications >"$acted" &
+gdbus monitor --session --dest org.freedesktop.Notifications >"$acted" 9>&- &
 monitor=$!
 gdbus call --session --dest org.freedesktop.Notifications --object-path /org/freedesktop/Notifications \
   --method org.freedesktop.Notifications.Notify T 0 "" "click me" "" '["default", "Open", "yes", "Yes"]' '{"resident": <true>}' 0 >/dev/null
@@ -189,7 +189,7 @@ check "a click on [1] Yes invokes yes alone, not default ($(invoked))" test "$(i
 kill "$monitor"
 
 # The file chip still drags with action chips beside it; notify-send -A waits for an action, so it is let go after.
-notify-send -a Tailscale -h "string:x-dots-files:$heic" -A open=Open -A save=Save "Taildrop · acts" "${heic##*/}" >/dev/null &
+notify-send -a Tailscale -h "string:x-dots-files:$heic" -A open=Open -A save=Save "Taildrop · acts" "${heic##*/}" >/dev/null 9>&- &
 sender=$!
 toast_for "Taildrop · acts"
 check "a file notification with actions draws its chips ($(island | jq -c .note.actions))" note_is '(.note.actions | length) == 2'

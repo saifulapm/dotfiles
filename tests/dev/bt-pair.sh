@@ -45,7 +45,7 @@ speaker=$(dev 3)
 nameless=$(dev 7)
 prop_is() { [ "$(bus get-property org.bluez "$1" org.bluez.Device1 "$2" 2>/dev/null)" = "b $3" ]; }
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" 9>&- &
 fake_pid=$!
 fake_up() { bus status org.bluez >/dev/null 2>&1; }
 until_ok 5000 fake_up
@@ -55,7 +55,7 @@ surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-sur
 until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 # The agent asks the nested shell, by this session's WAYLAND_DISPLAY, and gives up on a request in 32 s rather than 60: past D-Bus's 25 s default, which once ended a pair early.
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS DOTS_BT_AGENT_TIMEOUT_S=32 "$repo/bin/dots-bt-agent" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS DOTS_BT_AGENT_TIMEOUT_S=32 "$repo/bin/dots-bt-agent" 9>&- &
 agent_pid=$!
 cleanup() {
   kill "$agent_pid" "$fake_pid" 2>/dev/null

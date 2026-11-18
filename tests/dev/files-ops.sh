@@ -98,7 +98,7 @@ wtype /setup
 wtype -k Return
 wtype y
 go down /Downloads
-( for _ in $(seq 2000); do op=$(pgrep -f '[d]ots-files-op (copy|move)') && { kill -STOP $op; echo "$op" >"$work/op.pid"; exit; }; done ) &
+( for _ in $(seq 2000); do op=$(pgrep -f '[d]ots-files-op (copy|move)') && { kill -STOP $op; echo "$op" >"$work/op.pid"; exit; }; done ) 9>&- &
 wtype p
 until_ok 5000 test -s "$work/op.pid"
 # Stopped before it summed its sources, the op runs in slices of well under a millisecond until the line has a size.

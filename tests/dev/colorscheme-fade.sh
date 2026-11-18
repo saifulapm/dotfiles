@@ -27,7 +27,7 @@ at=0 kinds=()
 for k in 1 2 3 4; do
   for _ in 1 2 3 4 5; do
     next=$(((at + k) % 5))
-    "$repo/bin/dots" colorscheme "${schemes[next]}" >/dev/null &
+    "$repo/bin/dots" colorscheme "${schemes[next]}" >/dev/null 9>&- &
     pid=$!
     kind=""
     for _ in $(seq 60); do

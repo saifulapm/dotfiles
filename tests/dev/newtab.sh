@@ -52,7 +52,7 @@ date_line() { LC_ALL=C date '+%A %-d %B %Y'; }
 names=(Alpha Bravo Charlie Delta Echo Foxtrot Golf)
 for n in "${names[@]}"; do echo "<title>$n</title><p>$n</p>" >"$work/site/${n,,}.html"; done
 port=$((20000 + RANDOM % 10000))
-python3 -m http.server --bind 127.0.0.1 --directory "$work/site" "$port" >/dev/null 2>&1 &
+python3 -m http.server --bind 127.0.0.1 --directory "$work/site" "$port" >/dev/null 2>&1 9>&- &
 server=$!
 site() { echo "http://127.0.0.1:$port/${1,,}.html"; }
 dport=$((30000 + RANDOM % 10000))

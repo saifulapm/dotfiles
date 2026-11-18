@@ -34,7 +34,7 @@ printf 'ao=null\n' >"$work/mpv/mpv.conf"
 ffmpeg -hide_banner -loglevel error -y -f lavfi -i testsrc=duration=120:size=640x360:rate=25 \
   -f lavfi -i sine=frequency=440:duration=120 -c:v libx264 -preset ultrafast -c:a aac -shortest "$work/clip.mkv"
 # The seeder sends 1.5 MB a second, so the 3.8 MB clip buffers over about 3 s and Starting is drawn long enough to read.
-"$fake_bin" --clip "$work/clip.mkv" --series --upload-bps 1500000 >"$work/hello" 2>"$work/fake.log" &
+"$fake_bin" --clip "$work/clip.mkv" --series --upload-bps 1500000 >"$work/hello" 2>"$work/fake.log" 9>&- &
 fake_pid=$!
 until_ok 30000 test -s "$work/hello"
 base=$(jq -r .base "$work/hello")

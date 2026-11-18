@@ -31,7 +31,7 @@ compose() {
 }
 
 export DROP_OUT=$DOTS_DEV_DIR/drops.json
-env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 &
+env -u QS_CONFIG_PATH qs -p "$repo/dev/drop-target.qml" >"$DOTS_DEV_DIR/drop-target.log" 2>&1 9>&- &
 target=$!
 cleanup() {
   pointer_stop

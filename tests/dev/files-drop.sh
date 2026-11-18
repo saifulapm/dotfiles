@@ -29,7 +29,7 @@ wayland-scanner private-code "$repo/dev/wlr-virtual-pointer-unstable-v1.xml" "$b
 gcc -I"$b" -o "$b/pointer" "$repo/dev/pointer.c" "$b/protocol.c" -lwayland-client || exit 1
 read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
 mkfifo "$b/in"
-"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 &
+"$b/pointer" "$ow" "$oh" <"$b/in" >"$b/log" 2>&1 9>&- &
 ptr=$!
 exec 7>"$b/in"
 done_count() { grep -c "^done $1" "$b/log"; }
@@ -44,12 +44,12 @@ point() {
 # Where a window's content starts on the output, from niri's layout.
 origin() { niri msg -j windows | jq -r --arg t "$1" '.[] | select(.app_id == $t or .title == $t) | .layout | "\((.tile_pos_in_workspace_view[0] + .window_offset_in_tile[0]) | floor) \((.tile_pos_in_workspace_view[1] + .window_offset_in_tile[1]) | floor)"'; }
 
-env -u QS_CONFIG_PATH DRAG_FILES="$(cat "$work/offer")" qs -p "$repo/dev/drag-source.qml" >"$DOTS_DEV_DIR/drag-source.log" 2>&1 &
+env -u QS_CONFIG_PATH DRAG_FILES="$(cat "$work/offer")" qs -p "$repo/dev/drag-source.qml" >"$DOTS_DEV_DIR/drag-source.log" 2>&1 9>&- &
 source=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e '[.[] | select(.title == \"drag-source\")] | length == 1' >/dev/null"
 first_source=$(niri msg -j windows | jq -r '.[] | select(.title == "drag-source") | .id')
 # A second source offers 500 files at once.
-env -u QS_CONFIG_PATH DRAG_FILES="$(ls "$work"/chromium/many-*.txt)" qs -p "$repo/dev/drag-source.qml" >"$DOTS_DEV_DIR/drag-source-500.log" 2>&1 &
+env -u QS_CONFIG_PATH DRAG_FILES="$(ls "$work"/chromium/many-*.txt)" qs -p "$repo/dev/drag-source.qml" >"$DOTS_DEV_DIR/drag-source-500.log" 2>&1 9>&- &
 source500=$!
 until_ok 5000 bash -c "niri msg -j windows | jq -e '[.[] | select(.title == \"drag-source\")] | length == 2' >/dev/null"
 many_source=$(niri msg -j windows | jq -r --argjson f "$first_source" '.[] | select(.title == "drag-source" and .id != $f) | .id')

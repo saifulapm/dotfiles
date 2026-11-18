@@ -350,12 +350,34 @@ export function foregroundActionSends(text) {
   return found;
 }
 
+// island-control.sh's fake NetworkManager, started with &, kept the nested-check lock's fd 9 past the check, and every later check waited on the lock.
+export function backgroundWithLock(text) {
+  const found = [];
+  text.split('\n').forEach((line, i) => {
+    const code = line.replace(/(^|\s)#.*$/, '');
+    if (/(^|[^&;|>])&\s*$/.test(code) && !/9>&-/.test(code)) found.push(i + 1);
+  });
+  return found;
+}
+
 test('the fake and notify-send lints catch the shapes that broke the island checks', () => {
   assert.deepEqual(fakesWithoutShebang('cat >"$fake/mem" <<EOF\nprintf hi\nEOF\nchmod +x "$fake/mem"\n'), [1]);
   assert.deepEqual(fakesWithoutShebang("printf 'echo hi\\n' >\"$f/claude\"\nchmod +x \"$f/claude\"\n"), [1]);
   assert.deepEqual(fakesWithoutShebang('cat >"$fake/mem" <<EOF\n#!/bin/sh\nEOF\nchmod +x "$fake/mem"\n'), []);
   assert.deepEqual(foregroundActionSends('notify-send -t 0 -A ok=OK "Deploy?" >/dev/null\n'), [1]);
   assert.deepEqual(foregroundActionSends('notify-send -t 0 -A ok=OK "Deploy?" >/dev/null &\n# notify-send -A waits\n'), []);
+  assert.deepEqual(backgroundWithLock('"$fake/NetworkManager" >"$log" 2>&1 &\nfake_pid=$!\n'), [1]);
+  assert.deepEqual(backgroundWithLock('sleep 30 & # held\n'), [1]);
+  assert.deepEqual(backgroundWithLock('"$fake/NetworkManager" >"$log" 2>&1 9>&- &\nsleep 30 9>&- & # held\n'), []);
+  assert.deepEqual(backgroundWithLock('a && b &&\n  c\ncase $x in a) b ;& c) d ;;& esac\n'), []);
+});
+
+test('every background process a tests/dev script starts closes the nested-check lock fd 9', () => {
+  const found = [];
+  for (const f of readdirSync(dir).filter((f) => f.endsWith('.sh'))) {
+    for (const n of backgroundWithLock(readFileSync(dir + f, 'utf8'))) found.push(`${f}:${n}`);
+  }
+  assert.deepEqual(found, [], 'add 9>&- to the command before its &');
 });
 
 test('every fake a tests/dev script marks executable starts with #!, and every notify-send -A runs in the background', () => {

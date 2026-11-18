@@ -90,7 +90,7 @@ check "three sends in one stack leave one Download in the history ($(held Downlo
 sleep 1
 check "and its card stays on the island, full ($(note bar))" state_is '.mode == "notification" and .note.bar == 20'
 # The older object's close comes as the newer one takes its key, and must leave the newer one's actions live.
-notify-send -a dl -h string:x-dunst-stack-tag:dl -A yes=Yes Download >/dev/null &
+notify-send -a dl -h string:x-dunst-stack-tag:dl -A yes=Yes Download >/dev/null 9>&- &
 sender=$!
 check "a stacked send keeps its action chip ($(note actions))" until_ok 2000 state_is '.note.actions | length == 1'
 kill "$sender"
@@ -105,7 +105,7 @@ done
 check "x-canonical-private-synchronous keeps one too ($(held Volume))" test "$(held Volume)" = 1
 # The older one's app hears it closed as expired, reason 1, not as dismissed by the user.
 bus=$(mktemp)
-gdbus monitor --session --dest org.freedesktop.Notifications >"$bus" &
+gdbus monitor --session --dest org.freedesktop.Notifications >"$bus" 9>&- &
 monitor=$!
 cleanup() { kill "$monitor" 2>/dev/null; rm -f "$pic" "$bus"; }
 first=$(notify-send -p -a vol -h string:x-canonical-private-synchronous:volume Volume)

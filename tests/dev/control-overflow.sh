@@ -28,11 +28,11 @@ long="Built-in Audio Digital Stereo (HDMI) Output + Analog Stereo Input on HDMI 
 until_ok 5000 shell_status >/dev/null
 pw-cli create-node adapter "{ factory.name = support.null-audio-sink node.name = dots-long node.description = \"$long\" media.class = Audio/Sink audio.position = [ FL FR ] object.linger = true }" >/dev/null
 until_ok 3000 node_id node.name dots-long >/dev/null
-pw-play --target dots-long -P '{ application.name = "Wide Player" node.name = wide-player }' --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null &
+pw-play --target dots-long -P '{ application.name = "Wide Player" node.name = wide-player }' --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null 9>&- &
 players+=($!)
 until_ok 3000 node_id application.name "Wide Player" >/dev/null
 both="A Player Whose Own Name Runs On Far Past Half Of The Row Here"
-pw-play --target dots-long -P "{ application.name = \"$both\" node.name = both-player }" --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null &
+pw-play --target dots-long -P "{ application.name = \"$both\" node.name = both-player }" --raw --rate 48000 --channels 2 --format s16 - </dev/zero 2>/dev/null 9>&- &
 players+=($!)
 until_ok 3000 node_id application.name "$both" >/dev/null
 

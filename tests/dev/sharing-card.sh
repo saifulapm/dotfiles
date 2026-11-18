@@ -26,7 +26,7 @@ cleanup() {
   [ -z "$named" ] || kill "$named" 2>/dev/null
 }
 
-wf-recorder -y -f "$DOTS_DEV_DIR/share.mp4" >/dev/null 2>&1 &
+wf-recorder -y -f "$DOTS_DEV_DIR/share.mp4" >/dev/null 2>&1 9>&- &
 wf=$!
 until_ok 3000 reads "LIVE SCREEN"
 mod_i
@@ -93,7 +93,7 @@ window_of() { niri msg -j windows | jq -e --arg a "$1" 'first(.[] | select(.app_
 until_ok 5000 window_of "$long" >/dev/null
 cast 2007 2007 "{\"Window\":{\"id\":$(window_of "$long")}}"
 # comm holds 15 bytes, room for a newline, U+202E and an ESC sequence, written at once: bash's printf would end the name at its newline.
-python3 -c 'import os, time; fd = os.open("/proc/self/comm", os.O_WRONLY); os.write(fd, "a\nb\u202e\x1b[31m".encode()); time.sleep(600)' &
+python3 -c 'import os, time; fd = os.open("/proc/self/comm", os.O_WRONLY); os.write(fd, "a\nb\u202e\x1b[31m".encode()); time.sleep(600)' 9>&- &
 named=$!
 cast 2008 2008 "$SCREEN" WlrScreencopy "$named"
 until_ok 2000 reads "LIVE ×2"

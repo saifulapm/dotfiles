@@ -15,7 +15,7 @@ mode_is() { island | jq -e --arg m "$1" '.mode == $m' >/dev/null 2>&1; }
 bus() { busctl --address="$DBUS_SESSION_BUS_ADDRESS" "$@"; }
 headphones=/org/bluez/hci0/dev_00_00_00_00_00_02
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" 9>&- &
 fake_pid=$!
 cleanup() {
   bus call org.bluez "$headphones" org.bluez.Device1 Disconnect 2>/dev/null

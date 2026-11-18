@@ -25,7 +25,7 @@ state_is() { pin_state | jq -e "$1" >/dev/null; }
 focus_is() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 # Not in a subshell, so its pid stays this shell's child for wait.
 show_bg() {
-  pass show web/github.com >"$out/$1.out" 2>"$out/$1.err" &
+  pass show web/github.com >"$out/$1.out" 2>"$out/$1.err" 9>&- &
   pid=$!
 }
 exited() { ! kill -0 "$1" 2>/dev/null; }
@@ -102,7 +102,7 @@ check "the first got its passphrase and the second its cancel" bash -c "grep -qx
 
 # gpg's error is the agent's text: one too long for the card is cut short inside it.
 long=$(printf 'A%.0s' $(seq 200))
-printf 'SETDESC long error\nSETERROR %s\nGETPIN\nBYE\n' "$long" | "$repo/bin/dots-pinentry" >/dev/null &
+printf 'SETDESC long error\nSETERROR %s\nGETPIN\nBYE\n' "$long" 9>&- | "$repo/bin/dots-pinentry" >/dev/null 9>&- &
 p=$!
 until_ok 3000 state_is '.open and .settled and .error != ""'
 check "a 200-character error is cut short inside the card ($(pin_state | jq -c '[.errorTruncated, .errorRight, (.cardBox.x + .cardBox.w)]'))" state_is '.errorTruncated and .errorRight <= .cardBox.x + .cardBox.w - 19'

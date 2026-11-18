@@ -36,7 +36,7 @@ disconnect() { bus call org.bluez "$1" org.bluez.Device1 Disconnect; }
 # -- keeps a battery of -1 from reading as an option.
 battery() { bus call -- org.bluez /org/bluez org.dots.FakeBluez SetBattery oi "$1" "$2"; }
 
-DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" &
+DBUS_SYSTEM_BUS_ADDRESS=$DBUS_SESSION_BUS_ADDRESS "$repo/bin/dev-fake-bluez" 9>&- &
 fake_pid=$!
 cleanup() {
   timeout 0.5 qs ipc call notifs dnd false >/dev/null 2>&1

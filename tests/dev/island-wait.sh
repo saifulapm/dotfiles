@@ -173,7 +173,7 @@ check "and no second copy follows it" test "$saw" = no
 
 # 10. A track starting while the sheet is open lights the dot as one, then plays after Esc.
 sheet_open
-"$repo/bin/dev-fake-mpris" Track Artist &
+"$repo/bin/dev-fake-mpris" Track Artist 9>&- &
 player=$!
 until_ok 3000 island_is '.waiting == 1'
 check "a track starting while the sheet is open lights the dot ($(island | jq -c '{waiting, dot}'))" island_is '.waiting == 1 and .dot != null and .surface == "cheatsheet"'

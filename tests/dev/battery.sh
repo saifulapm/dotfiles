@@ -11,7 +11,7 @@ just_date() { margins | jq -e --arg d "$today" '.right.text == $d' >/dev/null; }
 echo "     margins with no UPower or NetworkManager: $(margins | jq -c .right)"
 check "the top-right is just the date ($today)" just_date
 
-"$repo/bin/dev-fake-upower" &
+"$repo/bin/dev-fake-upower" 9>&- &
 fake_pid=$!
 cleanup() { kill "$fake_pid" 2>/dev/null; }
 fake_up() { busctl --user status org.freedesktop.UPower >/dev/null 2>&1; }

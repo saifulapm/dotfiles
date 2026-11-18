@@ -15,7 +15,7 @@ answers=$(mktemp)
 cleanup() { rm -f "$answers"; }
 
 until_ok 3000 island_is '.mode == "rest"'
-notify-send -A yes=Yes -A no=No "Deploy?" >"$answers" &
+notify-send -A yes=Yes -A no=No "Deploy?" >"$answers" 9>&- &
 settled '.mode == "notification"'
 echo "     note: $(island | jq -c '.note | {summary, app, age, buttons}')"
 check "the card is 440 px wide ($(island | jq .width))" island_is '.width == 440'

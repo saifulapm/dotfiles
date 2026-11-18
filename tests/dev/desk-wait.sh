@@ -8,7 +8,7 @@ window_of() { niri msg -j windows | jq -r ".[] | select(.app_id == \"$1\") | .id
 
 # Started first; the factory launches a second later.
 t0=$(now_ms)
-"$screen" wait window-open --app org.gtk.WidgetFactory4 >"$DOTS_DEV_DIR/open.json" &
+"$screen" wait window-open --app org.gtk.WidgetFactory4 >"$DOTS_DEV_DIR/open.json" 9>&- &
 waiter=$!
 sleep 1
 launched=$(now_ms)
@@ -33,7 +33,7 @@ titled_up() { [ "$(niri msg -j windows | jq -r '.[] | select(.app_id == "titled"
 until_ok 5000 titled_up
 titled=$(window_of titled)
 had=$(niri msg -j windows | jq -r ".[] | select(.id == $titled) | .title")
-"$screen" wait title --id "$titled" --matches 'x$' >"$DOTS_DEV_DIR/title.json" &
+"$screen" wait title --id "$titled" --matches 'x$' >"$DOTS_DEV_DIR/title.json" 9>&- &
 waiter=$!
 sleep 0.5
 touch "$DOTS_DEV_DIR/go"
@@ -41,14 +41,14 @@ wait "$waiter"
 out=$(cat "$DOTS_DEV_DIR/title.json")
 check "a title wait on a foot titled '$had' returns when it ends in x: $out" bash -c "[ '$had' = working ] && jq -e '.already == false and .window.title == \"all done x\"' <<<'$out' >/dev/null"
 
-"$screen" wait focus --id "$factory" >"$DOTS_DEV_DIR/focus.json" &
+"$screen" wait focus --id "$factory" >"$DOTS_DEV_DIR/focus.json" 9>&- &
 waiter=$!
 sleep 0.5
 niri msg action focus-window --id "$factory"
 wait "$waiter"
 check "a focus wait returns when the factory takes focus" jq -e ".window.id == $factory and .window.focused" "$DOTS_DEV_DIR/focus.json"
 
-"$screen" wait workspace 2 >"$DOTS_DEV_DIR/ws.json" &
+"$screen" wait workspace 2 >"$DOTS_DEV_DIR/ws.json" 9>&- &
 waiter=$!
 sleep 0.5
 niri msg action focus-workspace 2
@@ -56,7 +56,7 @@ wait "$waiter"
 check "a workspace wait returns on focus-workspace 2" jq -e '.already == false and .workspace.idx == 2' "$DOTS_DEV_DIR/ws.json"
 niri msg action focus-workspace 1
 
-"$screen" wait overview open >"$DOTS_DEV_DIR/overview.json" &
+"$screen" wait overview open >"$DOTS_DEV_DIR/overview.json" 9>&- &
 waiter=$!
 sleep 0.5
 niri msg action open-overview
@@ -64,7 +64,7 @@ wait "$waiter"
 check "an overview wait returns after open-overview" jq -e '.already == false and .overview == "open"' "$DOTS_DEV_DIR/overview.json"
 niri msg action close-overview
 
-"$screen" wait window-closed --id "$titled" >"$DOTS_DEV_DIR/closed.json" &
+"$screen" wait window-closed --id "$titled" >"$DOTS_DEV_DIR/closed.json" 9>&- &
 waiter=$!
 sleep 0.5
 niri msg action close-window --id "$titled"

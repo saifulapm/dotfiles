@@ -16,7 +16,7 @@ cleanup() { rm -f "$polled" "$polled.on"; }
 # Polls island state every 20 ms into $polled, one [surface, drawn width] a line, until $polled.on goes.
 poll() {
   : >"$polled.on"
-  (while [ -f "$polled.on" ]; do island | jq -c '[.surface, .drawn]' >>"$polled"; sleep 0.02; done) &
+  (while [ -f "$polled.on" ]; do island | jq -c '[.surface, .drawn]' >>"$polled"; sleep 0.02; done) 9>&- &
   poller=$!
 }
 unpoll() { rm -f "$polled.on"; wait "$poller" 2>/dev/null; }

@@ -83,7 +83,7 @@ check "the foot server's recorder has ended ($(island | jq -r .text))" mode_is r
 niri msg action spawn -- foot -c /dev/null -T plain
 until_ok 5000 has_win plain
 other_pid=$(niri msg -j windows | jq -r 'first(.[] | select(.title == "other") | .pid)')
-pw-record -P "{ application.name = Loner node.name = test-loner application.process.id = $other_pid }" --raw - >/dev/null 2>&1 &
+pw-record -P "{ application.name = Loner node.name = test-loner application.process.id = $other_pid }" --raw - >/dev/null 2>&1 9>&- &
 rec=$!
 until_ok 3000 reads "● MIC · Loner"
 check "a windowless recorder claiming other's process reads ● MIC · Loner ($(island | jq -r .text))" reads "● MIC · Loner"

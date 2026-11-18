@@ -23,9 +23,9 @@ for i in 1 2 3 4 5; do
 done
 
 # Two switches at once take turns on the lock, and the desktop ends wholly in the one that ran last.
-"$repo/bin/dots" colorscheme gruvbox-dark >/dev/null &
+"$repo/bin/dots" colorscheme gruvbox-dark >/dev/null 9>&- &
 first=$!
-"$repo/bin/dots" colorscheme rose-pine-dawn >/dev/null &
+"$repo/bin/dots" colorscheme rose-pine-dawn >/dev/null 9>&- &
 second=$!
 wait "$first"
 rc1=$?
