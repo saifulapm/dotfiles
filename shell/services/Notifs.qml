@@ -252,7 +252,7 @@ Scope {
         if (runAction(key, "default"))
             return true;
         const e = history.find(h => h.key === key) ?? (current?.key === key ? current : null);
-        if (e?.app !== "Mail")
+        if (e?.app !== "Mail" || (e.actions ?? []).length > 0)
             return false;
         Quickshell.execDetached([Quickshell.env("DOTS_MAIL_OPEN") || Quickshell.shellDir + "/bin/mail-open", e.mailThread ? "thread:" + e.mailThread : "Imbox"]);
         return true;

@@ -66,3 +66,12 @@ test('an image clip is marked for its thumbnail, and a text clip of one hex colo
   const rows = clipRows('8\t#C8381E\n7\t[[ binary data 12 KiB png 640x480 ]]\n6\t#C8381E is red\n5\t#c8381e\n', '', db);
   assert.deepEqual(rows.map((r) => [r.image, r.swatch]), [[false, '#C8381E'], [true, ''], [false, ''], [false, '#c8381e']]);
 });
+
+test('a pinned clip lists as pinned and pastes from its own file, with the terminals as its second argument', () => {
+  const [pin, clip] = clipRows('pin:17\tkept\n12\tsecond\n', '', db);
+  assert.deepEqual([pin.id, pin.pinned, pin.file, clip.pinned], ['pin:17', true, '/state/dots/clip-pins/17', false]);
+  assert.deepEqual(pin.exec.slice(3), ['sh', '/state/dots/clip-pins/17', TERMINALS.join(' ')]);
+  assert.match(pin.exec[2], /^wl-copy <"\$1"; .*case " \$2 " in/);
+  assert.deepEqual(pin.copyExec.slice(2), ['wl-copy <"$1"', 'sh', '/state/dots/clip-pins/17']);
+  assert.equal(clipRows('pin:1x\tnot a pin\n', '', db)[0].pinned, false);
+});

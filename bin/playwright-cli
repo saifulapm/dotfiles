@@ -28,7 +28,10 @@ done
 
 # A session attached to the desktop chromium leaves its name here, so detach and close know whose browser it is.
 marks=${XDG_RUNTIME_DIR:-/tmp}/dots-playwright
-mark=$marks/${session:-${extension:-default}}
+name=${session:-${PLAYWRIGHT_CLI_SESSION:-${extension:-default}}}
+mark=$marks/${name//\//_}
+# A browser opened under a name is an isolated one, whatever an attach that never detached left here.
+[[ $subcommand == open ]] && rm -f "$mark"
 
 # attach --extension drives the desktop chromium, and Playwright would look for Google Chrome, which has no Linux arm64 build.
 if [[ $subcommand == attach && -n $extension ]]; then

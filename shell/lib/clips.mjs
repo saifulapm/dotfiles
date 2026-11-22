@@ -9,7 +9,8 @@ const PASTE =
 
 // Shift+Enter puts the clip on the clipboard and presses nothing.
 const COPY = 'cliphist -db-path "$1" decode "$2" | wl-copy';
-// A pinned clip is its own file beside the db, in clip-pins, so it is copied from there.
+// A pinned clip is its own file beside the db, in clip-pins, so it is copied from there, and the terminals are its second argument.
+const PASTE_PIN = PASTE.replace('cliphist -db-path "$1" decode "$2" | wl-copy', 'wl-copy <"$1"').replace('" $3 "', '" $2 "');
 const PIN = /^pin:(\d+)$/;
 const pinFile = (db, name) => db.replace(/[^/]*$/, 'clip-pins/') + name;
 
@@ -56,7 +57,7 @@ export function clipRows(text, q, db, times = '', now = 0) {
         id,
         pinned: !!pin,
         file: pin ? pinFile(db, pin[1]) : '',
-        exec: pin ? ['sh', '-c', PASTE.replace('cliphist -db-path "$1" decode "$2" | wl-copy', 'wl-copy <"$1"').replace('"$3"', '"$2"'), ...from, TERMINALS.join(' ')] : ['sh', '-c', PASTE, ...from, TERMINALS.join(' ')],
+        exec: ['sh', '-c', pin ? PASTE_PIN : PASTE, ...from, TERMINALS.join(' ')],
         copyExec: pin ? ['sh', '-c', 'wl-copy <"$1"', ...from] : ['sh', '-c', COPY, ...from],
       };
     })

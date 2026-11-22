@@ -87,7 +87,7 @@ test('no window fades: an unfocused one draws as the focused one does', () => {
   assert.doesNotMatch(renderNiri(artboard), /opacity/);
 });
 
-test('windows sit 56 px down and 32 px in, clear of the margins', () => {
+test('windows sit 26 px down, under the island\'s lower 8 px, and 32 px in', () => {
   const kdl = renderNiri(artboard);
   assert.match(kdl, /struts \{\s*top 26\s*bottom 28\s*left 32\s*right 32\s*\}/);
   assert.match(kdl, /^prefer-no-csd$/m);

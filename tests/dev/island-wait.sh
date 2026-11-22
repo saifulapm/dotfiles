@@ -91,19 +91,27 @@ check "and stays until dismissed" island_is '.mode == "notification" and .note.s
 dismiss
 until_ok 3000 island_is '.mode == "rest"'
 
-# 5. Ten show one at a time, in arrival order.
+# 5. Ten show as one stack in arrival order: d puts away the one on top, and Esc clears what is left at once (NQJ87M6W).
 sheet_open
 for n in 1 2 3 4 5 6 7 8 9 10; do notify-send -t 0 "n$n"; done
 until_ok 3000 island_is '.waiting == 10'
 check "ten notifications sent while the sheet is open wait as 10" island_is '.waiting == 10'
 esc
+until_ok 3000 island_is '.mode == "notification" and .animating == false'
+check "after Esc they show as one stack of 10 with the first on top ($(island | jq -c '[.note.summary, .stack.count]'))" island_is '.note.summary == "n1" and .stack.count == 10'
 seen=()
-for n in 1 2 3 4 5 6 7 8 9 10; do
-  until_ok 3000 island_is '.mode == "notification" and .animating == false'
+for n in 1 2 3; do
+  until_ok 3000 island_is --arg s "n$n" '.mode == "notification" and .note.summary == $s and .animating == false'
   seen+=("$(island | jq -r .note.summary)")
-  dismiss
+  mod_i
+  wtype d
 done
-check "they show one at a time after Esc, in order (${seen[*]})" test "${seen[*]}" = "n1 n2 n3 n4 n5 n6 n7 n8 n9 n10"
+check "d puts them away one at a time, in order (${seen[*]})" test "${seen[*]}" = "n1 n2 n3"
+until_ok 3000 island_is '.note.summary == "n4" and .animating == false'
+dismiss
+until_ok 3000 island_is '.mode == "rest"'
+sleep 1
+check "and Esc clears the seven left at once ($(island | jq -c '{mode, waiting}'))" island_is '.mode == "rest" and .waiting == 0'
 until_ok 3000 island_is '.mode == "rest"'
 
 # 6. A volume key changes the volume and its OSD has run out by the close.

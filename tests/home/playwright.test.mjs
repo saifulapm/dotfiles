@@ -211,6 +211,7 @@ test('chromium-tabs closes only the tabs of a grey Playwright group', async () =
   await import(join(repo, 'home/dot_local/share/dots/chromium-tabs/bg.js'));
   await listeners.updated({ id: 1, color: 'green', title: 'Playwright · cli' });
   await listeners.updated({ id: 2, color: 'grey', title: 'Work' });
+  await listeners.updated({ id: 5, color: 'grey', title: 'Playwright notes' });
   await listeners.updated({ id: 3, color: 'grey' });
   assert.deepEqual(removed, []);
   await listeners.updated({ id: 4, color: 'grey', title: 'Playwright · cli' });

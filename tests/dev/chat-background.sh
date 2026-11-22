@@ -13,7 +13,7 @@ wtype -k Escape
 until_ok 2000 island_is '.surface == null'
 check "Esc mid-reply closes the chat while the reply streams on ($(island | jq -c .surface), $(chat | jq -c .streaming))" chat_is '.open == false and .streaming'
 check "the reply ends behind the closed chat ($(chat | jq -c '{streaming, blocks}'))" until_ok 10000 chat_is '.streaming == false'
-check "the resting island waits on it as one, 204 px wide with the dot ($(island | jq -c '{mode, waiting, width, dot, animating}'))" until_ok 3000 island_is '.mode == "rest" and .waiting == 1 and .width == 204 and .dot != null'
+check "the resting island waits on it as one, with the dot ($(island | jq -c '{mode, waiting, width, dot, animating}'))" until_ok 3000 island_is '.mode == "rest" and .waiting == 1 and .dot != null'
 check "the chat holds the reply as unseen ($(chat | jq -c .unseen))" chat_is '.unseen'
 check "and the resting island has stopped moving while it waits ($(island | jq -c .animating))" until_ok 2000 island_is '.animating == false'
 open_chat

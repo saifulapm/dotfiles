@@ -1,5 +1,5 @@
 // The Playwright Extension keeps a session's tabs in a group named "Playwright · <client>" and turns the group grey once the session ends; the CLI cannot close them itself, since it reopens a blank tab whenever it has none, so the tabs of a grey group close here.
-const ended = (group) => group.color === 'grey' && (group.title ?? '').startsWith('Playwright');
+const ended = (group) => group.color === 'grey' && (group.title ?? '').startsWith('Playwright · ');
 
 async function closeTabs(group) {
   if (!ended(group)) return;

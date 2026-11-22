@@ -196,6 +196,8 @@ check "a second request while one shows waits ($(pin | jq -c '{description, wait
 until_ok 3000 prompt_up
 wtype one
 until_ok 2000 pin_is '.field == 3'
+# A prompt ignores Enter for its first half second (29PTQZ0V), which the island's open no longer outlasts.
+sleep 0.5
 wtype -k Return
 until_ok 3000 pin_is '.open and .description == "second-request" and .waiting == 0'
 check "and shows after the first is answered ($(pin | jq -c '{description, waiting}'))" pin_is '.open and .description == "second-request" and .waiting == 0'

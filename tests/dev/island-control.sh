@@ -125,6 +125,8 @@ select_row() {
 }
 secured_field() {
   open_control
+  # The first key shows the cursor, on Wi-Fi.
+  wtype h
   wtype -k Return
   until_ok 2000 control_is '.page == "wifi"'
   until_ok 3000 select_row "Dots Secured"

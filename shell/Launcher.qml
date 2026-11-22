@@ -403,7 +403,12 @@ Item {
         stdout: StdioCollector {
             id: clipped
         }
-        onExited: code => launcher.clipList = code === 0 ? clipped.text : ""
+        onExited: code => {
+            launcher.clipList = code === 0 ? clipped.text : "";
+            // A list that lost a clip keeps its cursor on a row that is left.
+            if (launcher.mode === "clipboard" && launcher.found.length > 0)
+                launcher.move(0);
+        }
     }
 
     // Ctrl+D deletes the selected clip and Ctrl+P pins it or lets a pinned one go; the list is read again after either.

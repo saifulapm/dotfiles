@@ -787,7 +787,9 @@ Item {
             return;
         // A second Mod+I gives the keyboard back and closes what the first opened; a notification or a question stays as it was (6S5DRAWK).
         if (focused) {
-            release();
+            // A reply being typed is kept: only Esc leaves it.
+            if (!replying)
+                release();
             return;
         }
         if (mode === "lease")
@@ -809,7 +811,17 @@ Item {
 
     // The pointer resting 150 ms on the island at rest opens the calendar as Mod+I does, without the keyboard; 300 ms after it leaves, the calendar closes, unless a click or Mod+I took the keyboard meanwhile (9Y0A71JD).
     property bool hoverOpened: false
-    readonly property bool hoverable: !holder && !focused && (mode === "rest" || mode === "playing")
+    // Set when the island is closed under a resting pointer, so it stays closed until the pointer has left.
+    property bool hoverSpent: false
+    readonly property bool hoverable: !holder && !focused && !hoverSpent && (mode === "rest" || mode === "playing")
+    // Anything live that arrives over a calendar opened by hover takes the island, since nothing but the pointer holds that calendar: what the island would show without it is no longer the clock or the track.
+    readonly property string modeUnderCalendar: H.modeOf(holder, Object.assign({}, slots, { calendar: null }))
+    onModeUnderCalendarChanged: Qt.callLater(() => {
+        if (hoverOpened && !focused && modeUnderCalendar !== "rest" && modeUnderCalendar !== "playing") {
+            hoverOpened = false;
+            calendar = null;
+        }
+    })
     Root.Tick {
         id: hoverOpen
         interval: 150
@@ -941,6 +953,7 @@ Item {
     function release() {
         focused = false;
         hoverOpened = false;
+        hoverSpent = boxHover.hovered;
         leaseOpen = false;
         sharingOpen = false;
         mediaOpen = false;
@@ -1237,6 +1250,8 @@ Item {
         // Under every part, so a question's scroll and a notification's own area take the pointer first.
         HoverHandler {
             id: boxHover
+            onHoveredChanged: if (!hovered)
+                island.hoverSpent = false
         }
 
         Root.Click {
@@ -1261,7 +1276,13 @@ Item {
                 width: island.sizes.label[0]
                 height: island.sizes.label[1]
 
-                readonly property bool rest: island.mode === "rest"
+                // Held while the part fades out, so the dots, date and battery leave with the clock and the clock keeps its place.
+                property bool rest: false
+                Binding on rest {
+                    when: labelPart.shown
+                    value: island.mode === "rest"
+                    restoreMode: Binding.RestoreNone
+                }
 
                 Row {
                     id: restDots

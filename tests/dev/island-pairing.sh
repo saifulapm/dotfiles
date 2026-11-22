@@ -156,6 +156,8 @@ until_ok 3000 titled "Test Speaker"
 authorize "$headphones" 3
 until_ok 2000 pair_is '.waiting == 1'
 check "a second request waits behind the first ($(pair | jq -c '{title, waiting}'))" pair_is '.title == "Test Speaker" and .waiting == 1'
+# A prompt ignores Enter for its first half second (29PTQZ0V), which the island's open no longer outlasts.
+sleep 0.5
 wtype -k Return
 until_ok 3000 answered authorize-2 allowed
 until_ok 3000 titled "Test Headphones"
