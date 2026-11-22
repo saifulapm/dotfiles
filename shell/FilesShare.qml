@@ -107,9 +107,9 @@ Item {
         const t = event.text;
         if (k === Qt.Key_Escape)
             close();
-        else if (t === "j" || k === Qt.Key_Down)
+        else if (t === "j" || k === Qt.Key_Down || k === Qt.Key_Right)
             move(1);
-        else if (t === "k" || k === Qt.Key_Up)
+        else if (t === "k" || k === Qt.Key_Up || k === Qt.Key_Left)
             move(-1);
         else if (k === Qt.Key_Return || k === Qt.Key_Enter)
             send();

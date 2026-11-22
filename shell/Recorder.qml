@@ -127,8 +127,8 @@ Item {
     Keys.onPressed: event => {
         const k = event.key;
         const shift = event.modifiers & Qt.ShiftModifier;
-        const dx = k === Qt.Key_H ? -1 : k === Qt.Key_L ? 1 : 0;
-        const dy = k === Qt.Key_K ? -1 : k === Qt.Key_J ? 1 : 0;
+        const dx = k === Qt.Key_H || k === Qt.Key_Left ? -1 : k === Qt.Key_L || k === Qt.Key_Right ? 1 : 0;
+        const dy = k === Qt.Key_K || k === Qt.Key_Up ? -1 : k === Qt.Key_J || k === Qt.Key_Down ? 1 : 0;
         if (dx || dy)
             region = shift ? R.resize(region, dx, dy, out) : R.move(region, dx, dy, out);
         else if (k === Qt.Key_F)

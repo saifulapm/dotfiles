@@ -2528,8 +2528,11 @@ Item {
                 if (island.mode === "calendar") {
                     if (event.key === Qt.Key_Escape)
                         island.release();
-                    else if (event.key === Qt.Key_H || event.key === Qt.Key_L)
-                        island.calendar = I.shiftMonth(island.calendar.year, island.calendar.month, event.key === Qt.Key_H ? -1 : 1);
+                    else if (event.key === Qt.Key_H || event.key === Qt.Key_L || event.key === Qt.Key_Left || event.key === Qt.Key_Right)
+                        island.calendar = I.shiftMonth(island.calendar.year, island.calendar.month, event.key === Qt.Key_H || event.key === Qt.Key_Left ? -1 : 1);
+                    // Up and Down, with k and j, step a year.
+                    else if (event.key === Qt.Key_K || event.key === Qt.Key_J || event.key === Qt.Key_Up || event.key === Qt.Key_Down)
+                        island.calendar = I.shiftMonth(island.calendar.year, island.calendar.month, event.key === Qt.Key_K || event.key === Qt.Key_Up ? -12 : 12);
                     return;
                 }
                 if (island.mode === "notification") {
