@@ -78,38 +78,12 @@ export function reconnected(state) {
   return set(initial, { configFailed: state.configFailed });
 }
 
-// Null until niri has told us about that output.
-export function outputView(state, output) {
-  const ws = state.workspaces.find((w) => w.output === output && w.is_active);
-  if (!ws) return null;
-  const win = state.windows.find((w) => w.id === ws.active_window_id);
-  return { idx: ws.idx, app: win ? win.app_id : null, title: win ? win.title : null };
-}
-
-// The numbers of the output's workspaces holding an urgent window, in workspace order.
-export function urgentWorkspaces(state, output) {
-  return state.workspaces
-    .filter((w) => w.output === output && w.is_urgent)
-    .map((w) => w.idx)
-    .sort((a, b) => a - b);
-}
-
 // The output's workspaces in number order, each saying whether it is the one shown there and whether it holds an urgent window.
 export function outputWorkspaces(state, output) {
   return state.workspaces
     .filter((w) => w.output === output)
     .sort((a, b) => a.idx - b.idx)
     .map((w) => ({ idx: w.idx, active: w.is_active, urgent: w.is_urgent }));
-}
-
-// The focused column of the output's shown workspace, of its tiled columns; null while a floating window or none is focused there.
-export function columnPosition(state, output) {
-  const ws = state.workspaces.find((w) => w.output === output && w.is_active);
-  const at = ws && state.windows.find((w) => w.id === ws.active_window_id)?.layout.pos_in_scrolling_layout?.[0];
-  if (!at) return null;
-  // niri shifts the columns before it reports the closed window, so for one event two windows share a number; the highest is the count.
-  const cols = state.windows.filter((w) => w.workspace_id === ws.id && w.layout.pos_in_scrolling_layout).map((w) => w.layout.pos_in_scrolling_layout[0]);
-  return { at, of: Math.max(...cols) };
 }
 
 // Whether the output's shown window spans its whole logical width, as only maximize-window-to-edges and fullscreen do, since the struts keep every tile 32 px in.
@@ -129,7 +103,7 @@ export function focusedOutput(state) {
   return state.workspaces.find((w) => w.is_focused)?.output ?? null;
 }
 
-// Every cast but the shell's own recording, whose wf-recorder pid is ownPid (0 while it records nothing); a window's app is its app_id, as the margin names it.
+// Every cast but the shell's own recording, whose wf-recorder pid is ownPid (0 while it records nothing); a window's app is its app_id.
 export function shares(state, ownPid) {
   return state.casts
     .filter((c) => !(ownPid && c.pid === ownPid))

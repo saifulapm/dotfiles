@@ -2,10 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { surfaceMotion, surfacePose, closePose, slowdownOf } from './motion.mjs';
 
-test('a surface rises from 96% and 8 px lower on the island spring, and settles within 400 ms', () => {
+test('a surface rises from 96% and 8 px lower on the island spring, and settles within 260 ms', () => {
   const m = surfaceMotion();
   assert.equal(m.kind, 'spring');
-  assert.ok(m.openMs > 300 && m.openMs <= 400, `spring settles in ${m.openMs} ms`);
+  assert.ok(m.openMs > 200 && m.openMs <= 260, `spring settles in ${m.openMs} ms`);
   assert.deepEqual(surfacePose(m, 0), { lift: 8, scale: 0.96, opacity: 1 });
   assert.deepEqual(surfacePose(m, 1), { lift: 0, scale: 1, opacity: 1 });
   // It overshoots its rest before it settles.

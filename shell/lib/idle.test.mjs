@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { TIMES, startTimes, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeWord, awakeDetail, awakeStep } from './idle.mjs';
+import { TIMES, startTimes, validTimes, awakeMinutes, awakeEnd, nextAwake, awakeDetail, awakeStep } from './idle.mjs';
 
 test('the idle steps dim at 4 min, lock at 5 and turn monitors off at 6', () => {
   assert.deepEqual(TIMES, [240, 300, 360]);
@@ -48,10 +48,8 @@ test("Control's row steps off, 30 min, 1 h, 2 h and back to off", () => {
   assert.equal(nextAwake(now, now + 20 * 60000), now + 30 * 60000);
 });
 
-test('the margin reads awake and the end, Control until and the end, or off', () => {
+test('Control reads until and the end, or off', () => {
   const until = new Date(2026, 9, 30, 14, 5).getTime();
-  assert.equal(awakeWord(until), 'awake 14:05');
-  assert.equal(awakeWord(0), '');
   assert.equal(awakeDetail(until), 'until 14:05');
   assert.equal(awakeDetail(0), 'off');
 });

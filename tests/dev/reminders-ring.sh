@@ -5,7 +5,7 @@ source "$(dirname "$0")/lib.sh"
 
 store="$DOTS_DEV_DIR/data/dots/reminders/dev.json"
 remote="$DOTS_DEV_DIR/remote/dots-sync/reminders"
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 stored() { [ -e "$store" ] && jq -e "$1" "$store" >/dev/null; }
 put() { jq -n "${@:2}" >"$1.tmp" && mv "$1.tmp" "$1"; }
 now_s=$(date +%s)

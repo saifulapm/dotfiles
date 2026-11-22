@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 store="$DOTS_DEV_DIR/data/dots/reminders/dev.json"
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 open_launcher() { niri msg action spawn -- dots-call launcher toggle; until_ok 3000 state_is '.open and .query == "" and .keyboard and .settled'; }
 close_launcher() { wtype -k Escape; until_ok 2000 state_is '.open == false'; }
 # The CLI runs as an agent's would, on the nested session's data dir; mise keeps its own dirs, or its node shim installs node afresh there.

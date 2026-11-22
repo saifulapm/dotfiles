@@ -300,6 +300,9 @@ if [ -s "$DB_DIR/notify.db" ]; then
 fi
 
 fresh=$(notmuch count -- tag:new and tag:inbox and tag:screened and tag:unread 2>/dev/null || echo 0)
+# One new mail's notification opens its thread on a click; with more it opens the Imbox, so no thread is named.
+fresh_thread=
+[ "${fresh:-0}" = 1 ] && fresh_thread=$(notmuch search --output=threads -- tag:new and tag:inbox and tag:screened and tag:unread 2>/dev/null | sed -n 's/^thread://p' | head -n 1)
 
 # Must run even if everything above failed, or the next run reprocesses this batch.
 notmuch tag -new -- tag:new 2>>"$LOG"
@@ -316,7 +319,7 @@ screener=$(count tag:inbox and not tag:screened)
 
 # Only screened-in mail notifies: an unscreened stranger must never buzz you.
 if [ "${fresh:-0}" -gt 0 ] && command -v notify-send >/dev/null 2>&1; then
-    notify-send -a "Mail" -i mail-unread \
+    notify-send -a "Mail" -i mail-unread ${fresh_thread:+-h "string:x-dots-mail-thread:$fresh_thread"} \
         "$fresh new in your Imbox" "$imbox unread · $screener waiting in the Screener"
 fi
 

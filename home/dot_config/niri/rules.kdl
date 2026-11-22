@@ -1,18 +1,18 @@
-// Shared with dev/niri-dev.kdl; Notes floats 420 px wide, docked to the right edge under the margin.
+// Shared with dev/niri-dev.kdl; Notes floats 420 px wide, docked to the right edge, level with the tiled windows.
 window-rule {
     match title="^Notes$" app-id="^org.quickshell$"
     open-floating true
     default-column-width { fixed 420; }
     default-window-height { proportion 0.9; }
-    default-floating-position x=32 y=56 relative-to="top-right"
+    default-floating-position x=32 y=26 relative-to="top-right"
 }
-// Picture-in-picture floats in the top-right corner, below the margin, as Notes does.
+// Picture-in-picture floats in the top-right corner, level with the tiled windows, as Notes does.
 window-rule {
     match title=r#"Picture.?in.?[Pp]icture"#
     open-floating true
     default-column-width { proportion 0.35; }
     default-window-height { proportion 0.32; }
-    default-floating-position x=32 y=56 relative-to="top-right"
+    default-floating-position x=32 y=26 relative-to="top-right"
 }
 window-rule {
     match app-id="^mpv$"

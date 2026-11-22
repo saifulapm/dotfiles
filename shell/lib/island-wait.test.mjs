@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { expiry, arrive, take, drop, count } from './island-wait.mjs';
+import { expiry, arrive, take, drop, count, pile } from './island-wait.mjs';
 
 const note = (key, at, expires = null, entry = key) => ({ kind: 'notification', key, at, expires, entry });
 const ask = (key, at, entry = key) => ({ kind: 'question', key, at, expires: null, entry });
@@ -53,4 +53,12 @@ test('drop removes only the named key, and arrive, take and drop leave their inp
 test('expiry adds the hold to the arrival, and a hold of 0 never expires', () => {
   assert.equal(expiry(1000, 5000), 6000);
   assert.equal(expiry(1000, 0), null);
+});
+
+test('the stack counts the shown notification, the criticals under it and those waiting, by app', () => {
+  const e = (key, app) => ({ key, app });
+  const q = (key, app) => ({ kind: 'notification', key, entry: e(key, app) });
+  assert.deepEqual(pile(null, [e('a', 'Battery')], []), { count: 0, app: '', same: 0, others: 0 });
+  assert.deepEqual(pile(e('c', 'Battery'), [e('b', 'Battery'), e('a', 'Battery')], []), { count: 3, app: 'Battery', same: 3, others: 0 });
+  assert.deepEqual(pile(e('c', 'Battery'), [e('b', 'Battery')], [q('m', 'Mail'), { kind: 'question', key: 'q1' }, q('c', 'Battery')]), { count: 3, app: 'Battery', same: 2, others: 1 });
 });

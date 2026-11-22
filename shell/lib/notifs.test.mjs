@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, setStays, stepStays, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon, stacked } from './notifs.mjs';
+import { addEntry, parseStore, storeText, LIMIT, visible, group, clampSelected, filesOf, fileUri, uriList, chipLabel, dragPayload, holdMs, setAside, resumeMs, shows, toggle, cycleStay, setStays, stepStays, ruleText, ruleOf, chipsOf, raiseTarget, iconName, pictureOf, progressOf, stackOf, entryIcon, stacked, mailThread } from './notifs.mjs';
 
 const entry = (n, app = 'notify-send') => ({ key: `k${n}`, app, summary: `n ${n}`, body: '', critical: false, time: 1000 + n, actions: [] });
 
@@ -382,4 +382,11 @@ test('a stays pill sets the app\'s time, Default drops it, and h and l step alon
   assert.deepEqual(stepStays({ Mail: { stays: 0 } }, 'Mail', 1), { Mail: { stays: 0 } });
   assert.deepEqual(stepStays({}, 'Mail', -1), {});
   assert.deepEqual(stepStays({ __proto__x: {} }, '__proto__', 1), { __proto__x: {}, ['__proto__']: { stays: 3000 } });
+});
+
+test('a mail thread hint passes only as notmuch\'s 16 hex digits', () => {
+  assert.equal(mailThread({ 'x-dots-mail-thread': '00000000000012ab' }), '00000000000012ab');
+  for (const bad of ['x; touch /tmp/p', '00000000000012AB', '12ab', '00000000000012ab\n', 'thread:00000000000012ab', 7]) assert.equal(mailThread({ 'x-dots-mail-thread': bad }), '', String(bad));
+  assert.equal(mailThread({}), '');
+  assert.equal(mailThread(undefined), '');
 });

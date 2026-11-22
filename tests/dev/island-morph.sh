@@ -6,11 +6,12 @@ source "$(dirname "$0")/lib.sh"
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
 sheet() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }
-at_rest() { island_is '.surface == null and .width == 176 and .animating == false'; }
+at_rest() { island_is '.surface == null and .mode == "rest" and .animating == false'; }
 settled_open() { island_is '.surface == "cheatsheet" and .animating == false'; }
 
 until_ok 5000 shell_status >/dev/null
 until_ok 3000 at_rest
+rest_w=$(island | jq .width)
 read -r ow oh < <(niri msg -j outputs | jq -r '.[] | .logical | "\(.width) \(.height)"')
 
 dots-call cheatsheet toggle >/dev/null
@@ -32,7 +33,7 @@ check "after Esc the island reads animating false within 200 ms (${close_ms} ms)
 frames=$(island | jq -c .morph)
 check "the window stays ${ow} x ${oh} on every frame of the close" one_window
 
-# An open 60 ms into the close turns back from where the box is drawn, never from the resting 176 px.
+# An open 60 ms into the close turns back from where the box is drawn, never from the resting width.
 dots-call cheatsheet toggle >/dev/null
 until_ok 3000 settled_open
 wtype -k Escape
@@ -41,7 +42,7 @@ dots-call cheatsheet toggle >/dev/null
 until_ok 3000 settled_open
 frames=$(island | jq -c .morph)
 echo "     reopen: $(jq -c '{kind, from, first: .frames[0]}' <<<"$frames")"
-turned_back() { jq -e '.kind == "open" and .from[0] > 176 and .from[0] < 1160 and all(.frames[]; .[1] >= $f[0].from[0] - 2)' --slurpfile f <(echo "$frames") <<<"$frames" >/dev/null; }
+turned_back() { jq -e --argjson rest "$rest_w" '.kind == "open" and .from[0] > $rest and .from[0] < 1160 and all(.frames[]; .[1] >= $f[0].from[0] - 2)' --slurpfile f <(echo "$frames") <<<"$frames" >/dev/null; }
 check "Mod+/ 60 ms into the close opens from where the box is, with no jump to rest" turned_back
 exit "$fails"
 }

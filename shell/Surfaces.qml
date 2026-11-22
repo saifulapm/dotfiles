@@ -331,6 +331,26 @@ PanelWindow {
     Region {
         id: islandInput
         item: host.island ? host.island.maskItem : null
+
+        Region {
+            item: notesCorner
+        }
+    }
+
+    // The pointer pushed into the top-right corner opens Notes, as niri's bottom-left corner opens the overview.
+    signal notesCornerReached
+
+    Item {
+        id: notesCorner
+        anchors.top: parent.top
+        anchors.right: parent.right
+        width: 2
+        height: 2
+
+        HoverHandler {
+            onHoveredChanged: if (hovered)
+                host.notesCornerReached()
+        }
     }
 
     // Holds focus while the overview is open and no surface shows; a printable key opens the launcher with it typed, and Esc or Enter closes the overview on the window it shows focused.

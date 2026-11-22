@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { surfaceStyle, marginStyle, restyled } from './surface.mjs';
+import { surfaceStyle, restyled } from './surface.mjs';
 import { schemeTokens, schemeNames } from './colorscheme-file.mjs';
 
 const artboard = schemeTokens('artboard');
@@ -25,10 +25,6 @@ test('every scheme gives the same shape, so nothing but colour changes between t
 
 test('before the tokens load a surface draws nothing', () => {
   assert.deepEqual(surfaceStyle(null, 'card'), { fill: 'transparent', text: 'transparent', frame: { width: 0, color: 'transparent' } });
-});
-
-test('margins are the ui face at 12 px as written, with no rules under them', () => {
-  assert.deepEqual(marginStyle(artboard), { font: 'Maple Mono', size: 12, caps: false, tracking: 0 });
 });
 
 test('a restyle swaps the fill, text and frame it names and keeps the rest (m21 lease warning)', () => {

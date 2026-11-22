@@ -147,7 +147,7 @@ function dueAt(t, now) {
   return d.getMonth() === Number(date[2]) - 1 && d.getDate() === Number(date[3]) ? d.getTime() : null;
 }
 
-// The prompt takes Nd or Nh from the start of this minute (the margin's clock moves only on the minute), or a date due 23:59 local; null refuses.
+// The prompt takes Nd or Nh from the start of this minute (the clock moves only on the minute), or a date due 23:59 local; null refuses.
 export function parseDeadline(text, now) {
   const t = text.trim();
   if (!t) return { deadline: null };
@@ -160,19 +160,6 @@ export function countdown(deadline, now) {
   const left = deadline - now;
   if (left <= 0) return 'late';
   return left < D ? Math.ceil(left / H) + 'h' : Math.ceil(left / D) + 'd';
-}
-
-// The goal the margin names, as { title, left }: the nearest deadline and its countdown, else the first goal with left null; null with no goal.
-export function marginGoalParts(store, now) {
-  const active = activeGoals(store);
-  const due = active.filter((g) => g.deadline !== null).sort((a, b) => a.deadline - b.deadline || byOrder(a, b));
-  if (due.length) return { title: due[0].title, left: countdown(due[0].deadline, now) };
-  return active.length ? { title: active[0].title, left: null } : null;
-}
-
-export function marginGoal(store, now) {
-  const g = marginGoalParts(store, now);
-  return g === null ? '' : g.left === null ? g.title : g.title + ' · ' + g.left;
 }
 
 // The copy that set the field later wins it; a tie goes to the larger value's text, so both machines pick the same one.

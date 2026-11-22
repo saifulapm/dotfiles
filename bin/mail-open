@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Usage: mail-open [BOX | mailto:URL]. Raises the kak-mail window (kak session and client "mail"), showing BOX, or a new draft written from URL; a second call reuses the window, since nothing inside kak can raise it.
+# Usage: mail-open [BOX | thread:ID | mailto:URL]. Raises the kak-mail window (kak session and client "mail"), showing BOX, the thread of that notmuch id, or a new draft written from URL; a second call reuses the window, since nothing inside kak can raise it.
 set -uo pipefail
 {
-usage='Usage: mail-open [BOX | mailto:URL]'
+usage='Usage: mail-open [BOX | thread:ID | mailto:URL]'
 arg=${1:-}
 kq() { printf "'%s'" "$(printf %s "$1" | sed "s/'/''/g")"; }
 case $arg in
@@ -12,6 +12,10 @@ case $arg in
   mailto:*)
     draft=$(kak-mail compose mailto "$arg") || exit 1
     cmd="mail-draft-open $(kq "$draft")" ;;
+  # A thread id comes from a notification's hint, so only notmuch's own 16 hex digits pass.
+  thread:*)
+    [[ $arg =~ ^thread:[0-9a-f]{16}$ ]] || { echo "$usage" >&2; exit 2; }
+    cmd="mail-thread $arg" ;;
   '') cmd=mail ;;
   *) cmd="mail-box $(kq "$arg")" ;;
 esac

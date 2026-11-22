@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A failed dots sync round marks the margin `sync !` and lists each failing unit in Control's Route, and a good round from the launcher clears both.
+# A failed dots sync round lists each failing unit in Control's Route, and a good round from the launcher lists each as ok.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -13,9 +13,6 @@ under_dev "${DOTS_AGE_IDENTITY:-}" && [ ! -e "$DOTS_AGE_IDENTITY" ] || { echo "F
 under_dev "${XDG_DATA_HOME:-}" || { echo "FAIL XDG_DATA_HOME is not the dev data dir"; exit 1; }
 remote=$DOTS_DEV_DIR/remote
 
-margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
-marked() { margins | jq -e '.right.sync == "sync !" and (.right.text | startswith("sync !  "))' >/dev/null 2>&1; }
-unmarked() { margins | jq -e '.right.sync == "" and (.right.text | startswith("sync") | not)' >/dev/null 2>&1; }
 control_state() { timeout 0.5 qs ipc call control state 2>/dev/null; }
 state_is() { control_state | jq -e "$@" >/dev/null 2>&1; }
 # Control opens on Route as Enter on its Sync tile opens it.
@@ -32,13 +29,9 @@ open_route
 until_ok 2000 state_is '.section == "route"'
 echo "     route: $(control_state | jq -c '{rows, details, sync}')"
 check "with no sync.json Route's Sync row reads no rounds yet" state_is '.rows[1] == "Sync" and .details[1] == "no rounds yet" and .sync == {}'
-check "with no sync.json the margin has no sync !" unmarked
 
 rm -rf "$remote"
 "$repo/bin/dots" sync >/dev/null 2>&1
-until_ok 3000 marked
-echo "     margins: $(margins | jq -c .right)"
-check "a round with the remote gone starts the margin with sync !" marked
 failing_rows() { state_is '.rows[0] == "Questions ring on" and (["notes", "goals", "fish", "ssh"] - .rows | length == 0) and ([range(1; .rows | length) as $i | select(.tones[$i] == "danger") | .details[$i]] | length >= 4 and all(endswith("directory not found"))) and ([.sync[].error] | all(endswith("directory not found")))'; }
 until_ok 2000 failing_rows
 echo "     route: $(control_state | jq -c '{rows, details, sync}')"
@@ -54,9 +47,6 @@ until_ok 3000 launcher_is '.open and .query == "" and .keyboard and .settled'
 wtype "> sync"
 until_ok 3000 launcher_is '.mode == "commands" and .results == ["sync"]'
 wtype -k Return
-until_ok 15000 unmarked
-echo "     margins: $(margins | jq -c .right)"
-check "a good round from the launcher's sync row removes sync !" unmarked
 ran_again() { jq -e --argjson t "$notes_run" '.notes.lastRun > $t' "$XDG_STATE_HOME/dots/sync.json" >/dev/null 2>&1; }
 until_ok 30000 ran_again
 check "the launcher's sync row ran a round without bin/ on the shell's PATH" ran_again

@@ -45,6 +45,8 @@ export DOTS_ACCOUNTS=$repo/bin/dev-fake-accounts
 export DOTS_DNS=$repo/bin/dev-fake-dns
 # An agent lease tells the phone through a fake that records each call in the temp dir, never a real Slack DM.
 export DOTS_NOTIFY_PHONE=$repo/bin/dev-fake-notify-phone
+# A click on a mail notification runs a fake that records what it would open, never the real mail-open, which starts kak on the live mail store.
+export DOTS_MAIL_OPEN=$repo/bin/dev-fake-mail-open
 # Taildrop's s picks files through a fake that reads DOTS_DEV_DIR/picked, since the nested bus has no portal.
 export DOTS_PICK_FILES=$repo/bin/dev-fake-pick-files
 # The chat never reaches pxy from a nested session: a chat check points it at bin/dev-fake-pxy, and anything else meets a refused port.

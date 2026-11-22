@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mod+/ grows the island into the six-column cheat sheet over the margins; Esc or a click outside closes it, another surface's key turns it into that surface, a notification waits behind it, and a pairing request takes the island over it.
+# Mod+/ grows the island into the six-column cheat sheet over the desk; Esc or a click outside closes it, another surface's key turns it into that surface, a notification waits behind it, and a pairing request takes the island over it.
 {
 source "$(dirname "$0")/lib.sh"
 source "$(dirname "$0")/pointer.bash"
@@ -8,13 +8,12 @@ island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$@" >/dev/null 2>&1; }
 sheet() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null; }
 sheet_is() { sheet | jq -e "$@" >/dev/null 2>&1; }
-margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
 px() { grim -g "$1,$2 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n'; }
 open_sheet() {
   niri msg action spawn -- dots-call cheatsheet toggle
   until_ok 3000 island_is '.surface == "cheatsheet" and .animating == false'
 }
-at_rest() { island_is '.surface == null and .width == 176 and .animating == false'; }
+at_rest() { island_is '.surface == null and .mode == "rest" and .animating == false'; }
 
 until_ok 5000 shell_status >/dev/null
 until_ok 3000 at_rest
@@ -46,9 +45,7 @@ t0=$(now_ms)
 wtype -k Escape
 until_ok 1000 at_rest
 took=$(($(now_ms) - t0))
-check "Esc sets surface to null and the width to 176 within 400 ms (${took} ms)" test "$took" -le 400
-gap=$(margins | jq -r '.drawn | (.islandLeft - .lineEnd) | floor')
-check "and the margins draw again, short of the resting island ($gap, shown $(margins | jq .shown))" eval '[ "$gap" = 20 ] && margins | jq -e .shown >/dev/null'
+check "Esc sets surface to null and the island to rest within 400 ms (${took} ms)" test "$took" -le 400
 
 open_sheet
 launcher_is() { timeout 0.5 qs ipc call launcher state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }

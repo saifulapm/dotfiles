@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pad2, dateText, clockText, msToNextMinute, marginState, batteryText, wifiText, mailCount } from './margins.mjs';
+import { pad2, dateText, clockText, msToNextMinute, batteryText } from './margins.mjs';
 
 const AT = new Date(2026, 9, 18, 14, 32, 10, 500);
 
@@ -24,69 +24,7 @@ test('the tick waits until the next minute boundary', () => {
   assert.equal(msToNextMinute(new Date(2026, 9, 18, 23, 59, 0, 0)), 60000);
 });
 
-test('the margin state for a focused window', () => {
-  const s = marginState({ idx: 1, app: 'foot', title: '~/Codes/dotfiles' }, AT, { goal: '', wifi: 'wifi', battery: '82%' });
-  assert.equal(
-    JSON.stringify(s),
-    '{"left":{"workspace":"01","app":"foot","title":"~/Codes/dotfiles","text":"01 · foot — ~/Codes/dotfiles"},"right":{"goal":"","wifi":"wifi","battery":"82%","date":"Sun 18 Oct","text":"wifi  82%  Sun 18 Oct"}}',
-  );
-});
-
-test('the margin state for an empty workspace is just its number', () => {
-  const s = marginState({ idx: 2, app: null, title: null }, AT, { goal: '', wifi: '', battery: '' });
-  assert.equal(s.left.text, '02');
-  assert.equal(s.left.workspace, '02');
-});
-
 test('the battery reads its percentage, and says when it is charging', () => {
   assert.equal(batteryText(0.82, false), '82%');
   assert.equal(batteryText(0.82, true), '82% charging');
-});
-
-test('the top-right drops the parts that are absent', () => {
-  const view = { idx: 1, app: null, title: null };
-  assert.equal(marginState(view, AT, { goal: '', wifi: 'no wifi', battery: '' }).right.text, 'no wifi  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { goal: '', wifi: '', battery: '82% charging' }).right.text, '82% charging  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { goal: '', wifi: '', battery: '' }).right.text, 'Sun 18 Oct');
-});
-
-test('the active goal opens the top-right, and an empty one leaves no gap', () => {
-  const view = { idx: 1, app: null, title: null };
-  const s = marginState(view, AT, { goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' });
-  assert.equal(s.right.goal, 'Ship v2 · 3d');
-  assert.equal(s.right.text, 'Ship v2 · 3d  wifi  82%  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { goal: '', wifi: 'wifi', battery: '82%' }).right.text.startsWith('wifi'), true);
-});
-
-test('a failing sync opens the top-right, before the goal', () => {
-  const view = { idx: 1, app: null, title: null };
-  const s = marginState(view, AT, { sync: 'sync !', goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' });
-  assert.equal(s.right.sync, 'sync !');
-  assert.equal(s.right.text, 'sync !  Ship v2 · 3d  wifi  82%  Sun 18 Oct');
-  assert.equal(marginState(view, AT, { sync: '', goal: 'Ship v2 · 3d', wifi: 'wifi', battery: '82%' }).right.text, 'Ship v2 · 3d  wifi  82%  Sun 18 Oct');
-});
-
-test('wifi is named only when there is a Wi-Fi device', () => {
-  assert.equal(wifiText([{ wifi: true, connected: true }]), 'wifi');
-  assert.equal(wifiText([{ wifi: false, connected: true }, { wifi: true, connected: false }]), 'no wifi');
-  assert.equal(wifiText([{ wifi: false, connected: true }]), '');
-});
-
-test('the mail count reads only a positive whole number from its file', () => {
-  assert.equal(mailCount('3\n'), 3);
-  assert.equal(mailCount('12'), 12);
-  for (const bad of ['0\n', '', '-2\n', '2.5\n', 'three\n', '3 4\n', null, undefined]) assert.equal(mailCount(bad), 0, String(bad));
-  // The margin keeps the count in a QML int, which wraps past 2^31; no Imbox holds a million unread.
-  assert.equal(mailCount('999999'), 999999);
-  for (const big of ['1000000', '4294967296', '99999999999999999999']) assert.equal(mailCount(big), 0, big);
-});
-
-test('unread mail sits between the goal and wifi, and 0 leaves no item', () => {
-  const view = { idx: 1, app: null, title: null };
-  const s = marginState(view, AT, { sync: '', goal: 'Ship v2 · 3d', mail: 3, wifi: 'wifi', battery: '82%' });
-  assert.equal(s.right.mail, 3);
-  assert.equal(s.right.text, 'Ship v2 · 3d  mail 3  wifi  82%  Sun 18 Oct');
-  const none = marginState(view, AT, { sync: '', goal: 'Ship v2 · 3d', mail: 0, wifi: 'wifi', battery: '82%' });
-  assert.equal(none.right.mail, 0);
-  assert.equal(none.right.text, 'Ship v2 · 3d  wifi  82%  Sun 18 Oct');
 });

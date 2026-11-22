@@ -6,7 +6,7 @@ source "$(dirname "$0")/pointer.bash"
 
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 # niri runs no binds for wtype's virtual keyboard, so the check spawns Mod+G's command through niri.
 open_goals() {
   until_ok 10000 desk_up

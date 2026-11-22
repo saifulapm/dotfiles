@@ -1,4 +1,4 @@
-// Clipboard rows from `cliphist list`, which prints "id\tpreview" newest first.
+// Clipboard rows from `dots-clip list`, which prints the pinned clips as "pin:name\tpreview" and then `cliphist list`'s "id\tpreview", newest first.
 const IMAGE = /^\[\[ binary data (\S+ \S+) \S+ \d+x\d+ \]\]$/;
 // Terminals paste on Ctrl+Shift+V, by app_id as niri reports it; every other window pastes on Ctrl+V.
 export const TERMINALS = ['foot', 'footclient', 'kitty', 'Alacritty', 'com.mitchellh.ghostty', 'org.wezfurlong.wezterm'];
@@ -9,6 +9,9 @@ const PASTE =
 
 // Shift+Enter puts the clip on the clipboard and presses nothing.
 const COPY = 'cliphist -db-path "$1" decode "$2" | wl-copy';
+// A pinned clip is its own file beside the db, in clip-pins, so it is copied from there.
+const PIN = /^pin:(\d+)$/;
+const pinFile = (db, name) => db.replace(/[^/]*$/, 'clip-pins/') + name;
 
 // How long ago a clip was copied, as its card reads it.
 function ageText(s) {
@@ -41,16 +44,20 @@ export function clipRows(text, q, db, times = '', now = 0) {
       const id = line.slice(0, line.indexOf('\t'));
       const preview = line.slice(id.length + 1);
       const image = preview.match(IMAGE);
+      const pin = id.match(PIN);
+      const from = pin ? ['sh', pinFile(db, pin[1])] : ['sh', db, id];
       return {
-        title: image ? 'image · ' + image[1] : preview,
+        title: image ? (pin ? 'image' : 'image · ' + image[1]) : preview,
         detail: '',
         glyph: image ? '◫' : '¶',
         age: at.has(id) ? ageText(now - at.get(id)) : '',
         image: !!image,
         swatch: HEX.test(preview) ? preview : '',
         id,
-        exec: ['sh', '-c', PASTE, 'sh', db, id, TERMINALS.join(' ')],
-        copyExec: ['sh', '-c', COPY, 'sh', db, id],
+        pinned: !!pin,
+        file: pin ? pinFile(db, pin[1]) : '',
+        exec: pin ? ['sh', '-c', PASTE.replace('cliphist -db-path "$1" decode "$2" | wl-copy', 'wl-copy <"$1"').replace('"$3"', '"$2"'), ...from, TERMINALS.join(' ')] : ['sh', '-c', PASTE, ...from, TERMINALS.join(' ')],
+        copyExec: pin ? ['sh', '-c', 'wl-copy <"$1"', ...from] : ['sh', '-c', COPY, ...from],
       };
     })
     .filter((r) => r.title.toLowerCase().includes(needle));

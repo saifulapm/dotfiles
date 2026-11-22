@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
-# The top-right battery and wifi words, from a UPower double on the nested bus that stands in for the system bus.
+# The resting island's battery word, from a UPower double on the nested bus that stands in for the system bus.
 {
 source "$(dirname "$0")/lib.sh"
 
 until_ok 5000 shell_status >/dev/null
-margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
+island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 
-today=$(LC_ALL=C date '+%a %-d %b')
-just_date() { margins | jq -e --arg d "$today" '.right.text == $d' >/dev/null; }
-echo "     margins with no UPower or NetworkManager: $(margins | jq -c .right)"
-check "the top-right is just the date ($today)" just_date
+no_battery() { island | jq -e '.rest.battery == null' >/dev/null; }
+echo "     island with no UPower: $(island | jq -c .rest)"
+check "with no UPower the resting island shows no battery" no_battery
 
 "$repo/bin/dev-fake-upower" 9>&- &
 fake_pid=$!
@@ -20,24 +19,15 @@ check "the UPower double owns its name on the nested bus" fake_up
 
 # Quickshell looks for UPower once, when the shell starts, so the shell restarts to find the double.
 systemctl --user restart "$DOTS_DEV_UNIT"
-margins_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
-until_ok 10000 margins_mapped
+surfaces_mapped() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
+until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 until_ok 6000 at_rest
 
-battery_is() { margins | jq -e --arg b "$1" '.right.battery == $b' >/dev/null 2>&1; }
+battery_is() { island | jq -e --arg b "$1" '.rest.battery == $b' >/dev/null 2>&1; }
 until_ok 5000 battery_is "82%"
-echo "     margins: $(margins | jq -c .right)"
+echo "     island: $(island | jq -c .rest)"
 check "the battery reads 82% while discharging" battery_is "82%"
-
-busctl --user call org.freedesktop.UPower /org/freedesktop/UPower org.dots.FakeUPower Set db 82 true
-start=$(now_ms)
-# No sleep between reads, so the poll adds no delay of its own.
-until battery_is "82% charging"; do (($(now_ms) - start < 2000)) || break; done
-elapsed=$(($(now_ms) - start))
-echo "     margins: $(margins | jq -c .right)"
-check "the battery reads 82% charging ${elapsed} ms after the double switched" battery_is "82% charging"
-check "the switch showed within 2000 ms" test "$elapsed" -le 2000
 
 status=$(shell_status)
 echo "     status: $status"

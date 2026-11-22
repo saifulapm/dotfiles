@@ -52,7 +52,6 @@ const ROWS = {
   'voice inOrder': (s) => voice.inOrder(s),
   'voice line': (s) => voice.line(s),
   'voice chipLook name': (s) => voice.chipLook(null).name([s]),
-  'voice marginLook tail': (s) => voice.marginLook(null).tail({ app: s, title: s }),
 };
 
 // A newline, ESC, BEL, RLO, LRI and RLM around ab; then ab alone, ab around each character one set holds and another does not, and each such character alone.
@@ -90,7 +89,6 @@ const BEFORE = {
   'voice inOrder': ["\nab\n", "ab", "a\tb", "a\nb", "a\rb", "ab", "ab", "ab", "ab", "ab", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a\ufeffb", "a%b", "\t", "\n", "\r", "", "", "", "", "", "", "\u200b", "\u200c", "", "", "", "", "", "", "\ufeff", "%"],
   'voice line': ["ab", "ab", "a b", "a b", "a b", "ab", "ab", "ab", "ab", "ab", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "", "", "", "", "", "", "", "", "", "\u200b", "\u200c", "", "", "", "", "", "", "", "%"],
   'voice chipLook name': ["ab", "ab", "a b", "a b", "a b", "ab", "ab", "ab", "ab", "ab", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "", "", "", "", "", "", "", "", "", "\u200b", "\u200c", "", "", "", "", "", "", "", "%"],
-  'voice marginLook tail': [" / ab — ab", " / ab — ab", " / a b — a b", " / a b — a b", " / a b — a b", " / a b — a b", " / a b — a b", " / a b — a b", " / a b — a b", " / a b — a b", " / ab — ab", " / a\u200bb — a\u200bb", " / a\u200cb — a\u200cb", " / ab — ab", " / ab — ab", " / ab — ab", " / ab — ab", " / ab — ab", " / ab — ab", " / a b — a b", " / a%b — a%b", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " / \u200b — \u200b", " / \u200c — \u200c", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " /  — ", " / % — %"],
 };
 
 for (const [name, fn] of Object.entries(ROWS)) {

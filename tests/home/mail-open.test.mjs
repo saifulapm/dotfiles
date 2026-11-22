@@ -45,6 +45,22 @@ test('mail-open BOX still opens the box', (t) => {
   assert.match(s.text, /in the box/);
 });
 
+test('mail-open thread:ID opens that thread, and refuses an id that is not notmuch\'s', (t) => {
+  const r = rig(t);
+  r.deliver({ Subject: 'the one thread' });
+  r.notmuch('tag', '+screened', '--', '*');
+  const id = r.notmuch('search', '--output=threads', '--', '*').trim();
+  assert.match(id, /^thread:[0-9a-f]{16}$/);
+  const res = r.open(id);
+  assert.equal(res.status, 0, res.stderr);
+  assert.match(r.shown().text, /the one thread/);
+  for (const bad of ['thread:', 'thread:x; touch /tmp/p', 'thread:00000000000012AB']) {
+    const refused = r.open(bad);
+    assert.equal(refused.status, 2, bad);
+    assert.match(refused.stderr, /^Usage: mail-open /);
+  }
+});
+
 test('mail-open --help prints its usage and opens no window', (t) => {
   const r = rig(t);
   const res = r.open('--help');

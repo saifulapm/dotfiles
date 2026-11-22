@@ -24,6 +24,6 @@ passage() { timeout 0.5 dots-call passage state 2>/dev/null; }
 passage_is() { passage | jq -e "$@" >/dev/null 2>&1; }
 # The reads deen took for a day's text, not the surahs it is asked for once.
 reads() { grep -cv '^api surahs$' "$work/calls"; }
-margins_date() { timeout 0.5 dots-call margins state 2>/dev/null | jq -r .right.date; }
+island_date() { timeout 0.5 dots-call island state 2>/dev/null | jq -r .rest.date; }
 # Sleeps until that many seconds after midnight; negative is before it.
 until_midnight() { local s=$((midnight + $1 - $(date +%s))); ((s <= 0)) || sleep "$s"; }

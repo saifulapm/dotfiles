@@ -65,11 +65,9 @@ wtype dots-test-pass
 wtype -k Return
 until_ok 3000 bash -c "! timeout 0.5 qs ipc call lock state | jq -e .locked >/dev/null"
 
-# Stay awake holds every step off, shows its end in the margin, and its end brings fresh steps.
-margins_right() { timeout 0.5 qs ipc call margins state 2>/dev/null | jq -r .right.text; }
+# Stay awake holds every step off, and its end brings fresh steps.
 timeout 0.5 qs ipc call idle awake 1 >/dev/null
 check "dots awake 1 holds for a minute" idle_is '(.awakeUntil - now * 1000) / 1000 | . > 55 and . <= 60'
-check "the margin reads awake and its end ($(margins_right))" bash -c "timeout 0.5 qs ipc call margins state | jq -e '.right.text | test(\"^awake [0-9]{2}:[0-9]{2}  \")' >/dev/null"
 before=$(idle_state | jq .monitorsOff)
 timeout 0.5 qs ipc call idle times 4 5 6 >/dev/null
 sleep 8
@@ -79,7 +77,6 @@ check "and the monitors stay on" idle_is ".monitorsOff == $before"
 t0=$(now_ms)
 "$repo/bin/dots" awake off >/dev/null
 check "dots awake off ends it" idle_is '.awakeUntil == 0'
-check "and the margin drops the word ($(margins_right))" bash -c "! timeout 0.5 qs ipc call margins state | jq -e '.right.text | startswith(\"awake\")' >/dev/null"
 until_ok 6000 idle_is .dimmed
 dim_at=$(since "$t0")
 echo "     dimmed ${dim_at} s after awake off"

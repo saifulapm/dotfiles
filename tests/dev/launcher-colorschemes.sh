@@ -24,9 +24,19 @@ check "six cards show, Artboard first" state_is '(.results | length) == 6 and .r
 check "under artboard the artboard row carries the mark and no other row does" state_is '.marks[0] == true and ([.marks[] | select(.)] | length) == 1'
 artboard_strip='["#e4e6ea","#ffffff","#3d5afe","#cf222e","#1a7f37","#9a6700","#8250df"]'
 check "the artboard row draws paper, surface, accent and ANSI 1, 2, 3 and 5" state_is ".strips[0] == $artboard_strip"
+wtype -k Right
+until_ok 2000 state_is '.top + .selected == 1'
+check "with nothing typed, Right lights the second card" state_is '.selected == 1 and .cursorName == .results[1]'
+wtype -k Right
+wtype -k Right
+until_ok 2000 state_is '.top + .selected == 3'
+check "Right at the end of the first row goes on to the fourth card, the first of the next row" state_is '.selected == 3 and .cursorName == .results[3]'
+wtype -k Up
+until_ok 2000 state_is '.top + .selected == 0'
+check "and Up from there lights the card above it, the first" state_is '.selected == 0'
 for _ in $(seq 1 10); do wtype -M ctrl -k j -m ctrl; done
-until_ok 2000 state_is '.top + .selected == 10'
-check "ten moves down page the cards a row at a time: the tenth card after the first is lit and drawn in its column ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 6 and .selected == 4 and (.results | length) == 6 and .cursorName == .results[4]'
+until_ok 2000 state_is '.top + .selected == 30'
+check "ten moves down go ten rows down and page the cards with them: the card is lit in its own column ($(launcher_state | jq -c '{top, selected}'))" state_is '.top == 27 and .selected == 3 and (.results | length) == 6 and .cursorName == .results[3]'
 for _ in $(seq 1 10); do wtype -M ctrl -k k -m ctrl; done
 until_ok 2000 state_is '.top + .selected == 0'
 check "ten moves up bring Artboard back to the top" state_is '.top == 0 and .selected == 0 and .cursorName == "Artboard"'

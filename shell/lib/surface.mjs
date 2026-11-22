@@ -19,11 +19,6 @@ export function surfaceStyle(tokens, role) {
   };
 }
 
-// The margins' type: the ui face at 12 px, in sentence case, ruled in ink.
-export function marginStyle(tokens) {
-  return { font: tokens ? tokens.type.ui : '', size: 12, caps: false, tracking: 0 };
-}
-
 // A surface's look with some parts swapped, as the island's lease draws its last minute: fill, text and frame.
 export function restyled(style, swap) {
   if (!swap) return style;

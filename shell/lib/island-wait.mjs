@@ -27,3 +27,13 @@ export const drop = (queue, key) => queue.filter((q) => q.key !== key);
 
 // How many items wait.
 export const count = (queue) => queue.length;
+
+// The island's stack of notifications: how many it holds in all, how many of them are from the shown one's app, and how many other apps wait in it.
+export function pile(current, waiting, queue) {
+  if (!current) return { count: 0, app: '', same: 0, others: 0 };
+  const seen = new Map([[current.key, current]]);
+  for (const e of [...waiting, ...queue.filter((q) => q.kind === 'notification').map((q) => q.entry)]) if (!seen.has(e.key)) seen.set(e.key, e);
+  const all = [...seen.values()];
+  const same = all.filter((e) => e.app === current.app).length;
+  return { count: all.length, app: current.app, same, others: new Set(all.filter((e) => e.app !== current.app).map((e) => e.app)).size };
+}

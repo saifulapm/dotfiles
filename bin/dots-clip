@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# dots-clip list | pin ID | unpin NAME | delete ID|pin:NAME: the clipboard picker's history, with the pinned clips first. A pin is a copy of the clip in its own file, so cliphist's 500-clip cap, its 30-day prune and its changing ids never lose it.
+set -euo pipefail
+{
+
+dir=${XDG_STATE_HOME:-$HOME/.local/state}/dots
+db=$dir/clips.db times=$dir/clip-times pins=$dir/clip-pins
+clip() { cliphist -db-path "$db" "$@"; }
+# A pin's name is the nanosecond it was pinned at, so anything but digits names no pin.
+unpin() {
+  [[ $1 =~ ^[0-9]+$ ]] || { echo "dots-clip: no pin named $1" >&2; exit 2; }
+  rm -f "$pins/$1"
+}
+
+case ${1:-} in
+  list)
+    # Newest pin first, each as cliphist prints a clip: an image as its binary line, text as its first 100 characters on one line.
+    for f in $(ls -r "$pins" 2>/dev/null); do
+      mime=$(file -b --mime-type "$pins/$f")
+      case $mime in
+        image/*) printf 'pin:%s\t[[ binary data %s KiB %s 0x0 ]]\n' "$f" "$((($(stat -c %s "$pins/$f") + 1023) / 1024))" "${mime#image/}" ;;
+        *) printf 'pin:%s\t%s\n' "$f" "$(head -c 400 "$pins/$f" | tr -s '[:space:]' ' ' | cut -c1-100)" ;;
+      esac
+    done
+    # cliphist exits 1 until the first copy creates its db, which is an empty history.
+    clip list 2>/dev/null || true
+    ;;
+  pin)
+    [[ ${2:-} =~ ^[0-9]+$ ]] || { echo "dots-clip: pin takes a clip's id" >&2; exit 2; }
+    mkdir -p -m 700 "$pins"
+    new=$pins/$(date +%s%N)
+    clip decode "$2" >"$new" && [ -s "$new" ] || { rm -f "$new"; exit 1; }
+    ;;
+  unpin) unpin "${2:-}" ;;
+  delete)
+    case ${2:-} in
+      pin:*) unpin "${2#pin:}" ;;
+      *)
+        [[ ${2:-} =~ ^[0-9]+$ ]] || { echo "dots-clip: delete takes a clip's id or pin:NAME" >&2; exit 2; }
+        echo "$2" | clip delete
+        # The clip's time goes with it, so the prune never meets an id cliphist gave to a later clip.
+        if [ -f "$times" ]; then
+          awk -v id="$2" '$1 != id' "$times" >"$times.new"
+          mv "$times.new" "$times"
+        fi
+        ;;
+    esac
+    ;;
+  *)
+    echo 'Usage: dots-clip list | pin ID | unpin NAME | delete ID|pin:NAME' >&2
+    exit 2
+    ;;
+esac
+exit
+}

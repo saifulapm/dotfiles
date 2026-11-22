@@ -14,7 +14,7 @@ until_midnight 3
 until_ok 5000 passage_is --arg d "$after" '.date == $d and (.bn != "" or .en != "")'
 check "by the tick at midnight the passage is $after's ($(passage | jq -c '[.date, .kind, .ref]'))" passage_is --arg d "$after" '.date == $d and (.bn != "" or .en != "")'
 check "read from deen once ($n then $(reads))" test "$(reads)" = $((n + 1))
-check "the margins read the same date ($(margins_date))" test "$(margins_date)" = "$(TZ=$DOTS_DEV_TZ date -d "@$midnight" '+%a %-d %b')"
+check "the resting island reads the same date ($(island_date))" test "$(island_date)" = "$(TZ=$DOTS_DEV_TZ date -d "@$midnight" '+%a %-d %b')"
 check "a cut: the first sheet draws the new day ($(passage | jq -c '.drawn | map(length)'))" passage_is --arg d "$after" '(.drawn | length) == 1 and (.drawn[0] | length) == 1 and .drawn[0][0].bn == .bn and .drawn[0][0].en == .en'
 
 # A hadith day whose deen never answers draws its fallback once a tick finds the read 30 s old.

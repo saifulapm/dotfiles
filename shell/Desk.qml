@@ -4,9 +4,6 @@ import QtQuick
 import "." as Root
 import "services" as Services
 import "lib/click.mjs" as ClickLib
-import "lib/margins.mjs" as MarginsLib
-import "lib/goals.mjs" as GoalsLib
-import "lib/idle.mjs" as IdleLib
 
 // The island, the margins and the services behind them; shell.qml loads this after the paper's first frame.
 Scope {
@@ -47,10 +44,6 @@ Scope {
 
     Services.Power {
         id: powerService
-    }
-
-    Services.Network {
-        id: networkService
     }
 
     Services.BluetoothStates {
@@ -157,6 +150,7 @@ Scope {
         theme: desk.theme
         niri: niriService
         clock: clockService
+        power: powerService
         zones: zonesService
         notifs: desk.notifs
         questions: questionsService
@@ -167,36 +161,13 @@ Scope {
         media: mediaService
     }
 
-    Variants {
-        id: marginsVariants
-        model: Quickshell.screens
-
-        Root.Margins {
-            theme: desk.theme
-            niri: niriService
-            clock: clockService
-            power: powerService
-            network: networkService
-            goals: goalsService
-            sync: syncService
-            islandWidth: island.boxWidth
-            // The corner opens Notes or brings it forward, and never closes it as Mod+N would.
-            onNotesCornerReached: {
-                notesLoader.active = true;
-                if (!notesLoader.item.shown || !notesLoader.item.focused)
-                    notesLoader.item.toggle();
-            }
-        }
-    }
-
-    Root.Ipc {
-        target: "margins"
-
-        // The margins of the output with the focused workspace.
-        function state(): string {
-            const view = niriService.view(niriService.focusedOutput) ?? { idx: 0, app: null, title: null };
-            const shown = marginsVariants.instances.find(m => m.screen.name === niriService.focusedOutput);
-            return JSON.stringify(Object.assign(MarginsLib.marginState(view, clockService.now, { awake: IdleLib.awakeWord(Root.State.awakeUntil), sync: syncService.failing ? "sync !" : "", goal: GoalsLib.marginGoal(goalsService.store, clockService.now), mail: shown ? shown.mail : 0, wifi: networkService.wifi, battery: powerService.battery }), { drawn: shown ? shown.drawnState() : null, shown: shown ? shown.visible : false }));
+    // The pointer in the focused output's top-right corner opens Notes or brings it forward, and never closes it as Mod+N would.
+    Connections {
+        target: desk.surfaces.item
+        function onNotesCornerReached() {
+            notesLoader.active = true;
+            if (!notesLoader.item.shown || !notesLoader.item.focused)
+                notesLoader.item.toggle();
         }
     }
 
@@ -205,7 +176,7 @@ Scope {
 
         function state(): string {
             const calendar = island.mode === "calendar" ? { title: island.grid.title, today: island.today || null, weeks: island.grid.weeks, cities: island.citiesDrawn(), grid: island.gridDrawn() } : null;
-            return JSON.stringify({ shown: island.visible, mode: island.mode, text: island.text, surface: island.surface, waiting: island.waiting, takeover: island.takeover, fill: { color: String(island.fillColor), startedAt: island.fillStartedAt, endedAt: island.fillEndedAt }, morph: { kind: island.morphKind, from: island.morphFrom, frames: island.morphFrames, clock: island.morphClock }, settledAt: island.settledAt, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, live: island.liveDrawn(), dot: island.dotBox(), media: island.mediaState(), note: island.noteState(), warning: island.leaseWarning, lease: island.leaseState(), sharing: island.sharingState(), ask: island.askState() });
+            return JSON.stringify({ shown: island.visible, mode: island.mode, text: island.text, rest: { dots: island.workspaces.map(w => w.urgent ? 2 : w.active ? 1 : 0), date: island.restDateText, battery: island.batteryText || null }, surface: island.surface, waiting: island.waiting, takeover: island.takeover, fill: { color: String(island.fillColor), startedAt: island.fillStartedAt, endedAt: island.fillEndedAt }, morph: { kind: island.morphKind, from: island.morphFrom, frames: island.morphFrames, clock: island.morphClock }, settledAt: island.settledAt, width: island.boxWidth, height: island.targetHeight, since: island.modeSince, focused: island.focused, animating: island.animating, drawn: island.drawnWidth, calendar, live: island.liveDrawn(), dot: island.dotBox(), media: island.mediaState(), note: island.noteState(), stack: island.mode === "notification" ? notifs.pile : null, warning: island.leaseWarning, lease: island.leaseState(), sharing: island.sharingState(), ask: island.askState() });
         }
 
         function focus(): void {

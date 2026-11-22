@@ -7,7 +7,7 @@ store="$DOTS_DEV_DIR/data/dots/reminders/dev.json"
 old="$DOTS_DEV_DIR/state/dots/reminders.json"
 launcher_state() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 state_is() { launcher_state | jq -e "$1" >/dev/null; }
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 # niri lists the layer Exclusive a moment before its keys arrive, so typing waits until the window has the keyboard.
 open_launcher() { niri msg action spawn -- dots-call launcher toggle; until_ok 3000 state_is '.open and .query == "" and .keyboard and .settled'; }
 close_launcher() { wtype -k Escape; until_ok 2000 state_is '.open == false'; }

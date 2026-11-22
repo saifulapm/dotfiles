@@ -89,8 +89,6 @@ export function parseSync(text) {
   return out;
 }
 
-export const syncFailing = (units) => Object.keys(units).some((k) => units[k].ok === false);
-
 // Control's detail text has no width of its own, so a long error is cut to 60 characters on screen.
 const cut = (s) => (s.length > 60 ? s.slice(0, 59) + '…' : s);
 

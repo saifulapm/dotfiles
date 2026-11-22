@@ -107,9 +107,9 @@ Item {
         }
         return [];
     }
-    // Clips draw as cards two to a row, four at a time, colorschemes three to a row, six at a time, commands as rows in two columns; every other mode as rows, eight at a time.
-    readonly property int columns: mode === "clipboard" || mode === "commands" ? 2 : mode === "colorschemes" ? 3 : 1
-    readonly property int pageSize: mode === "clipboard" ? 4 : mode === "colorschemes" ? 6 : 8
+    // Colorschemes draw as cards three to a row, six at a time, commands as rows in two columns; every other mode, clips among them, as rows, eight at a time (ETPYGJS9).
+    readonly property int columns: mode === "commands" ? 2 : mode === "colorschemes" ? 3 : 1
+    readonly property int pageSize: mode === "colorschemes" ? 6 : 8
     readonly property var rows: found.slice(scrollTop, scrollTop + pageSize)
     readonly property var look: L.launcherLook(theme.tokens)
     implicitHeight: column.implicitHeight + 32
@@ -150,7 +150,7 @@ Item {
     property var thumbsReady: ({})
     property bool thumbsAgain: false
     function decodeThumbs() {
-        const ids = rows.filter(r => r.image && !thumbsReady[r.id]).map(r => r.id);
+        const ids = rows.filter(r => r.image && !r.pinned && !thumbsReady[r.id]).map(r => r.id);
         if (ids.length === 0)
             return;
         if (thumber.running) {
@@ -205,6 +205,14 @@ Item {
         const s = Lib.scroll(scrollTop, selected, 0, found.length, pageSize, columns);
         scrollTop = s.top;
         selected = s.selected;
+    }
+
+    // Up and Down move a whole row of a grid and stay when no row is left that way; Left and Right move one card, on to the next row at a row's end (D5TKZPSM).
+    function moveRow(by) {
+        const at = scrollTop + selected + by * columns;
+        if (at < 0 || Math.floor(at / columns) > Math.floor((found.length - 1) / columns))
+            return;
+        move(Math.min(found.length - 1, at) - scrollTop - selected);
     }
 
     function move(by) {
@@ -391,12 +399,24 @@ Item {
 
     Process {
         id: clipper
-        command: ["cliphist", "-db-path", launcher.clipDb, "list"]
+        command: [Quickshell.shellDir + "/bin/dots-clip", "list"]
         stdout: StdioCollector {
             id: clipped
         }
-        // cliphist exits 1 until the first copy creates its db, which is an empty history.
         onExited: code => launcher.clipList = code === 0 ? clipped.text : ""
+    }
+
+    // Ctrl+D deletes the selected clip and Ctrl+P pins it or lets a pinned one go; the list is read again after either.
+    Process {
+        id: clipEdit
+        onExited: launcher.listClips()
+    }
+    function editClip(verb) {
+        const row = rows[selected];
+        if (mode !== "clipboard" || !row || clipEdit.running)
+            return;
+        clipEdit.command = [Quickshell.shellDir + "/bin/dots-clip"].concat(verb === "delete" ? ["delete", row.id] : row.pinned ? ["unpin", row.id.slice(4)] : ["pin", row.id]);
+        clipEdit.running = true;
     }
 
     Process {
@@ -518,9 +538,16 @@ Item {
                         Keys.onPressed: event => {
                             const ctrl = event.modifiers & Qt.ControlModifier;
                             if (event.key === Qt.Key_Down || (ctrl && event.key === Qt.Key_J))
-                                launcher.move(1);
+                                launcher.moveRow(1);
                             else if (event.key === Qt.Key_Up || (ctrl && event.key === Qt.Key_K))
-                                launcher.move(-1);
+                                launcher.moveRow(-1);
+                            // With nothing typed there is no text for the arrows to move in, so in a grid they move the cursor.
+                            else if (launcher.columns > 1 && input.text === "" && (event.key === Qt.Key_Left || event.key === Qt.Key_Right))
+                                launcher.move(event.key === Qt.Key_Right ? 1 : -1);
+                            else if (ctrl && event.key === Qt.Key_D && launcher.mode === "clipboard")
+                                launcher.editClip("delete");
+                            else if (ctrl && event.key === Qt.Key_P && launcher.mode === "clipboard")
+                                launcher.editClip("pin");
                             else if (event.key === Qt.Key_Tab)
                                 results.forceActiveFocus();
                             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
@@ -545,10 +572,17 @@ Item {
             visible: launcher.query !== ""
             height: visible ? list.implicitHeight : 0
             Keys.onPressed: event => {
-                if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
-                    launcher.move(1);
+                const ctrl = event.modifiers & Qt.ControlModifier;
+                if (ctrl && event.key === Qt.Key_D && launcher.mode === "clipboard")
+                    launcher.editClip("delete");
+                else if (ctrl && event.key === Qt.Key_P && launcher.mode === "clipboard")
+                    launcher.editClip("pin");
+                else if (event.key === Qt.Key_J || event.key === Qt.Key_Down)
+                    launcher.moveRow(1);
                 else if (event.key === Qt.Key_K || event.key === Qt.Key_Up)
-                    launcher.move(-1);
+                    launcher.moveRow(-1);
+                else if (launcher.columns > 1 && (event.key === Qt.Key_H || event.key === Qt.Key_Left || event.key === Qt.Key_L || event.key === Qt.Key_Right))
+                    launcher.move(event.key === Qt.Key_L || event.key === Qt.Key_Right ? 1 : -1);
                 else if (event.key === Qt.Key_Slash)
                     input.forceActiveFocus();
                 else if (event.key === Qt.Key_D && launcher.mode === "reminder")
@@ -618,7 +652,7 @@ Item {
                         required property int index
                         readonly property bool current: index === launcher.selected
                         readonly property string kind: launcher.mode === "calculator" ? "answer" : launcher.mode === "clipboard" ? "clip" : launcher.mode === "colorschemes" ? "scheme" : launcher.mode === "commands" ? "command" : modelData.remind ? "tile" : "row"
-                        readonly property var clipDrawn: kind === "clip" ? { text: clipText.text, age: clipAge.text, height: rowBox.height, textHeight: clipText.height, lines: clipText.lineCount, thumb: thumb.status === Image.Ready, swatch: swatch.visible ? String(swatch.color) : null } : null
+                        readonly property var clipDrawn: kind === "clip" ? { text: clipText.text, age: clipAge.text, height: rowBox.height, pinned: clipPin.text !== "", thumb: thumb.status === Image.Ready, swatch: swatch.visible ? String(swatch.color) : null } : null
                         readonly property var answerDrawn: kind === "answer" ? { text: answer.text, size: answer.font.pixelSize, bold: answer.font.bold, under: under.text } : null
                         readonly property string headText: modelData.head ? headLabel.text : ""
                         // A colorscheme row's strip as drawn, for the state.
@@ -648,37 +682,38 @@ Item {
                         Rectangle {
                             id: rowBox
                             width: parent.width
-                            height: kind === "answer" ? 80 : kind === "clip" ? 84 : kind === "scheme" ? 110 : kind === "tile" ? 56 : 48
-                            radius: kind === "clip" || kind === "scheme" ? 14 : 12
-                            color: kind === "clip" || kind === "scheme" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && (kind === "row" || kind === "command")) ? Qt.alpha(launcher.on, 0.07) : "transparent"
+                            height: kind === "answer" ? 80 : kind === "scheme" ? 110 : kind === "tile" ? 56 : 48
+                            radius: kind === "scheme" ? 14 : 12
+                            color: kind === "scheme" ? Qt.alpha(launcher.on, current ? 0.10 : 0.07) : kind === "tile" || (current && (kind === "row" || kind === "command" || kind === "clip")) ? Qt.alpha(launcher.on, 0.07) : "transparent"
 
                             Root.Click {
                                 name: "launcher-row:" + index
                                 onTapped: launcher.runRow(index)
                             }
 
-                            // A clip's card: an image's thumbnail or a colour's swatch, then up to three lines of its text cut to the card, and its age.
+                            // A clip's row: an image's thumbnail or a colour's swatch, one line of its text, a pin's mark, and its age.
                             Row {
                                 visible: kind === "clip"
                                 x: 12
-                                y: 11
                                 width: parent.width - 24
-                                height: parent.height - 22
+                                height: parent.height
                                 spacing: 12
 
                                 Rectangle {
                                     visible: !!modelData.image
-                                    width: 104
-                                    height: 62
-                                    radius: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 56
+                                    height: 34
+                                    radius: 6
                                     color: Qt.alpha(launcher.on, 0.12)
+                                    clip: true
                                     Image {
                                         id: thumb
                                         anchors.fill: parent
                                         fillMode: Image.PreserveAspectCrop
-                                        source: kind === "clip" && modelData.image && launcher.thumbsReady[modelData.id] ? "file://" + launcher.thumbDir + "/" + modelData.id : ""
-                                        sourceSize.width: 208
-                                        sourceSize.height: 124
+                                        source: kind !== "clip" || !modelData.image ? "" : modelData.pinned ? "file://" + modelData.file : launcher.thumbsReady[modelData.id] ? "file://" + launcher.thumbDir + "/" + modelData.id : ""
+                                        sourceSize.width: 112
+                                        sourceSize.height: 68
                                         asynchronous: true
                                         cache: false
                                     }
@@ -687,46 +722,44 @@ Item {
                                 Rectangle {
                                     id: swatch
                                     visible: !!modelData.swatch
-                                    width: 62
-                                    height: 62
-                                    radius: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 34
+                                    height: 34
+                                    radius: 8
                                     color: modelData.swatch || "transparent"
                                 }
 
-                                Column {
-                                    width: parent.width - (modelData.image ? 116 : modelData.swatch ? 74 : 0)
-                                    height: parent.height
+                                Text {
+                                    id: clipText
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: parent.width - (modelData.image ? 68 : modelData.swatch ? 46 : 0) - clipPin.width - clipAge.width - 24
+                                    textFormat: Text.PlainText
+                                    text: kind === "clip" ? look.title(modelData.title) : ""
+                                    elide: Text.ElideRight
+                                    maximumLineCount: 1
+                                    color: launcher.on
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 13
+                                }
 
-                                    Text {
-                                        id: clipText
-                                        width: parent.width
-                                        // Three 15 px lines, a gap and the age fit the card's 62 px inside its padding.
-                                        height: Math.min(implicitHeight, 45)
-                                        textFormat: Text.PlainText
-                                        text: kind === "clip" ? look.title(modelData.title) : ""
-                                        wrapMode: Text.WrapAnywhere
-                                        maximumLineCount: 3
-                                        elide: Text.ElideRight
-                                        lineHeightMode: Text.FixedHeight
-                                        lineHeight: 15
-                                        color: launcher.on
-                                        font.family: launcher.fonts.ui ?? ""
-                                        font.pixelSize: 12
-                                    }
+                                Text {
+                                    id: clipPin
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: modelData.pinned ? "\uf08d" : ""
+                                    color: launcher.tones.accent
+                                    font.family: "Symbols Nerd Font Mono"
+                                    font.pixelSize: 12
+                                }
 
-                                    Item {
-                                        width: 1
-                                        height: parent.height - clipText.height - clipAge.height
-                                    }
-
-                                    Text {
-                                        id: clipAge
-                                        textFormat: Text.PlainText
-                                        text: modelData.age ?? ""
-                                        color: launcher.tones.muted
-                                        font.family: launcher.fonts.ui ?? ""
-                                        font.pixelSize: 11
-                                    }
+                                Text {
+                                    id: clipAge
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
+                                    text: modelData.age ?? ""
+                                    color: launcher.tones.muted
+                                    font.family: launcher.fonts.ui ?? ""
+                                    font.pixelSize: 11
                                 }
                             }
 

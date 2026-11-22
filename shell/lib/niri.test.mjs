@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { initial, reduce, outputView, focusedOutput, shares, urgentWorkspaces, outputWorkspaces, columnPosition, edgeToEdge, covered, configNotifies, reconnected } from './niri.mjs';
+import { initial, reduce, focusedOutput, shares, outputWorkspaces, edgeToEdge, covered, configNotifies, reconnected } from './niri.mjs';
 
 // Captured from niri 26.04's event stream: start, open foot, workspace 2, workspace 1, open and close a second foot.
 const LINES = [
@@ -26,26 +26,19 @@ const RETITLE =
 
 const run = (lines, state = initial) => lines.reduce((s, l) => reduce(s, JSON.parse(l)), state);
 
-test('foot open on workspace 1 shows in the view of its output', () => {
-  assert.deepEqual(outputView(run(LINES), 'winit'), { idx: 1, app: 'foot', title: 'foot' });
+const shownIdx = (s) => outputWorkspaces(s, 'winit').find((w) => w.active).idx;
+
+test('an empty workspace and going back to workspace 1 move the shown workspace', () => {
+  assert.equal(shownIdx(run([...LINES, ...WS2])), 2);
+  assert.equal(shownIdx(run([...LINES, ...WS2, ...WS1])), 1);
 });
 
-test('an empty workspace shows its index and no window', () => {
-  assert.deepEqual(outputView(run([...LINES, ...WS2]), 'winit'), { idx: 2, app: null, title: null });
-});
-
-test('going back to workspace 1 shows foot again', () => {
-  assert.deepEqual(outputView(run([...LINES, ...WS2, ...WS1]), 'winit'), { idx: 1, app: 'foot', title: 'foot' });
-});
-
-test('closing the second window returns the view to the first', () => {
-  const s = run([...LINES, ...SECOND_FOOT, ...CLOSE_SECOND]);
-  assert.deepEqual(s.windows.map((w) => w.id), [2]);
-  assert.deepEqual(outputView(s, 'winit'), { idx: 1, app: 'foot', title: 'foot' });
+test('closing the second window leaves the first', () => {
+  assert.deepEqual(run([...LINES, ...SECOND_FOOT, ...CLOSE_SECOND]).windows.map((w) => w.id), [2]);
 });
 
 test('a title change arrives as WindowOpenedOrChanged and replaces the title', () => {
-  assert.deepEqual(outputView(run([...LINES, RETITLE]), 'winit'), { idx: 1, app: 'foot', title: '~/Codes/dotfiles' });
+  assert.equal(run([...LINES, RETITLE]).windows.find((w) => w.id === 2).title, '~/Codes/dotfiles');
 });
 
 test('the reply to the EventStream request leaves the state as it was', () => {
@@ -57,8 +50,7 @@ test('the focused output is the output of the focused workspace', () => {
   assert.equal(focusedOutput(run(LINES)), 'winit');
 });
 
-test('before any event there is no view and no focused output', () => {
-  assert.equal(outputView(initial, 'winit'), null);
+test('before any event there is no focused output', () => {
   assert.equal(focusedOutput(initial), null);
 });
 
@@ -103,7 +95,7 @@ test("the shell's own wf-recorder is no share, and no recording leaves every cas
   assert.deepEqual(shares(live, 0).map((s) => s.stream), [1, 2]);
 });
 
-test('a window share names its app as the margin does, and a cleared or paused one says so', () => {
+test('a window share names its app, and a cleared or paused one says so', () => {
   const live = run([...LINES, pw(2, 2, { Window: { id: 2 } }), pw(3, 3, 'Nothing'), pw(4, 4, { Window: { id: 99 } }, false)]);
   assert.deepEqual(
     shares(live, 0).map((s) => [s.target, s.app, s.active]),
@@ -128,38 +120,10 @@ const ws = (id, idx, output, urgent = false, active = false) => ({ id, idx, name
 const workspaces = (...list) => JSON.stringify({ WorkspacesChanged: { workspaces: list } });
 const wsUrgency = (id, urgent) => JSON.stringify({ WorkspaceUrgencyChanged: { id, urgent } });
 
-test("an output's urgent workspaces read in workspace order, the current one included", () => {
-  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'), ws(3, 3, 'eDP-1'), ws(4, 4, 'eDP-1')), wsUrgency(3, true), wsUrgency(2, true), wsUrgency(1, true)]);
-  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), [1, 2, 3]);
-});
-
-test('a workspace no longer urgent drops out of the list', () => {
-  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1')), wsUrgency(2, true), wsUrgency(2, false)]);
-  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), []);
-});
-
-test('each output lists only its own urgent workspaces, though their numbers repeat', () => {
-  const s = run([workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'), ws(3, 1, 'HDMI-A-1', false, true), ws(4, 2, 'HDMI-A-1')), wsUrgency(4, true)]);
-  assert.deepEqual(urgentWorkspaces(s, 'eDP-1'), []);
-  assert.deepEqual(urgentWorkspaces(s, 'HDMI-A-1'), [2]);
-});
-
-test('an empty workspace above dropping out moves the mark to the new number', () => {
-  const before = run([workspaces(ws(1, 1, 'eDP-1'), ws(2, 2, 'eDP-1', false, true), ws(3, 3, 'eDP-1')), wsUrgency(3, true)]);
-  assert.deepEqual(urgentWorkspaces(before, 'eDP-1'), [3]);
-  // A renumbering arrives as WorkspacesChanged alone, carrying each workspace's urgency.
-  const after = run([workspaces(ws(2, 1, 'eDP-1', false, true), ws(3, 2, 'eDP-1', true))], before);
-  assert.deepEqual(urgentWorkspaces(after, 'eDP-1'), [2]);
-});
-
 test('a window keeps the urgency niri last reported for it', () => {
   const s = run([...LINES, '{"WindowUrgencyChanged":{"id":2,"urgent":true}}']);
   assert.equal(s.windows.find((w) => w.id === 2).is_urgent, true);
   assert.equal(run(['{"WindowUrgencyChanged":{"id":2,"urgent":false}}'], s).windows.find((w) => w.id === 2).is_urgent, false);
-});
-
-test('before any event no workspace is urgent', () => {
-  assert.deepEqual(urgentWorkspaces(initial, 'eDP-1'), []);
 });
 
 test("an output's workspaces list in number order, each saying whether it is shown and urgent", () => {
@@ -177,22 +141,6 @@ const win = (id, col, workspace = 1) => ({ id, title: 'foot', app_id: 'foot', wo
 const windows = (...list) => JSON.stringify({ WindowsChanged: { windows: list } });
 const activeWindow = (id) => JSON.stringify({ WorkspaceActiveWindowChanged: { workspace_id: 1, active_window_id: id } });
 const shown = workspaces(ws(1, 1, 'eDP-1', false, true), ws(2, 2, 'eDP-1'));
-
-test("the margin's column reads the shown workspace's focused column of its columns", () => {
-  assert.deepEqual(columnPosition(run([shown, windows(win(1, 1), win(2, 2), win(3, 3), win(4, 1, 2)), activeWindow(2)]), 'eDP-1'), { at: 2, of: 3 });
-});
-
-test('a column move reaches the margin as WindowLayoutsChanged', () => {
-  const s = run([shown, windows(win(1, 1), win(2, 2), win(3, 3)), activeWindow(2)]);
-  const moved = JSON.stringify({ WindowLayoutsChanged: { changes: [[2, win(2, 3).layout], [3, win(3, 2).layout]] } });
-  assert.deepEqual(columnPosition(run([moved], s), 'eDP-1'), { at: 3, of: 3 });
-});
-
-test('a floating window, an empty workspace or no event yet has no column', () => {
-  assert.equal(columnPosition(run([shown, windows(win(1, 1), win(2, null)), activeWindow(2)]), 'eDP-1'), null);
-  assert.equal(columnPosition(run([shown, windows(win(1, 1, 2))]), 'eDP-1'), null);
-  assert.equal(columnPosition(initial, 'eDP-1'), null);
-});
 
 // eDP-1 is 2048 px wide at scale 1.25: Mod+F leaves a 1984 px tile inside the struts, and Mod+M or fullscreen a 2048 px one.
 const sized = (id, w) => ({ ...win(id, 1), layout: { ...win(id, 1).layout, tile_size: [w, 1196.0] } });

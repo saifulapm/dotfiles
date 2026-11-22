@@ -1,11 +1,11 @@
-// How the shell speaks under a token set, in its one plain voice: the launcher and the lists that share its idioms, the island's notification and OSD, and the margins.
+// How the shell speaks under a token set, in its one plain voice: the launcher and the lists that share its idioms, the island's notification and OSD.
 
-import { dateText, pad2 } from './margins.mjs';
+import { pad2 } from './margins.mjs';
 import { chipLabel } from './notifs.mjs';
 import { mix } from './notes-look.mjs';
 import { contrast } from './theme.mjs';
 import { slabText } from './surface.mjs';
-import { BIDI, CONTROL as ANY_CONTROL, C0, C0_BUT_LINES, DEL, C1, klass } from './clean.mjs';
+import { BIDI, C0, C0_BUT_LINES, DEL, C1, klass } from './clean.mjs';
 
 export const MODES = ['apps', 'windows', 'clipboard', 'emoji', 'calculator', 'commands', 'reminder', 'colorschemes'];
 
@@ -317,50 +317,4 @@ export function listLook(tokens) {
       return s < 60 ? 'now' : s < 3600 ? `${Math.floor(s / 60)}m` : s < 86400 ? `${Math.floor(s / 3600)}h` : `${Math.floor(s / 86400)}d`;
     },
   });
-}
-
-// How the margins read under a token set: Page 03, the app and title, an accent dot before the goal, and the date.
-export function marginLook(tokens) {
-  // The margins sit on the desk, so each word reads on its paper and its field.
-  const raw = (tokens || UNTHEMED).color;
-  const c = Object.assign({}, raw, { ink: onDesk(tokens, raw.ink), muted: onDesk(tokens, raw.muted), accent: onDesk(tokens, raw.accent) });
-  // A title is its file's name, which whoever sent the file chose; a control would draw as tofu, so it becomes a space.
-  const words = (s) => line((s ?? '').replace(ANY_CONTROL, ' '));
-  const look = {
-    number: (idx) => `Page ${pad2(idx)}`,
-    numberColor: c.ink,
-    numberWeight: 600,
-    // The focused column of its columns, two spaces after the number; a workspace of one column draws none.
-    column: (pos) => (!pos || pos.of < 2 ? '' : `  ${pos.at} / ${pos.of}`),
-    tail: (view) => (view.app === null && view.title === null ? '' : ` / ${words(view.app)} — ${words(view.title)}`),
-    tailColor: c.muted,
-    goal: (g) => (!g ? '' : g.left === null ? same(g.title) : `${same(g.title)} · ${same(g.left)}`),
-    goalColor: c.ink,
-    goalWeight: 500,
-    dot: true,
-    dotColor: c.accent,
-    // Unread mail is something to act on, so it reads in ink.
-    mail: (n) => (n > 0 ? `mail ${n}` : ''),
-    mailColor: c.ink,
-    mailWeight: 500,
-    word: (w) => same(w).replace(/^wifi$/, 'Wi-Fi').replace(/^no wifi$/, 'No Wi-Fi'),
-    date: (d) => same(dateText(d)),
-    dateColor: c.muted,
-    spacing: 16,
-    // The urgent workspaces after the title, three spaces on: at most 3 accent dots before their ink numbers, then a count of the rest; each segment is drawn in its own colour.
-    marks(idxs) {
-      if (idxs.length === 0) return [];
-      const rest = idxs.length - 3;
-      const shown = idxs.slice(0, 3).reduce((segs, idx, i) => segs.concat([{ text: `${i ? '  ' : '   '}•`, color: c.accent }, { text: ` ${pad2(idx)}`, color: c.ink }]), []);
-      return rest > 0 ? shown.concat([{ text: `  +${rest}`, color: c.ink }]) : shown;
-    },
-  };
-  // The words on screen, in order, as the tests read them.
-  look.drawn = (view, now, right) => ({
-    left: look.number(view.idx) + look.tail(view),
-    right: [right.sync && look.word(right.sync), look.goal(right.goal), look.mail(right.mail), right.wifi && look.word(right.wifi), right.battery && look.word(right.battery), look.date(now)]
-      .filter((p) => p)
-      .join(' '),
-  });
-  return look;
 }

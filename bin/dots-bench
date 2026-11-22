@@ -226,7 +226,7 @@ for i in 1 2 3; do
   dots-call launcher toggle >/dev/null || die "launcher toggle failed"
   until_ok 3000 island_is '.surface == "launcher" and .animating == false' || die "the island never settled on the launcher"
   dots-call cheatsheet toggle >/dev/null || die "cheatsheet toggle failed"
-  until_ok 3000 island_is '.surface == "cheatsheet" and .animating == false and .morph.from[0] != 176' || die "the island never settled on the cheat sheet from the launcher"
+  until_ok 3000 island_is '.surface == "cheatsheet" and .animating == false and .morph.from[0] > 400' || die "the island never settled on the cheat sheet from the launcher"
   read -r mx p95 < <(morph_stats)
   [ -n "$mx" ] || die "the island recorded no frames for its switch"
   switch_maxes+=("$mx") switch_p95=$(worse "$switch_p95" "$p95")

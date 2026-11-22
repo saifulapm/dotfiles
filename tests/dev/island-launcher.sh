@@ -9,7 +9,7 @@ launcher() { timeout 0.5 qs ipc call launcher state 2>/dev/null; }
 launcher_is() { launcher | jq -e "$@" >/dev/null 2>&1; }
 sheet_is() { timeout 0.5 qs ipc call cheatsheet state 2>/dev/null | jq -e "$@" >/dev/null 2>&1; }
 px() { grim -g "$1,$2 1x1" -t ppm - 2>/dev/null | tail -c3 | od -An -tx1 | tr -d ' \n'; }
-at_rest() { island_is '.surface == null and .width == 176 and .animating == false'; }
+at_rest() { island_is '.surface == null and .mode == "rest" and .animating == false'; }
 surfaces_focus() { niri msg -j layers | jq -e --arg k "$1" 'any(.[]; .namespace == "dots-surfaces" and .keyboard_interactivity == $k)' >/dev/null; }
 mod_space() { niri msg action spawn -- dots-call launcher toggle; }
 open_launcher() {

@@ -158,9 +158,9 @@ open, at 181 MiB idle, so drive its surfaces through `dots-call` instead. Chromi
   --id N`, the same call toggles back) and capture the output:
   `grim -o "$(niri msg -j focused-output | jq -r .name)" ...`.
 - Shell surfaces are layers `dots-surfaces` (the island and every surface),
-  `dots-margins`, `dots-paper` and `dots-dim`: check `niri msg -j layers` before trusting an
-  empty shot. A surface closes on the next key or click, so chain open and
-  grim in one call.
+  `dots-paper` and `dots-dim`: check `niri msg -j layers` before trusting an
+  empty shot. There are no margins: read the workspace, date and battery from `island state` `.rest`.
+  A surface closes on the next key or click, so chain open and grim in one call.
 
 ## 4. Input: only through the scripts
 
@@ -283,7 +283,7 @@ reaches them in about 4 ms and falls back to `qs ipc call`; a typed call
 |---|---|---|
 | `lock` | `state`, `lock`, `unlock <who> <min>`, `renew <who> <min>` | the session lock and its lease |
 | `idle` | `state`, `times <dimS> <lockS> <offS>` | dim, lock and monitors-off steps |
-| `island` | `state`, `focus` | the top island: clock, toasts, OSD, lease slot |
+| `island` | `state`, `focus` | the top island: clock, toasts, OSD, lease slot; at rest `.rest` holds the workspace dots, date and battery |
 | `notifs` | `state`, `open`, `close`, `toggle`, `clear`, `dnd <bool>`, `toggleDnd` | notification centre |
 | `launcher` | `state`, `open`, `close`, `toggle`, `mode <name>` | modes apps, windows, clipboard, emoji, calculator, commands, colorschemes (`c `; `dots colorscheme <name>` switches from a shell) |
 | `control` | `state`, `open`, `close`, `toggle`, `section <name>` | sections audio, wifi, bluetooth, power, display, route |
@@ -294,7 +294,6 @@ reaches them in about 4 ms and falls back to `qs ipc call`; a typed call
 | `record` | `state`, `toggle` | region recorder: picks, or stops a recording |
 | `media` | `playPause`, `next`, `previous` | the current MPRIS player |
 | `osd` | `brightness <step>` | brightness with its OSD, step like `5%+` |
-| `margins` | `state` | the margin text on the focused output |
 | `pinentry` | `state` | the gpg passphrase prompt |
 | `polkit` | `state` | the polkit prompt |
 | `shell` | `status` | theme, outputs, memory, sync |

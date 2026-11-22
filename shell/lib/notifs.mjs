@@ -234,3 +234,9 @@ export function chipLabel(files) {
 
 export const dragPayload = (entry) =>
   entry.files && entry.files.length > 0 ? { mime: 'text/uri-list', data: uriList(entry.files) } : { mime: 'text/plain', data: entry.body };
+
+// The notmuch thread a Mail notification names in its x-dots-mail-thread hint; anything but notmuch's 16 hex digits reads as none, since the id goes on to mail-open.
+export function mailThread(hints) {
+  const id = String(hints?.['x-dots-mail-thread'] ?? '');
+  return /^[0-9a-f]{16}$/.test(id) ? id : '';
+}

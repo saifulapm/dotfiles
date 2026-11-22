@@ -6,7 +6,7 @@ source "$(dirname "$0")/lib.sh"
 store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 open_goals() {
   until_ok 10000 desk_up
   niri msg action spawn -- dots-call goals toggle

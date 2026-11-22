@@ -9,14 +9,10 @@ layer_up() { layers | jq -e --arg ns "$1" 'any(.[]; .namespace == $ns)' >/dev/nu
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
 island_is() { island | jq -e "$1" >/dev/null 2>&1; }
 
-# The resting island is drawn in dots-surfaces, so the window maps with the margins, not on the surfaces' warm-up a second later.
+# The resting island is drawn in dots-surfaces, so the window maps on the shell's start.
 systemctl --user kill -s KILL "$DOTS_DEV_UNIT"
 until_ok 3000 eval '! layer_up dots-paper'
-until_ok 10000 layer_up dots-margins
-t_margins=$(now_ms)
-until_ok 3000 layer_up dots-surfaces
-gap=$(($(now_ms) - t_margins))
-check "dots-surfaces maps with the margins, not a second later (${gap} ms)" test "$gap" -le 400
+until_ok 10000 layer_up dots-surfaces
 until_ok 5000 shell_status >/dev/null
 
 focused=$(niri msg -j focused-output | jq -r .name)

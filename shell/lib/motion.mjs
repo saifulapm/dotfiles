@@ -2,7 +2,7 @@
 import { springCurve, ease } from './island.mjs';
 
 // The island's spring, ended within 1/30 of its travel: under half a pixel at the edge of a 640 px card from 96%.
-const SPRING = springCurve(260, 0.7, 30);
+const SPRING = springCurve(590, 0.7, 30);
 
 // The spring a surface opens on, and the short close that feels instant, their times stretched by the dev slowdown.
 export function surfaceMotion(slowdown = 1) {

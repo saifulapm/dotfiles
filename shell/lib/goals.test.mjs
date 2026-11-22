@@ -18,7 +18,6 @@ import {
   liveTasks,
   parseDeadline,
   countdown,
-  marginGoal,
   mergeStores,
 } from './goals.mjs';
 
@@ -120,20 +119,6 @@ test('the countdown rounds up, switches to hours under a day, and reads late onc
   assert.equal(countdown(T + 5 * H, T), '5h');
   assert.equal(countdown(T + 4.5 * H, T), '5h');
   assert.equal(countdown(T, T), 'late');
-});
-
-test('the margin shows the active goal with the nearest deadline', () => {
-  let s = addGoal(emptyStore(), 'Docs', T + 12 * D, T, 'g1');
-  s = addGoal(s, 'Ship v2', T + 3 * D, T, 'g2');
-  assert.equal(marginGoal(s, T + 60000), 'Ship v2 · 3d');
-  assert.equal(marginGoal(addGoal(emptyStore(), 'Ship v2', T + 5 * H, T, 'g1'), T), 'Ship v2 · 5h');
-});
-
-test('with no deadline the margin shows the first active goal bare, and with none active nothing', () => {
-  let s = addGoal(addGoal(emptyStore(), 'Ship v2', null, T, 'g1'), 'Read', null, T, 'g2');
-  assert.equal(marginGoal(moveGoal(s, 'g2', -1, T), T), 'Read');
-  assert.equal(marginGoal(toggleGoal(toggleGoal(s, 'g1', T), 'g2', T), T), '');
-  assert.equal(marginGoal(emptyStore(), T), '');
 });
 
 test('a merge takes the newer copy of each goal and of each task, and keeps tombstones', () => {

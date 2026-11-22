@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stands in for mail-open in a nested session: it records what it was asked to open and opens nothing.
+echo "$1" >"$DOTS_DEV_DIR/mail-opened"

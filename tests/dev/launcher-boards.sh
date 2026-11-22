@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Each launcher mode draws its board 3 form in the island: the calculator's 40 px answer, a reminder's one tile, the clipboard's 2 x 2 preview cards, the colorschemes' cards three to a row, the commands in two columns.
+# Each launcher mode draws its board 3 form in the island: the calculator's 40 px answer, a reminder's one tile, the clipboard's one-line rows, the colorschemes' cards three to a row, the commands in two columns.
 {
 source "$(dirname "$0")/lib.sh"
 
@@ -39,12 +39,21 @@ until_ok 3000 more_than $((n + 2))
 wl-copy 'just bench --only morph'
 until_ok 3000 more_than $((n + 3))
 niri msg action spawn -- dots-call launcher mode clipboard
-until_ok 3000 state_is '.open and .mode == "clipboard" and (.clips | length) == 4 and .keyboard and .settled'
+until_ok 3000 state_is '.open and .mode == "clipboard" and (.clips | length) == 5 and .keyboard and .settled'
 until_ok 3000 state_is '.clips[2].thumb'
-check "Mod+V draws the clips as 2 x 2 cards of 84 px, each with its age ($(launcher | jq -c '{columns, clips: [.clips[] | {height, age}]}'))" state_is '.columns == 2 and (.clips | length) == 4 and (.clips | all(.height == 84 and .age == "now"))'
+check "Mod+V draws the clips as one column of 48 px rows, each with its age ($(launcher | jq -c '{columns, clips: [.clips[] | {height, age}]}'))" state_is '.columns == 1 and (.clips | length) == 5 and (.clips | all(.height == 48 and .age == "now" and .pinned == false))'
 check "the image clip shows a thumbnail ($(launcher | jq -c '.clips[2] | {text, thumb}'))" state_is '.clips[2].thumb == true'
 check "the colour clip shows its swatch ($(launcher | jq -c '.clips[1].swatch'))" state_is '.clips[1].swatch == "#c8381e"'
-check "the 100 KB clip draws as a card cut to its box, three lines at most ($(launcher | jq -c '.clips[3] | {height, textHeight, lines}'))" state_is '.clips[3].height == 84 and .clips[3].textHeight <= 51 and .clips[3].lines <= 3'
+check "the 100 KB clip draws as one row like the rest ($(launcher | jq -c '.clips[3] | {height}'))" state_is '.clips[3].height == 48'
+wtype -M ctrl -k p -m ctrl
+until_ok 3000 state_is '.clips[0].pinned'
+check "Ctrl+P pins the selected clip, which then lists first with its mark ($(launcher | jq -c '[.clips[] | .pinned]'))" state_is '(.clips | length) == 6 and .clips[0].pinned and .clips[0].text == .clips[1].text'
+wtype -M ctrl -k d -m ctrl
+until_ok 3000 state_is '(.clips | length) == 5'
+check "and Ctrl+D on the pinned row deletes the pin and leaves the clip" state_is '(.clips | length) == 5 and (.clips | all(.pinned == false))'
+wtype -M ctrl -k d -m ctrl
+until_ok 3000 state_is '(.clips | length) == 4'
+check "Ctrl+D on a clip deletes it from the history" state_is '(.clips | length) == 4'
 close_launcher
 
 read -r oh < <(niri msg -j outputs | jq -r '.[] | .logical.height')

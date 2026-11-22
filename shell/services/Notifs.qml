@@ -44,6 +44,7 @@ Scope {
             picture: N.pictureOf(n.image, n.appIcon, Quickshell.env("HOME")),
             progress: N.progressOf(n.hints),
             stack: N.stackOf(n.hints),
+            mailThread: N.mailThread(n.hints),
             summary: n.summary,
             body: n.body,
             files: N.filesOf(n.hints, Quickshell.env("HOME")),
@@ -246,9 +247,25 @@ Scope {
         save();
     }
 
-    // True when the entry's app is still there to take its default action.
+    // True when the entry's app is still there to take its default action. Mail sends none, so its notification opens the thread it names, or the Imbox (VCZKSEDV).
     function act(key) {
-        return runAction(key, "default");
+        if (runAction(key, "default"))
+            return true;
+        const e = history.find(h => h.key === key) ?? (current?.key === key ? current : null);
+        if (e?.app !== "Mail")
+            return false;
+        Quickshell.execDetached([Quickshell.env("DOTS_MAIL_OPEN") || Quickshell.shellDir + "/bin/mail-open", e.mailThread ? "thread:" + e.mailThread : "Imbox"]);
+        return true;
+    }
+
+    // What the island shows as one stack: the notification it holds, the criticals set aside under it and those waiting behind it.
+    readonly property var pile: W.pile(current, waiting, queue)
+
+    // Esc on the island clears the whole stack from it at once; each stays in the history, and a waiting question shows next (NQJ87M6W).
+    function putAwayAll() {
+        waiting = [];
+        queue = queue.filter(q => q.kind !== "notification");
+        next();
     }
 
     function runAction(key, identifier) {

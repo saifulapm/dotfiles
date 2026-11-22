@@ -18,6 +18,7 @@ import "lib/switch.mjs" as Sw
 import "lib/island-live.mjs" as L
 import "lib/island-tones.mjs" as T
 import "lib/island-wait.mjs" as Wait
+import "lib/margins.mjs" as M
 
 // At rest the island is the clock, a Surface box 10 px below the top edge; it draws in the surfaces' window, which fills its output.
 Item {
@@ -26,6 +27,8 @@ Item {
     required property var theme
     required property var niri
     required property var clock
+    // The battery's word, empty on a machine with none.
+    required property var power
     // dots-zones's answer for the calendar's city column, run when the calendar first opens.
     required property var zones
     required property var notifs
@@ -197,7 +200,7 @@ Item {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: mode === "rest" || mode === "surface" ? [waiting > 0 && mode === "rest" ? 204 : H.REST.width, H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
+            label: mode === "rest" || mode === "surface" ? [restWidth + (waiting > 0 && mode === "rest" ? 14 : 0), H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
             live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
             leaseCard: [520, leaseColumn.implicitHeight + 32],
             sharingCard: [520, shareColumn.implicitHeight + 32],
@@ -209,6 +212,11 @@ Item {
             // An open surface's own width and height, up to the output's less 48 px each way (PMQRFEYY, M4SVCQVQ).
             surface: [Math.min(surfaceWidth, output.width - 48), Math.min(surfaceHeight, output.height - 48)]
         })
+    // The resting island, left to right: a dot per workspace of its output, the date, the clock and the battery, 14 px in from each end (MV63RJG3).
+    readonly property var workspaces: niri.workspaces(output.name)
+    readonly property string restDateText: M.dateText(clock.now)
+    readonly property string batteryText: (power.battery || "").split(" ")[0]
+    readonly property real restWidth: Math.ceil(14 + (workspaces.length > 0 ? restDots.width + 12 : 0) + restDate.implicitWidth + 8 + restClock.width + (batteryText ? 12 + restBattery.implicitWidth : 0) + 14)
     readonly property string part: ["notification", "question", "calendar", "leaseCard", "sharingCard", "mediaCard", "surface"].indexOf(mode) >= 0 ? mode : live ? "live" : "label"
     // Board 2's one-line state of this mode, picked from the same slots the mode reads, or null; heldLive keeps the last one so it leaves drawn.
     readonly property var live: L.liveState(H.modeOf(holder, slots), slots, clock.now)
@@ -311,7 +319,7 @@ Item {
         morphClock = [];
         if (glide) {
             const s0 = 13 / 34;
-            glideFrom = Qt.point((fromWidth - glideClock.implicitWidth * s0) / 2, (fromHeight - glideClock.implicitHeight * s0) / 2);
+            glideFrom = Qt.point(labelPart.x + label.x + (label.width - glideClock.implicitWidth * s0) / 2, (fromHeight - glideClock.implicitHeight * s0) / 2);
             clockGlide = true;
         }
         morphT0 = Date.now();
@@ -792,14 +800,41 @@ Item {
                 month: clock.now.getMonth()
             };
             zones.need();
-        } else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard" && mode !== "sharingCard")
+        } else if (mode !== "question" && mode !== "notification" && mode !== "leaseCard" && mode !== "sharingCard" && mode !== "calendar")
             return;
+        hoverOpened = false;
         focused = true;
         keys.forceActiveFocus();
     }
 
+    // The pointer resting 150 ms on the island at rest opens the calendar as Mod+I does, without the keyboard; 300 ms after it leaves, the calendar closes, unless a click or Mod+I took the keyboard meanwhile (9Y0A71JD).
+    property bool hoverOpened: false
+    readonly property bool hoverable: !holder && !focused && (mode === "rest" || mode === "playing")
+    Root.Tick {
+        id: hoverOpen
+        interval: 150
+        running: boxHover.hovered && island.hoverable
+        onTriggered: {
+            island.calendar = {
+                year: island.clock.now.getFullYear(),
+                month: island.clock.now.getMonth()
+            };
+            island.zones.need();
+            island.hoverOpened = true;
+        }
+    }
+    Root.Tick {
+        interval: 300
+        running: island.hoverOpened && !boxHover.hovered
+        onTriggered: {
+            island.hoverOpened = false;
+            if (!island.focused)
+                island.calendar = null;
+        }
+    }
+
     // A click on the resting island opens what it shows: the media, lease or sharing card, a closed question, the recording app's window, the YouTube App during its download (0WP8K4M3), or the calendar when nothing is live.
-    readonly property bool clickable: ["rest", "playing", "lease", "sharing", "mic", "downloading"].indexOf(mode) >= 0 || (mode === "question" && !focused)
+    readonly property bool clickable: ["rest", "playing", "lease", "sharing", "mic", "downloading"].indexOf(mode) >= 0 || ((mode === "question" || mode === "calendar") && !focused)
     function openActivity() {
         if (mode === "mic") {
             focusRecorder();
@@ -870,6 +905,12 @@ Item {
         release();
     }
 
+    // Esc and a right click clear every notification stacked in the island at once.
+    function putAwayAll() {
+        notifs.putAwayAll();
+        release();
+    }
+
     // A capture's Captured or a refusal shows for 1.5 s.
     function showToast(text) {
         toast = text;
@@ -899,6 +940,7 @@ Item {
 
     function release() {
         focused = false;
+        hoverOpened = false;
         leaseOpen = false;
         sharingOpen = false;
         mediaOpen = false;
@@ -1193,6 +1235,10 @@ Item {
         role: "island"
 
         // Under every part, so a question's scroll and a notification's own area take the pointer first.
+        HoverHandler {
+            id: boxHover
+        }
+
         Root.Click {
             name: "island"
             acceptedButtons: island.clickable ? Qt.LeftButton : Qt.NoButton
@@ -1215,10 +1261,64 @@ Item {
                 width: island.sizes.label[0]
                 height: island.sizes.label[1]
 
+                readonly property bool rest: island.mode === "rest"
+
+                Row {
+                    id: restDots
+                    visible: labelPart.rest
+                    x: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 5
+
+                    Repeater {
+                        model: island.workspaces
+
+                        Rectangle {
+                            required property var modelData
+                            width: modelData.active ? 14 : 6
+                            height: 6
+                            radius: 3
+                            color: modelData.urgent ? island.tones.danger : modelData.active ? box.style.text : Qt.alpha(box.style.text, 0.35)
+                        }
+                    }
+                }
+
+                Text {
+                    id: restDate
+                    visible: labelPart.rest
+                    textFormat: Text.PlainText
+                    x: 14 + (island.workspaces.length > 0 ? restDots.width + 12 : 0)
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: island.restDateText
+                    color: island.tones.muted
+                    font.family: island.theme.tokens?.type.mono ?? ""
+                    font.pixelSize: 13
+                }
+
+                // The clock's width at its widest digits, so a minute's change never moves the battery.
+                TextMetrics {
+                    id: restClock
+                    text: "00:00"
+                    font: label.font
+                }
+
+                Text {
+                    id: restBattery
+                    visible: labelPart.rest && island.batteryText !== ""
+                    textFormat: Text.PlainText
+                    x: label.x + restClock.width + 12
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: island.batteryText
+                    color: island.power.battery.indexOf("charging") >= 0 ? island.tones.ok : island.tones.muted
+                    font.family: island.theme.tokens?.type.mono ?? ""
+                    font.pixelSize: 13
+                }
+
                 Text {
                     id: label
                     textFormat: Text.PlainText
-                    anchors.centerIn: parent
+                    x: labelPart.rest ? restDate.x + restDate.implicitWidth + 8 : Math.round((parent.width - width) / 2)
+                    anchors.verticalCenter: parent.verticalCenter
                     width: Math.min(implicitWidth, parent.width - 28)
                     elide: Text.ElideRight
                     text: I.isCompact(island.mode) ? island.text : island.heldText
@@ -1724,7 +1824,7 @@ Item {
                         image: island.heldNotification?.icon ?? ""
                         letter: island.noteLook.glyph(island.heldNotification?.app ?? "")
                         title: island.noteLook.summaryText(island.heldNotification?.summary ?? "")
-                        detail: island.noteLook.appText(island.heldNotification?.app ?? "")
+                        detail: island.noteLook.appText(island.heldNotification?.app ?? "") + (island.notifs.pile.count > 1 ? " · +" + (island.notifs.pile.count - 1) + " more" : "")
                         clock: island.clockNow
                         ink: box.style.text
                         muted: island.tones.muted
@@ -2330,7 +2430,7 @@ Item {
         Rectangle {
             id: waitDot
             visible: island.waiting > 0 && (island.mode === "surface" || island.mode === "rest")
-            x: island.mode === "surface" ? box.width - 14 - width : Math.round(box.width / 2 + label.implicitWidth / 2 + 8)
+            x: box.width - 14 - width
             y: island.mode === "surface" ? 14 : Math.round((box.height - height) / 2)
             z: 2
             width: 6
@@ -2350,7 +2450,7 @@ Item {
             // A click on an action chip runs that action alone; the area covers the card, so it finds the chip itself.
             onClicked: mouse => {
                 if (mouse.button === Qt.RightButton)
-                    return island.putAway();
+                    return island.putAwayAll();
                 for (let i = 0; i < actionRepeater.count; i++) {
                     const chip = actionRepeater.itemAt(i);
                     if (chip.contains(chip.mapFromItem(noteArea, mouse.x, mouse.y)))
@@ -2414,8 +2514,10 @@ Item {
                 if (island.mode === "notification") {
                     if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                         island.openNotification();
-                    else if (event.key === Qt.Key_D || event.key === Qt.Key_Escape)
+                    else if (event.key === Qt.Key_D)
                         island.putAway();
+                    else if (event.key === Qt.Key_Escape)
+                        island.putAwayAll();
                     else
                         island.runChip(event.text);
                     return;

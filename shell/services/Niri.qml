@@ -11,16 +11,8 @@ Scope {
     readonly property string focusedOutput: N.focusedOutput(state) ?? ""
     readonly property bool overview: state.overview
 
-    function view(output) {
-        return N.outputView(state, output);
-    }
-
-    function urgent(output) {
-        return N.urgentWorkspaces(state, output);
-    }
-
-    function column(output) {
-        return N.columnPosition(state, output);
+    function workspaces(output) {
+        return N.outputWorkspaces(state, output);
     }
 
     function edgeToEdge(output, width) {

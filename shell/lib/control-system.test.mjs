@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncFailing, syncRows, batteryLine, chargeLimit, chargeCommand } from './control-system.mjs';
+import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncRows, batteryLine, chargeLimit, chargeCommand } from './control-system.mjs';
 
 test('brightnessctl -m -l lines become backlights with their percent', () => {
   const text = 'apple-panel-bl,backlight,36,7%,509\n228600000.dsi.0,backlight,0,0%,255\n';
@@ -50,7 +50,6 @@ test('Route lists every sync unit, a failing one with its error in the danger to
   const at = (h, m) => new Date(2026, 9, 19, h, m).getTime();
   assert.deepEqual(syncRows({}), [{ title: 'Sync', detail: 'no rounds yet' }]);
   const good = { notes: { ok: true, lastRun: at(9, 5), lastOk: at(9, 5), error: null }, goals: { ok: true, lastRun: at(14, 2), lastOk: at(14, 2), error: null } };
-  assert.equal(syncFailing(good), false);
   assert.deepEqual(syncRows(good), [
     { title: 'notes', detail: 'ok · 09:05' },
     { title: 'goals', detail: 'ok · 14:02' },
@@ -60,7 +59,6 @@ test('Route lists every sync unit, a failing one with its error in the danger to
     goals: { ok: true, lastRun: at(14, 3), lastOk: at(14, 3), error: null },
     fish: { ok: false, lastRun: at(14, 3), lastOk: null, error: 'Failed to copy: ' + 'x'.repeat(80) },
   };
-  assert.equal(syncFailing(bad), true);
   assert.deepEqual(syncRows(bad), [
     { title: 'notes', detail: 'directory not found', tone: 'danger' },
     { title: 'goals', detail: 'ok · 14:03' },
@@ -82,7 +80,6 @@ test('a forged sync.json reads as units Route can draw, never a TypeError', () =
     ssh: { ok: false, lastRun: null, lastOk: null, error: 'no error recorded' },
     '<b>x</b>': { ok: true, lastRun: null, lastOk: null, error: null },
   });
-  assert.equal(syncFailing(units), true);
   assert.deepEqual(syncRows(units).map((r) => r.detail), ['no error recorded', 'no error recorded', 'ok']);
   assert.deepEqual(syncRows(parseSync('{"notes":{"ok":true,"lastOk":"x"}}')), [{ title: 'notes', detail: 'ok' }]);
 });

@@ -13,16 +13,15 @@ store="$DOTS_DEV_DIR/data/dots/goals/dev.json"
 goals_state() { timeout 0.5 qs ipc call goals state 2>/dev/null; }
 state_is() { goals_state | jq -e "$@" >/dev/null 2>&1; }
 island() { timeout 0.5 qs ipc call island state 2>/dev/null; }
-margins() { timeout 0.5 qs ipc call margins state 2>/dev/null; }
-desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-margins")' >/dev/null; }
+desk_up() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces")' >/dev/null; }
 
-# A goal on disk the held store has not read: the margin names it only once the store loads.
+# A goal on disk the held store has not read: Goals lists it only once the store loads.
 /usr/bin/mkdir -p "$(dirname "$store")"
 node --input-type=module -e "const G = await import('$repo/shell/lib/goals.mjs'); console.log(JSON.stringify(G.addGoal(G.emptyStore(), 'Ship v2', null, Date.now(), 'g0')))" >"$store"
 
 until_ok 10000 desk_up
 sleep 1
-check "with the store held, the margin names no goal ($(margins | jq -c .right.goal))" bash -c "timeout 0.5 qs ipc call margins state | jq -e '.right.goal == \"\"' >/dev/null"
+check "with the store held, Goals lists no goal ($(goals_state | jq -c .active))" state_is '.active == []'
 niri msg action spawn -- dots-call goals toggle
 sleep 1
 check "Mod+G before the store is read leaves the island at rest ($(island | jq -c '{surface, mode}'))" bash -c "timeout 0.5 qs ipc call island state | jq -e '.surface == null' >/dev/null"
@@ -32,9 +31,9 @@ errors=$(qml_errors)
 check "and the shell's journal has no QML error" test -z "$errors"
 
 touch "$fake/release"
-read_store() { margins | jq -e '.right.goal == "Ship v2"' >/dev/null 2>&1; }
+read_store() { state_is '.active == ["Ship v2"]'; }
 until_ok 5000 read_store
-check "once the mkdir exits, the store is read and the margin names Ship v2 ($(margins | jq -c .right.goal))" read_store
+check "once the mkdir exits, the store is read and Goals lists Ship v2 ($(goals_state | jq -c .active))" read_store
 niri msg action spawn -- dots-call goals toggle
 until_ok 3000 state_is '.open and .keyboard and .settled'
 check "Mod+G now opens Goals on the island ($(island | jq -c .surface))" bash -c "timeout 0.5 qs ipc call island state | jq -e '.surface == \"goals\"' >/dev/null"
