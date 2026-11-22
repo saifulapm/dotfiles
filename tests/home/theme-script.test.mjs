@@ -28,7 +28,7 @@ test('dots-dev renders DOTS_DEV_SCHEME with the colorscheme render, artboard by 
 test('the script, run where a dark old theme is saved, saves artboard and tells GTK light', (t) => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'theme-script-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const d of ['bin/dots', 'shell/lib', 'shell/newtab', 'colorschemes', 'home/.chezmoitemplates/lib.sh']) cpSync(join(repo, d), join(root, d), { recursive: true });
+  for (const d of ['bin/dots', 'shell/lib', 'colorschemes', 'home/.chezmoitemplates/lib.sh']) cpSync(join(repo, d), join(root, d), { recursive: true });
   writeFileSync(join(root, '.chezmoiroot'), 'home\n');
   const r = spawnSync('chezmoi', ['--config', join(root, 'none.toml'), '--source', root, 'execute-template'], {
     input: read('home/.chezmoiscripts/run_onchange_after_10-theme.sh.tmpl'), encoding: 'utf8', env: { PATH: process.env.PATH, HOME: root },

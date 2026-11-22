@@ -11,7 +11,6 @@ import * as dns from './dns.mjs';
 import * as island from './island.mjs';
 import * as launcher from './launcher.mjs';
 import * as lease from './lease.mjs';
-import * as newtab from './newtab.mjs';
 import * as notes from './notes.mjs';
 import * as notesLook from './notes-look.mjs';
 import * as picker from './picker.mjs';
@@ -39,7 +38,6 @@ const ROWS = {
   'island trackText': (s) => island.trackText({ title: s }),
   'launcher overviewChar': (s) => launcher.overviewChar(s, {}),
   'lease holder': (s) => lease.holder(s),
-  'newtab siteRows': (s) => newtab.siteRows([{ url: 'https://x.org/', title: s }])[0].title,
   'notes displayText': (s) => notes.displayText(s),
   'notes-look tabLabels': (s) => notesLook.tabLabels({ sectionLabel: (x) => '#' + x }, [s], '')[0].label,
   'picker oneLine': (s) => picker.oneLine(s),
@@ -78,7 +76,6 @@ const BEFORE = {
   'island trackText': ["ab", "ab", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "", "", "", "", "", "", "", "", "", "\u200b", "\u200c", "", "", "", "", "", "", "", "%"],
   'launcher overviewChar': ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "\u0085", "\u009f", "\u061c", "\u200b", "\u200c", "\u200e", "\u200f", "\u202a", "\u202e", "\u2066", "\u2069", "\ufeff", "%"],
   'lease holder': ["ab", "ab", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "agent", "agent", "agent", "agent", "agent", "agent", "agent", "agent", "agent", "\u200b", "\u200c", "agent", "agent", "agent", "agent", "agent", "agent", "agent", "%"],
-  'newtab siteRows': ["ab", "ab", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "\u200b", "\u200c", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "x.org", "%"],
   'notes displayText': ["\n\u001b\u0007⟨U+202E⟩⟨U+2066⟩⟨U+200F⟩ab⟨U+200F⟩⟨U+2066⟩⟨U+202E⟩\u0007\u001b\n", "ab", "a\tb", "a\nb", "a\rb", "a\u0000b", "a\u001bb", "a\u007fb", "a\u0085b", "a\u009fb", "a⟨U+61C⟩b", "a\u200bb", "a\u200cb", "a⟨U+200E⟩b", "a⟨U+200F⟩b", "a⟨U+202A⟩b", "a⟨U+202E⟩b", "a⟨U+2066⟩b", "a⟨U+2069⟩b", "a\ufeffb", "a%b", "\t", "\n", "\r", "\u0000", "\u001b", "\u007f", "\u0085", "\u009f", "⟨U+61C⟩", "\u200b", "\u200c", "⟨U+200E⟩", "⟨U+200F⟩", "⟨U+202A⟩", "⟨U+202E⟩", "⟨U+2066⟩", "⟨U+2069⟩", "\ufeff", "%"],
   'notes-look tabLabels': ["#⟨U+202E⟩⟨U+2066⟩⟨U+200F⟩ab⟨U+200F⟩⟨U+2066⟩⟨U+202E⟩", "#ab", "#a b", "#a b", "#a b", "#a b", "#a b", "#a b", "#a b", "#a b", "#a⟨U+61C⟩b", "#a\u200bb", "#a\u200cb", "#a⟨U+200E⟩b", "#a⟨U+200F⟩b", "#a⟨U+202A⟩b", "#a⟨U+202E⟩b", "#a⟨U+2066⟩b", "#a⟨U+2069⟩b", "#a\ufeffb", "#a%b", "#", "#", "#", "#", "#", "#", "#", "#", "#⟨U+61C⟩", "#\u200b", "#\u200c", "#⟨U+200E⟩", "#⟨U+200F⟩", "#⟨U+202A⟩", "#⟨U+202E⟩", "#⟨U+2066⟩", "#⟨U+2069⟩", "#", "#%"],
   'picker oneLine': ["ab", "ab", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "a b", "ab", "a\u200bb", "a\u200cb", "ab", "ab", "ab", "ab", "ab", "ab", "a b", "a%b", "", "", "", "", "", "", "", "", "", "\u200b", "\u200c", "", "", "", "", "", "", "", "%"],

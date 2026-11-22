@@ -4,11 +4,10 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createHash } from 'node:crypto';
 import { contrast } from './theme.mjs';
 import { mix } from './notes-look.mjs';
 import { loadScheme, schemeNames } from './colorscheme-file.mjs';
-import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Two schemes stand in for the old themes the checks were written against: a light one, and a dark one.
 const light = loadScheme('github-light');
@@ -122,44 +121,6 @@ test('the chromium theme sits the frame and the other tabs on the paper and lift
     assert.deepEqual(m.theme.colors.toolbar_text, rgbOf(t.color.ink), t.name);
   }
   assert.deepEqual(JSON.parse(renderChromiumTheme(termTheme(dark))).theme.colors.frame, [29, 32, 33]);
-});
-
-// Chromium ignores a new-tab override inside a theme, so the page is its own extension; its key fixes the id whatever folder it loads from.
-test('the new-tab extension overrides the new tab with a fixed id and reads the top sites and the search engine', () => {
-  const m = JSON.parse(renderNewtabManifest());
-  assert.equal(m.manifest_version, 3);
-  assert.deepEqual(m.chrome_url_overrides, { newtab: 'newtab.html' });
-  assert.deepEqual(m.permissions, ['topSites', 'search', 'tabs']);
-  assert.deepEqual(m.background, { service_worker: 'bg.js' });
-  assert.equal(m.theme, undefined);
-  const der = Buffer.from(m.key, 'base64');
-  const id = createHash('sha256').update(der).digest('hex').slice(0, 32).replace(/[0-9a-f]/g, (c) => 'abcdefghijklmnop'[parseInt(c, 16)]);
-  assert.equal(id, 'aakconifmcmaooplokgfeaepglecbmaf');
-});
-
-test('the new-tab page names its scheme and loads its colours, its look and its script', () => {
-  for (const t of [light, dark, artboard]) {
-    const html = renderNewtabHtml(t);
-    assert.match(html, new RegExp(`<html lang="en" data-theme="${t.name}">`), t.name);
-    assert.match(html, /<title>New Tab<\/title>/);
-    assert.match(html, /<link rel="stylesheet" href="theme.css">\s*<link rel="stylesheet" href="newtab.css">/);
-    assert.match(html, /<script type="module" src="newtab.js"><\/script>/);
-    assert.match(html, /<input id="q" type="text"[^>]*aria-label="Search"/);
-  }
-});
-
-test('the new-tab page draws in the scheme\'s paper, ink and fonts, on the dot grid', () => {
-  const vars = (t) => Object.fromEntries([...renderNewtabCss(t).matchAll(/--([a-z-]+): ([^;]+);/g)].map((m) => [m[1], m[2]]));
-  assert.deepEqual(
-    { paper: vars(artboard).paper, ink: vars(artboard).ink, surface: vars(artboard).surface, accent: vars(artboard).accent, display: vars(artboard).display, ui: vars(artboard).ui },
-    { paper: '#E4E6EA', ink: '#15171B', surface: '#FFFFFF', accent: '#3D5AFE', display: '"Maple Mono"', ui: '"Maple Mono"' },
-  );
-  assert.equal(vars(dark).paper, '#1D2021');
-  assert.match(renderNewtabCss(artboard), /radial-gradient\(#D0D7DE 1px, transparent 1.3px\)/);
-  assert.match(renderNewtabCss(artboard), /background-size: 16px 16px;/);
-  assert.match(renderNewtabCss(dark), /radial-gradient\(#3C3836 1px, transparent 1.3px\)/);
-  assert.match(renderNewtabCss(light), /color-scheme: light;/);
-  assert.match(renderNewtabCss(dark), /color-scheme: dark;/);
 });
 
 test('colors.fish sets fish and fzf colours', () => {

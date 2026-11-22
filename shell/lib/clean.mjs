@@ -1,4 +1,4 @@
-// The control characters and bidi marks the shell cleans from text it did not write. Each set is regex source to put between [ and ], so a caller composes the class its own cleaning needs; every character is an escape, so a reviewer can read each set whole. The new-tab page loads this file beside newtab.mjs, so it imports nothing.
+// The control characters and bidi marks the shell cleans from text it did not write. Each set is regex source to put between [ and ], so a caller composes the class its own cleaning needs; every character is an escape, so a reviewer can read each set whole.
 
 export const C0 = '\\u0000-\\u001f';
 // C0 but tab, newline and return, for text that keeps its lines.

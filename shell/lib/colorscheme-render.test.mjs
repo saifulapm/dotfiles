@@ -20,7 +20,7 @@ const files = (dir) => readdirSync(dir, { recursive: true }).sort();
 test('a colorscheme renders every app\'s output', (t) => {
   const state = scratch(t);
   execFileSync('node', [cli, 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
-  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'btop.theme', 'chromium-newtab', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'gtk4.css', 'helix.toml', 'imv.conf', 'lazygit.yml', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
+  assert.deepEqual(readdirSync(join(state, 'dots/theme-out')).sort(), ['amx.toml', 'btop.theme', 'chromium-theme', 'claude.json', 'colors.fish', 'dots.kak', 'foot.args', 'foot.ini', 'foot.osc', 'gtk-settings.ini', 'gtk.css', 'gtk4.css', 'helix.toml', 'imv.conf', 'lazygit.yml', 'mpv.conf', 'mpv.ipc', 'niri.kdl', 'notice', 'pi.json', 'shell.json', 'themes.json', 'tmux.conf', 'wl-kbptr', 'yazi-theme.toml', 'zathura']);
 });
 
 test('the shell tokens name the one design and the scheme\'s light or dark', (t) => {
@@ -56,7 +56,7 @@ test("GTK's views and header bars and Chromium's frame sit on the paper, not a s
 
 test('themes.json lists every valid scheme, artboard first, and skips a broken one', (t) => {
   const root = scratch(t);
-  for (const d of ['shell/lib', 'shell/newtab', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
+  for (const d of ['shell/lib', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
   writeFileSync(join(root, 'colorschemes/aaa-broken.toml'), '[meta]\nname = "aaa-broken"\n');
   const state = join(root, 'state');
   execFileSync('node', [join(root, 'shell/lib/colorscheme-render.mjs'), 'artboard'], { env: { ...process.env, XDG_STATE_HOME: state } });
@@ -79,7 +79,7 @@ test('an unknown name exits 1 with no such colorscheme and writes nothing', (t) 
 
 test('a file the check refuses exits 1 with its reason and writes nothing', (t) => {
   const root = scratch(t);
-  for (const d of ['shell/lib', 'shell/newtab', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
+  for (const d of ['shell/lib', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
   const art = readFileSync(join(repo, 'colorschemes/artboard.toml'), 'utf8');
   writeFileSync(join(root, 'colorschemes/faint.toml'), art.replace('name = "artboard"', 'name = "faint"').replace('ink = "#15171B"', 'ink = "#9AA0A6"'));
   writeFileSync(join(root, 'colorschemes/shaped.toml'), art + '\n[niri]\ngaps = 4\n');

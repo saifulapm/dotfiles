@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { checkTokens, qtTokens, renderNiri, renderFoot, renderFootArgs, renderFootOsc } from './theme.mjs';
 import { listLook } from './voice.mjs';
-import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderNewtabManifest, renderNewtabHtml, renderNewtabCss, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
+import { termTheme, renderGtk4Css, renderBtop, renderLazygit, renderTmux, renderKak, renderHelix, renderYazi, renderFish, renderGtkCss, renderGtkSettings, renderChromiumTheme, renderClaude, renderPi, renderAmx, renderMpv, renderMpvIpc, renderZathura, renderImv, renderKbptr } from './apps.mjs';
 
 // Board hexes for the kak-mail list that no token carries: Artboard's date orange.
 const MAIL_BOARD = { artboard: { date: '#C2410C' } };
@@ -64,14 +64,6 @@ export function renderOutputs(theme, list, label) {
     'gtk4.css': renderGtk4Css(term),
     'gtk-settings.ini': renderGtkSettings(theme),
     'chromium-theme/manifest.json': renderChromiumTheme(term),
-    'chromium-newtab/manifest.json': renderNewtabManifest(),
-    'chromium-newtab/newtab.html': renderNewtabHtml(spoken),
-    'chromium-newtab/theme.css': renderNewtabCss(theme),
-    'chromium-newtab/newtab.css': readFileSync(new URL('../newtab/newtab.css', import.meta.url), 'utf8'),
-    'chromium-newtab/newtab.js': readFileSync(new URL('../newtab/newtab.js', import.meta.url), 'utf8'),
-    'chromium-newtab/bg.js': readFileSync(new URL('../newtab/bg.js', import.meta.url), 'utf8'),
-    'chromium-newtab/words.mjs': readFileSync(new URL('./newtab.mjs', import.meta.url), 'utf8'),
-    'chromium-newtab/clean.mjs': readFileSync(new URL('./clean.mjs', import.meta.url), 'utf8'),
     'mpv.conf': renderMpv(theme),
     'mpv.ipc': renderMpvIpc(theme),
     zathura: renderZathura(theme),

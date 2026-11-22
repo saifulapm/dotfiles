@@ -41,7 +41,7 @@ const faint = artboard.replace('name = "artboard"', 'name = "faint"').replace('i
 // bin/dots finds its repo from its own path, so a copy of it renders the schemes beside it, the test's own among them; the tests only read the copy, so they share one.
 const root = mkdtempSync(join(tmpdir(), 'dots-root-'));
 after(() => rmSync(root, { recursive: true, force: true }));
-for (const d of ['bin/dots', 'shell/lib', 'shell/newtab', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
+for (const d of ['bin/dots', 'shell/lib', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
 writeFileSync(join(root, 'colorschemes/night.toml'), night);
 writeFileSync(join(root, 'colorschemes/faint.toml'), faint);
 

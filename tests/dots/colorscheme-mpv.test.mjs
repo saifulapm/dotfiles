@@ -14,7 +14,7 @@ const repo = new URL('../..', import.meta.url).pathname;
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'dots-mpv-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const d of ['bin/dots', 'shell/lib', 'shell/newtab', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
+  for (const d of ['bin/dots', 'shell/lib', 'colorschemes']) cpSync(join(repo, d), join(root, d), { recursive: true });
   // A dark scheme under its own name; Artboard's light colours on a dark surface would fail the colorscheme check.
   writeFileSync(join(root, 'colorschemes/night.toml'), readFileSync(join(repo, 'colorschemes/github-dark.toml'), 'utf8').replace('name = "github-dark"', 'name = "night"'));
   const state = join(root, 'state');
