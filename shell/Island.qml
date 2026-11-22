@@ -200,8 +200,8 @@ Item {
     readonly property var osdLook: V.osdLook(theme.tokens)
     // As drawn: the theme's 420 or 440 px notification card, a 560 px question and calendar, and the theme's OSD bar; any other mode is one line as wide as its text.
     readonly property var sizes: ({
-            label: mode === "rest" || mode === "surface" ? [restWidth + (waiting > 0 && mode === "rest" ? 14 : 0), H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), 34],
-            live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), 34],
+            label: mode === "rest" || mode === "surface" ? [restWidth + (waiting > 0 && mode === "rest" ? 14 : 0), H.REST.height] : [I.boxWidth(Math.ceil(label.implicitWidth) + 28), H.REST.height],
+            live: [L.liveWidth({ text: liveText.implicitWidth, tail: liveTail.visible ? liveTail.implicitWidth : 0, bar: liveBar.visible, swatch: liveSwatch.visible, clock: liveClock.implicitWidth }), H.REST.height],
             leaseCard: [520, leaseColumn.implicitHeight + 32],
             sharingCard: [520, shareColumn.implicitHeight + 32],
             notification: [440, card.implicitHeight + 32],

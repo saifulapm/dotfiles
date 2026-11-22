@@ -1,4 +1,4 @@
-// Board 2's one-line states (2VC2VCJR): each is a 14 px filled icon, its short text, then the clock pinned right, 34 px tall.
+// Board 2's one-line states (2VC2VCJR): each is a 14 px filled icon, its short text, then the clock pinned right, as tall as the resting island.
 import { clockText } from './margins.mjs';
 import { deviceName } from './bt-pairing.mjs';
 import { CONTROL, BIDI } from './clean.mjs';

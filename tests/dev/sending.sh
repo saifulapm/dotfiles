@@ -29,7 +29,7 @@ dots-call sending progress 48
 settled '.mode == "sending"'
 echo "     sending: $(island | jq -c '{text, width, drawn, live}')"
 check "island state reports mode sending with 48%" state_is '.mode == "sending" and (.text | contains("48%"))'
-check "the line draws an upload icon, what goes where and a pill bar, with the clock at the right" state_is --arg i "$(printf '\U000F0552')" '.live.icon == $i and .live.text == "2 files to nuc" and .live.bar.pct == 48 and .live.clockRight == 14 and .height == 34'
+check "the line draws an upload icon, what goes where and a pill bar, with the clock at the right" state_is --arg i "$(printf '\U000F0552')" '.live.icon == $i and .live.text == "2 files to nuc" and .live.bar.pct == 48 and .live.clockRight == 14 and .height == 26'
 # The bar's fill is drawn 48% of the slot's width, and a slot at 0% or 100% would fail either bound.
 check "the bar is filled to 48% of its width" state_is '(.live.bar.width | type == "number") and .live.bar.fill >= (.live.bar.width * 0.46) and .live.bar.fill <= (.live.bar.width * 0.50)'
 # The fill's colour over most of the fill's own area, which neither the mark nor the words could draw alone.

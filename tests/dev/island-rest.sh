@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The resting island hugs the top edge: 34 px tall and as wide as its content, two 12 px concave corners joining it to the edge, 14 px bottom corners, no frame and no shadow, in the scheme's island fill.
+# The resting island hugs the top edge: 26 px tall and as wide as its content, two 12 px concave corners joining it to the edge, 12 px bottom corners, no frame and no shadow, in the scheme's island fill.
 {
 export DOTS_DEV_SCHEME=github-light
 source "$(dirname "$0")/lib.sh"
@@ -20,7 +20,7 @@ paper_near() {
 until_ok 3000 eval "shell_status | jq -e '.theme == \"github-light\" and .transition == \"\"' >/dev/null"
 until_ok 3000 island_is '.mode == "rest" and .animating == false'
 today=$(LC_ALL=C date '+%a %-d %b')
-check "at rest the island is 34 px tall and reads today's date, $today ($(island | jq -c '{width, height, rest}'))" island_is ".height == 34 and .width > 0 and .rest.date == \"$today\""
+check "at rest the island is 26 px tall and reads today's date, $today ($(island | jq -c '{width, height, rest}'))" island_is ".height == 26 and .width > 0 and .rest.date == \"$today\""
 read -r bx by bw bh < <(timeout 0.5 qs ipc call island box island | jq -r '"\(.x | floor) \(.y | floor) \(.w | floor) \(.h | floor)"')
 cx=$((bx + bw / 2))
 check "the island's box starts on the output's top row (y $by)" test "$by" -eq 0
@@ -30,7 +30,7 @@ check "and 2 px right of it too ($(px $((bx + bw + 1)) 0))" px_is $((bx + bw + 1
 check "12 px left of and 12 px below the box's top left corner is the paper, outside the corner ($(px $((bx - 12)) 12))" paper_near $((bx - 12)) 12
 check "the box's last row at its centre is the fill ($(px "$cx" $((by + bh - 1))))" px_is "$cx" $((by + bh - 1)) "#1F2328"
 check "and the row below it is the paper, with no frame or shadow between ($(px "$cx" $((by + bh))))" paper_near "$cx" $((by + bh))
-check "a 14 px bottom corner leaves the box's bottom left pixel to the paper ($(px "$bx" $((by + bh - 1))))" paper_near "$bx" $((by + bh - 1))
+check "a 12 px bottom corner leaves the box's bottom left pixel to the paper ($(px "$bx" $((by + bh - 1))))" paper_near "$bx" $((by + bh - 1))
 
 "$repo/bin/dots" colorscheme catppuccin-mocha >/dev/null
 switched() { shell_status | jq -e '.theme == "catppuccin-mocha" and .transition == ""' >/dev/null && island_is '.fill.color == "#1e1e2e" and .fill.endedAt > .fill.startedAt'; }

@@ -1,7 +1,8 @@
 // The island as the one host of the shell's surfaces: its approved motion (38G8XV1J), its resting shape and which arrivals take it from an open surface.
 import { springCurve, pick } from './island.mjs';
 
-export const REST = { height: 34 };
+// The island is as tall as the windows' top strut, so its foot meets their tops and covers none of them.
+export const REST = { height: 26 };
 // The concave corner that joins the island to the top edge on each side.
 export const CONCAVE = 12;
 
@@ -22,7 +23,7 @@ export function hostMotion() {
 // When row n of the incoming content starts to fade in, how long it takes and how far it rises; rows past the tenth come in with it (496AQ7DS).
 export const rowFade = (n) => ({ delay: 30 + 12 * Math.min(n, 9), ms: 140, rise: 6 });
 
-const radiusAt = (height) => (height > REST.height ? 20 : 14);
+const radiusAt = (height) => (height > REST.height ? 20 : 12);
 
 // The bottom corners' radius for a box this tall, or mid-morph from one height to another at eased progress e.
 export function bottomRadius(from, to, e) {

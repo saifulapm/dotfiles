@@ -15,8 +15,8 @@ unlock() {
   until_ok 3000 lock_is ".locked == false and .monitorsOff > $n"
   niri msg action power-on-monitors
 }
-# The island's box: centred on the output, 10 px from the top.
-box() { niri msg -j outputs | jq -r --argjson w "$(island | jq .drawn)" --argjson h "$(island | jq .height)" 'first(.[]).logical | "\(((.width - $w) / 2 + .x) | floor),\(.y + 10) \($w | floor)x\($h | floor)"'; }
+# The island's box: centred on the output, at its top edge.
+box() { niri msg -j outputs | jq -r --argjson w "$(island | jq .drawn)" --argjson h "$(island | jq .height)" 'first(.[]).logical | "\(((.width - $w) / 2 + .x) | floor),\(.y) \($w | floor)x\($h | floor)"'; }
 # What tesseract reads in the box, light text made dark on light, at the output's own pixels.
 ocr() {
   grim -t ppm -g "$(box)" - | node -e '
@@ -50,7 +50,7 @@ unlock claude 2
 settled '.mode == "lease"'
 echo "     lease: $(island | jq -c '{text, warning, live}')"
 check "island state reads the lease with claude, out of its warning" state_is '.mode == "lease" and (.text | contains("claude")) and .warning == false'
-check "the line draws a robot icon, claude and the time left, the clock at the right, 34 px" state_is --arg i "$(printf '\U000F06A9')" '.live.icon == $i and .live.text == "claude" and (.live.tail | test("^[12]:[0-5][0-9]$")) and .live.clockRight == 14 and .height == 34'
+check "the line draws a robot icon, claude and the time left, the clock at the right, 26 px" state_is --arg i "$(printf '\U000F06A9')" '.live.icon == $i and .live.text == "claude" and (.live.tail | test("^[12]:[0-5][0-9]$")) and .live.clockRight == 14 and .height == 26'
 read_back=$(ocr)
 check "the box draws the slot where the clock was (tesseract read '$read_back')" grep -qiF claude <<<"$read_back"
 

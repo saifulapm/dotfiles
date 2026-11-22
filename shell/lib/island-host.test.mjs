@@ -47,22 +47,22 @@ test('the stagger stops at the tenth row, so every row is in by 278 ms', () => {
   assert.equal(last.delay + last.ms, 278);
 });
 
-test('the island rests 34 px high, as wide as its words, with 12 px concave corners', () => {
-  assert.deepEqual(REST, { height: 34 });
+test('the island rests 26 px high, as wide as its words, with 12 px concave corners', () => {
+  assert.deepEqual(REST, { height: 26 });
   assert.equal(CONCAVE, 12);
 });
 
-test('the bottom corners are 14 px on a one-line island and 20 px on anything taller', () => {
-  assert.equal(bottomRadius(34), 14);
-  assert.equal(bottomRadius(35), 20);
+test('the bottom corners are 12 px on a one-line island and 20 px on anything taller', () => {
+  assert.equal(bottomRadius(26), 12);
+  assert.equal(bottomRadius(27), 20);
   assert.equal(bottomRadius(640), 20);
 });
 
 test('the bottom radius follows the same progress as the box, from 14 to 20 and back', () => {
-  assert.equal(bottomRadius(34, 600, 0), 14);
-  assert.equal(bottomRadius(34, 600, 1), 20);
-  assert.equal(bottomRadius(34, 600, 0.5), 17);
-  assert.equal(bottomRadius(600, 34, 1), 14);
+  assert.equal(bottomRadius(26, 600, 0), 12);
+  assert.equal(bottomRadius(26, 600, 1), 20);
+  assert.equal(bottomRadius(26, 600, 0.5), 16);
+  assert.equal(bottomRadius(600, 26, 1), 12);
 });
 
 const note = { key: 'n1', summary: 'hi' };

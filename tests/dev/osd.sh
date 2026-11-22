@@ -100,7 +100,7 @@ osd_is() { island | jq -e --arg v "$1%" '.mode == "osd" and .animating == false 
 osd_reads() { until_ok 2000 osd_is "$1"; }
 wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.64
 osd_reads 64
-check "the OSD draws a speaker, a pill bar filled to 64% and 64%" eval 'island | jq -e --arg i "$(printf "\\U000F057E")" ".live.icon == \$i and .live.bar.pct == 64 and .live.text == \"64%\" and .height == 34" >/dev/null'
+check "the OSD draws a speaker, a pill bar filled to 64% and 64%" eval 'island | jq -e --arg i "$(printf "\\U000F057E")" ".live.icon == \$i and .live.bar.pct == 64 and .live.text == \"64%\" and .height == 26" >/dev/null'
 until_ok 3000 mode_is rest
 one_timer() { shell_status | jq -e '.timers == 1' >/dev/null; }
 check "status reports timers 1 once the OSD has gone" one_timer

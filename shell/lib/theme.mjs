@@ -136,7 +136,7 @@ export function renderNiri(t) {
     insert-hint {
         color "${c.accent}80"
     }
-    // Windows start 26 px down, so the 34 px island floats over their top 8 px (HQH7PSZA), and 32 px in.
+    // Windows start 26 px down, where the 26 px island's foot ends, and 32 px in.
     struts {
         top ${26 - t.niri.gaps}
         bottom ${28 - t.niri.gaps}

@@ -29,7 +29,7 @@ dots-call downloading progress 37
 settled '.mode == "downloading"'
 echo "     downloading: $(island | jq -c '{text, width, drawn, live}')"
 check "island state reports mode downloading and the line" state_is '.mode == "downloading" and .text == "↓ Focus 3 / 18 · Feather · 37%"'
-check "the line draws a download icon, 3 / 18 and 37%, the clock at the right, in 34 px" state_is --arg i "$(printf '\U000F01DA')" '.live.icon == $i and .live.text == "3 / 18" and .live.tail == "37%" and (.live.elided | not) and .live.tone == "normal" and .live.clockRight == 14 and .height == 34'
+check "the line draws a download icon, 3 / 18 and 37%, the clock at the right, in 26 px" state_is --arg i "$(printf '\U000F01DA')" '.live.icon == $i and .live.text == "3 / 18" and .live.tail == "37%" and (.live.elided | not) and .live.tone == "normal" and .live.clockRight == 14 and .height == 26'
 check "the bar is filled to 37% of its width" state_is '(.live.bar.width | type == "number") and .live.bar.fill >= (.live.bar.width * 0.35) and .live.bar.fill <= (.live.bar.width * 0.39)'
 area=$(island | jq '(.live.bar.fill * 6 * 0.8) | floor')
 ink=$(island | jq -r '.live.ink | ascii_upcase')
