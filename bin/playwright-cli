@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# playwright-cli: hands the browser Playwright starts the desktop's scaling flags and the machine-wide config, then runs the real CLI.
+# playwright-cli: hands the browser Playwright starts the desktop's scaling flags and the machine-wide config, attaches to the desktop chromium with no click, then runs the real CLI.
 set -euo pipefail
 {
 # This wrapper comes first on PATH, so a PATH lookup would find itself; mise which prints the install's own path, asked from home since mise refuses to run inside a folder with an untrusted mise.toml.
@@ -9,50 +9,73 @@ config=${XDG_CONFIG_HOME:-$HOME/.config}/playwright/cli.config.json
 
 subcommand=""
 explicit_config=false
-extension=false
+extension=""
+session=""
+prev=""
 # The global session flag is spelled -s=<name>, so a token that starts with - is never the subcommand.
 for arg in "$@"; do
+  [[ $prev == --session ]] && session=$arg
   case $arg in
     --config | --config=*) explicit_config=true ;;
-    --extension | --extension=*) extension=true ;;
+    --extension) extension=default ;;
+    --extension=*) extension=${arg#*=} ;;
+    -s=* | --session=*) session=${arg#*=} ;;
     -*) ;;
-    *) [[ -n $subcommand ]] || subcommand=$arg ;;
+    *) [[ -n $subcommand || $prev == --session ]] || subcommand=$arg ;;
   esac
+  prev=$arg
 done
 
+# A session attached to the desktop chromium leaves its name here, so detach and close know whose browser it is.
+marks=${XDG_RUNTIME_DIR:-/tmp}/dots-playwright
+mark=$marks/${session:-${extension:-default}}
+
 # attach --extension drives the desktop chromium, and Playwright would look for Google Chrome, which has no Linux arm64 build.
-if [[ $subcommand == attach && $extension == true ]]; then
+if [[ $subcommand == attach && -n $extension ]]; then
   export PLAYWRIGHT_MCP_EXECUTABLE_PATH=${PLAYWRIGHT_MCP_EXECUTABLE_PATH:-/usr/bin/chromium-browser}
-  # Over ssh nobody is at the screen to click the extension's Allow, so chromium starts as its own user unit, not a child of the CLI daemon, and the extension's token approves the attach.
-  if [[ -n ${SSH_CONNECTION:-} ]]; then
-    # SingletonLock links to <host>-<pid> of the running browser; the socket beside it outlives a killed chromium.
-    chromium_up() {
-      local lock
-      lock=$(readlink "$HOME/.config/chromium/SingletonLock" 2>/dev/null) &&
-        kill -0 "${lock##*-}" 2>/dev/null
-    }
-    if ! chromium_up; then
-      systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
-      for _ in {1..50}; do
-        chromium_up && break
-        sleep 0.2
-      done
-    fi
-    if [[ -z ${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-} ]] &&
-      token=$(playwright-extension-token); then
-      export PLAYWRIGHT_MCP_EXTENSION_TOKEN=$token
-    fi
+  # Chromium starts as its own user unit, not a child of the CLI daemon, so it outlives the session. SingletonLock links to <host>-<pid> of the running browser; the socket beside it outlives a killed chromium.
+  chromium_up() {
+    local lock
+    lock=$(readlink "$HOME/.config/chromium/SingletonLock" 2>/dev/null) &&
+      kill -0 "${lock##*-}" 2>/dev/null
+  }
+  if ! chromium_up; then
+    systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
+    for _ in {1..50}; do
+      chromium_up && break
+      sleep 0.2
+    done
   fi
+  # The extension's token approves the attach, so nobody clicks its Allow; without one yet, the click is still asked for.
+  if [[ -z ${PLAYWRIGHT_MCP_EXTENSION_TOKEN:-} ]] &&
+    token=$(playwright-extension-token); then
+    export PLAYWRIGHT_MCP_EXTENSION_TOKEN=$token
+  fi
+  mkdir -p "$marks" && : >"$mark"
 fi
+
+if [[ -e $mark ]]; then
+  case $subcommand in
+    close)
+      echo "playwright-cli: session ${mark##*/} is Saiful's own Chromium; end it with detach, and its tabs close" >&2
+      exit 2
+      ;;
+    detach) rm -f "$mark" ;;
+  esac
+fi
+
+# An agent that never detaches is detached after 30 idle minutes, so its tabs close then; chromium-tabs closes the tabs of every ended session.
+idle=()
+[[ $subcommand == attach && -n $extension && " $* " != *" --idle-timeout"* ]] && idle=(--idle-timeout=1800000)
 
 # playwright-cli reads a default config only from .playwright/ in the cwd, and only open and attach take --config; a project's own config or an explicit --config wins.
 if [[ -f $config ]] &&
   [[ $subcommand == open || $subcommand == attach ]] &&
   [[ $explicit_config == false ]] &&
   [[ ! -f .playwright/cli.config.json ]]; then
-  exec "$real" "$@" --config "$config"
+  exec "$real" "$@" "${idle[@]}" --config "$config"
 fi
 
-exec "$real" "$@"
+exec "$real" "$@" "${idle[@]}"
 exit
 }

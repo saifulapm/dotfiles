@@ -34,16 +34,14 @@ login** (their store, their dashboard, their account). Say in your hand-back
 that you used it.
 
 ```sh
-pgrep -x chromium-browse >/dev/null || systemd-run --user --quiet --collect --property=ExitType=cgroup -- chromium-browser
-playwright-cli attach --extension=chromium      # session name: chromium
-playwright-cli -s=chromium goto <url>           # then drive as usual
-playwright-cli -s=chromium detach               # at the end
+playwright-cli attach --extension=chromium      # session name: chromium; starts Chromium if needed, no Allow click
+playwright-cli -s=chromium tab-new <url>        # then drive as usual
+playwright-cli -s=chromium detach               # always, at the end: every tab you opened closes
 ```
 
-NEVER `close`, `close-all` or `kill-all` on that session — they shut the
-user's browser and every tab in it. Open your work in a `tab-new` and
-`tab-close` only that tab. If attach waits for an Allow click nobody gives,
-stop and say so.
+ALWAYS end with `detach`, also when you stop early or fail: it closes the
+session's tabs and leaves the user's own tabs alone. `close` on that session
+is refused; NEVER `close-all` or `kill-all` — they shut the user's browser.
 
 ## Read the page cheaply
 
@@ -94,4 +92,4 @@ you would need to continue. No snapshots, no screenshots, no page dumps; do
 not quote private page content beyond what the brief needs.
 
 Clean up before you answer: `close` an isolated session, `detach` from the
-user's, and `rm -rf /tmp/browse/.playwright-cli`.
+user's (its tabs close with it), and `rm -rf /tmp/browse/.playwright-cli`.

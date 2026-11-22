@@ -252,17 +252,18 @@ no `--config` of your own.
 Saiful's own Chromium, with his logins, through the Playwright extension:
 
 ```sh
-playwright-cli attach --extension=chromium     # session name: chromium
+playwright-cli attach --extension=chromium     # session name: chromium; no Allow click
 playwright-cli -s=chromium tab-new https://...
 playwright-cli -s=chromium find "Orders"       # search the page, do not dump it
-playwright-cli -s=chromium tab-close
-playwright-cli -s=chromium detach              # never close, close-all or kill-all
+playwright-cli -s=chromium detach              # always, at the end: every tab the session opened closes
 ```
 
-`close` and `close-all` shut his browser and every tab in it. Locally
-Chromium must be running (start it as above) and he clicks the extension's
-Allow; over SSH the wrapper starts it and approves the attach with the
-extension's token. Attach behind the lock is untested.
+Always end with `detach`: Chromium then closes the session's tabs, the blank
+one attach makes included. `close` on this session is refused, since it would
+shut his browser; never `close-all` or `kill-all`. The wrapper starts
+Chromium when it is not running and approves the attach with the
+extension's token, locally and over SSH. A session left attached is detached
+after 30 idle minutes. Attach behind the lock is untested.
 
 When the task needs no login, an isolated browser is safer and repeatable:
 `playwright-cli -s=op open <url>` ... `playwright-cli -s=op close`.

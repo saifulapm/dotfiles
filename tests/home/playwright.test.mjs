@@ -136,3 +136,83 @@ test('every playwright config launches chromium with its sandbox on', () => {
   for (const file of ['home/dot_config/playwright/cli.config.json', 'home/dot_config/playwright-cli/config.json'])
     assert.equal(JSON.parse(readFileSync(join(repo, file), 'utf8')).browser.launchOptions.chromiumSandbox, true, file);
 });
+
+// Stubs for the attach path: a token printer, and a systemd-run that leaves the lock a started chromium would.
+function withDesktopChromium(home, token = 'tok-1') {
+  exe(join(home, 'stubs/playwright-extension-token'), token === null ? '#!/bin/sh\nexit 1\n' : `#!/bin/sh\necho ${token}\n`);
+  exe(join(home, 'stubs/systemd-run'), '#!/bin/sh\necho "$*" >> "$HOME/systemd.log"\nmkdir -p "$HOME/.config/chromium"\nln -sf "host-$PPID" "$HOME/.config/chromium/SingletonLock"\n');
+  exe(join(home, 'real/playwright-cli'), '#!/bin/sh\necho "$*" >> "$HOME/real.log"\necho "${PLAYWRIGHT_MCP_EXTENSION_TOKEN-none}" >> "$HOME/token.log"\n');
+}
+
+test('a local attach to the desktop chromium starts it as its own unit and passes the extension token', () => {
+  const { home, env } = scratch();
+  withDesktopChromium(home);
+  const run = (extra, ...args) => spawnSync('bash', [wrapper, ...args], { encoding: 'utf8', env: { ...env, XDG_RUNTIME_DIR: home, ...extra }, cwd: home });
+
+  assert.equal(run({}, 'attach', '--extension=chromium').status, 0);
+  assert.deepEqual(calls(home), ['attach --extension=chromium --idle-timeout=1800000']);
+  assert.deepEqual(calls(home, 'token.log'), ['tok-1']);
+  assert.match(calls(home, 'systemd.log')[0], /chromium-browser$/);
+
+  assert.equal(run({ PLAYWRIGHT_MCP_EXTENSION_TOKEN: 'mine' }, 'attach', '--extension=chromium').status, 0);
+  assert.equal(calls(home, 'token.log').at(-1), 'mine');
+});
+
+test('an attach still runs, with no token, before the extension has made one', () => {
+  const { home, env } = scratch();
+  withDesktopChromium(home, null);
+  const r = spawnSync('bash', [wrapper, 'attach', '--extension=chromium'], { encoding: 'utf8', env: { ...env, XDG_RUNTIME_DIR: home }, cwd: home });
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(calls(home, 'token.log'), ['none']);
+});
+
+// chromium-tabs closes an ended session's tabs, so detach is all an agent runs.
+test('close on the desktop chromium\'s session is refused until it is detached', () => {
+  const { home, env } = scratch();
+  withDesktopChromium(home);
+  const run = (...args) => spawnSync('bash', [wrapper, ...args], { encoding: 'utf8', env: { ...env, XDG_RUNTIME_DIR: home }, cwd: home });
+
+  run('attach', '--extension=chromium');
+  const refused = run('-s=chromium', 'close');
+  assert.equal(refused.status, 2);
+  assert.match(refused.stderr, /detach/);
+
+  assert.equal(run('-s=chromium', 'detach').status, 0);
+  assert.equal(calls(home).at(-1), '-s=chromium detach');
+
+  // The session is gone, so the same name is an isolated browser's again.
+  assert.equal(run('-s=chromium', 'close').status, 0);
+  assert.equal(calls(home).at(-1), '-s=chromium close');
+});
+
+test('detach and close of an isolated session pass through unchanged', () => {
+  const { home, env } = scratch();
+  const run = (...args) => spawnSync('bash', [wrapper, ...args], { encoding: 'utf8', env: { ...env, XDG_RUNTIME_DIR: home }, cwd: home });
+  assert.equal(run('-s=op', 'detach').status, 0);
+  assert.equal(run('-s=op', 'close').status, 0);
+  assert.deepEqual(calls(home), ['-s=op detach', '-s=op close']);
+});
+
+test('an attach keeps the idle timeout its caller names', () => {
+  const { home, env } = scratch();
+  withDesktopChromium(home);
+  spawnSync('bash', [wrapper, 'attach', '--extension=chromium', '--idle-timeout=5'], { encoding: 'utf8', env: { ...env, XDG_RUNTIME_DIR: home }, cwd: home });
+  assert.deepEqual(calls(home), ['attach --extension=chromium --idle-timeout=5']);
+});
+
+test('chromium-tabs closes only the tabs of a grey Playwright group', async () => {
+  const removed = [];
+  const listeners = {};
+  globalThis.chrome = {
+    tabGroups: { onUpdated: { addListener: (f) => (listeners.updated = f) }, query: async () => [] },
+    tabs: { query: async ({ groupId }) => [{ id: groupId * 10 }, { id: groupId * 10 + 1 }], remove: async (ids) => removed.push(...ids) },
+    runtime: { onStartup: { addListener() {} }, onInstalled: { addListener() {} } },
+  };
+  await import(join(repo, 'home/dot_local/share/dots/chromium-tabs/bg.js'));
+  await listeners.updated({ id: 1, color: 'green', title: 'Playwright · cli' });
+  await listeners.updated({ id: 2, color: 'grey', title: 'Work' });
+  await listeners.updated({ id: 3, color: 'grey' });
+  assert.deepEqual(removed, []);
+  await listeners.updated({ id: 4, color: 'grey', title: 'Playwright · cli' });
+  assert.deepEqual(removed, [40, 41]);
+});

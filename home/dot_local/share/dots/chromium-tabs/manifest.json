@@ -1,0 +1,8 @@
+{
+  "manifest_version": 3,
+  "name": "dots tabs",
+  "version": "1",
+  "description": "Closes the tabs an agent's Playwright session leaves behind",
+  "permissions": ["tabs", "tabGroups"],
+  "background": { "service_worker": "bg.js" }
+}
