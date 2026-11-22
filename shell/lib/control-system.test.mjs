@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncRows, batteryLine, chargeLimit, chargeCommand } from './control-system.mjs';
+import { backlights, ddcDisplays, routeOf, ACTIONS, actionCommand, parseSync, syncRows, batteryLine, chargeLimit, chargeCommand, newlyFailing } from './control-system.mjs';
 
 test('brightnessctl -m -l lines become backlights with their percent', () => {
   const text = 'apple-panel-bl,backlight,36,7%,509\n228600000.dsi.0,backlight,0,0%,255\n';
@@ -135,4 +135,14 @@ test("a sync unit's forged name and error draw as one plain line", () => {
   assert.equal(row.title, 'un it RLO [31mesc');
   assert.equal(row.detail, 'bad thing here');
   assert.equal(row.tone, 'danger');
+});
+
+test('a unit that starts to fail is named once, and again only after it went well', () => {
+  const ok = { notes: { ok: true }, mail: { ok: true } };
+  const bad = { notes: { ok: false }, mail: { ok: true } };
+  assert.deepEqual(newlyFailing({}, ok), []);
+  assert.deepEqual(newlyFailing(ok, bad), ['notes']);
+  assert.deepEqual(newlyFailing(bad, bad), []);
+  assert.deepEqual(newlyFailing(bad, { notes: { ok: false }, mail: { ok: false } }), ['mail']);
+  assert.deepEqual(newlyFailing({}, { z: { ok: false }, a: { ok: false } }), ['a', 'z']);
 });

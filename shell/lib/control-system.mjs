@@ -118,3 +118,10 @@ export function batteryLine(state, toEmpty, toFull) {
   if (state === 'discharging') return ['Discharging', time(toEmpty) && time(toEmpty) + ' left'].filter((x) => x).join(' · ');
   return state === 'fully charged' ? 'Full' : state ? state[0].toUpperCase() + state.slice(1) : '';
 }
+
+// The units failing now that were not failing before, in name order: a unit that keeps failing tells once, and tells again only after a round that went well.
+export function newlyFailing(before, after) {
+  const failing = (units) => Object.keys(units).filter((k) => units[k].ok === false);
+  const was = new Set(failing(before));
+  return failing(after).filter((k) => !was.has(k)).sort();
+}
