@@ -44,12 +44,13 @@ until_ok 10000 surfaces_mapped
 until_ok 5000 shell_status >/dev/null
 
 control_focus() { niri msg -j layers | jq -e 'any(.[]; .namespace == "dots-surfaces" and .layer == "Overlay" and .keyboard_interactivity == "Exclusive")' >/dev/null; }
-# Opens Control and Enter on its Wi-Fi tile, where Home opens.
+# Opens Control and Enter on its Wi-Fi tile, where the first key shows the cursor.
 open_wifi() {
   niri msg action spawn -- dots-call control toggle
   until_ok 3000 section_is home
   until_ok 3000 control_focus
   until_ok 3000 state_is '.keyboard and .settled'
+  wtype h
   wtype -k Return
   until_ok 2000 section_is wifi
 }

@@ -43,6 +43,8 @@ check "the open reports a numeric openMs" state_is '(.openMs | type) == "number"
 
 # Keys sent before Control has the keyboard arrive late, so they wait for it.
 until_ok 3000 state_is '.keyboard'
+# The first key only shows the cursor, on Wi-Fi.
+wtype h
 wtype l
 wtype l
 until_ok 2000 state_is '.cursor == "sound"'

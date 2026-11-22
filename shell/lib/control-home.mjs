@@ -50,14 +50,10 @@ export const height = () => rowTop(ROWS.length - 1) + ROWS[ROWS.length - 1];
 
 const centre = (t) => t.x + t.w / 2;
 
-// h and l move along the row and stop at its ends; j and k move to the row above or below, onto the tile whose centre is nearest.
+// h and l move to the next or previous tile in reading order, so the end of a row leads on to the next row, and stop at the first and last tile; j and k move to the row above or below, onto the tile whose centre is nearest.
 export function move(id, dx, dy) {
   const at = TILES.find((t) => t.id === id) ?? TILES[1];
-  if (dx) {
-    const row = TILES.filter((t) => t.row === at.row);
-    const i = row.indexOf(at) + dx;
-    return row[Math.max(0, Math.min(row.length - 1, i))].id;
-  }
+  if (dx) return TILES[Math.max(0, Math.min(TILES.length - 1, TILES.indexOf(at) + dx))].id;
   const r = at.row + dy;
   const row = TILES.filter((t) => t.row === r);
   if (row.length === 0) return at.id;

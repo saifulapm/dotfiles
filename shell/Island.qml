@@ -777,6 +777,11 @@ Item {
     function focusIsland() {
         if (takeover)
             return;
+        // A second Mod+I gives the keyboard back and closes what the first opened; a notification or a question stays as it was (6S5DRAWK).
+        if (focused) {
+            release();
+            return;
+        }
         if (mode === "lease")
             leaseOpen = true;
         else if (mode === "sharing")

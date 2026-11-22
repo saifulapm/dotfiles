@@ -18,8 +18,14 @@ test('from Wi-Fi, l is Bluetooth and j is the Brightness row below', () => {
   assert.equal(move('wifi', 1, 0), 'bluetooth');
   assert.equal(move('wifi', 0, 1), 'brightness');
   assert.equal(move('wifi', 0, -1), 'calendar');
-  assert.equal(move('wifi', -1, 0), 'wifi');
-  assert.equal(move('sound', 1, 0), 'sound');
+});
+
+test('l at the end of a row goes on to the next row, h comes back, and both stop at the first and last tile', () => {
+  assert.equal(move('sound', 1, 0), 'brightness');
+  assert.equal(move('brightness', -1, 0), 'sound');
+  assert.equal(move('wifi', -1, 0), 'calendar');
+  assert.equal(move('calendar', -1, 0), 'calendar');
+  assert.equal(move('power', 1, 0), 'power');
 });
 
 test('j and k land on the nearest tile of the next row and stop at the ends', () => {

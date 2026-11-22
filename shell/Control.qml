@@ -35,6 +35,8 @@ Item {
     property bool clockHidden: false
     // The tile Home's keys act on.
     property string cursor: "wifi"
+    // The cursor draws only once a key has moved it or a page has come back to its tile, so Home opens with no tile marked (FX15M9XA).
+    property bool cursorShown: false
     property real wheelRest: 0
     property int opens: 0
     property var openMs: null
@@ -110,6 +112,7 @@ Item {
         recordNow = Date.now();
         page = "";
         cursor = "wifi";
+        cursorShown = false;
         shown = true;
         forceActiveFocus();
     }
@@ -134,6 +137,7 @@ Item {
             return;
         }
         cursor = Home.TILE_OF[page] ?? cursor;
+        cursorShown = true;
         // A scan runs only while its page shows.
         if (page === "bluetooth")
             bluetooth.stopScan();
@@ -242,6 +246,7 @@ Item {
             section: page || "home",
             sections: Lib.SECTIONS,
             cursor: cursor,
+            cursorShown: cursorShown,
             tiles: tiles.map((t, i) => {
                 const item = tileRepeater.itemAt(i);
                 return Object.assign({}, t, item ? { fill: String(item.color), box: box(item), focused: item.focused, content: item.content ? box(item.content) : null } : {});
@@ -304,16 +309,21 @@ Item {
                 move(1);
             else if (k === Qt.Key_K || k === Qt.Key_Up)
                 move(-1);
-            else if (k === Qt.Key_Equal || k === Qt.Key_Minus)
-                // - and = step the focused slider as h and l always have.
-                section.key({ key: k === Qt.Key_Equal ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
+            else if (k === Qt.Key_Equal || k === Qt.Key_Minus || k === Qt.Key_Left || k === Qt.Key_Right)
+                // -, = and the arrows step the focused slider as h and l always have.
+                section.key({ key: k === Qt.Key_Equal || k === Qt.Key_Right ? Qt.Key_L : Qt.Key_H, modifiers: 0, text: "" });
             else if (!section.key(event))
                 return;
         } else {
             const dx = k === Qt.Key_H || k === Qt.Key_Left ? -1 : k === Qt.Key_L || k === Qt.Key_Right ? 1 : 0;
             const dy = k === Qt.Key_K || k === Qt.Key_Up ? -1 : k === Qt.Key_J || k === Qt.Key_Down ? 1 : 0;
-            if (dx || dy)
+            // The first navigation key shows the cursor where it is; until one has, Enter and the slider keys have no tile to act on.
+            if ((dx || dy) && !cursorShown)
+                cursorShown = true;
+            else if (dx || dy)
                 cursor = Home.move(cursor, dx, dy);
+            else if (!cursorShown)
+                return;
             else if (k === Qt.Key_Return || k === Qt.Key_Enter)
                 act(cursor);
             else if (k === Qt.Key_Equal || k === Qt.Key_Minus)
@@ -398,7 +408,7 @@ Item {
 
             Rectangle {
                 id: calendarBox
-                readonly property bool focused: control.cursor === "calendar"
+                readonly property bool focused: control.cursorShown && control.cursor === "calendar"
                 anchors.verticalCenter: parent.verticalCenter
                 width: dateColumn.implicitWidth + 16
                 height: dateColumn.implicitHeight + 8
@@ -444,7 +454,7 @@ Item {
                 required property int index
                 readonly property var t: control.tiles[index]
                 readonly property var at: Home.TILES[index + 1]
-                readonly property bool focused: control.cursor === at.id
+                readonly property bool focused: control.cursorShown && control.cursor === at.id
                 // The tile's drawn content, for state(): it must sit inside the tile.
                 readonly property Item content: tileLoader.item?.children[0] ?? null
                 readonly property color ink: t.on ? control.fill : control.on

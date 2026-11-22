@@ -48,6 +48,12 @@ wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.30
 wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
 
 open_control
+check "Home opens with no tile marked" control_is '.cursorShown == false and all(.tiles[]; .focused != true)'
+press -k Return
+check "and Enter does nothing before a key has shown the cursor" control_is '.open and .page == "home"'
+press -k Right
+until_ok 1000 control_is '.cursorShown'
+check "the first arrow shows the cursor on Wi-Fi without moving it" control_is '.cursorShown and .cursor == "wifi"'
 press l
 until_ok 1000 cursor_is bluetooth
 check "from Wi-Fi, l focuses Bluetooth" cursor_is bluetooth
@@ -68,8 +74,13 @@ check "and Down lands on Brightness" cursor_is brightness
 
 press k
 press l
-press l
 until_ok 1000 cursor_is sound
+press -k Right
+until_ok 1000 cursor_is brightness
+check "Right on Sound, the end of its row, goes on to Brightness" cursor_is brightness
+press -k Left
+until_ok 1000 cursor_is sound
+check "and Left comes back to Sound" cursor_is sound
 press =
 until_ok 2000 volume_is 0.35
 check "= on Sound at 30% sets 35% ($(wpctl get-volume @DEFAULT_AUDIO_SINK@))" volume_is 0.35
@@ -119,6 +130,7 @@ press -k Escape
 until_ok 3000 at_rest
 
 open_control
+press h
 for _ in 1 2 3; do press j; done
 press l
 until_ok 1000 cursor_is lock
