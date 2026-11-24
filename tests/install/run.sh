@@ -175,7 +175,7 @@ done
 for tool in "delta --version" "difft --version" "tree --version" "yq --version" "glow --version" "gum --version" "tokei --version" "trash-put --version" "shellcheck --version" "gm version" "dig -v" "uv --version"; do
   check "'$tool' exits 0" as_user "$tool >/dev/null 2>&1"
 done
-for tool in "sd --version" "tv --version" "hurl --version" "sg --version" "usql --version" "bun --version"; do
+for tool in "sd --version" "tv --version" "hurl --version" "sg --version" "usql --version" "bun --version" "gcloud --version"; do
   check "'$tool' exits 0 through mise" as_user "mise exec -- $tool >/dev/null 2>&1"
 done
 check "rustup --version exits 0" as_user "~/.cargo/bin/rustup --version >/dev/null 2>&1"

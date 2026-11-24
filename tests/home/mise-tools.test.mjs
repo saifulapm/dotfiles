@@ -9,11 +9,12 @@ import { join } from 'node:path';
 const repo = new URL('../../', import.meta.url).pathname;
 const config = readFileSync(join(repo, 'home/dot_config/mise/config.toml'), 'utf8');
 
-test('mise declares pnpm, the shopify cli, cloudflared and goimapnotify', () => {
+test('mise declares pnpm, the shopify cli, cloudflared, goimapnotify and gcloud', () => {
   assert.match(config, /^"?aqua:pnpm\/pnpm"? = "/m);
   assert.match(config, /^"npm:@shopify\/cli" = "/m);
   assert.match(config, /^"aqua:cloudflare\/cloudflared" = "/m);
   assert.match(config, /^"go:gitlab\.com\/shackra\/goimapnotify\/cmd\/goimapnotify" = "2\.5\.8"/m);
+  assert.match(config, /^gcloud = "latest"$/m);
 });
 
 // Fedora 45 packages none of these six, so they come as prebuilt binaries from the aqua registry.
