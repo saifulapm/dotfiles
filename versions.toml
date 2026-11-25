@@ -13,14 +13,14 @@ sha256.x86_64 = "a02fe91d3304294048c681f010f1100856872a4e98ecf6927328e888d40a6ad
 
 [[pin]]
 name = "yt-dlp"
-version = "2026.10.26"
+version = "2026.11.23"
 repo = "yt-dlp/yt-dlp"
 install = "~/.local/bin/yt-dlp, replacing the rpm and v1's stale copy; Dekho's trailers run on it through mpv's ytdl hook"
 check = "yt-dlp --version"
 url.aarch64 = "https://github.com/yt-dlp/yt-dlp/releases/download/{version}/yt-dlp_linux_aarch64"
 url.x86_64 = "https://github.com/yt-dlp/yt-dlp/releases/download/{version}/yt-dlp_linux"
-sha256.aarch64 = "e87e9533e89fe5889abaa21f5114dfe7756d6aa6219b83551add04d48b18e483"
-sha256.x86_64 = "767ba9dce7052aa196f8b12652f433d76de128ba168966fa84b6394d5e6c6795"
+sha256.aarch64 = "fb847a2e4a9ddc8cf5fcfb4bb7f42ba8969ecf72068def0278074f9d300bd13c"
+sha256.x86_64 = "249ddb058234276bc449b9cd9492aad9f133bda5923c61a9e39983ae114ef17d"
 
 [[pin]]
 name = "maple-mono"
@@ -49,33 +49,33 @@ sha256 = "01172f37db8543edb102e5cb5c64101c9f4686630804d49b419aa07b23a69996"
 
 [[pin]]
 name = "kakoune"
-version = "f5ad4bfdb64c0df6b2c507103732a44234b0bb2a"
+version = "386d12bb97f20bdaca08dd75bb6084c182277a8a"
 repo = "saifulapm/kakoune"
 track = "commit"
 install = "~/.local/bin/kak and ~/.local/share/kak, built from source"
 check = "kak -version"
 url = "https://github.com/saifulapm/kakoune/archive/{version}.tar.gz"
-sha256 = "dfee3ae8ff4a4a5d671be032db8463f8b72798535183d2bdaf9331b22550cd7a"
+sha256 = "0abb40e829d77a9ba3d4bc19eae542b99aeb14717ec0bc19b7cd321cc08071c4"
 
 [[pin]]
 name = "amx"
-version = "b8c75a20ccb923fd2109d61fdace1c88c871201f"
+version = "c7a3a926d13be18fa1b3a0dc8419549f5a8bb661"
 repo = "saifulapm/amx"
 track = "commit"
 install = "~/.local/bin/amx, built with cargo"
 runs = "amx --version"
 url = "https://github.com/saifulapm/amx/archive/{version}.tar.gz"
-sha256 = "bff5098cf2e2208d5a52dcb79ab26a1022b4f86214ad00f495be05816ea5d43d"
+sha256 = "5c58ff5a3c28511e63848603387d091474a22478e45bf9ca23dd86356aba953f"
 
 [[pin]]
 name = "workflow"
-version = "2314f53c9d76e7df16e6a3b1cbfe4d55106fd92f"
+version = "a5e30ec37e9e3c1798d119b65db3c93188c40e67"
 repo = "saifulapm/workflow"
 track = "commit"
 install = "~/.local/bin/mem, ~/.local/bin/workflow and ~/.local/bin/hub, built with cargo"
 runs = "mem --version && workflow --version && hub --version"
 url = "https://github.com/saifulapm/workflow/archive/{version}.tar.gz"
-sha256 = "7b3689e329635d5f5bcafe9058a0b1e6485603ff313e7b751582e554d88b85e9"
+sha256 = "e05b82db4d2c96057338b493ed8ffa4a90384232405152436a05a5c629e6bd00"
 
 [[pin]]
 name = "pxy"
@@ -130,14 +130,14 @@ sha256.x86_64 = "0a23f429a95f0d09db298b3c291536d818de066aa5a85c255806f0490ff6656
 
 [[pin]]
 name = "satty"
-version = "0.22.0"
+version = "0.23.0"
 repo = "Satty-org/Satty"
 install = "~/.local/bin/satty"
 check = "satty --version"
 url.aarch64 = "https://github.com/Satty-org/Satty/releases/download/v{version}/satty-aarch64-unknown-linux-gnu.tar.gz"
 url.x86_64 = "https://github.com/Satty-org/Satty/releases/download/v{version}/satty-x86_64-unknown-linux-gnu.tar.gz"
-sha256.aarch64 = "814073f70e7e18390d826f8b60dc429fc904b3abd05f6cae2b00fb8c2b9ea44b"
-sha256.x86_64 = "eb7a028c4a5ce331c2f355add8e2b807a7d697fe4495f7e1965786a4f6bcd5b8"
+sha256.aarch64 = "b810ec7513f330be1062c39fbe612da767d90afa202396b193d8860ace51c7e7"
+sha256.x86_64 = "96bb0951186a86544d6815db88d89895a0f90927431b0a54dbc3d2da2785c1c2"
 
 [[pin]]
 name = "avd-fw"
@@ -159,12 +159,12 @@ sha256 = "8233a8bd4263bc570e5f90bbbc73e8e9b64687b1b1090f3ba6946323e88b6b4e"
 
 [[pin]]
 name = "kbd-light"
-version = "727076b83eb65b0162317a9e2fa0ba850df1f5ca"
+version = "05ca86feb70304a844a7b04aa6dc1dfda8e9b4f0"
 repo = "aurora-silicon/kbd-light"
 track = "commit"
 install = "/usr/bin/aurora-kbd-light and its system unit on the MacBook, the keyboard light following the room's light"
 url = "https://github.com/aurora-silicon/kbd-light/archive/{version}.tar.gz"
-sha256 = "9419eea57c51fd4ccf83fe764bb85c18f9054d684d21415d189fa46fe568e88c"
+sha256 = "cf81bdd0434621cad69332cdf6d263186f2275b4429502064a2928dd49dc5086"
 
 [[pin]]
 name = "elfeed-kak"
@@ -188,11 +188,11 @@ sha256 = "90de5e641854fb27c21cbad4aca3f8cf954e4ab355c266051c23e4202788c70d"
 
 [[pin]]
 name = "cliairplay"
-version = "0.5.14"
+version = "0.5.17"
 repo = "music-assistant/airplay-cli"
 install = "~/.local/bin/cliairplay on the mini, the office HomePod's AirPlay 2 sender"
 url = "https://github.com/music-assistant/airplay-cli/releases/download/v{version}/cliairplay-linux-aarch64"
-sha256 = "dfe8fb5143657d1ea741a8c66bc3dc659d35fc54dd5b80f60ae338d286e1b9e6"
+sha256 = "1caaa37c539b0f19d84c0d63170a4d6f112b4aed1002b5205d790d9a0a8d0fda"
 
 [[pin]]
 name = "scrcpy"
