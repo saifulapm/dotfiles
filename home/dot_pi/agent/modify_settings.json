@@ -31,6 +31,11 @@
 #                   run_onchange_after_27-pin-workflow
 #   theme "dots"    dots colorscheme writes ~/.pi/agent/themes/dots.json from the
 #                   current theme on every switch
+#   skills          symlink_skills points ~/.pi/agent/skills at ~/.claude/skills,
+#                   which holds every skill ~/.agents/skills does. pi also reads
+#                   ~/.agents/skills on its own, and the real folders `workflow
+#                   install` writes into both raise "collision" warnings at
+#                   startup, so that second read is switched off.
 set -euo pipefail
 
 managed=$(
@@ -50,7 +55,8 @@ managed=$(
   "fullscreenScrollbar": "hidden",
   "steeringMode": "all",
   "followUpMode": "all",
-  "defaultTools": ["bash", "edit", "write", "ls", "find", "grep", "read"]
+  "defaultTools": ["bash", "edit", "write", "ls", "find", "grep", "read"],
+  "skills": ["!~/.agents/skills/**"]
 }
 JSON
 )
