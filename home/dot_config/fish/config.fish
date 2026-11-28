@@ -18,6 +18,8 @@ set -gx ANDROID_HOME ~/Android/Sdk
 set -gx LG_CONFIG_FILE ~/.config/lazygit/config.yml,$HOME/.local/state/dots/theme-out/lazygit.yml
 # A login over SSH never reads environment.d, whose 80-claude-presence.conf names the same file.
 set -gx CLAUDE_CLIENT_PRESENCE_FILE $XDG_RUNTIME_DIR/dots-present
+# A login over SSH never reads environment.d, whose 85-agy.conf turns the Antigravity CLI's updater off the same way; dots update updates it.
+set -gx AGY_CLI_DISABLE_AUTO_UPDATE true
 # workflow go --cloud starts this claude, which picks the active Claude account and its cloud environment; dots secrets gives the local hub the same line.
 set -gx WORKFLOW_CLAUDE ~/.local/libexec/dots/claude
 

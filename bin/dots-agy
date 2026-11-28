@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# dots-agy: put the Antigravity CLI in ~/.local/bin, or replace it when its release manifest names another version. Google's install.sh reads the same manifest but then runs `agy install`, which appends a PATH line to every shell profile, fish's config in this repo among them. agy's own updater is off (environment.d and fish), so the apply's install and dots update both come here.
+set -euo pipefail
+
+die() {
+  echo "dots: $*" >&2
+  exit 1
+}
+
+main() {
+  local arch manifest version url sha bin tmp
+  case $(uname -m) in
+    aarch64) arch=arm64 ;;
+    x86_64) arch=amd64 ;;
+    *) die "the Antigravity CLI has no build for $(uname -m)" ;;
+  esac
+  manifest=$(curl -fsSL "https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/linux_$arch.json") || die "could not fetch the Antigravity CLI manifest"
+  if ! version=$(jq -er .version <<<"$manifest") || ! url=$(jq -er .url <<<"$manifest") || ! sha=$(jq -er .sha512 <<<"$manifest"); then
+    die "the Antigravity CLI manifest has no version, url or sha512"
+  fi
+
+  bin=$HOME/.local/bin/agy
+  if [[ -x $bin && $("$bin" --version 2>/dev/null) == "$version" ]]; then return 0; fi
+
+  tmp=$(mktemp -d -t dots-agy-XXXX)
+  # shellcheck disable=SC2064 # tmp is fixed now
+  trap "rm -rf '$tmp'" EXIT
+  curl -fsSL -o "$tmp/agy.tar.gz" "$url" || die "could not download the Antigravity CLI $version"
+  echo "$sha  $tmp/agy.tar.gz" | sha512sum -c --status || die "the Antigravity CLI $version download does not match its manifest's sha512"
+  tar -xzf "$tmp/agy.tar.gz" -C "$tmp" antigravity || die "the Antigravity CLI $version archive holds no antigravity binary"
+  mkdir -p "$HOME/.local/bin"
+  # A rename, so an agy already running keeps the binary it started from.
+  install -m 755 "$tmp/antigravity" "$bin.new" && mv -f "$bin.new" "$bin"
+}
+
+# git pull can rewrite this file while bash reads it, so main runs and exits on one line.
+main "$@"; exit

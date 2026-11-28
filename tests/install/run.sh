@@ -100,6 +100,8 @@ echo "--- first run"
 check "first dots install exits 0" dots_install
 installs=$(podman exec "$name" grep -c 'claude.ai/install.sh' "$curl_log")
 check "first run runs the Claude installer once (got $installs)" test "$installs" = 1
+installs=$(podman exec "$name" grep -c 'antigravity-cli-auto-updater.*/manifests/' "$curl_log")
+check "first run reads the Antigravity CLI manifest once (got $installs)" test "$installs" = 1
 
 target=$(podman exec "$name" readlink "$home/.config/quickshell")
 check "\$HOME/.config/quickshell links to $home/Codes/dotfiles/shell (got '$target')" \
@@ -163,6 +165,12 @@ wayvnc=$(as_user "wayvnc --version" 2>&1)
 check "wayvnc --version prints 0.9.1 (got '${wayvnc%%$'\n'*}')" grep -qx 'wayvnc: 0.9.1' <<<"$wayvnc"
 claude=$(as_user "claude --version" 2>&1)
 check "claude --version prints a version (got '$claude')" grep -qE '^[0-9]+\.[0-9]+\.[0-9]+' <<<"$claude"
+agy=$(as_user "agy --version" 2>&1)
+check "agy --version prints a version (got '$agy')" grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' <<<"$agy"
+check "agy's settings pin the terminal's colours" as_user "jq -e '.colorScheme == \"terminal\"' ~/.gemini/antigravity-cli/settings.json >/dev/null"
+for f in .bashrc .bash_profile .profile .config/fish/config.fish; do
+  check "\$HOME/$f names no Antigravity installer line" as_user "! grep -qs 'Antigravity CLI installer' ~/$f"
+done
 pi=$(as_user "fish -c 'pi --version'" 2>&1)
 # sort -V puts any word after a number, so the output must be a version before it is compared.
 check "pi --version prints 1.3.0 or newer (got '$pi')" bash -c "[[ \$1 =~ ^[0-9]+\.[0-9]+\.[0-9]+\$ && \$(printf '%s\n' 1.3.0 \"\$1\" | sort -V | head -n1) == 1.3.0 ]]" _ "$pi"
@@ -332,6 +340,8 @@ as_root ": > $curl_log"
 check "second dots install exits 0" dots_install
 installs=$(podman exec "$name" grep -c 'claude.ai/install.sh' "$curl_log")
 check "second run runs the Claude installer 0 times (got $installs)" test "$installs" = 0
+installs=$(podman exec "$name" grep -c 'antigravity-cli-auto-updater.*/manifests/' "$curl_log")
+check "second run reads the Antigravity CLI manifest 0 times (got $installs)" test "$installs" = 0
 after=$(snapshot)
 check "second run changes no file under $home or /etc" diff <(echo "$before") <(echo "$after")
 

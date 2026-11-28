@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dots update: pull the repo, dnf upgrade, pull the skills clone, chezmoi apply, mise up, claude update, then one summary line.
+# dots update: pull the repo, dnf upgrade, pull the skills clone, chezmoi apply, mise up, claude update, the Antigravity CLI's update, then one summary line.
 set -euo pipefail
 
 die() {
@@ -85,10 +85,22 @@ main() {
     fi
   fi
 
+  # The Antigravity CLI's own updater is off in environment.d and fish, so its updates come from here, as claude's do.
+  local agy='' bin=$HOME/.local/bin/agy
+  if [[ -x $bin ]]; then
+    was=$("$bin" --version 2>/dev/null || true)
+    if "$repo/bin/dots-agy"; then
+      now=$("$bin" --version 2>/dev/null || true)
+      if [[ $now != "$was" ]]; then agy=" · agy: $was → $now"; fi
+    else
+      agy=' · agy: update failed'
+    fi
+  fi
+
   local upgraded pins
   upgraded=$(comm -13 "$tmp/before" "$tmp/after" | wc -l)
   pins=$(grep -c '^dots: pin [^ ]* [^ ]*$' "$tmp/chezmoi" || true)
-  echo "dnf: $upgraded upgraded${snap:+ · snapshot: $snap} · pins: $pins changed$skills$mise$claude$(reboot_needed && echo ' · reboot: needed')"
+  echo "dnf: $upgraded upgraded${snap:+ · snapshot: $snap} · pins: $pins changed$skills$mise$claude$agy$(reboot_needed && echo ' · reboot: needed')"
 }
 
 # git pull can rewrite this file while bash reads it, so main runs and exits on one line.

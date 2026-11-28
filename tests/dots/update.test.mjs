@@ -23,7 +23,7 @@ const stub = (dir, name, body) => {
   chmodSync(join(dir, name), 0o755);
 };
 
-// opts.mise: fail to make mise up exit 1; the stub keeps the real mise out of every run. opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri; opts.fs: the root's filesystem type, ext4 unless named; opts.snapFail: btrfs fails to snapshot.
+// opts.mise: fail to make mise up exit 1; the stub keeps the real mise out of every run. opts.claude: claude's version before and after claude update, or fail to make it fail; the stub keeps the real claude out of every run. opts.agy: agy's version before and after bin/dots-agy, or fail to make it fail; without it home has no agy, and the clone's dots-agy is always a stub, so no run fetches the real one. opts.upgrade: dnf upgrade changes two packages; opts.chezmoi: what chezmoi apply prints; opts.hang: dnf upgrade never returns; opts.kernels: the modules dir's kernels, the booted one first; opts.niri: the pids pgrep reports for niri; opts.fs: the root's filesystem type, ext4 unless named; opts.snapFail: btrfs fails to snapshot.
 function scratch(opts = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), 'dots-update-')));
   const stubs = join(root, 'stubs');
@@ -40,6 +40,14 @@ function scratch(opts = {}) {
   sh(root, 'git clone -q origin.git seed 2>/dev/null');
   mkdirSync(join(root, 'seed/bin'));
   for (const f of ['dots', 'dots-update']) copyFileSync(join(bin, f), join(root, 'seed/bin', f));
+  const agy = Object.assign({ from: '1.5.16', to: '1.5.16', fail: false }, opts.agy);
+  const agyVersion = join(root, 'agy.version');
+  writeFileSync(agyVersion, agy.from);
+  writeFileSync(join(root, 'seed/bin/dots-agy'), `#!/bin/sh\necho dots-agy >> ${log}\n${agy.fail ? 'exit 1' : `echo ${agy.to} > ${agyVersion}`}\n`);
+  if (opts.agy) {
+    mkdirSync(join(root, '.local/bin'), { recursive: true });
+    writeFileSync(join(root, '.local/bin/agy'), `#!/bin/sh\ncat ${agyVersion}\n`, { mode: 0o755 });
+  }
   sh(join(root, 'seed'), `chmod +x bin/*; git add bin; ${GIT} commit -qm seed; git push -q origin HEAD:main`);
   sh(root, 'git clone -q origin.git repo');
 
@@ -188,6 +196,27 @@ test('update runs claude update after chezmoi apply and names the new version', 
   const order = lines(s.log).map((l) => l.split(' ').slice(0, 2).join(' '));
   assert.ok(order.indexOf('claude update') > order.indexOf('chezmoi apply'), order.join(', '));
   assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · claude: 2.1.303 → 2.1.310');
+});
+
+// agy's own updater is off, so dots update runs bin/dots-agy after claude update and names a new version.
+test('update runs dots-agy after claude update and names the new agy version', () => {
+  const s = scratch({ agy: { from: '1.5.16', to: '1.5.19' } });
+  const r = run(s);
+  assert.equal(r.status, 0, r.stderr);
+  assert.deepEqual(lines(s.log), ['dnf upgrade -y pulled=no', 'chezmoi apply', 'mise up', 'claude update', 'dots-agy']);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · agy: 1.5.16 → 1.5.19');
+});
+
+test('an agy already current adds nothing to the summary', () => {
+  const r = run(scratch({ agy: {} }));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed');
+});
+
+test('a failed agy update is named in the summary, and the update still succeeds', () => {
+  const r = run(scratch({ agy: { fail: true } }));
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim().split('\n').at(-1), 'dnf: 0 upgraded · pins: 0 changed · agy: update failed');
 });
 
 test('a failed claude update is named in the summary, and the update still succeeds', () => {

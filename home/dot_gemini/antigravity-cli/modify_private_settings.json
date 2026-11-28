@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# ~/.gemini/antigravity-cli/settings.json — a modify_ script, as pi's settings are, because agy writes this file itself (trustedWorkspaces, /config) and keeps it 0600: chezmoi writes a real file from the current one on stdin, so agy owns every key but the ones below.
+#
+# colorScheme takes only agy's built-in names, so no rendered colorscheme can reach it; "terminal" draws in foot's palette, which dots colorscheme recolours, so agy follows every switch. It is agy's default, and agy drops a key at its default when it saves, so after a run the file may not show it; the next apply writes it back, and a scheme picked in /config lasts only until then.
+set -euo pipefail
+
+managed='{"colorScheme": "terminal"}'
+
+# Empty stdin is a machine where agy has never run, so merge onto {}.
+current=$(cat)
+[ -n "$current" ] || current='{}'
+printf '%s' "$current" | jq --argjson managed "$managed" '. * $managed'
